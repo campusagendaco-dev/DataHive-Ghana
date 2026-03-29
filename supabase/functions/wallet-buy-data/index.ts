@@ -6,15 +6,16 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-const DATA_PROVIDER_BASE_URL = "https://backend.mycledanet.com";
-
 function mapNetworkToApi(network: string): string {
-  const map: Record<string, string> = {
-    "MTN": "MTN",
-    "Telecel": "TELECEL",
-    "AirtelTigo": "AIRTELTIGO_ISHARE",
-  };
-  return map[network] || network;
+  const normalized = network.trim().toUpperCase();
+  if (normalized === "AIRTELTIGO" || normalized === "AIRTEL TIGO") return "AIRTELTIGO";
+  if (normalized === "TELECEL" || normalized === "VODAFONE") return "TELECEL";
+  if (normalized === "MTN") return "MTN";
+  return normalized;
+}
+
+function formatDataPlan(packageSize: string): string {
+  return packageSize.replace(/\s+/g, "").toUpperCase();
 }
 
 serve(async (req) => {
@@ -25,8 +26,9 @@ serve(async (req) => {
   const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
   const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
   const DATA_PROVIDER_API_KEY = Deno.env.get("DATA_PROVIDER_API_KEY")?.trim();
+  const DATA_PROVIDER_BASE_URL = Deno.env.get("DATA_PROVIDER_BASE_URL")?.trim().replace(/\/+$/, "");
 
-  if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY || !DATA_PROVIDER_API_KEY) {
+  if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY || !DATA_PROVIDER_API_KEY || !DATA_PROVIDER_BASE_URL) {
     return new Response(JSON.stringify({ error: "Server misconfigured" }), {
       status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
@@ -100,20 +102,24 @@ serve(async (req) => {
       status: "paid",
     });
 
-    // Fulfill via API
-    let size = 0;
-    const gbMatch = package_size.match(/^(\d+(?:\.\d+)?)\s*GB$/i);
-    const mbMatch = package_size.match(/^(\d+(?:\.\d+)?)\s*MB$/i);
-    if (gbMatch) size = parseFloat(gbMatch[1]);
-    else if (mbMatch) size = parseFloat(mbMatch[1]) / 1000;
-
+    // Fulfill via API (DataBossHub format)
     const apiNetwork = mapNetworkToApi(network);
-    console.log("Wallet buy data:", { network, apiNetwork, package_size, size, customer_phone });
+    const dataPlan = formatDataPlan(package_size);
+    console.log("Wallet buy data:", { network, apiNetwork, package_size, dataPlan, customer_phone });
 
-    const fulfillRes = await fetch(`${DATA_PROVIDER_BASE_URL}/api/order`, {
+    const fulfillRes = await fetch(`${DATA_PROVIDER_BASE_URL}/api/v1/order`, {
       method: "POST",
-      headers: { "Content-Type": "application/json", "X-API-Key": DATA_PROVIDER_API_KEY },
-      body: JSON.stringify({ phone: customer_phone, size, network: apiNetwork }),
+      headers: {
+        "Content-Type": "application/json",
+        "Accept": "application/json",
+        "User-Agent": "DataBossHub-API-Client/1.0",
+        "X-API-KEY": DATA_PROVIDER_API_KEY,
+      },
+      body: JSON.stringify({
+        network: apiNetwork,
+        data_plan: dataPlan,
+        beneficiary: customer_phone,
+      }),
     });
 
     const fulfillText = await fulfillRes.text();

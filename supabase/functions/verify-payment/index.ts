@@ -7,12 +7,15 @@ const corsHeaders = {
 };
 
 function mapNetworkToApi(network: string): string {
-  const map: Record<string, string> = {
-    "MTN": "MTN",
-    "Telecel": "TELECEL",
-    "AirtelTigo": "AIRTELTIGO_ISHARE",
-  };
-  return map[network] || network;
+  const normalized = network.trim().toUpperCase();
+  if (normalized === "AIRTELTIGO" || normalized === "AIRTEL TIGO") return "AIRTELTIGO";
+  if (normalized === "TELECEL" || normalized === "VODAFONE") return "TELECEL";
+  if (normalized === "MTN") return "MTN";
+  return normalized;
+}
+
+function formatDataPlan(packageSize: string): string {
+  return packageSize.replace(/\s+/g, "").toUpperCase();
 }
 
 async function fetchWithRetry(url: string, options: RequestInit, maxAttempts = 3): Promise<Response> {
@@ -45,12 +48,11 @@ serve(async (req) => {
   const PAYSTACK_SECRET_KEY = Deno.env.get("PAYSTACK_SECRET_KEY");
   const DATA_PROVIDER_API_KEY_RAW = Deno.env.get("DATA_PROVIDER_API_KEY");
   const DATA_PROVIDER_API_KEY = DATA_PROVIDER_API_KEY_RAW?.trim();
+  const DATA_PROVIDER_BASE_URL = Deno.env.get("DATA_PROVIDER_BASE_URL")?.trim().replace(/\/+$/, "");
   const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
   const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
 
-  const DATA_PROVIDER_BASE_URL = "https://backend.mycledanet.com";
-
-  if (!PAYSTACK_SECRET_KEY || !SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
+  if (!PAYSTACK_SECRET_KEY || !SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY || !DATA_PROVIDER_BASE_URL) {
     return new Response(JSON.stringify({ error: "Server misconfigured" }), {
       status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
@@ -183,7 +185,12 @@ serve(async (req) => {
         `${DATA_PROVIDER_BASE_URL}/api/afa-registration`,
         {
           method: "POST",
-          headers: { "Content-Type": "application/json", "X-API-Key": DATA_PROVIDER_API_KEY },
+          headers: {
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+            "User-Agent": "DataBossHub-API-Client/1.0",
+            "X-API-KEY": DATA_PROVIDER_API_KEY,
+          },
           body: JSON.stringify(afaData),
         }
       );
@@ -210,21 +217,25 @@ serve(async (req) => {
       const customerPhone = order?.customer_phone || metadata.customer_phone;
 
       if (network && packageSize && customerPhone) {
-        let size = 0;
-        const gbMatch = packageSize.match(/^(\d+(?:\.\d+)?)\s*GB$/i);
-        const mbMatch = packageSize.match(/^(\d+(?:\.\d+)?)\s*MB$/i);
-        if (gbMatch) size = parseFloat(gbMatch[1]);
-        else if (mbMatch) size = parseFloat(mbMatch[1]) / 1000;
-
         const apiNetwork = mapNetworkToApi(network);
-        console.log("Fulfilling data order:", { network, apiNetwork, packageSize, size, customerPhone });
+        const dataPlan = formatDataPlan(packageSize);
+        console.log("Fulfilling data order:", { network, apiNetwork, packageSize, dataPlan, customerPhone });
 
         const fulfillRes = await fetchWithRetry(
-          `${DATA_PROVIDER_BASE_URL}/api/order`,
+          `${DATA_PROVIDER_BASE_URL}/api/v1/order`,
           {
             method: "POST",
-            headers: { "Content-Type": "application/json", "X-API-Key": DATA_PROVIDER_API_KEY },
-            body: JSON.stringify({ phone: customerPhone, size, network: apiNetwork }),
+            headers: {
+              "Content-Type": "application/json",
+              "Accept": "application/json",
+              "User-Agent": "DataBossHub-API-Client/1.0",
+              "X-API-KEY": DATA_PROVIDER_API_KEY,
+            },
+            body: JSON.stringify({
+              network: apiNetwork,
+              data_plan: dataPlan,
+              beneficiary: customerPhone,
+            }),
           }
         );
 

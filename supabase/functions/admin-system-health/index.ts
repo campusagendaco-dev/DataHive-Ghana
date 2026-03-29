@@ -109,6 +109,11 @@ serve(async (req) => {
         required_for: ["data/AFA fulfillment in verify-payment and webhook"],
       },
       {
+        key: "DATA_PROVIDER_BASE_URL",
+        present: !!Deno.env.get("DATA_PROVIDER_BASE_URL"),
+        required_for: ["data/AFA fulfillment endpoint host in verify-payment, webhook, and wallet-buy-data"],
+      },
+      {
         key: "TWILIO_ACCOUNT_SID",
         present: !!Deno.env.get("TWILIO_ACCOUNT_SID"),
         required_for: ["admin-send-sms"],
@@ -166,6 +171,7 @@ serve(async (req) => {
       "admin-user-actions",
       "admin-send-sms",
       "admin-system-health",
+      "maintenance-mode",
     ];
 
     const functionChecks: FunctionCheck[] = [];
