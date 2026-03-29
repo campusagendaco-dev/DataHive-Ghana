@@ -189,6 +189,7 @@ serve(async (req) => {
             "Content-Type": "application/json",
             "Accept": "application/json",
             "User-Agent": "DataBossHub-API-Client/1.0",
+            "X-API-Key": DATA_PROVIDER_API_KEY,
             "X-API-KEY": DATA_PROVIDER_API_KEY,
           },
           body: JSON.stringify(afaData),
@@ -229,6 +230,7 @@ serve(async (req) => {
               "Content-Type": "application/json",
               "Accept": "application/json",
               "User-Agent": "DataBossHub-API-Client/1.0",
+              "X-API-Key": DATA_PROVIDER_API_KEY,
               "X-API-KEY": DATA_PROVIDER_API_KEY,
             },
             body: JSON.stringify({
