@@ -4,18 +4,19 @@ import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Zap, ArrowRight, Eye, EyeOff, Store } from "lucide-react";
+import { ArrowRight, Eye, EyeOff, Store } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 const AuthAgent = () => {
   const [isSignUp, setIsSignUp] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [fullName, setFullName] = useState("");
   const [loading, setLoading] = useState(false);
-  const [resetLoading, setResetLoading] = useState(false);
+  const [oauthLoading, setOauthLoading] = useState<"google" | null>(null);
   const [showPassword, setShowPassword] = useState(false);
-  const { signUp, signIn, requestPasswordReset } = useAuth();
+  const { signUp, signIn, signInWithOAuth } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -29,6 +30,13 @@ const AuthAgent = () => {
         setLoading(false);
         return;
       }
+
+      if (password !== confirmPassword) {
+        toast({ title: "Passwords do not match", description: "Please re-enter both passwords.", variant: "destructive" });
+        setLoading(false);
+        return;
+      }
+
       const { error } = await signUp(email, password, fullName);
       if (error) {
         toast({ title: "Sign up failed", description: error.message, variant: "destructive" });
@@ -46,23 +54,23 @@ const AuthAgent = () => {
         navigate("/dashboard");
       }
     }
+
     setLoading(false);
   };
 
   const handleForgotPassword = async () => {
-    if (!email.trim()) {
-      toast({ title: "Enter your email first", description: "We need your email to send a reset link.", variant: "destructive" });
-      return;
-    }
+    const normalizedEmail = email.trim().toLowerCase();
+    const prefill = normalizedEmail ? `&email=${encodeURIComponent(normalizedEmail)}` : "";
+    navigate(`/forgot-password?role=agent${prefill}`);
+  };
 
-    setResetLoading(true);
-    const { error } = await requestPasswordReset(email, "/reset-password?role=agent");
+  const handleOAuthSignIn = async (provider: "google") => {
+    setOauthLoading(provider);
+    const { error } = await signInWithOAuth(provider, "/auth/callback?role=agent");
     if (error) {
-      toast({ title: "Could not send reset link", description: error.message, variant: "destructive" });
-    } else {
-      toast({ title: "Reset link sent", description: "Check your email and follow the link to set a new password." });
+      toast({ title: "Social sign in failed", description: error.message, variant: "destructive" });
+      setOauthLoading(null);
     }
-    setResetLoading(false);
   };
 
   return (
@@ -73,12 +81,12 @@ const AuthAgent = () => {
             <Store className="w-8 h-8 text-primary" />
           </div>
           <h1 className="font-display text-2xl font-bold mb-2">
-            {isSignUp ? "Create Agent Account" : "Agent Sign In"}
+            {isSignUp ? "Agent Sign Up" : "Agent Sign In"}
           </h1>
           <p className="text-muted-foreground text-sm">
             {isSignUp
-              ? "Sign up to start your data reselling business"
-              : "Sign in to access your agent dashboard"}
+              ? "Register with email to start your data reselling business"
+              : "Sign in with email to access your agent dashboard"}
           </p>
         </div>
 
@@ -97,6 +105,7 @@ const AuthAgent = () => {
                 />
               </div>
             )}
+
             <div>
               <Label htmlFor="email">Email</Label>
               <Input
@@ -109,6 +118,7 @@ const AuthAgent = () => {
                 required
               />
             </div>
+
             <div>
               <Label htmlFor="password">Password</Label>
               <div className="relative mt-1">
@@ -117,7 +127,7 @@ const AuthAgent = () => {
                   type={showPassword ? "text" : "password"}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  placeholder="••••••••"
+                  placeholder="********"
                   className="bg-secondary pr-10"
                   required
                   minLength={6}
@@ -134,29 +144,63 @@ const AuthAgent = () => {
                 <button
                   type="button"
                   onClick={handleForgotPassword}
-                  disabled={resetLoading}
                   className="mt-2 text-xs text-primary hover:underline disabled:opacity-70"
                 >
-                  {resetLoading ? "Sending reset link..." : "Forgot password?"}
+                  Forgot password?
                 </button>
               )}
             </div>
-            <Button type="submit" className="w-full" size="lg" disabled={loading}>
+
+            {isSignUp && (
+              <div>
+                <Label htmlFor="confirmPassword">Confirm Password</Label>
+                <Input
+                  id="confirmPassword"
+                  type={showPassword ? "text" : "password"}
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  placeholder="********"
+                  className="mt-1 bg-secondary"
+                  required
+                  minLength={6}
+                />
+              </div>
+            )}
+
+            <Button type="submit" className="w-full" size="lg" disabled={loading || !!oauthLoading}>
               {loading ? "Please wait..." : isSignUp ? "Create Agent Account" : "Sign In"}
               <ArrowRight className="ml-2 w-4 h-4" />
             </Button>
           </form>
+
+          <div className="my-5 flex items-center gap-3">
+            <div className="h-px flex-1 bg-border" />
+            <span className="text-xs text-muted-foreground">OR</span>
+            <div className="h-px flex-1 bg-border" />
+          </div>
+
+          <div className="space-y-2">
+            <Button
+              type="button"
+              variant="outline"
+              className="w-full"
+              disabled={!!oauthLoading || loading}
+              onClick={() => handleOAuthSignIn("google")}
+            >
+              {oauthLoading === "google" ? "Connecting Google..." : "Continue with Google"}
+            </Button>
+          </div>
 
           <div className="mt-6 text-center space-y-3">
             <button
               onClick={() => setIsSignUp(!isSignUp)}
               className="text-sm text-muted-foreground hover:text-primary transition-colors"
             >
-              {isSignUp ? "Already have an agent account? Sign in" : "Don't have an account? Sign up"}
+              {isSignUp ? "Already have an account? Sign in with email" : "Don't have an account? Sign up with email"}
             </button>
             <div className="border-t border-border pt-3">
               <Link to="/login" className="text-sm text-muted-foreground hover:text-primary transition-colors">
-                ← Not an agent? Sign in as a customer
+                Not an agent? Sign in as a customer
               </Link>
             </div>
           </div>

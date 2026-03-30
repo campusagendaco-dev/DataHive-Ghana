@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Verify OTP</title>
+    <style>
+      body { font-family: Arial, sans-serif; max-width: 440px; margin: 48px auto; padding: 0 16px; }
+      input, button { width: 100%; margin: 8px 0; padding: 10px; box-sizing: border-box; }
+      .error { color: #b00020; }
+      .ok { color: #0a7a28; }
+      .muted { color: #666; font-size: 14px; }
+    </style>
+  </head>
+  <body>
+    <h2>Verify Code</h2>
+    <p id="emailText" class="muted"></p>
+    <form id="verifyForm">
+      <input id="otp" type="text" inputmode="numeric" maxlength="6" placeholder="6-digit OTP" required />
+      <button type="submit">Verify OTP</button>
+    </form>
+    <p id="message"></p>
+
+    <script>
+      const messageEl = document.getElementById("message");
+      const email = new URLSearchParams(window.location.search).get("email");
+      const emailText = document.getElementById("emailText");
+
+      if (!email) {
+        emailText.textContent = "Missing email context. Start from forgot password page.";
+        document.getElementById("verifyForm").style.display = "none";
+      } else {
+        emailText.textContent = `We sent a code to ${email}`;
+      }
+
+      document.getElementById("verifyForm").addEventListener("submit", async (event) => {
+        event.preventDefault();
+        const otp = document.getElementById("otp").value.trim();
+        messageEl.className = "";
+
+        if (!/^\d{6}$/.test(otp)) {
+          messageEl.className = "error";
+          messageEl.textContent = "Enter a valid 6-digit code.";
+          return;
+        }
+
+        try {
+          const response = await fetch("/api/verify-otp", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ email, otp }),
+          });
+          const data = await response.json();
+
+          if (!response.ok) {
+            messageEl.className = "error";
+            messageEl.textContent = data.message || "OTP verification failed.";
+            return;
+          }
+
+          sessionStorage.setItem("resetToken", data?.data?.resetToken || "");
+          sessionStorage.setItem("resetEmail", email);
+          messageEl.className = "ok";
+          messageEl.textContent = "OTP verified. Redirecting to reset password...";
+          window.setTimeout(() => {
+            window.location.href = `/reset-password.html?email=${encodeURIComponent(email)}`;
+          }, 800);
+        } catch (_error) {
+          messageEl.className = "error";
+          messageEl.textContent = "Network error. Please try again.";
+        }
+      });
+    </script>
+  </body>
+</html>

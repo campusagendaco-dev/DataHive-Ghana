@@ -2,7 +2,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, Navigate, useLocation, useNavigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { AuthProvider, useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
@@ -21,6 +21,10 @@ import DashboardWithdraw from "./pages/DashboardWithdraw";
 import DashboardWallet from "./pages/DashboardWallet";
 import DashboardSettings from "./pages/DashboardSettings";
 import AuthUser from "./pages/AuthUser";
+import AuthAgent from "./pages/AuthAgent";
+import AuthCallback from "./pages/AuthCallback";
+import ForgotPassword from "./pages/ForgotPassword";
+import VerifyOtp from "./pages/VerifyOtp";
 import ResetPassword from "./pages/ResetPassword";
 import Onboarding from "./pages/Onboarding";
 import AgentPending from "./pages/AgentPending";
@@ -88,9 +92,8 @@ const PendingGuard = ({ children }: { children: React.ReactNode }) => {
 };
 
 const AppContent = () => {
-  const { isAdmin: isAdminUser, loading: authLoading } = useAuth();
+  const { user, isAdmin: isAdminUser, loading: authLoading } = useAuth();
   const location = useLocation();
-  const navigate = useNavigate();
   const [maintenance, setMaintenance] = useState<{ is_enabled: boolean; message: string }>({
     is_enabled: false,
     message: "",
@@ -101,60 +104,50 @@ const AppContent = () => {
     let mounted = true;
 
     const loadMaintenance = async () => {
-      const { data, error } = await supabase
-        .from("maintenance_settings" as any)
-        .select("is_enabled, message")
-        .eq("id", 1)
-        .maybeSingle();
+      try {
+        const maintenanceResult = await Promise.race([
+          supabase.functions.invoke("maintenance-mode", {
+            body: { action: "get" },
+          }),
+          new Promise<never>((_, reject) => {
+            window.setTimeout(() => reject(new Error("maintenance-timeout")), 6000);
+          }),
+        ]);
+        const { data, error } = maintenanceResult as { data: any; error: any };
 
-      if (!mounted) return;
+        if (!mounted) return;
 
-      if (error) {
+        if (error) {
+          setMaintenance({ is_enabled: false, message: "" });
+        } else if (data && !(data as any).error) {
+          setMaintenance({
+            is_enabled: Boolean((data as any).is_enabled),
+            message: String((data as any).message || ""),
+          });
+        } else {
+          setMaintenance({ is_enabled: false, message: "" });
+        }
+      } catch {
+        if (!mounted) return;
         setMaintenance({ is_enabled: false, message: "" });
-      } else if (data) {
-        setMaintenance({
-          is_enabled: Boolean((data as any).is_enabled),
-          message: String((data as any).message || ""),
-        });
-      } else {
-        setMaintenance({ is_enabled: false, message: "" });
+      } finally {
+        if (mounted) setMaintenanceLoading(false);
       }
-
-      setMaintenanceLoading(false);
     };
 
     loadMaintenance();
+    const firstLoadSafetyTimeout = window.setTimeout(() => {
+      if (mounted) setMaintenanceLoading(false);
+    }, 7000);
 
-    const channel = supabase
-      .channel("maintenance-settings-live")
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "maintenance_settings" },
-        () => {
-          loadMaintenance();
-        },
-      )
-      .subscribe();
+    const interval = window.setInterval(loadMaintenance, 30000);
 
     return () => {
       mounted = false;
-      supabase.removeChannel(channel);
+      window.clearTimeout(firstLoadSafetyTimeout);
+      window.clearInterval(interval);
     };
   }, []);
-
-  useEffect(() => {
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((event) => {
-      if (event === "PASSWORD_RECOVERY") {
-        navigate("/reset-password", { replace: true });
-      }
-    });
-
-    return () => {
-      subscription.unsubscribe();
-    };
-  }, [navigate]);
 
   const isDashboard = location.pathname.startsWith("/dashboard");
   const isAdmin = location.pathname.startsWith("/admin");
@@ -164,26 +157,13 @@ const AppContent = () => {
     location.pathname === "/login" ||
     location.pathname === "/agent/login" ||
     location.pathname === "/reset-password" ||
+    location.pathname === "/auth/callback" ||
     location.pathname === "/auth";
-  const searchParams = new URLSearchParams(location.search);
-  const hashParams = new URLSearchParams(location.hash.replace(/^#/, ""));
-  const isRecoveryLink =
-    hashParams.get("type") === "recovery" ||
-    searchParams.get("type") === "recovery" ||
-    !!searchParams.get("token_hash") ||
-    !!searchParams.get("code");
-
   if (authLoading || maintenanceLoading) {
     return <div className="min-h-screen flex items-center justify-center text-muted-foreground">Loading...</div>;
   }
 
-  // If Supabase recovery link lands on any route other than /reset-password,
-  // force redirect so user always sees the password change form.
-  if (isRecoveryLink && location.pathname !== "/reset-password") {
-    return <Navigate to={`/reset-password${location.search || ""}${location.hash || ""}`} replace />;
-  }
-
-  if (maintenance.is_enabled && !isAdminUser && !isMaintenanceBypassRoute) {
+  if (maintenance.is_enabled && !user && !isAdminUser && !isMaintenanceBypassRoute) {
     return <Maintenance message={maintenance.message} />;
   }
 
@@ -200,7 +180,10 @@ const AppContent = () => {
 
         {/* Auth pages */}
         <Route path="/login" element={<AuthUser />} />
-        <Route path="/agent/login" element={<Navigate to="/login" replace />} />
+        <Route path="/agent/login" element={<AuthAgent />} />
+        <Route path="/auth/callback" element={<AuthCallback />} />
+        <Route path="/forgot-password" element={<ForgotPassword />} />
+        <Route path="/verify-otp" element={<VerifyOtp />} />
         <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="/auth" element={<Navigate to="/login" replace />} />
 

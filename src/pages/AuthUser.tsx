@@ -11,11 +11,12 @@ const AuthUser = () => {
   const [isSignUp, setIsSignUp] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [fullName, setFullName] = useState("");
   const [loading, setLoading] = useState(false);
-  const [resetLoading, setResetLoading] = useState(false);
+  const [oauthLoading, setOauthLoading] = useState<"google" | null>(null);
   const [showPassword, setShowPassword] = useState(false);
-  const { signUp, signIn, requestPasswordReset } = useAuth();
+  const { signUp, signIn, signInWithOAuth } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -26,6 +27,11 @@ const AuthUser = () => {
     if (isSignUp) {
       if (!fullName.trim()) {
         toast({ title: "Please enter your full name", variant: "destructive" });
+        setLoading(false);
+        return;
+      }
+      if (password !== confirmPassword) {
+        toast({ title: "Passwords do not match", description: "Please re-enter both passwords.", variant: "destructive" });
         setLoading(false);
         return;
       }
@@ -51,19 +57,18 @@ const AuthUser = () => {
   };
 
   const handleForgotPassword = async () => {
-    if (!email.trim()) {
-      toast({ title: "Enter your email first", description: "We need your email to send a reset link.", variant: "destructive" });
-      return;
-    }
+    const normalizedEmail = email.trim().toLowerCase();
+    const prefill = normalizedEmail ? `&email=${encodeURIComponent(normalizedEmail)}` : "";
+    navigate(`/forgot-password?role=user${prefill}`);
+  };
 
-    setResetLoading(true);
-    const { error } = await requestPasswordReset(email, "/reset-password?role=user");
+  const handleOAuthSignIn = async (provider: "google") => {
+    setOauthLoading(provider);
+    const { error } = await signInWithOAuth(provider, "/auth/callback?role=user");
     if (error) {
-      toast({ title: "Could not send reset link", description: error.message, variant: "destructive" });
-    } else {
-      toast({ title: "Reset link sent", description: "Check your email and follow the link to set a new password." });
+      toast({ title: "Social sign in failed", description: error.message, variant: "destructive" });
+      setOauthLoading(null);
     }
-    setResetLoading(false);
   };
 
   return (
@@ -75,12 +80,12 @@ const AuthUser = () => {
             <span className="font-display text-2xl font-bold">QuickData GH</span>
           </div>
           <h1 className="font-display text-2xl font-bold mb-2">
-            {isSignUp ? "Create Your Account" : "Welcome Back"}
+            {isSignUp ? "Sign Up" : "Sign In"}
           </h1>
           <p className="text-muted-foreground text-sm">
             {isSignUp
-              ? "Sign up to start buying affordable data bundles"
-              : "Sign in to your account to buy data"}
+              ? "Register with your email to start buying affordable data bundles"
+              : "Sign in with your email to buy data quickly"}
           </p>
         </div>
 
@@ -136,25 +141,57 @@ const AuthUser = () => {
                 <button
                   type="button"
                   onClick={handleForgotPassword}
-                  disabled={resetLoading}
                   className="mt-2 text-xs text-primary hover:underline disabled:opacity-70"
                 >
-                  {resetLoading ? "Sending reset link..." : "Forgot password?"}
+                  Forgot password?
                 </button>
               )}
             </div>
-            <Button type="submit" className="w-full" size="lg" disabled={loading}>
+            {isSignUp && (
+              <div>
+                <Label htmlFor="confirmPassword">Confirm Password</Label>
+                <Input
+                  id="confirmPassword"
+                  type={showPassword ? "text" : "password"}
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  placeholder="********"
+                  className="mt-1 bg-secondary"
+                  required
+                  minLength={6}
+                />
+              </div>
+            )}
+            <Button type="submit" className="w-full" size="lg" disabled={loading || !!oauthLoading}>
               {loading ? "Please wait..." : isSignUp ? "Create Account" : "Sign In"}
               <ArrowRight className="ml-2 w-4 h-4" />
             </Button>
           </form>
+
+          <div className="my-5 flex items-center gap-3">
+            <div className="h-px flex-1 bg-border" />
+            <span className="text-xs text-muted-foreground">OR</span>
+            <div className="h-px flex-1 bg-border" />
+          </div>
+
+          <div className="space-y-2">
+            <Button
+              type="button"
+              variant="outline"
+              className="w-full"
+              disabled={!!oauthLoading || loading}
+              onClick={() => handleOAuthSignIn("google")}
+            >
+              {oauthLoading === "google" ? "Connecting Google..." : "Continue with Google"}
+            </Button>
+          </div>
 
           <div className="mt-6 text-center space-y-3">
             <button
               onClick={() => setIsSignUp(!isSignUp)}
               className="text-sm text-muted-foreground hover:text-primary transition-colors"
             >
-              {isSignUp ? "Already have an account? Sign in" : "Don't have an account? Sign up"}
+              {isSignUp ? "Already have an account? Sign in with email" : "Don't have an account? Sign up with email"}
             </button>
             <div className="border-t border-border pt-3">
               <Link to="/agent-program" className="text-sm text-primary hover:underline">
