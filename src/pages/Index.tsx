@@ -11,9 +11,9 @@ const networks = [
 const features = [
   { icon: Zap, title: "Instant Delivery", desc: "Data delivered to any number in seconds, 24/7." },
   { icon: Shield, title: "Secure Payments", desc: "Mobile money & bank payments, fully encrypted." },
-  { icon: Users, title: "Agent Platform", desc: "Become an agent, set your prices, earn profits." },
+  { icon: Users, title: "Reseller Platform", desc: "Become a reseller, set your prices, and earn profits." },
   { icon: Globe, title: "All Networks", desc: "MTN, Telecel & AirtelTigo supported." },
-  { icon: TrendingUp, title: "Agent Dashboard", desc: "Track sales, manage sub-agents, grow your business." },
+  { icon: TrendingUp, title: "Reseller Dashboard", desc: "Track sales, set margins, and grow your business." },
 ];
 
 const Index = () => (
@@ -29,14 +29,14 @@ const Index = () => (
           Buy Data for <span className="text-gradient">All Networks</span> <br />in Ghana — Instantly
         </h1>
         <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto mb-8 animate-fade-in" style={{ animationDelay: "0.2s" }}>
-          Affordable data bundles for MTN, Telecel & AirtelTigo. Become an agent and earn by reselling with your own branded platform.
+          Affordable data bundles for MTN, Telecel & AirtelTigo. Become a reseller and earn by selling with your own branded platform.
         </p>
         <div className="flex flex-col sm:flex-row gap-4 justify-center animate-fade-in" style={{ animationDelay: "0.3s" }}>
           <Button size="lg" asChild>
             <Link to="/buy-data">Buy Data Now <ArrowRight className="ml-2 w-4 h-4" /></Link>
           </Button>
           <Button size="lg" variant="outline" asChild>
-            <Link to="/agent-program">Become an Agent</Link>
+            <Link to="/agent-program">Become a Reseller</Link>
           </Button>
         </div>
 
@@ -80,9 +80,9 @@ const Index = () => (
       <div className="container mx-auto">
         <div className="bg-card border border-border rounded-2xl p-8 md:p-14 text-center glow-yellow">
           <h2 className="font-display text-3xl md:text-4xl font-bold mb-4">Ready to Start Selling Data?</h2>
-          <p className="text-muted-foreground mb-8 max-w-md mx-auto">Join hundreds of agents earning daily profits by reselling data bundles across Ghana.</p>
+          <p className="text-muted-foreground mb-8 max-w-md mx-auto">Join resellers earning daily profits by selling data bundles across Ghana.</p>
           <Button size="lg" asChild>
-            <Link to="/agent-program">Start as an Agent <ArrowRight className="ml-2 w-4 h-4" /></Link>
+            <Link to="/agent-program">Start as a Reseller <ArrowRight className="ml-2 w-4 h-4" /></Link>
           </Button>
         </div>
       </div>

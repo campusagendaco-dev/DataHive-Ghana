@@ -43,8 +43,8 @@ serve(async (req) => {
     const agentId = user.id;
     const { amount } = await req.json();
 
-    if (!amount || amount < 10) {
-      return new Response(JSON.stringify({ error: "Minimum withdrawal amount is GH₵10.00" }), {
+    if (!amount || amount < 100) {
+      return new Response(JSON.stringify({ error: "Minimum withdrawal amount is GHS 100.00" }), {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
@@ -87,7 +87,7 @@ serve(async (req) => {
     const availableBalance = parseFloat((totalProfit - totalWithdrawn).toFixed(2));
 
     if (amount > availableBalance) {
-      return new Response(JSON.stringify({ error: `Insufficient balance. Available: GH₵${availableBalance.toFixed(2)}` }), {
+      return new Response(JSON.stringify({ error: `Insufficient balance. Available: GHS ${availableBalance.toFixed(2)}` }), {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
@@ -111,3 +111,5 @@ serve(async (req) => {
     });
   }
 });
+
+

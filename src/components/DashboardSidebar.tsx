@@ -6,7 +6,7 @@ import { cn } from "@/lib/utils";
 const navItems = [
   { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { to: "/dashboard/orders", label: "Orders", icon: ClipboardList },
-  { to: "/dashboard/wallet", label: "Wallet", icon: CreditCard },
+  { to: "/dashboard/wallet", label: "Reseller Wallet", icon: CreditCard },
   { to: "/dashboard/withdraw", label: "Withdrawals", icon: Wallet },
   { to: "/dashboard/pricing", label: "Store Pricing", icon: Store },
   { to: "/dashboard/afa", label: "AFA Bundle", icon: UserPlus },

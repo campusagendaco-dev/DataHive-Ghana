@@ -26,3 +26,6 @@ verify_jwt = false
 
 [functions.admin-system-health]
 verify_jwt = false
+
+[functions.maintenance-mode]
+verify_jwt = false

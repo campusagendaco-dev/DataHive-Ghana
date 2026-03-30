@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Outlet, Link, useLocation } from "react-router-dom";
+import { Outlet, Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { LayoutDashboard, Users, ShieldCheck, ShoppingCart, LogOut, Zap, Menu, Wallet, Bell, Package, CreditCard, Activity } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -21,6 +21,13 @@ const navItems = [
 const SidebarContent = ({ onNavigate }: { onNavigate?: () => void }) => {
   const { signOut } = useAuth();
   const location = useLocation();
+  const navigate = useNavigate();
+
+  const handleSignOut = async () => {
+    await signOut();
+    onNavigate?.();
+    navigate("/login", { replace: true });
+  };
 
   return (
     <div className="flex flex-col h-full">
@@ -54,7 +61,7 @@ const SidebarContent = ({ onNavigate }: { onNavigate?: () => void }) => {
         <Button
           variant="ghost"
           className="w-full justify-start text-sidebar-foreground/70"
-          onClick={signOut}
+          onClick={handleSignOut}
         >
           <LogOut className="w-4 h-4 mr-2" />
           Sign Out

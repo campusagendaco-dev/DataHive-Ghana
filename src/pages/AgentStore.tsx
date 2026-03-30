@@ -39,7 +39,7 @@ interface GlobalPkgSetting {
 }
 
 const AgentStore = () => {
-  const AGENT_STORE_SETTLEMENT_MODE: "automatic" | "manual" = "automatic";
+  const RESELLER_STORE_SETTLEMENT_MODE: "automatic" | "manual" = "automatic";
   const { slug } = useParams<{ slug: string }>();
   const { toast } = useToast();
   const [agent, setAgent] = useState<AgentProfile | null>(null);
@@ -52,8 +52,6 @@ const AgentStore = () => {
   const [menuOpen, setMenuOpen] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [pendingOrder, setPendingOrder] = useState<{ network: string; size: string; basePrice: number } | null>(null);
-  const [agentWalletBalance, setAgentWalletBalance] = useState<number | null>(null);
-  const [walletInsufficient, setWalletInsufficient] = useState(false);
   const [globalSettings, setGlobalSettings] = useState<Record<string, GlobalPkgSetting>>({});
 
   useEffect(() => {
@@ -65,6 +63,7 @@ const AgentStore = () => {
           .eq("slug", slug)
           .eq("is_agent", true)
           .eq("onboarding_complete", true)
+          .eq("agent_approved", true)
           .maybeSingle(),
         supabase
           .from("global_package_settings")
@@ -80,12 +79,6 @@ const AgentStore = () => {
         setNotFound(true);
       } else {
         setAgent(agentRes.data as AgentProfile);
-        const { data: walletData } = await supabase
-          .from("wallets")
-          .select("balance")
-          .eq("agent_id", agentRes.data.user_id)
-          .maybeSingle();
-        setAgentWalletBalance(walletData?.balance ?? 0);
       }
       setLoading(false);
     };
@@ -144,14 +137,6 @@ const AgentStore = () => {
   };
 
   const handleBuyClick = (network: string, size: string, basePrice: number) => {
-    // In manual mode, agent wallet must be pre-funded before customer checkout.
-    if (
-      AGENT_STORE_SETTLEMENT_MODE === "manual" &&
-      (agentWalletBalance === null || agentWalletBalance < basePrice)
-    ) {
-      setWalletInsufficient(true);
-      return;
-    }
     setPendingOrder({ network, size, basePrice });
     setConfirmOpen(true);
   };
@@ -212,8 +197,8 @@ const AgentStore = () => {
           agent_id: agent.user_id,
           base_price: basePrice,
           payment_source: "agent_store",
-          deduct_agent_wallet: true,
-          wallet_settlement_mode: AGENT_STORE_SETTLEMENT_MODE,
+          deduct_agent_wallet: false,
+          wallet_settlement_mode: RESELLER_STORE_SETTLEMENT_MODE,
         },
       },
     });
@@ -408,29 +393,6 @@ const AgentStore = () => {
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Wallet Insufficient Dialog */}
-      <AlertDialog open={walletInsufficient} onOpenChange={setWalletInsufficient}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle className="flex items-center gap-2">
-              <AlertTriangle className="w-5 h-5 text-destructive" />
-              Store Temporarily Unavailable
-            </AlertDialogTitle>
-            <AlertDialogDescription>
-              This store is currently unable to process orders. Please contact the store owner for assistance.
-              {agent.support_number && (
-                <span className="block mt-2">
-                  Support: <a href={`tel:${agent.support_number}`} className="text-primary font-medium">{agent.support_number}</a>
-                </span>
-              )}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogAction onClick={() => setWalletInsufficient(false)}>OK</AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
       {/* Footer */}
       <footer className="border-t border-border bg-card/30 py-6">
         <div className="container mx-auto max-w-3xl px-4">
@@ -454,7 +416,7 @@ const AgentStore = () => {
               </span>
             </div>
             <div className="text-xs text-muted-foreground/60">
-              Developed by Bensarfo Tech
+              Developed by OB CodeLab
             </div>
           </div>
         </div>

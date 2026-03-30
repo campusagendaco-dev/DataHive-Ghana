@@ -8,8 +8,14 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Wallet, ArrowDownToLine, Loader2, CheckCircle, XCircle, Clock } from "lucide-react";
 import {
-  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
-  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 
 interface Withdrawal {
@@ -19,6 +25,8 @@ interface Withdrawal {
   failure_reason: string | null;
   created_at: string;
 }
+
+const MIN_WITHDRAWAL = 100;
 
 const statusConfig: Record<string, { icon: typeof CheckCircle; color: string; label: string }> = {
   completed: { icon: CheckCircle, color: "bg-green-500/20 text-green-400 border-green-500/30", label: "Completed" },
@@ -61,15 +69,17 @@ const DashboardWithdraw = () => {
     setLoading(false);
   }, [user]);
 
-  useEffect(() => { fetchData(); }, [fetchData]);
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
 
   const handleWithdraw = async () => {
     setConfirmOpen(false);
     setWithdrawing(true);
 
     const numAmount = parseFloat(amount);
-    if (isNaN(numAmount) || numAmount < 10) {
-      toast({ title: "Minimum withdrawal is GH₵10.00", variant: "destructive" });
+    if (isNaN(numAmount) || numAmount < MIN_WITHDRAWAL) {
+      toast({ title: `Minimum withdrawal is GHS ${MIN_WITHDRAWAL.toFixed(2)}`, variant: "destructive" });
       setWithdrawing(false);
       return;
     }
@@ -102,7 +112,7 @@ const DashboardWithdraw = () => {
             <Wallet className="w-4 h-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <p className="font-display text-2xl font-bold">GH₵{totalProfit.toFixed(2)}</p>
+            <p className="font-display text-2xl font-bold">GHS {totalProfit.toFixed(2)}</p>
           </CardContent>
         </Card>
         <Card>
@@ -111,7 +121,7 @@ const DashboardWithdraw = () => {
             <ArrowDownToLine className="w-4 h-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <p className="font-display text-2xl font-bold">GH₵{totalWithdrawn.toFixed(2)}</p>
+            <p className="font-display text-2xl font-bold">GHS {totalWithdrawn.toFixed(2)}</p>
           </CardContent>
         </Card>
         <Card className="border-primary/30 bg-primary/5">
@@ -120,15 +130,16 @@ const DashboardWithdraw = () => {
             <Wallet className="w-4 h-4 text-primary" />
           </CardHeader>
           <CardContent>
-            <p className="font-display text-2xl font-bold text-primary">GH₵{availableBalance.toFixed(2)}</p>
+            <p className="font-display text-2xl font-bold text-primary">GHS {availableBalance.toFixed(2)}</p>
           </CardContent>
         </Card>
       </div>
 
-      {/* MoMo Details */}
       {profile && (
         <Card>
-          <CardHeader><CardTitle className="text-lg">Your MoMo Details</CardTitle></CardHeader>
+          <CardHeader>
+            <CardTitle className="text-lg">Your MoMo Details</CardTitle>
+          </CardHeader>
           <CardContent className="space-y-2 text-sm">
             <div className="flex justify-between"><span className="text-muted-foreground">Name</span><span className="font-medium">{profile.momo_account_name || "Not set"}</span></div>
             <div className="flex justify-between"><span className="text-muted-foreground">Number</span><span className="font-medium">{profile.momo_number || "Not set"}</span></div>
@@ -138,24 +149,37 @@ const DashboardWithdraw = () => {
       )}
 
       <Card>
-        <CardHeader><CardTitle className="text-lg">Request Withdrawal</CardTitle></CardHeader>
+        <CardHeader>
+          <CardTitle className="text-lg">Request Withdrawal</CardTitle>
+        </CardHeader>
         <CardContent>
           <div className="flex flex-col sm:flex-row gap-3">
             <div className="flex-1">
               <Input
-                type="number" step="0.01" min="10" max={availableBalance}
-                placeholder={`Amount (min GH₵10.00, max GH₵${availableBalance.toFixed(2)})`}
-                value={amount} onChange={(e) => setAmount(e.target.value)} className="bg-secondary"
+                type="number"
+                step="0.01"
+                min={MIN_WITHDRAWAL}
+                max={availableBalance}
+                placeholder={`Amount (min GHS ${MIN_WITHDRAWAL.toFixed(2)}, max GHS ${availableBalance.toFixed(2)})`}
+                value={amount}
+                onChange={(e) => setAmount(e.target.value)}
+                className="bg-secondary"
               />
             </div>
             <Button
               onClick={() => {
                 const n = parseFloat(amount);
-                if (isNaN(n) || n < 10) { toast({ title: "Minimum withdrawal is GH₵10.00", variant: "destructive" }); return; }
-                if (n > availableBalance) { toast({ title: "Amount exceeds available balance", variant: "destructive" }); return; }
+                if (isNaN(n) || n < MIN_WITHDRAWAL) {
+                  toast({ title: `Minimum withdrawal is GHS ${MIN_WITHDRAWAL.toFixed(2)}`, variant: "destructive" });
+                  return;
+                }
+                if (n > availableBalance) {
+                  toast({ title: "Amount exceeds available balance", variant: "destructive" });
+                  return;
+                }
                 setConfirmOpen(true);
               }}
-              disabled={withdrawing || availableBalance < 10}
+              disabled={withdrawing || availableBalance < MIN_WITHDRAWAL}
               className="gap-2"
             >
               {withdrawing ? <Loader2 className="w-4 h-4 animate-spin" /> : <ArrowDownToLine className="w-4 h-4" />}
@@ -167,7 +191,9 @@ const DashboardWithdraw = () => {
       </Card>
 
       <Card>
-        <CardHeader><CardTitle className="text-lg">Withdrawal History</CardTitle></CardHeader>
+        <CardHeader>
+          <CardTitle className="text-lg">Withdrawal History</CardTitle>
+        </CardHeader>
         <CardContent>
           {withdrawals.length === 0 ? (
             <p className="text-muted-foreground text-sm text-center py-6">No withdrawals yet.</p>
@@ -181,9 +207,9 @@ const DashboardWithdraw = () => {
                     <div className="flex items-center gap-3">
                       <Icon className={`w-4 h-4 ${w.status === "processing" ? "animate-spin" : ""} ${config.color.split(" ")[1]}`} />
                       <div>
-                        <p className="font-medium text-sm">GH₵{w.amount.toFixed(2)}</p>
+                        <p className="font-medium text-sm">GHS {w.amount.toFixed(2)}</p>
                         <p className="text-xs text-muted-foreground">
-                          {new Date(w.created_at).toLocaleDateString()} · {new Date(w.created_at).toLocaleTimeString()}
+                          {new Date(w.created_at).toLocaleDateString()} - {new Date(w.created_at).toLocaleTimeString()}
                         </p>
                         {w.failure_reason && <p className="text-xs text-destructive mt-0.5">{w.failure_reason}</p>}
                       </div>
@@ -202,7 +228,7 @@ const DashboardWithdraw = () => {
           <AlertDialogHeader>
             <AlertDialogTitle>Confirm Withdrawal Request</AlertDialogTitle>
             <AlertDialogDescription>
-              You are requesting <span className="font-bold text-foreground">GH₵{parseFloat(amount || "0").toFixed(2)}</span> to be sent to your MoMo ({profile?.momo_number}). This will be processed within 24 hours.
+              You are requesting <span className="font-bold text-foreground">GHS {parseFloat(amount || "0").toFixed(2)}</span> to be sent to your MoMo ({profile?.momo_number}).
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

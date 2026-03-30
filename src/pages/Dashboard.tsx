@@ -136,15 +136,15 @@ const Dashboard = () => {
         </div>
       )}
 
-      {/* Topup Reference */}
+      {/* Optional wallet reference */}
       <div className="bg-card border border-border rounded-xl p-5 mb-8 flex flex-col sm:flex-row sm:items-center gap-4">
         <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-primary/10 shrink-0">
           <Hash className="w-5 h-5 text-primary" />
         </div>
         <div className="flex-1">
-          <h3 className="font-display font-semibold text-sm">Your Topup Reference</h3>
+          <h3 className="font-display font-semibold text-sm">Optional Wallet Topup Reference</h3>
           <p className="font-display text-2xl font-bold tracking-[0.3em] text-primary">{topupReference}</p>
-          <p className="text-xs text-muted-foreground">Use this code when sending MoMo for wallet top-up</p>
+          <p className="text-xs text-muted-foreground">Reseller sales do not require wallet funding. This is only for optional wallet top-up.</p>
         </div>
         <Button variant="outline" size="sm" onClick={copyReference}>
           <Copy className="w-4 h-4 mr-1" /> Copy

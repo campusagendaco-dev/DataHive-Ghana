@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
+import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -43,7 +44,8 @@ const AuthAgent = () => {
       } else {
         const { error: signInError } = await signIn(email, password);
         if (!signInError) {
-          navigate("/onboarding");
+          await supabase.from("profiles").update({ is_agent: true }).eq("email", email.trim().toLowerCase());
+          navigate("/agent/pending");
         }
       }
     } else {
@@ -51,7 +53,7 @@ const AuthAgent = () => {
       if (error) {
         toast({ title: "Sign in failed", description: error.message, variant: "destructive" });
       } else {
-        navigate("/dashboard");
+        navigate("/agent/pending");
       }
     }
 

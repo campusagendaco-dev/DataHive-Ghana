@@ -37,7 +37,7 @@ const Footer = () =>
       </div>
       <div className="border-t border-border mt-8 pt-6 text-center text-sm text-muted-foreground">
         <p>(c) 2026 QuickData GH. All rights reserved.</p>
-        <p className="mt-1">Developed by Bensarfo Tech</p>
+        <p className="mt-1">Developed by OB CodeLab</p>
       </div>
     </div>
   </footer>;

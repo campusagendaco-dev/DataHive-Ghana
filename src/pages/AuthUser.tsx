@@ -195,7 +195,7 @@ const AuthUser = () => {
             </button>
             <div className="border-t border-border pt-3">
               <Link to="/agent-program" className="text-sm text-primary hover:underline">
-                Want to become an agent? Click here
+                Want to become a reseller? Click here
               </Link>
             </div>
           </div>

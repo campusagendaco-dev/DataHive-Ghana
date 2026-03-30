@@ -1,29 +1,41 @@
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { MessageCircle, Clock, CheckCircle, LogOut } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 
 const ADMIN_WHATSAPP = "+233203256540";
 const APPROVAL_PAYMENT_NUMBER = "0547116139";
 const APPROVAL_PAYMENT_NAME = "Samuel Owusu Bensarfo Kofi";
-const APPROVAL_PAYMENT_AMOUNT = "GHS 30";
+const APPROVAL_PAYMENT_AMOUNT = "GHS 50";
 const WHATSAPP_MESSAGE = encodeURIComponent(
-  `Hello, I have signed up as an agent on QuickData GH and paid ${APPROVAL_PAYMENT_AMOUNT} to ${APPROVAL_PAYMENT_NUMBER} (${APPROVAL_PAYMENT_NAME}). Please approve my account. Thank you!`
+  `Hello, I have signed up as a reseller on QuickData GH and paid ${APPROVAL_PAYMENT_AMOUNT} to ${APPROVAL_PAYMENT_NUMBER} (${APPROVAL_PAYMENT_NAME}). Please approve my reseller account. Thank you!`
 );
 
 const AgentPending = () => {
   const { profile, signOut, refreshProfile } = useAuth();
+  const navigate = useNavigate();
+  const approvedButSetupIncomplete = Boolean(profile?.agent_approved && !profile?.onboarding_complete);
+
+  const handleSignOut = async () => {
+    await signOut();
+    navigate("/login", { replace: true });
+  };
 
   return (
     <div className="min-h-screen pt-24 pb-16 px-4 flex items-center justify-center">
       <div className="w-full max-w-md text-center">
         <Clock className="w-16 h-16 text-primary mx-auto mb-6" />
-        <h1 className="font-display text-2xl font-bold mb-3">Account Pending Approval</h1>
+        <h1 className="font-display text-2xl font-bold mb-3">
+          {approvedButSetupIncomplete ? "Approval Granted" : "Reseller Account Pending Approval"}
+        </h1>
         <p className="text-muted-foreground mb-8">
-          Your agent account has been created successfully.
-          To get approved, please make payment and contact customer service.
+          {approvedButSetupIncomplete
+            ? "Your reseller request is approved. Click check status to continue with setup."
+            : "Your reseller account request has been created successfully. To get approved, please make payment and contact customer service."}
         </p>
 
-        <div className="bg-card border border-border rounded-2xl p-6 mb-6 glow-yellow">
+        {!approvedButSetupIncomplete && (
+          <div className="bg-card border border-border rounded-2xl p-6 mb-6 glow-yellow">
           <div className="text-sm text-left space-y-2 mb-4">
             <p className="text-muted-foreground">Approval steps:</p>
             <p>1. Send <span className="font-semibold">{APPROVAL_PAYMENT_AMOUNT}</span> to <span className="font-semibold">{APPROVAL_PAYMENT_NUMBER}</span>.</p>
@@ -44,14 +56,15 @@ const AgentPending = () => {
           <p className="text-xs text-muted-foreground mt-3">
             {ADMIN_WHATSAPP}
           </p>
-        </div>
+          </div>
+        )}
 
         <div className="space-y-3">
           <Button variant="outline" onClick={refreshProfile} className="w-full">
             <CheckCircle className="w-4 h-4 mr-2" />
             Check Approval Status
           </Button>
-          <Button variant="ghost" onClick={signOut} className="w-full text-muted-foreground">
+          <Button variant="ghost" onClick={handleSignOut} className="w-full text-muted-foreground">
             <LogOut className="w-4 h-4 mr-2" />
             Sign Out
           </Button>

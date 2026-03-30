@@ -51,14 +51,44 @@ const AdminSystemHealth = () => {
   const [loading, setLoading] = useState(true);
   const [health, setHealth] = useState<HealthResponse | null>(null);
 
+  const callHealthFunction = async () => {
+    const { data: sessionData } = await supabase.auth.getSession();
+    const accessToken = sessionData.session?.access_token;
+    if (!accessToken) {
+      return {
+        data: null,
+        error: { message: "Not authenticated. Please sign in again." },
+      };
+    }
+
+    return supabase.functions.invoke("admin-system-health", {
+      body: {},
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+    });
+  };
+
   const loadHealth = async () => {
     setLoading(true);
-    const { data, error } = await supabase.functions.invoke("admin-system-health", { body: {} });
+    let result = await callHealthFunction();
+
+    if (result.error) {
+      // Retry once for transient edge-function network failures.
+      await new Promise((resolve) => window.setTimeout(resolve, 600));
+      result = await callHealthFunction();
+    }
+
+    const { data, error } = result;
 
     if (error || data?.error) {
+      const description =
+        data?.error ||
+        error?.message ||
+        "Could not load system health. Ensure the admin-system-health function is deployed.";
       toast({
         title: "Health check failed",
-        description: data?.error || error?.message || "Could not load system health.",
+        description,
         variant: "destructive",
       });
       setHealth(null);

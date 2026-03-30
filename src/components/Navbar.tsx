@@ -14,7 +14,7 @@ const Navbar = () => {
     { to: "/", label: "Home" },
     { to: "/buy-data", label: "Buy Data" },
     { to: "/afa-bundles", label: "AFA Bundle" },
-    { to: "/agent-program", label: "Become an Agent" },
+    { to: "/agent-program", label: "Become a Reseller" },
     ...(user && profile?.is_agent ? [{ to: "/dashboard", label: "Dashboard" }] : []),
     ...(user && isAdmin ? [{ to: "/admin", label: "Admin" }] : []),
   ];

@@ -22,13 +22,13 @@ const AdminOverview = () => {
       const [ordersRes, profilesRes, maintenanceRes] = await Promise.all([
         supabase.from("orders").select("id, amount, status"),
         supabase.from("profiles").select("id, is_agent, agent_approved, onboarding_complete"),
-        supabase.from("maintenance_settings" as any).select("is_enabled, message").eq("id", 1).maybeSingle(),
+        supabase.functions.invoke("maintenance-mode", { body: { action: "get" } }),
       ]);
 
       const orders = ordersRes.data || [];
       const profiles = profilesRes.data || [];
-      const maintenanceRow = maintenanceRes.data as { is_enabled?: boolean; message?: string } | null;
-      const maintenanceError = maintenanceRes.error;
+      const maintenanceRow = maintenanceRes.data as { is_enabled?: boolean; message?: string; table_ready?: boolean; error?: string } | null;
+      const maintenanceError = maintenanceRes.error || maintenanceRow?.error;
 
       setStats({
         totalOrders: orders.length,
@@ -42,7 +42,7 @@ const AdminOverview = () => {
       if (maintenanceError) {
         setMaintenanceTableReady(false);
       } else if (maintenanceRow) {
-        setMaintenanceTableReady(true);
+        setMaintenanceTableReady(Boolean(maintenanceRow.table_ready ?? true));
         setMaintenanceEnabled(!!maintenanceRow.is_enabled);
         setMaintenanceMessage(
           maintenanceRow.message?.trim() || "We are performing scheduled maintenance. Please check back soon.",
@@ -65,22 +65,37 @@ const AdminOverview = () => {
     }
 
     setSavingMaintenance(true);
-    const { error } = await supabase
-      .from("maintenance_settings" as any)
-      .upsert({
-        id: 1,
+    const { data: sessionData } = await supabase.auth.getSession();
+    const accessToken = sessionData.session?.access_token;
+    if (!accessToken) {
+      toast({
+        title: "Not authenticated",
+        description: "Please sign in again and retry saving maintenance mode.",
+        variant: "destructive",
+      });
+      setSavingMaintenance(false);
+      return;
+    }
+
+    const { data, error } = await supabase.functions.invoke("maintenance-mode", {
+      body: {
+        action: "set",
         is_enabled: maintenanceEnabled,
         message: maintenanceMessage.trim() || "We are performing scheduled maintenance. Please check back soon.",
-        updated_at: new Date().toISOString(),
-      });
+      },
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+    });
 
-    if (error) {
-      const isMissingTable = error.message.toLowerCase().includes("maintenance_settings");
+    if (error || data?.error) {
+      const detail = (data?.error as string | undefined) || error?.message || "Unknown error";
+      const isMissingTable = detail.toLowerCase().includes("maintenance_settings");
       toast({
         title: "Failed to save maintenance mode",
         description: isMissingTable
           ? "Table public.maintenance_settings is missing. Run the latest migration and refresh."
-          : error.message,
+          : detail,
         variant: "destructive",
       });
     } else {

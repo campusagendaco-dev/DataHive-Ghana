@@ -49,7 +49,7 @@ const AdminAgents = () => {
     if (error) {
       toast({ title: "Failed to approve", description: error.message, variant: "destructive" });
     } else {
-      toast({ title: "Agent approved ✅" });
+      toast({ title: "Reseller approved" });
       fetchAgents();
     }
   };
@@ -63,19 +63,19 @@ const AdminAgents = () => {
     if (error) {
       toast({ title: "Failed to revoke", description: error.message, variant: "destructive" });
     } else {
-      toast({ title: "Agent access revoked" });
+      toast({ title: "Reseller access revoked" });
       fetchAgents();
     }
   };
 
-  if (loading) return <div className="text-muted-foreground">Loading agents...</div>;
+  if (loading) return <div className="text-muted-foreground">Loading resellers...</div>;
 
   return (
     <div>
-      <h1 className="font-display text-2xl font-bold mb-6">Agent Management</h1>
+      <h1 className="font-display text-2xl font-bold mb-6">Reseller Management</h1>
 
       {agents.length === 0 ? (
-        <p className="text-muted-foreground">No agents registered yet.</p>
+        <p className="text-muted-foreground">No resellers registered yet.</p>
       ) : (
         <div className="bg-card border border-border rounded-xl overflow-hidden">
           <div className="overflow-x-auto">
@@ -115,7 +115,7 @@ const AdminAgents = () => {
                       )}
                     </td>
                     <td className="p-4">
-                      {agent.onboarding_complete && !agent.agent_approved && (
+                      {!agent.agent_approved && (
                         <Button size="sm" onClick={() => handleApprove(agent.user_id)}>
                           Approve
                         </Button>
@@ -138,3 +138,4 @@ const AdminAgents = () => {
 };
 
 export default AdminAgents;
+

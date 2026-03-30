@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from "react";
-import { User, Session } from "@supabase/supabase-js";
+import { User, Session, Provider } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 
 export interface Profile {
@@ -32,6 +32,7 @@ interface AuthContextType {
   isAdmin: boolean;
   signUp: (email: string, password: string, fullName: string) => Promise<{ error: any }>;
   signIn: (email: string, password: string) => Promise<{ error: any }>;
+  signInWithOAuth: (provider: Provider, redirectPath?: string) => Promise<{ error: any }>;
   requestPasswordReset: (email: string, redirectPath?: string) => Promise<{ error: any }>;
   updatePassword: (password: string) => Promise<{ error: any }>;
   signOut: () => Promise<void>;
@@ -46,7 +47,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
-  const appBaseUrl = (import.meta.env.VITE_SITE_URL as string | undefined)?.trim() || window.location.origin;
+  const envSiteUrl = (import.meta.env.VITE_SITE_URL as string | undefined)?.trim();
+  const isLocalDevHost =
+    window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
+  const appBaseUrl = isLocalDevHost ? window.location.origin : (envSiteUrl || window.location.origin);
 
   const fetchProfile = async (userId: string) => {
     const { data } = await supabase
@@ -74,34 +78,58 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   useEffect(() => {
+    let mounted = true;
+    const loadingSafetyTimeout = window.setTimeout(() => {
+      if (mounted) setLoading(false);
+    }, 7000);
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (_event, session) => {
-        setSession(session);
-        setUser(session?.user ?? null);
-        if (session?.user) {
-          setTimeout(() => {
-            fetchProfile(session.user.id);
-            checkAdminRole(session.user.id);
-          }, 0);
-        } else {
-          setProfile(null);
-          setIsAdmin(false);
+        try {
+          if (!mounted) return;
+          setSession(session);
+          setUser(session?.user ?? null);
+          if (session?.user) {
+            // Fetch profile/roles in background so sign-in UX is not blocked by network latency.
+            void Promise.all([
+              fetchProfile(session.user.id),
+              checkAdminRole(session.user.id),
+            ]).catch((error) => {
+              console.error("Background auth profile refresh failed:", error);
+            });
+          } else {
+            setProfile(null);
+            setIsAdmin(false);
+          }
+        } finally {
+          if (mounted) setLoading(false);
         }
-        setLoading(false);
       }
     );
 
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      if (session?.user) {
-        fetchProfile(session.user.id);
-        checkAdminRole(session.user.id);
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
+      try {
+        if (!mounted) return;
+        setSession(session);
+        setUser(session?.user ?? null);
+        if (session?.user) {
+          void Promise.all([
+            fetchProfile(session.user.id),
+            checkAdminRole(session.user.id),
+          ]).catch((error) => {
+            console.error("Initial auth profile refresh failed:", error);
+          });
+        }
+      } finally {
+        if (mounted) setLoading(false);
       }
-      setLoading(false);
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      mounted = false;
+      window.clearTimeout(loadingSafetyTimeout);
+      subscription.unsubscribe();
+    };
   }, []);
 
   const signUp = async (email: string, password: string, fullName: string) => {
@@ -121,6 +149,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     return { error };
   };
 
+  const signInWithOAuth = async (provider: Provider, redirectPath = "/auth/callback") => {
+    const normalizedPath = redirectPath.startsWith("/") ? redirectPath : `/${redirectPath}`;
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider,
+      options: {
+        redirectTo: `${appBaseUrl}${normalizedPath}`,
+      },
+    });
+    return { error };
+  };
+
   const requestPasswordReset = async (email: string, redirectPath = "/reset-password") => {
     const normalizedPath = redirectPath.startsWith("/") ? redirectPath : `/${redirectPath}`;
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
@@ -135,13 +174,23 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const signOut = async () => {
-    await supabase.auth.signOut();
-    setProfile(null);
-    setIsAdmin(false);
+    try {
+      await Promise.race([
+        supabase.auth.signOut({ scope: "local" }),
+        new Promise((resolve) => window.setTimeout(resolve, 5000)),
+      ]);
+    } catch (error) {
+      console.error("signOut error:", error);
+    } finally {
+      setSession(null);
+      setUser(null);
+      setProfile(null);
+      setIsAdmin(false);
+    }
   };
 
   return (
-    <AuthContext.Provider value={{ user, session, profile, loading, isAdmin, signUp, signIn, requestPasswordReset, updatePassword, signOut, refreshProfile }}>
+    <AuthContext.Provider value={{ user, session, profile, loading, isAdmin, signUp, signIn, signInWithOAuth, requestPasswordReset, updatePassword, signOut, refreshProfile }}>
       {children}
     </AuthContext.Provider>
   );

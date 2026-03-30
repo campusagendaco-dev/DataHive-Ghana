@@ -18,8 +18,6 @@ const DashboardWallet = () => {
   const [availableProfit, setAvailableProfit] = useState(0);
   const [loading, setLoading] = useState(true);
   const [copied, setCopied] = useState(false);
-  const [topupAmount, setTopupAmount] = useState("");
-  const [toppingUp, setToppingUp] = useState(false);
 
   // Buy data form
   const [selectedNetwork, setSelectedNetwork] = useState("");
@@ -110,34 +108,6 @@ const DashboardWallet = () => {
 
   const totalPaystack = selectedPkg ? Math.round((selectedPkg.price + paystackFee) * 100) / 100 : 0;
 
-  const handlePaystackTopup = async () => {
-    const amount = parseFloat(topupAmount);
-    if (isNaN(amount) || amount < 1) {
-      toast({ title: "Enter a valid top-up amount", description: "Minimum is GHS 1.00", variant: "destructive" });
-      return;
-    }
-
-    setToppingUp(true);
-    const { data, error } = await supabase.functions.invoke("wallet-topup", {
-      body: {
-        amount,
-        callback_url: `${window.location.origin}/dashboard/wallet`,
-      },
-    });
-
-    if (error || data?.error || !data?.authorization_url) {
-      toast({
-        title: "Top-up failed",
-        description: data?.error || error?.message || "Could not initialize Paystack payment.",
-        variant: "destructive",
-      });
-      setToppingUp(false);
-      return;
-    }
-
-    window.location.href = data.authorization_url;
-  };
-
   const handleBuyData = async () => {
     if (!selectedNetwork || !selectedPackage || !customerPhone || !selectedPkg) {
       toast({ title: "Fill in all fields", variant: "destructive" });
@@ -227,7 +197,10 @@ const DashboardWallet = () => {
 
   return (
     <div className="space-y-6 p-6 md:p-8 max-w-4xl">
-      <h1 className="font-display text-2xl font-bold">Wallet</h1>
+      <h1 className="font-display text-2xl font-bold">Reseller Wallet</h1>
+      <p className="text-sm text-muted-foreground -mt-3">
+        Reseller store orders do not require pre-funding. Wallet is optional for your own dashboard purchases and top-ups.
+      </p>
 
       {/* Balance + Topup Reference */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -291,34 +264,6 @@ const DashboardWallet = () => {
               After sending, the admin will verify and credit your wallet.
             </p>
           </div>
-        </CardContent>
-      </Card>
-
-      {/* Paystack Top Up */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg">Instant Wallet Top-Up (Paystack)</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          <div>
-            <Label>Top-up Amount (GHS)</Label>
-            <Input
-              type="number"
-              min="1"
-              step="0.01"
-              placeholder="e.g. 50.00"
-              value={topupAmount}
-              onChange={(e) => setTopupAmount(e.target.value)}
-              className="bg-secondary mt-1 max-w-xs"
-            />
-          </div>
-          <Button onClick={handlePaystackTopup} disabled={toppingUp || !topupAmount} className="gap-2">
-            {toppingUp ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
-            Top Up with Paystack
-          </Button>
-          <p className="text-xs text-muted-foreground">
-            You will be redirected to Paystack. Wallet will be credited automatically after successful payment.
-          </p>
         </CardContent>
       </Card>
 

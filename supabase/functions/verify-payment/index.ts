@@ -18,6 +18,21 @@ function formatDataPlan(packageSize: string): string {
   return packageSize.replace(/\s+/g, "").toUpperCase();
 }
 
+function normalizeProviderFailure(rawText: string | null | undefined, fallback: string): string {
+  const text = (rawText || "").trim();
+  if (!text) return fallback;
+  const lower = text.toLowerCase();
+  if (
+    lower.includes("<!doctype html") ||
+    lower.includes("<html") ||
+    lower.includes("cf_chl_opt") ||
+    lower.includes("just a moment")
+  ) {
+    return "Provider blocked server request (Cloudflare challenge). Contact DataBossHub support to whitelist API traffic.";
+  }
+  return text;
+}
+
 async function fetchWithRetry(url: string, options: RequestInit, maxAttempts = 3): Promise<Response> {
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
@@ -203,7 +218,7 @@ serve(async (req) => {
         await supabase.from("orders").update({ status: "fulfilled" }).eq("id", reference);
         fulfilled = true;
       } else {
-        const reason = fulfillText || "AFA registration failed";
+        const reason = normalizeProviderFailure(fulfillText, "AFA registration failed");
         await supabase.from("orders").update({ status: "fulfillment_failed", failure_reason: reason }).eq("id", reference);
       }
     } else {
@@ -248,7 +263,13 @@ serve(async (req) => {
           await supabase.from("orders").update({ status: "fulfilled" }).eq("id", reference);
           fulfilled = true;
         } else {
-          const reason = JSON.parse(fulfillText)?.message || fulfillText || "Data delivery failed";
+          let reason = fulfillText || "Data delivery failed";
+          try {
+            reason = JSON.parse(fulfillText)?.message || reason;
+          } catch {
+            // Keep plain-text provider response as failure reason.
+          }
+          reason = normalizeProviderFailure(reason, "Data delivery failed");
           console.error("Fulfillment failed. Status:", fulfillRes.status, "Body:", fulfillText);
           await supabase.from("orders").update({ status: "fulfillment_failed", failure_reason: reason }).eq("id", reference);
         }

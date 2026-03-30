@@ -5,7 +5,9 @@ type ApiResult<T = any> = {
   message: string;
 };
 
-const BASE_URL = "http://localhost:3000";
+const BASE_URL =
+  (import.meta.env.VITE_AUTH_API_BASE_URL as string | undefined)?.trim().replace(/\/+$/, "") ||
+  "http://localhost:3000";
 
 export const callPasswordResetApi = async <T = any>(endpoint: string, data: Record<string, any>): Promise<ApiResult<T>> => {
   try {

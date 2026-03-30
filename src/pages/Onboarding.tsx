@@ -63,7 +63,7 @@ const Onboarding = () => {
       toast({ title: "Error saving details", description: error.message, variant: "destructive" });
     } else {
       await refreshProfile();
-      toast({ title: "Details saved! 🎉", description: "Now contact admin on WhatsApp to get approved." });
+      toast({ title: "Details saved!", description: "Now pay GHS 50 and contact admin on WhatsApp for reseller approval." });
       navigate("/agent/pending");
     }
     setLoading(false);
@@ -76,7 +76,7 @@ const Onboarding = () => {
           <div className="flex items-center justify-center gap-2 mb-4">
             <Store className="w-8 h-8 text-primary" />
           </div>
-          <h1 className="font-display text-2xl font-bold mb-2">Set Up Your Agent Store</h1>
+          <h1 className="font-display text-2xl font-bold mb-2">Set Up Your Reseller Store</h1>
           <p className="text-muted-foreground text-sm">
             Tell us a bit about your business so we can create your branded website.
           </p>
@@ -187,7 +187,7 @@ const Onboarding = () => {
               />
             </div>
             <Button type="submit" className="w-full" size="lg" disabled={loading}>
-              {loading ? "Setting up..." : "Create My Agent Store"}
+              {loading ? "Setting up..." : "Create My Reseller Store"}
               <ArrowRight className="ml-2 w-4 h-4" />
             </Button>
           </form>

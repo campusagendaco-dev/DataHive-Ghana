@@ -35,8 +35,9 @@ app.get("/health", (_req, res) => {
 mongoose
   .connect(process.env.MONGODB_URI)
   .then(() => {
-    app.listen(process.env.PORT || 3000, () => {
-      console.log(`Auth backend running on http://localhost:${process.env.PORT || 3000}`);
+    const port = Number(process.env.PORT || 3000);
+    app.listen(port, "0.0.0.0", () => {
+      console.log(`Auth backend running on http://0.0.0.0:${port}`);
     });
   })
   .catch((error) => {
