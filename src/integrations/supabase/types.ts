@@ -238,6 +238,51 @@ export type Database = {
         }
         Relationships: []
       }
+      system_settings: {
+        Row: {
+          auto_api_switch: boolean
+          backup_provider: string
+          customer_service_number: string
+          dark_mode_enabled: boolean
+          disable_ordering: boolean
+          holiday_message: string
+          holiday_mode_enabled: boolean
+          id: number
+          preferred_provider: string
+          support_channel_link: string | null
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          auto_api_switch?: boolean
+          backup_provider?: string
+          customer_service_number?: string
+          dark_mode_enabled?: boolean
+          disable_ordering?: boolean
+          holiday_message?: string
+          holiday_mode_enabled?: boolean
+          id?: number
+          preferred_provider?: string
+          support_channel_link?: string | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          auto_api_switch?: boolean
+          backup_provider?: string
+          customer_service_number?: string
+          dark_mode_enabled?: boolean
+          disable_ordering?: boolean
+          holiday_message?: string
+          holiday_mode_enabled?: boolean
+          id?: number
+          preferred_provider?: string
+          support_channel_link?: string | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           id: string

@@ -1,6 +1,8 @@
 import { ArrowRight, Shield, Zap, Users, Globe, TrendingUp, Signal, MessageCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
 
 const networks = [
   { name: "MTN", color: "#FFCC00" },
@@ -16,8 +18,22 @@ const features = [
   { icon: TrendingUp, title: "Reseller Dashboard", desc: "Track sales, set margins, and grow your business." },
 ];
 
-const Index = () => (
-  <div className="min-h-screen">
+const Index = () => {
+  const [supportChannelLink, setSupportChannelLink] = useState("https://whatsapp.com/channel/0029Vb6Xwed60eBaztkH2B3m");
+
+  useEffect(() => {
+    const loadSupportLink = async () => {
+      const { data } = await supabase.functions.invoke("system-settings", {
+        body: { action: "get" },
+      });
+      const link = String((data as any)?.support_channel_link || "").trim();
+      if (link) setSupportChannelLink(link);
+    };
+    loadSupportLink();
+  }, []);
+
+  return (
+    <div className="min-h-screen">
     {/* Hero */}
     <section className="relative pt-32 pb-20 px-4 overflow-hidden">
       <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,hsl(48_100%_50%/0.06),transparent_60%)]" />
@@ -90,7 +106,7 @@ const Index = () => (
 
     {/* Floating WhatsApp Button */}
     <a
-      href="https://whatsapp.com/channel/0029Vb6Xwed60eBaztkH2B3m"
+      href={supportChannelLink}
       target="_blank"
       rel="noopener noreferrer"
       className="fixed bottom-6 right-6 z-50 flex items-center gap-2 bg-[#25D366] hover:bg-[#1da851] text-white font-semibold px-5 py-3 rounded-full shadow-lg hover:shadow-xl transition-all duration-300 animate-fade-in"
@@ -99,7 +115,8 @@ const Index = () => (
       <span className="hidden sm:inline">Join WhatsApp Channel</span>
       <span className="sm:hidden">WhatsApp</span>
     </a>
-  </div>
-);
+    </div>
+  );
+};
 
 export default Index;

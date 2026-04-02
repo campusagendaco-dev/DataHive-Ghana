@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
+import { getFunctionErrorMessage } from "@/lib/function-errors";
 import { Loader2, RefreshCw } from "lucide-react";
 
 type SecretCheck = {
@@ -52,13 +53,26 @@ const AdminSystemHealth = () => {
   const [health, setHealth] = useState<HealthResponse | null>(null);
 
   const callHealthFunction = async () => {
-    const { data: sessionData } = await supabase.auth.getSession();
-    const accessToken = sessionData.session?.access_token;
-    if (!accessToken) {
+    // Force a user check first so Supabase can refresh stale tokens.
+    const { data: userData } = await supabase.auth.getUser();
+    if (!userData.user) {
       return {
         data: null,
         error: { message: "Not authenticated. Please sign in again." },
       };
+    }
+
+    const { data: sessionData } = await supabase.auth.getSession();
+    let accessToken = sessionData.session?.access_token;
+    if (!accessToken) {
+      const { data: refreshed } = await supabase.auth.refreshSession();
+      accessToken = refreshed.session?.access_token;
+      if (!accessToken) {
+        return {
+          data: null,
+          error: { message: "Not authenticated. Please sign in again." },
+        };
+      }
     }
 
     return supabase.functions.invoke("admin-system-health", {
@@ -82,10 +96,23 @@ const AdminSystemHealth = () => {
     const { data, error } = result;
 
     if (error || data?.error) {
-      const description =
-        data?.error ||
-        error?.message ||
-        "Could not load system health. Ensure the admin-system-health function is deployed.";
+      // If unauthorized, force one token refresh and retry once more.
+      const initialMessage = data?.error || error?.message || "";
+      if (initialMessage.toLowerCase().includes("unauthorized")) {
+        await supabase.auth.refreshSession();
+        result = await callHealthFunction();
+      }
+    }
+
+    const finalData = result.data;
+    const finalError = result.error;
+
+    if (finalError || finalData?.error) {
+      const parsed = await getFunctionErrorMessage(
+        finalError,
+        "Could not load system health. Ensure the admin-system-health function is deployed.",
+      );
+      const description = finalData?.error || parsed;
       toast({
         title: "Health check failed",
         description,
@@ -96,7 +123,7 @@ const AdminSystemHealth = () => {
       return;
     }
 
-    setHealth(data as HealthResponse);
+    setHealth(finalData as HealthResponse);
     setLoading(false);
   };
 

@@ -2,19 +2,33 @@ import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { MessageCircle, Clock, CheckCircle, LogOut } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
 
-const ADMIN_WHATSAPP = "+233203256540";
+const DEFAULT_ADMIN_WHATSAPP = "+233203256540";
 const APPROVAL_PAYMENT_NUMBER = "0547116139";
 const APPROVAL_PAYMENT_NAME = "Samuel Owusu Bensarfo Kofi";
 const APPROVAL_PAYMENT_AMOUNT = "GHS 50";
-const WHATSAPP_MESSAGE = encodeURIComponent(
-  `Hello, I have signed up as a reseller on QuickData GH and paid ${APPROVAL_PAYMENT_AMOUNT} to ${APPROVAL_PAYMENT_NUMBER} (${APPROVAL_PAYMENT_NAME}). Please approve my reseller account. Thank you!`
-);
 
 const AgentPending = () => {
   const { profile, signOut, refreshProfile } = useAuth();
   const navigate = useNavigate();
+  const [adminWhatsapp, setAdminWhatsapp] = useState(DEFAULT_ADMIN_WHATSAPP);
   const approvedButSetupIncomplete = Boolean(profile?.agent_approved && !profile?.onboarding_complete);
+  const whatsappMessage = encodeURIComponent(
+    `Hello, I have signed up as a reseller on QuickData GH and paid ${APPROVAL_PAYMENT_AMOUNT} to ${APPROVAL_PAYMENT_NUMBER} (${APPROVAL_PAYMENT_NAME}). Please approve my reseller account. Thank you!`
+  );
+
+  useEffect(() => {
+    const loadSupportNumber = async () => {
+      const { data } = await supabase.functions.invoke("system-settings", {
+        body: { action: "get" },
+      });
+      const number = String((data as any)?.customer_service_number || "").trim();
+      if (number) setAdminWhatsapp(number);
+    };
+    loadSupportNumber();
+  }, []);
 
   const handleSignOut = async () => {
     await signOut();
@@ -43,7 +57,7 @@ const AgentPending = () => {
             <p>3. Contact customer service on WhatsApp for approval.</p>
           </div>
           <a
-            href={`https://wa.me/${ADMIN_WHATSAPP.replace("+", "")}?text=${WHATSAPP_MESSAGE}`}
+            href={`https://wa.me/${adminWhatsapp.replace("+", "")}?text=${whatsappMessage}`}
             target="_blank"
             rel="noopener noreferrer"
             className="inline-flex items-center gap-2"
@@ -54,7 +68,7 @@ const AgentPending = () => {
             </Button>
           </a>
           <p className="text-xs text-muted-foreground mt-3">
-            {ADMIN_WHATSAPP}
+            {adminWhatsapp}
           </p>
           </div>
         )}

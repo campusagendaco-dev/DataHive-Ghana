@@ -23,6 +23,24 @@ const OrderStatus = () => {
   const [loading, setLoading] = useState(false);
   const [verifying, setVerifying] = useState(false);
   const [notFound, setNotFound] = useState(false);
+  const [verificationNote, setVerificationNote] = useState("");
+
+  const pollOrderStatus = async (ref: string, attempts = 20, delayMs = 3000) => {
+    for (let i = 0; i < attempts; i++) {
+      await new Promise(r => setTimeout(r, delayMs));
+      const { data } = await supabase
+        .from("orders")
+        .select("id, status, network, package_size, customer_phone, amount, created_at")
+        .eq("id", ref)
+        .maybeSingle();
+      if (data && (data.status === "fulfilled" || data.status === "fulfillment_failed")) {
+        setOrder(data);
+        return;
+      }
+      if (data) setOrder(data);
+    }
+    setVerificationNote("Payment confirmed, but delivery is still processing. Please refresh in a moment.");
+  };
 
   const lookupOrder = useCallback(async (id?: string) => {
     const ref = id || orderId.trim();
@@ -30,6 +48,7 @@ const OrderStatus = () => {
     setLoading(true);
     setNotFound(false);
     setOrder(null);
+    setVerificationNote("");
 
     const { data, error } = await supabase
       .from("orders")
@@ -46,39 +65,30 @@ const OrderStatus = () => {
     setOrder(data);
     setLoading(false);
 
-    // If pending or paid, trigger verification
     if (data.status === "pending" || data.status === "paid") {
       setVerifying(true);
       try {
-        const { data: result } = await supabase.functions.invoke("verify-payment", {
+        const verifyPromise = supabase.functions.invoke("verify-payment", {
           body: { reference: ref },
         });
-        if (result?.status) {
-          // verify-payment always returns "fulfilled" to user after payment verified
-          setOrder(prev => prev ? { ...prev, status: result.status } : prev);
+        const verifyTimeout = new Promise<never>((_, reject) =>
+          window.setTimeout(() => reject(new Error("verify-timeout")), 15000)
+        );
+        const verifyResult = await Promise.race([verifyPromise, verifyTimeout]) as { data?: any };
+        const nextStatus = verifyResult?.data?.status as string | undefined;
+
+        if (nextStatus === "fulfilled" || nextStatus === "fulfillment_failed") {
+          setOrder((prev) => (prev ? { ...prev, status: nextStatus } : prev));
+        } else {
+          await pollOrderStatus(ref);
         }
       } catch {
         await pollOrderStatus(ref);
+      } finally {
+        setVerifying(false);
       }
-      setVerifying(false);
     }
   }, [orderId]);
-
-  const pollOrderStatus = async (ref: string) => {
-    for (let i = 0; i < 10; i++) {
-      await new Promise(r => setTimeout(r, 3000));
-      const { data } = await supabase
-        .from("orders")
-        .select("id, status, network, package_size, customer_phone, amount, created_at")
-        .eq("id", ref)
-        .maybeSingle();
-      if (data && (data.status === "fulfilled" || data.status === "fulfillment_failed")) {
-        setOrder(data);
-        return;
-      }
-      if (data) setOrder(data);
-    }
-  };
 
   useEffect(() => {
     const ref = searchParams.get("reference");
@@ -105,7 +115,7 @@ const OrderStatus = () => {
   };
 
   const display = getDisplayStatus();
-  const isProcessing = verifying || order?.status === "pending" || order?.status === "paid";
+  const isProcessing = (verifying || order?.status === "pending" || order?.status === "paid") && !verificationNote;
 
   return (
     <div className="min-h-screen pt-24 pb-16 px-4">
@@ -139,6 +149,9 @@ const OrderStatus = () => {
                 <display.icon className={`w-12 h-12 mx-auto mb-3 ${display.color} ${isProcessing ? "animate-spin" : ""}`} />
                 <p className={`font-display font-bold text-lg ${display.color}`}>{display.label}</p>
                 <p className="text-sm text-muted-foreground mt-1">{display.desc}</p>
+                {verificationNote && (
+                  <p className="text-xs text-yellow-400 mt-2">{verificationNote}</p>
+                )}
               </div>
 
               <div className="bg-muted/50 rounded-lg p-4 space-y-2 text-sm">

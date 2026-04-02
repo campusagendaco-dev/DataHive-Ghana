@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -11,6 +12,8 @@ serve(async (req) => {
   }
 
   const PAYSTACK_SECRET_KEY = Deno.env.get("PAYSTACK_SECRET_KEY");
+  const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
+  const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
   if (!PAYSTACK_SECRET_KEY) {
     console.error("PAYSTACK_SECRET_KEY is not configured");
     return new Response(JSON.stringify({ error: "Paystack not configured" }), {
@@ -18,6 +21,15 @@ serve(async (req) => {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
+
+  if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
+    return new Response(JSON.stringify({ error: "Server misconfigured" }), {
+      status: 500,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+
+  const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
   // Validate key type — must be a secret key
   if (PAYSTACK_SECRET_KEY.startsWith("pk_")) {
@@ -29,6 +41,21 @@ serve(async (req) => {
   }
 
   try {
+    const { data: settings } = await supabaseAdmin
+      .from("system_settings")
+      .select("holiday_mode_enabled, holiday_message, disable_ordering")
+      .eq("id", 1)
+      .maybeSingle();
+
+    if (settings?.disable_ordering) {
+      return new Response(JSON.stringify({
+        error: settings.holiday_message || "Ordering is currently disabled. Please try again later.",
+      }), {
+        status: 403,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     const payload = await req.json();
     const email = typeof payload?.email === "string" ? payload.email.trim() : "";
     const amount = Number(payload?.amount);

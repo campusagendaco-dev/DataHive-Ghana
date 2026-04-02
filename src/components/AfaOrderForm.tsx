@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { getFunctionErrorMessage } from "@/lib/function-errors";
+import { getAppBaseUrl } from "@/lib/app-base-url";
 import { Shield } from "lucide-react";
 
 interface AfaOrderFormProps {
@@ -97,7 +98,7 @@ const AfaOrderForm = ({ price, agentId, profit = 0, onOrderSaved }: AfaOrderForm
         email: form.email.trim(),
         amount: total,
         reference: orderId,
-        callback_url: `${window.location.origin}/order-status?reference=${orderId}`,
+        callback_url: `${getAppBaseUrl()}/order-status?reference=${orderId}`,
         metadata: {
           order_id: orderId,
           order_type: "afa",

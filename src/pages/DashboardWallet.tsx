@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { getFunctionErrorMessage } from "@/lib/function-errors";
+import { getAppBaseUrl } from "@/lib/app-base-url";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,6 +11,13 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Wallet, Loader2, Send, Copy, Check, Smartphone } from "lucide-react";
 import { basePackages, networks } from "@/lib/data";
+
+interface WalletTopupRow {
+  id: string;
+  amount: number;
+  status: string;
+  created_at: string;
+}
 
 const DashboardWallet = () => {
   const { user, profile } = useAuth();
@@ -25,6 +33,9 @@ const DashboardWallet = () => {
   const [customerPhone, setCustomerPhone] = useState("");
   const [paymentMethod, setPaymentMethod] = useState<"wallet" | "paystack">("wallet");
   const [buying, setBuying] = useState(false);
+  const [syncingDeposits, setSyncingDeposits] = useState(false);
+  const [recentTopups, setRecentTopups] = useState<WalletTopupRow[]>([]);
+  const [referenceToVerify, setReferenceToVerify] = useState("");
 
   const fetchBalance = useCallback(async () => {
     if (!user) return;
@@ -57,7 +68,20 @@ const DashboardWallet = () => {
     setLoading(false);
   }, [user]);
 
+  const fetchRecentTopups = useCallback(async () => {
+    if (!user) return;
+    const { data } = await supabase
+      .from("orders")
+      .select("id, amount, status, created_at")
+      .eq("agent_id", user.id)
+      .eq("order_type", "wallet_topup")
+      .order("created_at", { ascending: false })
+      .limit(8);
+    setRecentTopups((data || []) as WalletTopupRow[]);
+  }, [user]);
+
   useEffect(() => { fetchBalance(); }, [fetchBalance]);
+  useEffect(() => { fetchRecentTopups(); }, [fetchRecentTopups]);
 
   // Check for returning from Paystack payment
   useEffect(() => {
@@ -69,23 +93,25 @@ const DashboardWallet = () => {
         if (status === "fulfilled") {
           toast({ title: "Wallet topped up successfully!" });
         } else {
-          toast({ title: "Payment processing", description: "Your deposit is being processed. Balance will update shortly." });
+          toast({ title: "Deposit received", description: "If balance is not updated yet, tap Verify Pending Deposit." });
         }
         await fetchBalance();
+        await fetchRecentTopups();
         let retries = 3;
         const poll = setInterval(async () => {
           await fetchBalance();
+          await fetchRecentTopups();
           retries--;
           if (retries <= 0) clearInterval(poll);
         }, 3000);
         window.history.replaceState({}, "", window.location.pathname);
       }).catch(async () => {
-        toast({ title: "Verification in progress", description: "Your payment is being verified.", variant: "destructive" });
+        toast({ title: "Could not auto-verify", description: "Tap Verify Pending Deposit or paste your reference below.", variant: "destructive" });
         await fetchBalance();
         window.history.replaceState({}, "", window.location.pathname);
       });
     }
-  }, [fetchBalance, toast]);
+  }, [fetchBalance, fetchRecentTopups, toast]);
 
   const topupReference = (profile as any)?.topup_reference || "------";
 
@@ -166,7 +192,7 @@ const DashboardWallet = () => {
           email: profile?.email || `${user!.id}@agent.quickdata.gh`,
           amount: totalPaystack,
           reference: orderId,
-          callback_url: `${window.location.origin}/dashboard/wallet`,
+          callback_url: `${getAppBaseUrl()}/dashboard/wallet`,
           metadata: {
             order_id: orderId,
             order_type: "data",
@@ -193,6 +219,91 @@ const DashboardWallet = () => {
     }
   };
 
+  const handleSyncPendingDeposits = async () => {
+    if (!user) return;
+    setSyncingDeposits(true);
+    try {
+      const { data: pendingRows, error } = await supabase
+        .from("orders")
+        .select("id, status")
+        .eq("agent_id", user.id)
+        .eq("order_type", "wallet_topup")
+        .in("status", ["pending", "paid"])
+        .order("created_at", { ascending: false })
+        .limit(10);
+
+      if (error) {
+        toast({ title: "Sync failed", description: error.message, variant: "destructive" });
+        return;
+      }
+
+      if (!pendingRows || pendingRows.length === 0) {
+        toast({ title: "No pending deposits found" });
+        return;
+      }
+
+      const checks = await Promise.allSettled(
+        pendingRows.map((row) =>
+          supabase.functions.invoke("verify-payment", { body: { reference: row.id } }),
+        ),
+      );
+
+      const fulfilledCount = checks.filter((result) => {
+        if (result.status !== "fulfilled") return false;
+        return result.value?.data?.status === "fulfilled";
+      }).length;
+
+      await fetchBalance();
+      await fetchRecentTopups();
+      toast({
+        title: "Deposit check completed",
+        description: fulfilledCount > 0
+          ? `${fulfilledCount} deposit(s) credited to your wallet.`
+          : "No new successful deposits found yet.",
+      });
+    } catch (syncError) {
+      toast({
+        title: "Sync failed",
+        description: syncError instanceof Error ? syncError.message : "Could not verify pending deposits.",
+        variant: "destructive",
+      });
+    } finally {
+      setSyncingDeposits(false);
+    }
+  };
+
+  const handleVerifyByReference = async () => {
+    const reference = referenceToVerify.trim();
+    if (!reference) {
+      toast({ title: "Enter a payment reference", variant: "destructive" });
+      return;
+    }
+    setSyncingDeposits(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("verify-payment", {
+        body: { reference },
+      });
+      if (error || data?.error) {
+        toast({
+          title: "Verification failed",
+          description: data?.error || error?.message || "Could not verify this reference.",
+          variant: "destructive",
+        });
+      } else if (data?.status === "fulfilled") {
+        toast({ title: "Deposit verified and credited!" });
+      } else {
+        toast({
+          title: "Verification completed",
+          description: `Current status: ${data?.status || "unknown"}`,
+        });
+      }
+      await fetchBalance();
+      await fetchRecentTopups();
+    } finally {
+      setSyncingDeposits(false);
+    }
+  };
+
   if (loading) return <div className="text-muted-foreground">Loading...</div>;
 
   return (
@@ -214,6 +325,16 @@ const DashboardWallet = () => {
             <p className="text-xs text-muted-foreground mt-1">
               Wallet: GHS {balance.toFixed(2)} + Profit: GHS {availableProfit.toFixed(2)}
             </p>
+            <Button
+              variant="outline"
+              size="sm"
+              className="mt-3"
+              onClick={handleSyncPendingDeposits}
+              disabled={syncingDeposits}
+            >
+              {syncingDeposits ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+              Verify Pending Deposit
+            </Button>
           </CardContent>
         </Card>
 
@@ -264,6 +385,45 @@ const DashboardWallet = () => {
               After sending, the admin will verify and credit your wallet.
             </p>
           </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg">Recent Deposits</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="flex flex-col sm:flex-row gap-3">
+            <Input
+              value={referenceToVerify}
+              onChange={(e) => setReferenceToVerify(e.target.value)}
+              placeholder="Paste Paystack/reference ID to verify"
+              className="bg-secondary"
+            />
+            <Button variant="outline" onClick={handleVerifyByReference} disabled={syncingDeposits}>
+              {syncingDeposits ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+              Verify This Reference
+            </Button>
+          </div>
+          {recentTopups.length === 0 ? (
+            <p className="text-sm text-muted-foreground">No deposit history yet.</p>
+          ) : (
+            <div className="space-y-2">
+              {recentTopups.map((row) => (
+                <div key={row.id} className="flex items-center justify-between rounded-lg border border-border p-3">
+                  <div>
+                    <p className="text-sm font-medium">GHS {Number(row.amount || 0).toFixed(2)}</p>
+                    <p className="text-xs text-muted-foreground">
+                      Ref: {row.id} • {new Date(row.created_at).toLocaleString()}
+                    </p>
+                  </div>
+                  <span className="text-xs px-2 py-1 rounded-full bg-secondary text-foreground capitalize">
+                    {row.status}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
         </CardContent>
       </Card>
 

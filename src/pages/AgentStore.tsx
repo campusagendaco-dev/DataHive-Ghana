@@ -7,6 +7,7 @@ import DataPackageCard from "@/components/DataPackageCard";
 import AfaOrderForm from "@/components/AfaOrderForm";
 import { useToast } from "@/hooks/use-toast";
 import { getFunctionErrorMessage } from "@/lib/function-errors";
+import { getAppBaseUrl } from "@/lib/app-base-url";
 import { Menu, X, Users, Shield, Zap, AlertTriangle } from "lucide-react";
 import {
   AlertDialog,
@@ -186,7 +187,7 @@ const AgentStore = () => {
         email: `${phone.replace(/\s/g, "")}@customer.quickdata.gh`,
         amount: total,
         reference: orderId,
-        callback_url: `${window.location.origin}/order-status?reference=${orderId}`,
+        callback_url: `${getAppBaseUrl()}/order-status?reference=${orderId}`,
         metadata: {
           order_id: orderId,
           order_type: "data",

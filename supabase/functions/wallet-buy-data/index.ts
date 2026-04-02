@@ -6,6 +6,98 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
+const PUBLIC_MARKUP = 1.12;
+const BASE_PACKAGE_PRICES: Record<string, Record<string, number>> = {
+  MTN: {
+    "1GB": 4.45, "2GB": 8.9, "3GB": 13.1, "4GB": 17.3, "5GB": 21.2, "6GB": 25.7, "7GB": 29.6, "8GB": 33.2,
+    "10GB": 42.5, "15GB": 62.0, "20GB": 80.2, "25GB": 100.8, "30GB": 124.0, "40GB": 159.0, "50GB": 199.3, "100GB": 385.0,
+  },
+  Telecel: {
+    "5GB": 23.0, "10GB": 41.8, "12GB": 49.0, "15GB": 58.99, "18GB": 71.8, "20GB": 78.5, "22GB": 82.5, "25GB": 102.0, "30GB": 125.5, "40GB": 166.0, "50GB": 190.0,
+  },
+  AirtelTigo: {
+    "1GB": 4.3, "2GB": 8.2, "3GB": 12.0, "4GB": 15.8, "5GB": 19.85, "6GB": 23.49, "7GB": 27.0, "8GB": 30.59, "9GB": 34.2,
+  },
+};
+
+function normalizeNetworkForPricing(network: string): "MTN" | "Telecel" | "AirtelTigo" {
+  const normalized = network.trim().toUpperCase();
+  if (normalized === "AT" || normalized === "AIRTEL TIGO" || normalized === "AIRTELTIGO") return "AirtelTigo";
+  if (normalized === "VODAFONE" || normalized === "TELECEL") return "Telecel";
+  return "MTN";
+}
+
+async function resolveExpectedAmount(
+  supabaseAdmin: ReturnType<typeof createClient>,
+  network: string,
+  packageSize: string,
+): Promise<number | null> {
+  const normalizedNetwork = normalizeNetworkForPricing(network);
+  const normalizedPackage = packageSize.replace(/\s+/g, "").toUpperCase();
+
+  const { data: globalRow } = await supabaseAdmin
+    .from("global_package_settings")
+    .select("public_price")
+    .eq("network", normalizedNetwork)
+    .eq("package_size", normalizedPackage)
+    .maybeSingle();
+
+  const configuredPrice = Number(globalRow?.public_price);
+  if (Number.isFinite(configuredPrice) && configuredPrice > 0) {
+    return Number(configuredPrice.toFixed(2));
+  }
+
+  const basePrice = BASE_PACKAGE_PRICES[normalizedNetwork]?.[normalizedPackage];
+  if (!basePrice) return null;
+  return Number((basePrice * PUBLIC_MARKUP).toFixed(2));
+}
+
+function normalizePhone(raw: string | null | undefined): string | null {
+  if (!raw) return null;
+  const clean = raw.trim().replace(/[^\d+]/g, "");
+  if (!clean) return null;
+  if (clean.startsWith("+")) {
+    const normalized = `+${clean.slice(1).replace(/\D/g, "")}`;
+    return normalized.length >= 11 ? normalized : null;
+  }
+  const digits = clean.replace(/\D/g, "");
+  if (!digits) return null;
+  if (digits.startsWith("233") && digits.length >= 12) return `+${digits}`;
+  if (digits.startsWith("0") && digits.length >= 10) return `+233${digits.slice(1)}`;
+  if (digits.startsWith("00") && digits.length > 2) return `+${digits.slice(2)}`;
+  return digits.length >= 10 ? `+${digits}` : null;
+}
+
+async function sendSmsIfConfigured(to: string, body: string): Promise<void> {
+  const TWILIO_ACCOUNT_SID = Deno.env.get("TWILIO_ACCOUNT_SID");
+  const TWILIO_AUTH_TOKEN = Deno.env.get("TWILIO_AUTH_TOKEN");
+  const TWILIO_FROM_NUMBER = Deno.env.get("TWILIO_FROM_NUMBER");
+
+  if (!TWILIO_ACCOUNT_SID || !TWILIO_AUTH_TOKEN || !TWILIO_FROM_NUMBER) {
+    return;
+  }
+
+  const endpoint = `https://api.twilio.com/2010-04-01/Accounts/${TWILIO_ACCOUNT_SID}/Messages.json`;
+  const auth = btoa(`${TWILIO_ACCOUNT_SID}:${TWILIO_AUTH_TOKEN}`);
+  const response = await fetch(endpoint, {
+    method: "POST",
+    headers: {
+      "Authorization": `Basic ${auth}`,
+      "Content-Type": "application/x-www-form-urlencoded",
+    },
+    body: new URLSearchParams({
+      To: to,
+      From: TWILIO_FROM_NUMBER,
+      Body: body,
+    }),
+  });
+
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(`Twilio send failed (${response.status}): ${text}`);
+  }
+}
+
 function mapNetworkToApi(network: string): string {
   const normalized = network.trim().toUpperCase();
   if (normalized === "AIRTELTIGO" || normalized === "AIRTEL TIGO") return "AIRTELTIGO";
@@ -18,6 +110,34 @@ function formatDataPlan(packageSize: string): string {
   return packageSize.replace(/\s+/g, "").toUpperCase();
 }
 
+async function placeDataOrder(
+  baseUrl: string,
+  apiKey: string,
+  network: string,
+  packageSize: string,
+  customerPhone: string,
+): Promise<{ ok: boolean; status: number; body: string }> {
+  const apiNetwork = mapNetworkToApi(network);
+  const dataPlan = formatDataPlan(packageSize);
+  const response = await fetch(`${baseUrl}/api/v1/order`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Accept": "application/json",
+      "User-Agent": "DataBossHub-API-Client/1.0",
+      "X-API-Key": apiKey,
+      "X-API-KEY": apiKey,
+    },
+    body: JSON.stringify({
+      network: apiNetwork,
+      data_plan: dataPlan,
+      beneficiary: customerPhone,
+    }),
+  });
+  const body = await response.text();
+  return { ok: response.ok, status: response.status, body };
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -25,10 +145,12 @@ serve(async (req) => {
 
   const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
   const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-  const DATA_PROVIDER_API_KEY = Deno.env.get("DATA_PROVIDER_API_KEY")?.trim();
-  const DATA_PROVIDER_BASE_URL = Deno.env.get("DATA_PROVIDER_BASE_URL")?.trim().replace(/\/+$/, "");
+  const PRIMARY_DATA_PROVIDER_API_KEY = Deno.env.get("DATA_PROVIDER_API_KEY")?.trim();
+  const PRIMARY_DATA_PROVIDER_BASE_URL = Deno.env.get("DATA_PROVIDER_BASE_URL")?.trim().replace(/\/+$/, "");
+  const SECONDARY_DATA_PROVIDER_API_KEY = Deno.env.get("SECONDARY_DATA_PROVIDER_API_KEY")?.trim();
+  const SECONDARY_DATA_PROVIDER_BASE_URL = Deno.env.get("SECONDARY_DATA_PROVIDER_BASE_URL")?.trim().replace(/\/+$/, "");
 
-  if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY || !DATA_PROVIDER_API_KEY || !DATA_PROVIDER_BASE_URL) {
+  if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY || !PRIMARY_DATA_PROVIDER_API_KEY || !PRIMARY_DATA_PROVIDER_BASE_URL) {
     return new Response(JSON.stringify({ error: "Server misconfigured" }), {
       status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
@@ -56,8 +178,44 @@ serve(async (req) => {
 
     const { network, package_size, customer_phone, amount } = await req.json();
 
+    const { data: settings } = await supabaseAdmin
+      .from("system_settings")
+      .select("auto_api_switch, preferred_provider, backup_provider, holiday_mode_enabled, holiday_message, disable_ordering")
+      .eq("id", 1)
+      .maybeSingle();
+
+    if (settings?.disable_ordering) {
+      return new Response(JSON.stringify({
+        error: settings.holiday_message || "Ordering is currently disabled. Please try again later.",
+      }), {
+        status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     if (!network || !package_size || !customer_phone || !amount) {
       return new Response(JSON.stringify({ error: "Missing required fields" }), {
+        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const requestedAmount = Number(amount);
+    if (!Number.isFinite(requestedAmount) || requestedAmount <= 0) {
+      return new Response(JSON.stringify({ error: "Invalid amount" }), {
+        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const expectedAmount = await resolveExpectedAmount(supabaseAdmin, network, package_size);
+    if (!expectedAmount) {
+      return new Response(JSON.stringify({ error: "Package price not configured" }), {
+        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    if (Math.abs(requestedAmount - expectedAmount) > 0.01) {
+      return new Response(JSON.stringify({
+        error: `Invalid amount for ${network} ${package_size}. Expected GHS ${expectedAmount.toFixed(2)}.`,
+      }), {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
@@ -78,14 +236,14 @@ serve(async (req) => {
       wallet = newWallet;
     }
 
-    if (!wallet || wallet.balance < amount) {
-      return new Response(JSON.stringify({ error: `Insufficient wallet balance. Available: GH₵${(wallet?.balance || 0).toFixed(2)}` }), {
+    if (!wallet || wallet.balance < expectedAmount) {
+      return new Response(JSON.stringify({ error: `Insufficient wallet balance. Available: GHS ${(wallet?.balance || 0).toFixed(2)}` }), {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
     // Deduct from wallet
-    const newBalance = parseFloat((wallet.balance - amount).toFixed(2));
+    const newBalance = parseFloat((wallet.balance - expectedAmount).toFixed(2));
     await supabaseAdmin.from("wallets").update({ balance: newBalance }).eq("agent_id", user.id);
 
     // Create order
@@ -97,48 +255,77 @@ serve(async (req) => {
       network,
       package_size,
       customer_phone,
-      amount,
+      amount: expectedAmount,
       profit: 0,
       status: "paid",
     });
 
-    // Fulfill via API (DataBossHub format)
-    const apiNetwork = mapNetworkToApi(network);
-    const dataPlan = formatDataPlan(package_size);
-    console.log("Wallet buy data:", { network, apiNetwork, package_size, dataPlan, customer_phone });
+    const autoSwitch = Boolean(settings?.auto_api_switch);
+    const preferred = settings?.preferred_provider === "secondary" ? "secondary" : "primary";
+    const backup = settings?.backup_provider === "primary" ? "primary" : "secondary";
 
-    const fulfillRes = await fetch(`${DATA_PROVIDER_BASE_URL}/api/v1/order`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Accept": "application/json",
-        "User-Agent": "DataBossHub-API-Client/1.0",
-        "X-API-Key": DATA_PROVIDER_API_KEY,
-        "X-API-KEY": DATA_PROVIDER_API_KEY,
-      },
-      body: JSON.stringify({
-        network: apiNetwork,
-        data_plan: dataPlan,
-        beneficiary: customer_phone,
-      }),
-    });
+    const providers = {
+      primary: { key: PRIMARY_DATA_PROVIDER_API_KEY, baseUrl: PRIMARY_DATA_PROVIDER_BASE_URL },
+      secondary: { key: SECONDARY_DATA_PROVIDER_API_KEY, baseUrl: SECONDARY_DATA_PROVIDER_BASE_URL },
+    };
 
-    const fulfillText = await fulfillRes.text();
-    console.log("Fulfillment response:", fulfillRes.status, fulfillText);
+    console.log("Wallet buy data:", { network, package_size, customer_phone, autoSwitch, preferred, backup });
+    const firstProvider = providers[preferred];
+    const secondProvider = providers[backup];
 
-    if (fulfillRes.ok) {
-      await supabaseAdmin.from("orders").update({ status: "fulfilled" }).eq("id", orderId);
+    let fulfillmentResult = await placeDataOrder(
+      firstProvider.baseUrl!,
+      firstProvider.key!,
+      network,
+      package_size,
+      customer_phone,
+    );
+
+    if (!fulfillmentResult.ok && autoSwitch && secondProvider.baseUrl && secondProvider.key) {
+      console.log("Primary provider failed, retrying with backup provider");
+      const backupResult = await placeDataOrder(
+        secondProvider.baseUrl,
+        secondProvider.key,
+        network,
+        package_size,
+        customer_phone,
+      );
+      if (backupResult.ok) {
+        fulfillmentResult = backupResult;
+      }
+    }
+
+    console.log("Fulfillment response:", fulfillmentResult.status, fulfillmentResult.body);
+
+    if (fulfillmentResult.ok) {
+      const { data: transitioned } = await supabaseAdmin
+        .from("orders")
+        .update({ status: "fulfilled" })
+        .eq("id", orderId)
+        .neq("status", "fulfilled")
+        .select("id, amount")
+        .maybeSingle();
+
+      const to = normalizePhone(customer_phone);
+      if (transitioned && to) {
+        const amountText = Number(transitioned.amount || expectedAmount || 0).toFixed(2);
+        await sendSmsIfConfigured(
+          to,
+          `QuickData: ${network} ${package_size} to ${customer_phone} delivered. Amount: GHS ${amountText}. Ref: ${orderId}.`,
+        ).catch((smsError) => console.error("Wallet data SMS error:", smsError));
+      }
+
       return new Response(JSON.stringify({ success: true, order_id: orderId, status: "fulfilled" }), {
         status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
-    } else {
-      let reason = "Data delivery failed";
-      try { reason = JSON.parse(fulfillText)?.message || reason; } catch { /* keep fallback reason */ }
-      await supabaseAdmin.from("orders").update({ status: "fulfillment_failed", failure_reason: reason }).eq("id", orderId);
-      return new Response(JSON.stringify({ success: true, order_id: orderId, status: "fulfillment_failed", failure_reason: reason }), {
-        status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
     }
+
+    let reason = "Data delivery failed";
+    try { reason = JSON.parse(fulfillmentResult.body)?.message || reason; } catch { /* keep fallback reason */ }
+    await supabaseAdmin.from("orders").update({ status: "fulfillment_failed", failure_reason: reason }).eq("id", orderId);
+    return new Response(JSON.stringify({ success: true, order_id: orderId, status: "fulfillment_failed", failure_reason: reason }), {
+      status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
   } catch (error) {
     console.error("Wallet buy data error:", error);
     return new Response(JSON.stringify({ error: error instanceof Error ? error.message : "Internal error" }), {

@@ -40,6 +40,7 @@ import AdminNotificationsPage from "./pages/AdminNotificationsPage";
 import AdminPackages from "./pages/AdminPackages";
 import AdminWalletTopup from "./pages/AdminWalletTopup";
 import AdminSystemHealth from "./pages/AdminSystemHealth";
+import AdminSettings from "./pages/AdminSettings";
 import Maintenance from "./pages/Maintenance";
 import NotFound from "./pages/NotFound";
 
@@ -102,6 +103,7 @@ const AppContent = () => {
     is_enabled: false,
     message: "",
   });
+  const [darkModeEnabled, setDarkModeEnabled] = useState(false);
   const [maintenanceLoading, setMaintenanceLoading] = useState(true);
 
   useEffect(() => {
@@ -152,6 +154,29 @@ const AppContent = () => {
       window.clearInterval(interval);
     };
   }, []);
+
+  useEffect(() => {
+    let active = true;
+
+    const loadSystemSettings = async () => {
+      const { data } = await supabase.functions.invoke("system-settings", {
+        body: { action: "get" },
+      });
+      if (!active || !data) return;
+      setDarkModeEnabled(Boolean((data as any).dark_mode_enabled));
+    };
+
+    loadSystemSettings();
+    const interval = window.setInterval(loadSystemSettings, 30000);
+    return () => {
+      active = false;
+      window.clearInterval(interval);
+    };
+  }, []);
+
+  useEffect(() => {
+    document.documentElement.classList.toggle("dark", darkModeEnabled);
+  }, [darkModeEnabled]);
 
   const isDashboard = location.pathname.startsWith("/dashboard");
   const isAdmin = location.pathname.startsWith("/admin");
@@ -220,6 +245,7 @@ const AppContent = () => {
           <Route path="packages" element={<AdminPackages />} />
           <Route path="wallet-topup" element={<AdminWalletTopup />} />
           <Route path="system-health" element={<AdminSystemHealth />} />
+          <Route path="settings" element={<AdminSettings />} />
         </Route>
 
         <Route path="*" element={<NotFound />} />

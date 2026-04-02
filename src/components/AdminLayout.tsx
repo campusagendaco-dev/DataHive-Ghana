@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Outlet, Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
-import { LayoutDashboard, Users, ShieldCheck, ShoppingCart, LogOut, Zap, Menu, Wallet, Bell, Package, CreditCard, Activity } from "lucide-react";
+import { LayoutDashboard, Users, ShieldCheck, ShoppingCart, LogOut, Zap, Menu, Wallet, Bell, Package, CreditCard, Activity, Settings } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import AdminNotifications from "@/components/AdminNotifications";
@@ -16,6 +16,7 @@ const navItems = [
   { label: "Notifications", icon: Bell, path: "/admin/notifications" },
   { label: "Users", icon: Users, path: "/admin/users" },
   { label: "System Health", icon: Activity, path: "/admin/system-health" },
+  { label: "Settings", icon: Settings, path: "/admin/settings" },
 ];
 
 const SidebarContent = ({ onNavigate }: { onNavigate?: () => void }) => {
@@ -92,7 +93,7 @@ const AdminLayout = () => {
                 <Menu className="w-5 h-5" />
               </Button>
             </SheetTrigger>
-            <SheetContent side="left" className="p-0 w-64 bg-sidebar-background">
+            <SheetContent side="left" className="p-0 w-[85vw] max-w-[20rem] bg-sidebar-background overflow-y-auto">
               <SidebarContent onNavigate={() => setOpen(false)} />
             </SheetContent>
           </Sheet>

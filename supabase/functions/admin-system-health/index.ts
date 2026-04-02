@@ -33,9 +33,8 @@ serve(async (req) => {
 
   const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
   const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-  const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY");
 
-  if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY || !SUPABASE_ANON_KEY) {
+  if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
     return new Response(JSON.stringify({ error: "Server misconfigured: missing Supabase env" }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -51,15 +50,20 @@ serve(async (req) => {
   }
 
   const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
-  const supabaseUser = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-    global: { headers: { Authorization: authHeader } },
-  });
 
   try {
+    const accessToken = authHeader.replace(/^Bearer\s+/i, "").trim();
+    if (!accessToken) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     const {
       data: { user: actor },
       error: actorError,
-    } = await supabaseUser.auth.getUser();
+    } = await supabaseAdmin.auth.getUser(accessToken);
 
     if (actorError || !actor) {
       return new Response(JSON.stringify({ error: "Unauthorized" }), {
