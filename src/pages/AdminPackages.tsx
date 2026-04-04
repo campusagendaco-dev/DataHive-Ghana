@@ -21,6 +21,8 @@ interface PackageSetting {
 const AdminPackages = () => {
   const { toast } = useToast();
   const [settings, setSettings] = useState<Record<string, PackageSetting>>({});
+  const [afaPublicPrice, setAfaPublicPrice] = useState(12.5);
+  const [afaAgentPrice, setAfaAgentPrice] = useState(12.5);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [userDiscountPercent, setUserDiscountPercent] = useState("");
@@ -36,6 +38,13 @@ const AdminPackages = () => {
         map[`${r.network}-${r.package_size}`] = r;
       });
       setSettings(map);
+
+      const afaSetting = map["AFA-BUNDLE"];
+      const publicPrice = Number(afaSetting?.public_price);
+      const agentPrice = Number(afaSetting?.agent_price);
+      if (Number.isFinite(publicPrice) && publicPrice >= 0) setAfaPublicPrice(publicPrice);
+      if (Number.isFinite(agentPrice) && agentPrice >= 0) setAfaAgentPrice(agentPrice);
+
       setLoading(false);
     };
     fetch();
@@ -55,6 +64,48 @@ const AdminPackages = () => {
   const handleSave = async () => {
     setSaving(true);
 
+    for (const n of networks) {
+      for (const pkg of basePackages[n.name] || []) {
+        const s = getSetting(n.name, pkg.size);
+        if (s.public_price !== null && s.public_price < 0) {
+          toast({
+            title: "Invalid public price",
+            description: `${n.name} ${pkg.size} public price cannot be negative.`,
+            variant: "destructive",
+          });
+          setSaving(false);
+          return;
+        }
+        if (s.agent_price !== null && s.agent_price < 0) {
+          toast({
+            title: "Invalid agent price",
+            description: `${n.name} ${pkg.size} agent price cannot be negative.`,
+            variant: "destructive",
+          });
+          setSaving(false);
+          return;
+        }
+      }
+    }
+    if (!Number.isFinite(afaPublicPrice) || afaPublicPrice < 0) {
+      toast({
+        title: "Invalid AFA user price",
+        description: "AFA user price cannot be negative.",
+        variant: "destructive",
+      });
+      setSaving(false);
+      return;
+    }
+    if (!Number.isFinite(afaAgentPrice) || afaAgentPrice < 0) {
+      toast({
+        title: "Invalid AFA agent price",
+        description: "AFA agent price cannot be negative.",
+        variant: "destructive",
+      });
+      setSaving(false);
+      return;
+    }
+
     // Collect all modified settings
     const upserts = Object.values(settings).map((s) => ({
       network: s.network,
@@ -72,10 +123,41 @@ const AdminPackages = () => {
 
       if (error) {
         toast({ title: "Save failed", description: error.message, variant: "destructive" });
-      } else {
-        toast({ title: "Package settings saved!" });
+        setSaving(false);
+        return;
       }
     }
+
+    const roundedPublic = Number(afaPublicPrice.toFixed(2));
+    const roundedAgent = Number(afaAgentPrice.toFixed(2));
+    const { error: afaError } = await supabase
+      .from("global_package_settings")
+      .upsert(
+        {
+          network: "AFA",
+          package_size: "BUNDLE",
+          public_price: roundedPublic,
+          agent_price: roundedAgent,
+          is_unavailable: false,
+          updated_at: new Date().toISOString(),
+        } as any,
+        { onConflict: "network,package_size" }
+      );
+
+    if (afaError) {
+      toast({
+        title: "AFA price save failed",
+        description: afaError.message || "Could not save AFA prices.",
+        variant: "destructive",
+      });
+      setSaving(false);
+      return;
+    }
+
+    toast({ title: "Package settings saved!" });
+    setAfaPublicPrice(roundedPublic);
+    setAfaAgentPrice(roundedAgent);
+
     setSaving(false);
   };
 
@@ -129,6 +211,42 @@ const AdminPackages = () => {
         Override prices for agents and users (public site). Leave blank to use default prices.
         Toggle unavailable to hide packages site-wide.
       </p>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>AFA Bundle Pricing</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <p className="text-sm font-medium mb-1">User AFA Price</p>
+              <Input
+                type="number"
+                min="0"
+                step="0.01"
+                value={afaPublicPrice}
+                onChange={(e) => setAfaPublicPrice(e.target.value === "" ? 0 : Number(e.target.value))}
+                className="bg-secondary"
+                placeholder="12.50"
+              />
+              <p className="text-xs text-muted-foreground mt-1">Used on the public AFA bundle page.</p>
+            </div>
+            <div>
+              <p className="text-sm font-medium mb-1">Agent AFA Price</p>
+              <Input
+                type="number"
+                min="0"
+                step="0.01"
+                value={afaAgentPrice}
+                onChange={(e) => setAfaAgentPrice(e.target.value === "" ? 0 : Number(e.target.value))}
+                className="bg-secondary"
+                placeholder="12.50"
+              />
+              <p className="text-xs text-muted-foreground mt-1">Used in agent dashboard AFA and agent store AFA section.</p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       <div className="flex flex-col sm:flex-row sm:items-center gap-3 p-4 border border-border rounded-lg bg-card">
         <div className="flex-1">

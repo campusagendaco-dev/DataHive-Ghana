@@ -39,6 +39,8 @@ interface GlobalPkgSetting {
   is_unavailable: boolean;
 }
 
+const DEFAULT_AFA_PRICE = 12.5;
+
 const AgentStore = () => {
   const RESELLER_STORE_SETTLEMENT_MODE: "automatic" | "manual" = "automatic";
   const { slug } = useParams<{ slug: string }>();
@@ -54,10 +56,11 @@ const AgentStore = () => {
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [pendingOrder, setPendingOrder] = useState<{ network: string; size: string; basePrice: number } | null>(null);
   const [globalSettings, setGlobalSettings] = useState<Record<string, GlobalPkgSetting>>({});
+  const [globalAfaPrice, setGlobalAfaPrice] = useState(DEFAULT_AFA_PRICE);
 
   useEffect(() => {
     const fetchAgent = async () => {
-      const [agentRes, settingsRes] = await Promise.all([
+      const [agentRes, packageSettingsRes] = await Promise.all([
         supabase
           .from("profiles")
           .select("user_id, store_name, full_name, whatsapp_number, support_number, email, whatsapp_group_link, agent_prices, disabled_packages")
@@ -68,13 +71,17 @@ const AgentStore = () => {
           .maybeSingle(),
         supabase
           .from("global_package_settings")
-          .select("network, package_size, agent_price, is_unavailable"),
+          .select("network, package_size, agent_price, public_price, is_unavailable"),
       ]);
 
       // Global settings
       const gsMap: Record<string, GlobalPkgSetting> = {};
-      (settingsRes.data || []).forEach((r: any) => { gsMap[`${r.network}-${r.package_size}`] = r; });
+      (packageSettingsRes.data || []).forEach((r: any) => { gsMap[`${r.network}-${r.package_size}`] = r; });
       setGlobalSettings(gsMap);
+      const numericAfa = Number((gsMap["AFA-BUNDLE"] as any)?.agent_price ?? (gsMap["AFA-BUNDLE"] as any)?.public_price);
+      if (Number.isFinite(numericAfa) && numericAfa >= 0) {
+        setGlobalAfaPrice(numericAfa);
+      }
 
       if (agentRes.error || !agentRes.data) {
         setNotFound(true);
@@ -123,7 +130,7 @@ const AgentStore = () => {
     return price || basePrice.toFixed(2);
   };
 
-  const afaPrice = agentPrices.AFA?.price;
+  const afaPrice = globalAfaPrice.toFixed(2);
 
   const handleSelectPackage = (network: string, size: string) => {
     if (isPackageDisabled(network, size)) return;
@@ -365,7 +372,7 @@ const AgentStore = () => {
                   <AfaOrderForm
                     price={afaPrice}
                     agentId={agent.user_id}
-                    profit={parseFloat(afaPrice) - 12.5}
+                    profit={0}
                   />
                 </div>
               </div>
