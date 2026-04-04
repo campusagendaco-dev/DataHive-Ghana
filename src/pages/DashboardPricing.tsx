@@ -9,33 +9,77 @@ import { useToast } from "@/hooks/use-toast";
 
 type AgentPrices = Record<string, Record<string, string>>;
 type DisabledPackages = Record<string, string[]>;
+type PackageBasePrices = Record<string, Record<string, number>>;
+
+const buildDefaultPrices = (packageBasePrices: PackageBasePrices): AgentPrices => {
+  const defaults: AgentPrices = {};
+  for (const [network, pkgs] of Object.entries(basePackages)) {
+    defaults[network] = {};
+    for (const pkg of pkgs) {
+      const basePrice = packageBasePrices[network]?.[pkg.size] ?? pkg.price;
+      defaults[network][pkg.size] = (basePrice + 2).toFixed(2);
+    }
+  }
+  return defaults;
+};
 
 const DashboardPricing = () => {
   const { user, profile, refreshProfile } = useAuth();
   const { toast } = useToast();
   const [prices, setPrices] = useState<AgentPrices>({});
   const [disabledPkgs, setDisabledPkgs] = useState<DisabledPackages>({});
+  const [packageBasePrices, setPackageBasePrices] = useState<PackageBasePrices>({});
   const [saving, setSaving] = useState(false);
   const [selectedNetwork, setSelectedNetwork] = useState("MTN");
 
   useEffect(() => {
-    if (profile?.agent_prices && Object.keys(profile.agent_prices).length > 0) {
-      setPrices(profile.agent_prices);
-    } else {
-      const defaults: AgentPrices = {};
+    const loadBasePrices = async () => {
+      const nextBasePrices: PackageBasePrices = {};
       for (const [network, pkgs] of Object.entries(basePackages)) {
-        defaults[network] = {};
+        nextBasePrices[network] = {};
         for (const pkg of pkgs) {
-          defaults[network][pkg.size] = (pkg.price + 2).toFixed(2);
+          nextBasePrices[network][pkg.size] = pkg.price;
         }
       }
-      setPrices(defaults);
+
+      const { data } = await supabase
+        .from("global_package_settings")
+        .select("network, package_size, agent_price");
+
+      (data || []).forEach((row: any) => {
+        const numericAgentPrice = Number(row?.agent_price);
+        if (!Number.isFinite(numericAgentPrice) || numericAgentPrice <= 0) return;
+        if (!nextBasePrices[row.network]) nextBasePrices[row.network] = {};
+        nextBasePrices[row.network][row.package_size] = numericAgentPrice;
+      });
+
+      setPackageBasePrices(nextBasePrices);
+    };
+
+    loadBasePrices();
+  }, []);
+
+  useEffect(() => {
+    const defaults = buildDefaultPrices(packageBasePrices);
+    const savedPrices = (profile?.agent_prices || {}) as Record<string, any>;
+
+    for (const [network, pkgs] of Object.entries(basePackages)) {
+      for (const pkg of pkgs) {
+        const saved = savedPrices?.[network]?.[pkg.size];
+        if (saved !== undefined && saved !== null && saved !== "") {
+          defaults[network][pkg.size] = String(saved);
+        }
+      }
     }
-    // Load disabled packages
+
+    setPrices(defaults);
+
     if ((profile as any)?.disabled_packages) {
       setDisabledPkgs((profile as any).disabled_packages);
+    } else {
+      setDisabledPkgs({});
     }
-  }, [profile]);
+  }, [profile, packageBasePrices]);
 
   const getPrice = (network: string, size: string) => prices[network]?.[size] || "";
   const setPrice = (network: string, size: string, value: string) => {
@@ -48,40 +92,45 @@ const DashboardPricing = () => {
       const list = prev[network] || [];
       if (list.includes(size)) {
         return { ...prev, [network]: list.filter((s) => s !== size) };
-      } else {
-        return { ...prev, [network]: [...list, size] };
       }
+      return { ...prev, [network]: [...list, size] };
     });
   };
 
+  const getBasePrice = (network: string, size: string) =>
+    packageBasePrices[network]?.[size] ?? basePackages[network]?.find((p) => p.size === size)?.price ?? 0;
+
   const getProfit = (network: string, size: string) => {
-    const basePrice = basePackages[network]?.find((p) => p.size === size)?.price || 0;
+    const basePrice = getBasePrice(network, size);
     const agentPrice = parseFloat(getPrice(network, size)) || 0;
     return agentPrice - basePrice;
   };
 
   const handleSave = async () => {
     if (!user) return;
-    setSaving(true);
 
     for (const [network, pkgs] of Object.entries(basePackages)) {
       for (const pkg of pkgs) {
-        const agentPrice = parseFloat(prices[network]?.[pkg.size] || "0");
-        if (agentPrice < pkg.price) {
+        const numericPrice = Number(prices?.[network]?.[pkg.size]);
+        const basePrice = getBasePrice(network, pkg.size);
+        if (!Number.isFinite(numericPrice) || numericPrice < basePrice) {
           toast({
             title: "Invalid price",
-            description: `${network} ${pkg.size} price (GH₵${agentPrice.toFixed(2)}) cannot be below base price (GH₵${pkg.price.toFixed(2)})`,
+            description: `${network} ${pkg.size} price (GHS ${Number.isFinite(numericPrice) ? numericPrice.toFixed(2) : "0.00"}) cannot be below base price (GHS ${basePrice.toFixed(2)}).`,
             variant: "destructive",
           });
-          setSaving(false);
           return;
         }
       }
     }
 
+    setSaving(true);
+    const existingPrices = (profile?.agent_prices || {}) as Record<string, any>;
+    const mergedPrices = { ...existingPrices, ...prices };
+
     const { error } = await supabase
       .from("profiles")
-      .update({ agent_prices: prices, disabled_packages: disabledPkgs } as any)
+      .update({ agent_prices: mergedPrices, disabled_packages: disabledPkgs } as any)
       .eq("user_id", user.id);
 
     if (error) {
@@ -90,6 +139,7 @@ const DashboardPricing = () => {
       await refreshProfile();
       toast({ title: "Prices saved! Your store has been updated." });
     }
+
     setSaving(false);
   };
 
@@ -100,7 +150,6 @@ const DashboardPricing = () => {
         <p className="text-muted-foreground">Set your selling price for each package. Toggle packages on/off for availability.</p>
       </div>
 
-      {/* Network tabs */}
       <div className="flex gap-2 mb-6">
         {networks.map((n) => (
           <button
@@ -117,7 +166,6 @@ const DashboardPricing = () => {
         ))}
       </div>
 
-      {/* Package pricing table */}
       <div className="bg-card border border-border rounded-xl overflow-hidden mb-6">
         <table className="w-full text-sm">
           <thead>
@@ -131,6 +179,7 @@ const DashboardPricing = () => {
           </thead>
           <tbody>
             {basePackages[selectedNetwork]?.map((pkg) => {
+              const basePrice = getBasePrice(selectedNetwork, pkg.size);
               const profit = getProfit(selectedNetwork, pkg.size);
               const disabled = isDisabled(selectedNetwork, pkg.size);
               return (
@@ -139,21 +188,23 @@ const DashboardPricing = () => {
                     <span className="font-medium text-foreground">{pkg.size}</span>
                     <span className="text-xs text-muted-foreground ml-2">{pkg.validity}</span>
                   </td>
-                  <td className="py-3 px-4 text-muted-foreground">GH₵ {pkg.price.toFixed(2)}</td>
+                  <td className="py-3 px-4 text-muted-foreground">GHS {basePrice.toFixed(2)}</td>
                   <td className="py-3 px-4">
                     <div className="flex items-center gap-1">
-                      <span className="text-muted-foreground text-xs">GH₵</span>
+                      <span className="text-muted-foreground text-xs">GHS</span>
                       <Input
                         value={getPrice(selectedNetwork, pkg.size)}
                         onChange={(e) => setPrice(selectedNetwork, pkg.size, e.target.value)}
                         className="w-24 h-8 text-center bg-secondary text-sm"
-                        type="number" step="0.50" min={pkg.price}
+                        type="number"
+                        step="0.50"
+                        min={basePrice}
                       />
                     </div>
                   </td>
                   <td className="py-3 px-4">
                     <span className={`font-medium ${profit > 0 ? "text-primary" : profit < 0 ? "text-destructive" : "text-muted-foreground"}`}>
-                      {profit >= 0 ? "+" : ""}GH₵ {profit.toFixed(2)}
+                      {profit >= 0 ? "+" : ""}GHS {profit.toFixed(2)}
                     </span>
                   </td>
                   <td className="py-3 px-4 text-center">
