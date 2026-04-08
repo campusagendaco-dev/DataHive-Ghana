@@ -33,7 +33,7 @@ export const callPasswordResetApi = async <T = any>(endpoint: string, data: Reco
     return {
       ok: response.ok,
       status: response.status,
-      data,
+      data: json,
       message,
     };
   } catch {
