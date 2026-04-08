@@ -191,7 +191,7 @@ const AgentStore = () => {
 
     const { data: paymentData, error: paymentError } = await supabase.functions.invoke("initialize-payment", {
       body: {
-        email: `${phone.replace(/\s/g, "")}@customer.quickdata.gh`,
+        email: `${phone.replace(/\s/g, "")}@customer.datahive.gh`,
         amount: total,
         reference: orderId,
         callback_url: `${getAppBaseUrl()}/order-status?reference=${orderId}`,
