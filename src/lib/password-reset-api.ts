@@ -27,8 +27,8 @@ export const callPasswordResetApi = async <T = any>(endpoint: string, data: Reco
       };
     }
 
-    const data = await response.json().catch(() => null);
-    const message = (data as any)?.message || (response.ok ? "Success" : "Request failed");
+    const json = await response.json().catch(() => null);
+    const message = (json as any)?.message || (response.ok ? "Success" : "Request failed");
 
     return {
       ok: response.ok,
