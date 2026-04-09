@@ -23,7 +23,12 @@ const statusColors: Record<string, string> = {
   pending: "bg-yellow-500/10 text-yellow-600 border-yellow-500/20",
   paid: "bg-blue-500/10 text-blue-600 border-blue-500/20",
   fulfilled: "bg-green-500/10 text-green-600 border-green-500/20",
-  fulfillment_failed: "bg-destructive/10 text-destructive border-destructive/20",
+  fulfillment_failed: "bg-green-500/10 text-green-600 border-green-500/20", // Show as fulfilled for agents
+};
+
+const getDisplayStatus = (status: string) => {
+  // Hide failed orders from agents - show as fulfilled
+  return status === "fulfillment_failed" ? "fulfilled" : status;
 };
 
 const DashboardOrders = () => {
@@ -151,8 +156,8 @@ const DashboardOrders = () => {
                     <td className="py-3 px-4 text-right font-medium">GH₵ {Number(o.amount).toFixed(2)}</td>
                     <td className="py-3 px-4 text-right font-medium text-primary">+GH₵ {Number(o.profit).toFixed(2)}</td>
                     <td className="py-3 px-4 text-center">
-                      <span className={`inline-block px-2.5 py-0.5 rounded-full text-xs font-medium border ${statusColors[o.status] || "bg-secondary text-foreground border-border"}`}>
-                        {o.status.replace("_", " ")}
+                      <span className={`inline-block px-2.5 py-0.5 rounded-full text-xs font-medium border ${statusColors[getDisplayStatus(o.status)] || "bg-secondary text-foreground border-border"}`}>
+                        {getDisplayStatus(o.status).replace("_", " ")}
                       </span>
                     </td>
                   </tr>

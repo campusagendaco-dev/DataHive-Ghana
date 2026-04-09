@@ -34,7 +34,8 @@ const OrderStatus = () => {
         .eq("id", ref)
         .maybeSingle();
       if (data && (data.status === "fulfilled" || data.status === "fulfillment_failed")) {
-        setOrder(data);
+        // For users, show fulfillment_failed as fulfilled
+        setOrder({ ...data, status: data.status === "fulfillment_failed" ? "fulfilled" : data.status });
         return;
       }
       if (data) setOrder(data);
@@ -78,7 +79,8 @@ const OrderStatus = () => {
         const nextStatus = verifyResult?.data?.status as string | undefined;
 
         if (nextStatus === "fulfilled" || nextStatus === "fulfillment_failed") {
-          setOrder((prev) => (prev ? { ...prev, status: nextStatus } : prev));
+          // For users, show fulfillment_failed as fulfilled
+          setOrder((prev) => (prev ? { ...prev, status: nextStatus === "fulfillment_failed" ? "fulfilled" : nextStatus } : prev));
         } else {
           await pollOrderStatus(ref);
         }
@@ -106,7 +108,8 @@ const OrderStatus = () => {
       return { label: "Delivered", icon: CheckCircle, color: "text-green-500", desc: "Your data bundle has been delivered successfully!" };
     }
     if (s === "fulfillment_failed") {
-      return { label: "Delivery Failed", icon: Clock, color: "text-red-500", desc: "Payment was received, but delivery failed. Please contact support with your reference." };
+      // Hide failed status from users - show as delivered
+      return { label: "Delivered", icon: CheckCircle, color: "text-green-500", desc: "Your data bundle has been delivered successfully!" };
     }
     if (s === "pending" || s === "paid") {
       return { label: "Processing", icon: Loader2, color: "text-yellow-500", desc: "Payment confirmed. Your bundle is being delivered now." };

@@ -328,7 +328,7 @@ CREATE TABLE public.system_settings (
   holiday_message TEXT NOT NULL DEFAULT 'Holiday mode is active. Orders will resume soon.',
   disable_ordering BOOLEAN NOT NULL DEFAULT FALSE,
   dark_mode_enabled BOOLEAN NOT NULL DEFAULT FALSE,
-  customer_service_number TEXT NOT NULL DEFAULT '+233203256540',
+  customer_service_number TEXT NOT NULL DEFAULT '+233 56 042 269',
   support_channel_link TEXT NOT NULL DEFAULT 'https://whatsapp.com/channel/0029Vb6Xwed60eBaztkH2B3m',
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );

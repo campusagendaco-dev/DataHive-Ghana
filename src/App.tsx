@@ -19,6 +19,7 @@ import DashboardAfa from "./pages/DashboardAfa";
 import DashboardOrders from "./pages/DashboardOrders";
 import DashboardWithdraw from "./pages/DashboardWithdraw";
 import DashboardWallet from "./pages/DashboardWallet";
+import DashboardFlyer from "./pages/DashboardFlyer";
 import DashboardSettings from "./pages/DashboardSettings";
 import AuthUser from "./pages/AuthUser";
 import AuthAgent from "./pages/AuthAgent";
@@ -231,6 +232,7 @@ const AppContent = () => {
           <Route path="orders" element={<DashboardOrders />} />
           <Route path="wallet" element={<DashboardWallet />} />
           <Route path="withdraw" element={<DashboardWithdraw />} />
+          <Route path="flyer" element={<DashboardFlyer />} />
           <Route path="settings" element={<DashboardSettings />} />
         </Route>
 

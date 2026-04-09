@@ -1,6 +1,6 @@
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
-import { LayoutDashboard, Store, UserPlus, LogOut, Zap, ExternalLink, X, Settings, ClipboardList, Wallet, CreditCard } from "lucide-react";
+import { LayoutDashboard, Store, UserPlus, LogOut, Zap, ExternalLink, X, Settings, ClipboardList, Wallet, CreditCard, FileText } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const navItems = [
@@ -9,6 +9,7 @@ const navItems = [
   { to: "/dashboard/wallet", label: "Reseller Wallet", icon: CreditCard },
   { to: "/dashboard/withdraw", label: "Withdrawals", icon: Wallet },
   { to: "/dashboard/pricing", label: "Store Pricing", icon: Store },
+  { to: "/dashboard/flyer", label: "Flyer Generator", icon: FileText },
   { to: "/dashboard/afa", label: "AFA Bundle", icon: UserPlus },
   { to: "/dashboard/settings", label: "Store Settings", icon: Settings },
 ];

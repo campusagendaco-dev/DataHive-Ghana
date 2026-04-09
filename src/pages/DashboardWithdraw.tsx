@@ -26,7 +26,7 @@ interface Withdrawal {
   created_at: string;
 }
 
-const MIN_WITHDRAWAL = 100;
+const MIN_WITHDRAWAL = 25;
 
 const statusConfig: Record<string, { icon: typeof CheckCircle; color: string; label: string }> = {
   completed: { icon: CheckCircle, color: "bg-green-500/20 text-green-400 border-green-500/30", label: "Completed" },

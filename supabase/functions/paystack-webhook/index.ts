@@ -169,7 +169,7 @@ serve(async (req) => {
           headers: {
             "Content-Type": "application/json",
             "Accept": "application/json",
-            "Authorization": `Bearer ${DATA_PROVIDER_API_KEY}`,
+            "X-API-Key": DATA_PROVIDER_API_KEY,
           },
           body: JSON.stringify(afaData),
         }
@@ -201,7 +201,7 @@ serve(async (req) => {
             headers: {
               "Content-Type": "application/json",
               "Accept": "application/json",
-              "Authorization": `Bearer ${DATA_PROVIDER_API_KEY}`,
+              "X-API-Key": DATA_PROVIDER_API_KEY,
             },
             body: JSON.stringify({
               network: apiNetwork,
