@@ -1,4 +1,4 @@
-﻿import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
@@ -10,13 +10,21 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Wallet, Loader2, Send, Copy, Check, Smartphone } from "lucide-react";
-import { basePackages, networks } from "@/lib/data";
+import { basePackages, networks, getPublicPrice } from "@/lib/data";
 
 interface WalletTopupRow {
   id: string;
   amount: number;
   status: string;
   created_at: string;
+}
+
+interface GlobalPackageSetting {
+  network: string;
+  package_size: string;
+  agent_price: number | null;
+  public_price: number | null;
+  is_unavailable: boolean;
 }
 
 const DashboardWallet = () => {
@@ -26,6 +34,7 @@ const DashboardWallet = () => {
   const [availableProfit, setAvailableProfit] = useState(0);
   const [loading, setLoading] = useState(true);
   const [copied, setCopied] = useState(false);
+  const [globalSettings, setGlobalSettings] = useState<GlobalPackageSetting[]>([]);
 
   // Buy data form
   const [selectedNetwork, setSelectedNetwork] = useState("");
@@ -37,25 +46,31 @@ const DashboardWallet = () => {
   const [recentTopups, setRecentTopups] = useState<WalletTopupRow[]>([]);
   const [referenceToVerify, setReferenceToVerify] = useState("");
 
+  // Fetch global package settings (admin-set agent prices)
+  useEffect(() => {
+    supabase.from("global_package_settings").select("*").then(({ data }) => {
+      if (data) setGlobalSettings(data as GlobalPackageSetting[]);
+    });
+  }, []);
+
+  const getAgentPrice = (network: string, size: string): number => {
+    // First check admin-set agent price from global_package_settings
+    const setting = globalSettings.find(
+      (s) => s.network === network && s.package_size === size.replace(/\s+/g, "").toUpperCase()
+    );
+    if (setting?.agent_price && setting.agent_price > 0) return setting.agent_price;
+    // Fallback to base price
+    const basePkg = basePackages[network]?.find((p) => p.size === size);
+    return basePkg ? basePkg.price : 0;
+  };
+
   const fetchBalance = useCallback(async () => {
     if (!user) return;
 
     const [walletRes, ordersRes, withdrawalsRes] = await Promise.all([
-      supabase
-        .from("wallets")
-        .select("balance")
-        .eq("agent_id", user.id)
-        .maybeSingle(),
-      supabase
-        .from("orders")
-        .select("profit")
-        .eq("agent_id", user.id)
-        .in("status", ["paid", "fulfilled", "fulfillment_failed"]),
-      supabase
-        .from("withdrawals")
-        .select("amount, status")
-        .eq("agent_id", user.id)
-        .in("status", ["completed", "pending", "processing"]),
+      supabase.from("wallets").select("balance").eq("agent_id", user.id).maybeSingle(),
+      supabase.from("orders").select("profit").eq("agent_id", user.id).in("status", ["paid", "fulfilled", "fulfillment_failed"]),
+      supabase.from("withdrawals").select("amount, status").eq("agent_id", user.id).in("status", ["completed", "pending", "processing"]),
     ]);
 
     const walletBalance = walletRes.data?.balance || 0;
@@ -122,8 +137,15 @@ const DashboardWallet = () => {
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const packages = selectedNetwork ? basePackages[selectedNetwork] || [] : [];
-  const selectedPkg = packages.find((p) => p.size === selectedPackage);
+  // Build packages list using agent prices
+  const agentPackages = selectedNetwork
+    ? (basePackages[selectedNetwork] || []).map((p) => ({
+        ...p,
+        price: getAgentPrice(selectedNetwork, p.size),
+      }))
+    : [];
+
+  const selectedPkg = agentPackages.find((p) => p.size === selectedPackage);
   const totalFunds = parseFloat((balance + availableProfit).toFixed(2));
 
   const paystackFee = (() => {
@@ -167,7 +189,6 @@ const DashboardWallet = () => {
       await fetchBalance();
       setBuying(false);
     } else {
-      // Paystack payment
       setBuying(true);
       const orderId = crypto.randomUUID();
       const { error: insertError } = await supabase.from("orders").insert({
@@ -194,16 +215,9 @@ const DashboardWallet = () => {
           reference: orderId,
           callback_url: `${getAppBaseUrl()}/dashboard/wallet`,
           metadata: {
-            order_id: orderId,
-            order_type: "data",
-            network: selectedNetwork,
-            package_size: selectedPackage,
-            customer_phone: customerPhone.replace(/\s/g, ""),
-            fee: paystackFee,
-            agent_id: user!.id,
-            base_price: selectedPkg.price,
-            payment_source: "dashboard_wallet",
-            deduct_agent_wallet: false,
+            order_id: orderId, order_type: "data", network: selectedNetwork, package_size: selectedPackage,
+            customer_phone: customerPhone.replace(/\s/g, ""), fee: paystackFee, agent_id: user!.id,
+            base_price: selectedPkg.price, payment_source: "dashboard_wallet", deduct_agent_wallet: false,
           },
         },
       });
@@ -224,49 +238,27 @@ const DashboardWallet = () => {
     setSyncingDeposits(true);
     try {
       const { data: pendingRows, error } = await supabase
-        .from("orders")
-        .select("id, status")
-        .eq("agent_id", user.id)
-        .eq("order_type", "wallet_topup")
-        .in("status", ["pending", "paid"])
-        .order("created_at", { ascending: false })
-        .limit(10);
+        .from("orders").select("id, status").eq("agent_id", user.id)
+        .eq("order_type", "wallet_topup").in("status", ["pending", "paid"])
+        .order("created_at", { ascending: false }).limit(10);
 
-      if (error) {
-        toast({ title: "Sync failed", description: error.message, variant: "destructive" });
-        return;
-      }
-
-      if (!pendingRows || pendingRows.length === 0) {
-        toast({ title: "No pending deposits found" });
-        return;
-      }
+      if (error) { toast({ title: "Sync failed", description: error.message, variant: "destructive" }); return; }
+      if (!pendingRows || pendingRows.length === 0) { toast({ title: "No pending deposits found" }); return; }
 
       const checks = await Promise.allSettled(
-        pendingRows.map((row) =>
-          supabase.functions.invoke("verify-payment", { body: { reference: row.id } }),
-        ),
+        pendingRows.map((row) => supabase.functions.invoke("verify-payment", { body: { reference: row.id } })),
       );
 
-      const fulfilledCount = checks.filter((result) => {
-        if (result.status !== "fulfilled") return false;
-        return result.value?.data?.status === "fulfilled";
-      }).length;
+      const fulfilledCount = checks.filter((result) => result.status === "fulfilled" && result.value?.data?.status === "fulfilled").length;
 
       await fetchBalance();
       await fetchRecentTopups();
       toast({
         title: "Deposit check completed",
-        description: fulfilledCount > 0
-          ? `${fulfilledCount} deposit(s) credited to your wallet.`
-          : "No new successful deposits found yet.",
+        description: fulfilledCount > 0 ? `${fulfilledCount} deposit(s) credited to your wallet.` : "No new successful deposits found yet.",
       });
     } catch (syncError) {
-      toast({
-        title: "Sync failed",
-        description: syncError instanceof Error ? syncError.message : "Could not verify pending deposits.",
-        variant: "destructive",
-      });
+      toast({ title: "Sync failed", description: syncError instanceof Error ? syncError.message : "Could not verify pending deposits.", variant: "destructive" });
     } finally {
       setSyncingDeposits(false);
     }
@@ -274,28 +266,16 @@ const DashboardWallet = () => {
 
   const handleVerifyByReference = async () => {
     const reference = referenceToVerify.trim();
-    if (!reference) {
-      toast({ title: "Enter a payment reference", variant: "destructive" });
-      return;
-    }
+    if (!reference) { toast({ title: "Enter a payment reference", variant: "destructive" }); return; }
     setSyncingDeposits(true);
     try {
-      const { data, error } = await supabase.functions.invoke("verify-payment", {
-        body: { reference },
-      });
+      const { data, error } = await supabase.functions.invoke("verify-payment", { body: { reference } });
       if (error || data?.error) {
-        toast({
-          title: "Verification failed",
-          description: data?.error || error?.message || "Could not verify this reference.",
-          variant: "destructive",
-        });
+        toast({ title: "Verification failed", description: data?.error || error?.message || "Could not verify this reference.", variant: "destructive" });
       } else if (data?.status === "fulfilled") {
         toast({ title: "Deposit verified and credited!" });
       } else {
-        toast({
-          title: "Verification completed",
-          description: `Current status: ${data?.status || "unknown"}`,
-        });
+        toast({ title: "Verification completed", description: `Current status: ${data?.status || "unknown"}` });
       }
       await fetchBalance();
       await fetchRecentTopups();
@@ -304,11 +284,11 @@ const DashboardWallet = () => {
     }
   };
 
-  if (loading) return <div className="text-muted-foreground">Loading...</div>;
+  if (loading) return <div className="text-muted-foreground p-8">Loading...</div>;
 
   return (
     <div className="space-y-6 p-6 md:p-8 max-w-4xl">
-      <h1 className="font-display text-2xl font-bold">Reseller Wallet</h1>
+      <h1 className="font-display text-2xl font-black">Reseller Wallet</h1>
       <p className="text-sm text-muted-foreground -mt-3">
         Reseller store orders do not require pre-funding. Wallet is optional for your own dashboard purchases and top-ups.
       </p>
@@ -321,17 +301,11 @@ const DashboardWallet = () => {
             <Wallet className="w-5 h-5 text-primary" />
           </CardHeader>
           <CardContent>
-            <p className="font-display text-3xl font-bold text-primary">GHS {totalFunds.toFixed(2)}</p>
+            <p className="font-display text-3xl font-black text-primary">GHS {totalFunds.toFixed(2)}</p>
             <p className="text-xs text-muted-foreground mt-1">
               Wallet: GHS {balance.toFixed(2)} + Profit: GHS {availableProfit.toFixed(2)}
             </p>
-            <Button
-              variant="outline"
-              size="sm"
-              className="mt-3"
-              onClick={handleSyncPendingDeposits}
-              disabled={syncingDeposits}
-            >
+            <Button variant="outline" size="sm" className="mt-3" onClick={handleSyncPendingDeposits} disabled={syncingDeposits}>
               {syncingDeposits ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
               Verify Pending Deposit
             </Button>
@@ -346,7 +320,7 @@ const DashboardWallet = () => {
             </button>
           </CardHeader>
           <CardContent>
-            <p className="font-display text-3xl font-bold tracking-[0.3em] text-foreground">{topupReference}</p>
+            <p className="font-display text-3xl font-black tracking-[0.3em] text-foreground">{topupReference}</p>
             <p className="text-xs text-muted-foreground mt-1">Use this code as payment reference when sending MoMo</p>
           </CardContent>
         </Card>
@@ -362,7 +336,7 @@ const DashboardWallet = () => {
         </CardHeader>
         <CardContent className="space-y-4">
           <p className="text-sm text-muted-foreground">
-            Send your desired top-up amount via Mobile Money to the number below. 
+            Send your desired top-up amount via Mobile Money to the number below.
             <strong className="text-foreground"> Use your Topup Reference ({topupReference}) as the payment reference.</strong>
           </p>
           <div className="bg-card border border-border rounded-xl p-4 space-y-2">
@@ -389,17 +363,10 @@ const DashboardWallet = () => {
       </Card>
 
       <Card>
-        <CardHeader>
-          <CardTitle className="text-lg">Recent Deposits</CardTitle>
-        </CardHeader>
+        <CardHeader><CardTitle className="text-lg">Recent Deposits</CardTitle></CardHeader>
         <CardContent className="space-y-3">
           <div className="flex flex-col sm:flex-row gap-3">
-            <Input
-              value={referenceToVerify}
-              onChange={(e) => setReferenceToVerify(e.target.value)}
-              placeholder="Paste Paystack/reference ID to verify"
-              className="bg-secondary"
-            />
+            <Input value={referenceToVerify} onChange={(e) => setReferenceToVerify(e.target.value)} placeholder="Paste Paystack/reference ID to verify" className="bg-secondary" />
             <Button variant="outline" onClick={handleVerifyByReference} disabled={syncingDeposits}>
               {syncingDeposits ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
               Verify This Reference
@@ -413,13 +380,9 @@ const DashboardWallet = () => {
                 <div key={row.id} className="flex items-center justify-between rounded-lg border border-border p-3">
                   <div>
                     <p className="text-sm font-medium">GHS {Number(row.amount || 0).toFixed(2)}</p>
-                    <p className="text-xs text-muted-foreground">
-                      Ref: {row.id} • {new Date(row.created_at).toLocaleString()}
-                    </p>
+                    <p className="text-xs text-muted-foreground">Ref: {row.id} • {new Date(row.created_at).toLocaleString()}</p>
                   </div>
-                  <span className="text-xs px-2 py-1 rounded-full bg-secondary text-foreground capitalize">
-                    {row.status}
-                  </span>
+                  <span className="text-xs px-2 py-1 rounded-full bg-secondary text-foreground capitalize">{row.status}</span>
                 </div>
               ))}
             </div>
@@ -437,9 +400,7 @@ const DashboardWallet = () => {
               <Select value={selectedNetwork} onValueChange={(v) => { setSelectedNetwork(v); setSelectedPackage(""); }}>
                 <SelectTrigger className="bg-secondary mt-1"><SelectValue placeholder="Select network" /></SelectTrigger>
                 <SelectContent>
-                  {networks.map((n) => (
-                    <SelectItem key={n.name} value={n.name}>{n.name}</SelectItem>
-                  ))}
+                  {networks.map((n) => (<SelectItem key={n.name} value={n.name}>{n.name}</SelectItem>))}
                 </SelectContent>
               </Select>
             </div>
@@ -448,7 +409,7 @@ const DashboardWallet = () => {
               <Select value={selectedPackage} onValueChange={setSelectedPackage} disabled={!selectedNetwork}>
                 <SelectTrigger className="bg-secondary mt-1"><SelectValue placeholder="Select package" /></SelectTrigger>
                 <SelectContent>
-                  {packages.map((p) => (
+                  {agentPackages.map((p) => (
                     <SelectItem key={p.size} value={p.size}>{p.size} - GHS {p.price.toFixed(2)}</SelectItem>
                   ))}
                 </SelectContent>
@@ -458,35 +419,16 @@ const DashboardWallet = () => {
 
           <div>
             <Label>Recipient Phone Number</Label>
-            <Input
-              placeholder="e.g. 0241234567" value={customerPhone}
-              onChange={(e) => setCustomerPhone(e.target.value)}
-              className="bg-secondary mt-1"
-            />
+            <Input placeholder="e.g. 0241234567" value={customerPhone} onChange={(e) => setCustomerPhone(e.target.value)} className="bg-secondary mt-1" />
           </div>
 
           <div>
             <Label>Payment Method</Label>
             <div className="flex gap-3 mt-1">
-              <button
-                onClick={() => setPaymentMethod("wallet")}
-                className={`flex-1 py-3 px-4 rounded-lg border text-sm font-medium transition-colors ${
-                  paymentMethod === "wallet"
-                    ? "border-primary bg-primary/10 text-primary"
-                    : "border-border bg-secondary text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                <Wallet className="w-4 h-4 inline mr-2" />
-                Wallet (GHS {balance.toFixed(2)})
+              <button onClick={() => setPaymentMethod("wallet")} className={`flex-1 py-3 px-4 rounded-lg border text-sm font-medium transition-colors ${paymentMethod === "wallet" ? "border-primary bg-primary/10 text-primary" : "border-border bg-secondary text-muted-foreground hover:text-foreground"}`}>
+                <Wallet className="w-4 h-4 inline mr-2" />Wallet (GHS {balance.toFixed(2)})
               </button>
-              <button
-                onClick={() => setPaymentMethod("paystack")}
-                className={`flex-1 py-3 px-4 rounded-lg border text-sm font-medium transition-colors ${
-                  paymentMethod === "paystack"
-                    ? "border-primary bg-primary/10 text-primary"
-                    : "border-border bg-secondary text-muted-foreground hover:text-foreground"
-                }`}
-              >
+              <button onClick={() => setPaymentMethod("paystack")} className={`flex-1 py-3 px-4 rounded-lg border text-sm font-medium transition-colors ${paymentMethod === "paystack" ? "border-primary bg-primary/10 text-primary" : "border-border bg-secondary text-muted-foreground hover:text-foreground"}`}>
                 Paystack
               </button>
             </div>
@@ -495,7 +437,7 @@ const DashboardWallet = () => {
           {selectedPkg && (
             <div className="bg-muted/50 rounded-lg p-3 text-sm space-y-1">
               <div className="flex justify-between"><span className="text-muted-foreground">Package</span><span className="font-medium">{selectedNetwork} {selectedPkg.size}</span></div>
-              <div className="flex justify-between"><span className="text-muted-foreground">Cost</span><span className="font-medium">GHS {selectedPkg.price.toFixed(2)}</span></div>
+              <div className="flex justify-between"><span className="text-muted-foreground">Agent Price</span><span className="font-medium">GHS {selectedPkg.price.toFixed(2)}</span></div>
               {paymentMethod === "paystack" && (
                 <>
                   <div className="flex justify-between"><span className="text-muted-foreground">Paystack Fee (1.95%)</span><span className="font-medium">GHS {paystackFee.toFixed(2)}</span></div>
@@ -508,10 +450,7 @@ const DashboardWallet = () => {
             </div>
           )}
 
-          <Button
-            onClick={handleBuyData} disabled={buying || !selectedPkg || !customerPhone}
-            className="w-full gap-2"
-          >
+          <Button onClick={handleBuyData} disabled={buying || !selectedPkg || !customerPhone} className="w-full gap-2">
             {buying ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
             {paymentMethod === "wallet"
               ? `Buy with Wallet (GHS ${selectedPkg?.price.toFixed(2) || "0.00"})`
@@ -525,4 +464,3 @@ const DashboardWallet = () => {
 };
 
 export default DashboardWallet;
-
