@@ -18,6 +18,7 @@ export interface Profile {
   momo_account_name: string;
   markups: Record<string, string>;
   agent_prices: Record<string, Record<string, string>>;
+  disabled_packages: Record<string, string[]>;
   is_agent: boolean;
   onboarding_complete: boolean;
   agent_approved: boolean;
