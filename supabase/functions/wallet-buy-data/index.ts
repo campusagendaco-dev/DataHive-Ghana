@@ -27,11 +27,8 @@ function normalizeNetworkForPricing(network: string): "MTN" | "Telecel" | "Airte
   return "MTN";
 }
 
-async function resolveExpectedAmount(
-  supabaseAdmin: ReturnType<typeof createClient>,
-  network: string,
-  packageSize: string,
-): Promise<number | null> {
+// deno-lint-ignore no-explicit-any
+async function resolveExpectedAmount(supabaseAdmin: any, network: string, packageSize: string): Promise<number | null> {
   const normalizedNetwork = normalizeNetworkForPricing(network);
   const normalizedPackage = packageSize.replace(/\s+/g, "").toUpperCase();
 
@@ -65,26 +62,14 @@ function formatDataPlan(packageSize: string): string {
 }
 
 async function placeDataOrder(
-  baseUrl: string,
-  apiKey: string,
-  network: string,
-  packageSize: string,
-  customerPhone: string,
+  baseUrl: string, apiKey: string, network: string, packageSize: string, customerPhone: string,
 ): Promise<{ ok: boolean; status: number; body: string }> {
   const apiNetwork = mapNetworkToApi(network);
   const dataPlan = formatDataPlan(packageSize);
   const response = await fetch(`${baseUrl}/api/order`, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "Accept": "application/json",
-      "X-API-Key": apiKey,
-    },
-    body: JSON.stringify({
-      network: apiNetwork,
-      data_plan: dataPlan,
-      beneficiary: customerPhone,
-    }),
+    headers: { "Content-Type": "application/json", "Accept": "application/json", "Authorization": `Bearer ${apiKey}` },
+    body: JSON.stringify({ network: apiNetwork, data_plan: dataPlan, beneficiary: customerPhone }),
   });
   const body = await response.text();
   return { ok: response.ok, status: response.status, body };
@@ -137,9 +122,7 @@ serve(async (req) => {
     if (settings?.disable_ordering) {
       return new Response(JSON.stringify({
         error: settings.holiday_message || "Ordering is currently disabled. Please try again later.",
-      }), {
-        status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      }), { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
     if (!network || !package_size || !customer_phone || !amount) {
@@ -165,24 +148,12 @@ serve(async (req) => {
     if (Math.abs(requestedAmount - expectedAmount) > 0.01) {
       return new Response(JSON.stringify({
         error: `Invalid amount for ${network} ${package_size}. Expected GHS ${expectedAmount.toFixed(2)}.`,
-      }), {
-        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    // Get or create wallet
-    let { data: wallet } = await supabaseAdmin
-      .from("wallets")
-      .select("id, balance")
-      .eq("agent_id", user.id)
-      .maybeSingle();
-
+    let { data: wallet } = await supabaseAdmin.from("wallets").select("id, balance").eq("agent_id", user.id).maybeSingle();
     if (!wallet) {
-      const { data: newWallet } = await supabaseAdmin
-        .from("wallets")
-        .insert({ agent_id: user.id, balance: 0 })
-        .select()
-        .single();
+      const { data: newWallet } = await supabaseAdmin.from("wallets").insert({ agent_id: user.id, balance: 0 }).select().single();
       wallet = newWallet;
     }
 
@@ -192,34 +163,18 @@ serve(async (req) => {
       });
     }
 
-    // Deduct from wallet
     const newBalance = parseFloat((wallet.balance - expectedAmount).toFixed(2));
     await supabaseAdmin.from("wallets").update({ balance: newBalance }).eq("agent_id", user.id);
 
-    // Create order
     const orderId = crypto.randomUUID();
     await supabaseAdmin.from("orders").insert({
-      id: orderId,
-      agent_id: user.id,
-      order_type: "data",
-      network,
-      package_size,
-      customer_phone,
-      amount: expectedAmount,
-      profit: 0,
-      status: "paid",
+      id: orderId, agent_id: user.id, order_type: "data", network, package_size, customer_phone,
+      amount: expectedAmount, profit: 0, status: "paid",
     });
 
     console.log("Wallet buy data:", { network, package_size, customer_phone });
 
-    const fulfillmentResult = await placeDataOrder(
-      DATA_PROVIDER_BASE_URL,
-      DATA_PROVIDER_API_KEY,
-      network,
-      package_size,
-      customer_phone,
-    );
-
+    const fulfillmentResult = await placeDataOrder(DATA_PROVIDER_BASE_URL, DATA_PROVIDER_API_KEY, network, package_size, customerPhone);
     console.log("Fulfillment response:", fulfillmentResult.status, fulfillmentResult.body);
 
     if (fulfillmentResult.ok) {
