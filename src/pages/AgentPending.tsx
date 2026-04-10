@@ -59,7 +59,7 @@ const AgentPending = () => {
       id: orderId,
       agent_id: user.id,
       order_type: "agent_activation",
-      amount: ACTIVATION_FEE,
+      amount: ACTIVATION_TOTAL,
       profit: 0,
       status: "pending",
     });
@@ -73,13 +73,15 @@ const AgentPending = () => {
     const { data: paymentData, error: paymentError } = await supabase.functions.invoke("initialize-payment", {
       body: {
         email: profile.email || `${user.id}@agent.datahive.gh`,
-        amount: ACTIVATION_FEE,
+        amount: ACTIVATION_TOTAL,
         reference: orderId,
         callback_url: `${getAppBaseUrl()}/agent/pending?reference=${orderId}`,
         metadata: {
           order_id: orderId,
           order_type: "agent_activation",
           agent_id: user.id,
+          base_amount: ACTIVATION_FEE,
+          paystack_fee: paystackFee,
         },
       },
     });
