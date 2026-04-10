@@ -8,6 +8,10 @@ import { useToast } from "@/hooks/use-toast";
 import { getAppBaseUrl } from "@/lib/app-base-url";
 
 const ACTIVATION_FEE = 20;
+const PAYSTACK_FEE_RATE = 0.0195;
+const PAYSTACK_FEE_CAP = 100;
+const paystackFee = Math.min(ACTIVATION_FEE * PAYSTACK_FEE_RATE, PAYSTACK_FEE_CAP);
+const ACTIVATION_TOTAL = parseFloat((ACTIVATION_FEE + paystackFee).toFixed(2));
 
 const AgentPending = () => {
   const { user, profile, signOut, refreshProfile } = useAuth();
