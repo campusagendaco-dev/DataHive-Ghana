@@ -107,7 +107,12 @@ const AdminLayout = () => {
               <span className="text-[#162316] font-black text-[8px] text-center leading-tight">SWIFT<br/>DATA</span>
             </div>
             <span className="font-display text-base font-bold text-white">Admin</span>
-            </div>
+          </div>
+        </header>
+
+        <main className="flex-1 p-4 md:p-8">
+          <Outlet />
+        </main>
       </div>
     </div>
   );
