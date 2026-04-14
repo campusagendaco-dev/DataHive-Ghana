@@ -8,7 +8,7 @@ import AfaOrderForm from "@/components/AfaOrderForm";
 import { useToast } from "@/hooks/use-toast";
 import { getFunctionErrorMessage } from "@/lib/function-errors";
 import { getAppBaseUrl } from "@/lib/app-base-url";
-import { Menu, X, Users, Shield, Zap, AlertTriangle } from "lucide-react";
+import { Menu, X, Users, Shield, AlertTriangle } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -229,19 +229,19 @@ const AgentStore = () => {
   return (
     <div className="min-h-screen flex flex-col bg-background">
       {/* Header */}
-      <header className="sticky top-0 z-50 border-b border-border bg-background/80 backdrop-blur-xl">
+      <header className="sticky top-0 z-50 bg-[#162316]">
         <div className="container mx-auto max-w-3xl flex items-center justify-between px-4 h-16">
           <div className="flex items-center gap-2.5">
-            <div className="w-9 h-9 rounded-lg bg-primary/15 flex items-center justify-center">
-              <Zap className="w-5 h-5 text-primary" />
+            <div className="w-9 h-9 rounded-full bg-white flex items-center justify-center shrink-0">
+              <span className="text-[#162316] font-black text-[8px] text-center leading-tight">DATA<br/>HIVE</span>
             </div>
-            <h1 className="font-display text-lg font-bold text-foreground truncate">
+            <h1 className="font-display text-lg font-bold text-white truncate">
               {agent.store_name}
             </h1>
           </div>
           <button
             onClick={() => setMenuOpen(!menuOpen)}
-            className="p-2 rounded-lg hover:bg-secondary transition-colors"
+            className="p-2 rounded-lg text-white/70 hover:text-white hover:bg-white/10 transition-colors"
             aria-label="Menu"
           >
             {menuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}

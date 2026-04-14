@@ -1,6 +1,6 @@
 import { FormEvent, useMemo, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
-import { Eye, EyeOff, Zap } from "lucide-react";
+import { Eye, EyeOff } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -77,9 +77,10 @@ const ResetPassword = () => {
     <div className="min-h-screen pt-24 pb-16 px-4 flex items-center justify-center">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
-          <div className="flex items-center justify-center gap-2 mb-4">
-            <Zap className="w-8 h-8 text-primary" />
-            <span className="font-display text-2xl font-bold">DataHive Ghana</span>
+          <div className="flex items-center justify-center mb-4">
+            <div className="w-16 h-16 rounded-full bg-[#162316] flex items-center justify-center shadow-lg">
+              <span className="text-white font-black text-[11px] text-center leading-tight">DATA<br/>HIVE</span>
+            </div>
           </div>
           <h1 className="font-display text-2xl font-bold mb-2">Reset Password</h1>
           <p className="text-muted-foreground text-sm">Enter your new password and confirm it.</p>

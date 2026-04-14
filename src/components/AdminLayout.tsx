@@ -1,10 +1,9 @@
 import { useState } from "react";
 import { Outlet, Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
-import { LayoutDashboard, Users, ShieldCheck, ShoppingCart, LogOut, Zap, Menu, Wallet, Bell, Package, CreditCard, Activity, Settings } from "lucide-react";
+import { LayoutDashboard, Users, ShieldCheck, ShoppingCart, LogOut, Menu, Wallet, Bell, Package, CreditCard, Activity, Settings } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
-import AdminNotifications from "@/components/AdminNotifications";
 
 const navItems = [
   { label: "Overview", icon: LayoutDashboard, path: "/admin" },
@@ -31,42 +30,48 @@ const SidebarContent = ({ onNavigate }: { onNavigate?: () => void }) => {
   };
 
   return (
-    <div className="flex flex-col h-full">
-      <div className="p-4 border-b border-sidebar-border">
-        <div className="flex items-center gap-2">
-          <Zap className="w-6 h-6 text-primary" />
-          <span className="font-display text-lg font-bold text-sidebar-foreground">Admin Panel</span>
+    <div className="flex flex-col h-full bg-[#162316]">
+      {/* Logo */}
+      <div className="p-5 flex items-center gap-3 border-b border-white/10">
+        <div className="w-12 h-12 rounded-full bg-white flex items-center justify-center shrink-0 shadow-md">
+          <span className="text-[#162316] font-black text-[10px] text-center leading-tight">DATA<br/>HIVE</span>
+        </div>
+        <div>
+          <p className="text-white font-bold text-sm leading-tight">DataHive GH</p>
+          <p className="text-white/50 text-xs">Admin Console</p>
         </div>
       </div>
-      <nav className="flex-1 p-3 space-y-1">
-        {navItems.map((item) => {
-          const isActive = location.pathname === item.path;
-          return (
-            <Link
-              key={item.path}
-              to={item.path}
-              onClick={onNavigate}
-              className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
-                isActive
-                  ? "bg-sidebar-accent text-sidebar-primary"
-                  : "text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground"
-              }`}
-            >
-              <item.icon className="w-4 h-4" />
-              {item.label}
-            </Link>
-          );
-        })}
+      <nav className="flex-1 p-3 overflow-y-auto">
+        <p className="text-white/30 text-[10px] font-semibold uppercase tracking-wider px-3 mb-2">Menu</p>
+        <div className="space-y-0.5">
+          {navItems.map((item) => {
+            const isActive = location.pathname === item.path;
+            return (
+              <Link
+                key={item.path}
+                to={item.path}
+                onClick={onNavigate}
+                className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+                  isActive
+                    ? "bg-[#243824] text-white"
+                    : "text-white/70 hover:text-white hover:bg-white/5"
+                }`}
+              >
+                <item.icon className="w-4 h-4 shrink-0" />
+                {item.label}
+              </Link>
+            );
+          })}
+        </div>
       </nav>
-      <div className="p-3 border-t border-sidebar-border">
-        <Button
-          variant="ghost"
-          className="w-full justify-start text-sidebar-foreground/70"
+      <div className="p-3 border-t border-white/10">
+        <button
           onClick={handleSignOut}
+          className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-white/70 hover:text-white hover:bg-white/5 transition-colors w-full"
         >
-          <LogOut className="w-4 h-4 mr-2" />
+          <LogOut className="w-4 h-4" />
           Sign Out
-        </Button>
+        </button>
       </div>
     </div>
   );
@@ -79,28 +84,29 @@ const AdminLayout = () => {
     <div className="min-h-screen flex">
       <AdminNotifications />
       {/* Desktop Sidebar */}
-      <aside className="hidden md:flex w-64 bg-sidebar-background border-r border-sidebar-border flex-col">
+      <aside className="hidden md:flex w-64 bg-[#162316] flex-col">
         <SidebarContent />
       </aside>
 
       {/* Main */}
       <div className="flex-1 flex flex-col overflow-auto">
         {/* Mobile Header */}
-        <header className="md:hidden flex items-center gap-3 p-4 border-b border-border bg-background sticky top-0 z-30">
+        <header className="md:hidden flex items-center gap-3 p-3 bg-[#162316] sticky top-0 z-30">
           <Sheet open={open} onOpenChange={setOpen}>
             <SheetTrigger asChild>
-              <Button variant="ghost" size="icon">
+              <Button variant="ghost" size="icon" className="text-white/70 hover:text-white hover:bg-white/10">
                 <Menu className="w-5 h-5" />
               </Button>
             </SheetTrigger>
-            <SheetContent side="left" className="p-0 w-[85vw] max-w-[20rem] bg-sidebar-background overflow-y-auto">
+            <SheetContent side="left" className="p-0 w-[85vw] max-w-[20rem] bg-[#162316] overflow-y-auto border-r-0">
               <SidebarContent onNavigate={() => setOpen(false)} />
             </SheetContent>
           </Sheet>
-          <div className="flex items-center gap-2">
-            <Zap className="w-5 h-5 text-primary" />
-            <span className="font-display text-lg font-bold">Admin</span>
-          </div>
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-full bg-white flex items-center justify-center shrink-0">
+              <span className="text-[#162316] font-black text-[8px] text-center leading-tight">DATA<br/>HIVE</span>
+            </div>
+            <span className="font-display text-base font-bold text-white">Admin</span>
         </header>
 
         <main className="flex-1 p-4 md:p-8">

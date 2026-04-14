@@ -99,10 +99,10 @@ const DashboardWithdraw = () => {
     setWithdrawing(false);
   };
 
-  if (loading) return <div className="text-muted-foreground">Loading...</div>;
+  if (loading) return <div className="text-muted-foreground p-8">Loading...</div>;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 p-6 md:p-8 max-w-4xl">
       <h1 className="font-display text-2xl font-bold">Withdrawals</h1>
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">

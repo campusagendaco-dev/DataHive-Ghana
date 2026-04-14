@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ArrowRight, Eye, EyeOff, Zap, Store } from "lucide-react";
+import { ArrowRight, Eye, EyeOff } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 type Role = "customer" | "reseller";
@@ -95,9 +95,10 @@ const AuthPage = () => {
       <div className="w-full max-w-md">
         {/* Header */}
         <div className="text-center mb-6">
-          <div className="flex items-center justify-center gap-2 mb-3">
-            <Zap className="w-7 h-7 text-primary" />
-            <span className="font-display text-xl font-bold">DataHive Ghana</span>
+          <div className="flex items-center justify-center mb-4">
+            <div className="w-16 h-16 rounded-full bg-[#162316] flex items-center justify-center shadow-lg">
+              <span className="text-white font-black text-[11px] text-center leading-tight">DATA<br/>HIVE</span>
+            </div>
           </div>
         </div>
 

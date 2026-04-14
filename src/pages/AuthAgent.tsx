@@ -5,7 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ArrowRight, Eye, EyeOff, Store } from "lucide-react";
+import { ArrowRight, Eye, EyeOff } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 const AuthAgent = () => {
@@ -79,8 +79,10 @@ const AuthAgent = () => {
     <div className="min-h-screen pt-24 pb-16 px-4 flex items-center justify-center">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
-          <div className="flex items-center justify-center gap-2 mb-4">
-            <Store className="w-8 h-8 text-primary" />
+          <div className="flex items-center justify-center mb-4">
+            <div className="w-16 h-16 rounded-full bg-[#162316] flex items-center justify-center shadow-lg">
+              <span className="text-white font-black text-[11px] text-center leading-tight">DATA<br/>HIVE</span>
+            </div>
           </div>
           <h1 className="font-display text-2xl font-bold mb-2">
             {isSignUp ? "Agent Sign Up" : "Agent Sign In"}
