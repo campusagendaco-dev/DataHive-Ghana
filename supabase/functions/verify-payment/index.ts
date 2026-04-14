@@ -128,7 +128,7 @@ type ProviderResult = {
 async function callProviderApi(
   baseUrl: string,
   apiKey: string,
-  endpoint: "order" | "afa-registration",
+  endpoint: "purchase" | "afa-registration",
   body: Record<string, unknown>,
 ): Promise<ProviderResult> {
   const urls = buildProviderUrls(baseUrl, endpoint);
@@ -390,7 +390,7 @@ serve(async (req) => {
         const dataPlan = formatDataPlan(packageSize);
         console.log("Fulfilling data order:", { apiNetwork, dataPlan, customerPhone });
 
-        const result = await callProviderApi(DATA_PROVIDER_BASE_URL, DATA_PROVIDER_API_KEY, "order", {
+        const result = await callProviderApi(DATA_PROVIDER_BASE_URL, DATA_PROVIDER_API_KEY, "purchase", {
           network: apiNetwork,
           data_plan: dataPlan,
           beneficiary: customerPhone,
