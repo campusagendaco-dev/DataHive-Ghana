@@ -7,16 +7,17 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-function mapNetworkToApi(network: string): string {
+function mapNetworkKey(network: string): string {
   const normalized = network.trim().toUpperCase();
-  if (normalized === "AIRTELTIGO" || normalized === "AIRTEL TIGO" || normalized === "AT") return "AIRTELTIGO_ISHARE";
+  if (normalized === "AIRTELTIGO" || normalized === "AIRTEL TIGO" || normalized === "AT") return "AT_PREMIUM";
   if (normalized === "TELECEL" || normalized === "VODAFONE") return "TELECEL";
-  if (normalized === "MTN") return "MTN";
+  if (normalized === "MTN") return "YELLO";
   return normalized;
 }
 
-function formatDataPlan(packageSize: string): string {
-  return packageSize.replace(/\s+/g, "").toUpperCase().replace(/GB$/, "");
+function parseCapacity(packageSize: string): number {
+  const match = packageSize.replace(/\s+/g, "").match(/^(\d+(?:\.\d+)?)/)
+  return match ? parseFloat(match[1]) : 0;
 }
 
 function normalizeProviderBaseUrl(baseUrl: string): string {
@@ -370,9 +371,9 @@ serve(async (req) => {
       DATA_PROVIDER_API_KEY,
       "purchase",
       {
-        network: mapNetworkToApi(network),
-        data_plan: formatDataPlan(packageSize),
-        beneficiary: customerPhone,
+        networkKey: mapNetworkKey(network),
+        recipient: customerPhone,
+        capacity: parseCapacity(packageSize),
       },
     );
 

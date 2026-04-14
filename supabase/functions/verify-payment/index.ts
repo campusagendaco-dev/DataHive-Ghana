@@ -6,16 +6,17 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-function mapNetworkToApi(network: string): string {
+function mapNetworkKey(network: string): string {
   const normalized = network.trim().toUpperCase();
-  if (normalized === "AIRTELTIGO" || normalized === "AIRTEL TIGO" || normalized === "AT") return "AIRTELTIGO_ISHARE";
+  if (normalized === "AIRTELTIGO" || normalized === "AIRTEL TIGO" || normalized === "AT") return "AT_PREMIUM";
   if (normalized === "TELECEL" || normalized === "VODAFONE") return "TELECEL";
-  if (normalized === "MTN") return "MTN";
+  if (normalized === "MTN") return "YELLO";
   return normalized;
 }
 
-function formatDataPlan(packageSize: string): string {
-  return packageSize.replace(/\s+/g, "").toUpperCase().replace(/GB$/, "");
+function parseCapacity(packageSize: string): number {
+  const match = packageSize.replace(/\s+/g, "").match(/^(\d+(?:\.\d+)?)/)
+  return match ? parseFloat(match[1]) : 0;
 }
 
 function normalizeProviderBaseUrl(baseUrl: string): string {
@@ -275,9 +276,9 @@ serve(async (req) => {
           await supabase.from("orders").update({ status: "fulfillment_failed", failure_reason: "Missing order details" }).eq("id", reference);
         } else {
           const result = await callProviderApi(DATA_PROVIDER_BASE_URL, DATA_PROVIDER_API_KEY, "purchase", {
-            network: mapNetworkToApi(network),
-            data_plan: formatDataPlan(packageSize),
-            beneficiary: customerPhone,
+            networkKey: mapNetworkKey(network),
+            recipient: customerPhone,
+            capacity: parseCapacity(packageSize),
           });
           if (result.ok) {
             await supabase.from("orders").update({ status: "fulfilled", failure_reason: null }).eq("id", reference);
@@ -432,14 +433,14 @@ serve(async (req) => {
           failure_reason: "Missing order details for fulfillment.",
         }).eq("id", reference);
       } else {
-        const apiNetwork = mapNetworkToApi(network);
-        const dataPlan = formatDataPlan(packageSize);
-        console.log("Fulfilling data order:", { apiNetwork, dataPlan, customerPhone });
+        const networkKey = mapNetworkKey(network);
+        const capacity = parseCapacity(packageSize);
+        console.log("Fulfilling data order:", { networkKey, capacity, recipient: customerPhone });
 
         const result = await callProviderApi(DATA_PROVIDER_BASE_URL, DATA_PROVIDER_API_KEY, "purchase", {
-          network: apiNetwork,
-          data_plan: dataPlan,
-          beneficiary: customerPhone,
+          networkKey,
+          recipient: customerPhone,
+          capacity,
         });
         console.log("Data fulfillment response:", {
           reference,

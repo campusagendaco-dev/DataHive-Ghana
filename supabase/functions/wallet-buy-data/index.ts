@@ -48,16 +48,17 @@ async function resolveExpectedAmount(supabaseAdmin: any, network: string, packag
   return Number(basePrice.toFixed(2));
 }
 
-function mapNetworkToApi(network: string): string {
+function mapNetworkKey(network: string): string {
   const normalized = network.trim().toUpperCase();
-  if (normalized === "AIRTELTIGO" || normalized === "AIRTEL TIGO" || normalized === "AT") return "AIRTELTIGO_ISHARE";
+  if (normalized === "AIRTELTIGO" || normalized === "AIRTEL TIGO" || normalized === "AT") return "AT_PREMIUM";
   if (normalized === "TELECEL" || normalized === "VODAFONE") return "TELECEL";
-  if (normalized === "MTN") return "MTN";
+  if (normalized === "MTN") return "YELLO";
   return normalized;
 }
 
-function formatDataPlan(packageSize: string): string {
-  return packageSize.replace(/\s+/g, "").toUpperCase().replace(/GB$/, "");
+function parseCapacity(packageSize: string): number {
+  const match = packageSize.replace(/\s+/g, "").match(/^(\d+(?:\.\d+)?)/)
+  return match ? parseFloat(match[1]) : 0;
 }
 
 function normalizeProviderBaseUrl(baseUrl: string): string {
@@ -171,10 +172,11 @@ async function placeDataOrder(
 ): Promise<ProviderResult> {
   const urls = buildProviderUrls(baseUrl, "purchase");
   const requestBody = {
-    network: mapNetworkToApi(network),
-    data_plan: formatDataPlan(packageSize),
-    beneficiary: customerPhone,
+    networkKey: mapNetworkKey(network),
+    recipient: customerPhone,
+    capacity: parseCapacity(packageSize),
   };
+  console.log("Provider request body:", requestBody);
 
   let lastFailure: ProviderResult = {
     ok: false,
