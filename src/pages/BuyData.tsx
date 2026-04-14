@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import NetworkCard from "@/components/NetworkCard";
-import DataPackageCard from "@/components/DataPackageCard"; // kept for reference
 import { basePackages, networks, getPublicPrice } from "@/lib/data";
+import { getNetworkCardColors } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { getFunctionErrorMessage } from "@/lib/function-errors";
