@@ -8,7 +8,7 @@ import AfaOrderForm from "@/components/AfaOrderForm";
 import { useToast } from "@/hooks/use-toast";
 import { getFunctionErrorMessage } from "@/lib/function-errors";
 import { getAppBaseUrl } from "@/lib/app-base-url";
-import { Menu, X, Users, Shield, AlertTriangle } from "lucide-react";
+import { Menu, X, Users, Shield, AlertTriangle, Zap } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -143,6 +143,7 @@ const AgentStore = () => {
   };
 
   const handleBuyClick = (network: string, size: string, basePrice: number) => {
+    setPhone("");
     setPendingOrder({ network, size, basePrice });
     setConfirmOpen(true);
   };
@@ -302,14 +303,14 @@ const AgentStore = () => {
         <div className="container mx-auto max-w-3xl">
           <div className="mb-8">
             <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-3">Choose Network</p>
-            <div className="grid grid-cols-3 gap-3">
+            <div className="flex flex-wrap gap-2">
               {networks.map((n) => (
                 <NetworkCard
                   key={n.name}
                   name={n.name}
                   color={n.color}
                   selected={selected === n.name}
-                  onClick={() => { setSelected(n.name); setSelectedPkg(null); setPhone(""); }}
+                  onClick={() => { setSelected(n.name); setPhone(""); }}
                 />
               ))}
             </div>
@@ -320,33 +321,31 @@ const AgentStore = () => {
               <div className="w-1 h-6 rounded-full bg-primary" />
               <h2 className="font-display text-xl font-bold">{selected} Bundles</h2>
             </div>
-            <div className="space-y-3">
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
               {basePackages[selected]?.map((pkg) => {
                 const disabled = isPackageDisabled(selected, pkg.size);
                 const key = `${selected}-${pkg.size}`;
-                const { fee, total } = getTotal(selected, pkg.size, pkg.price);
+                const agentPriceStr = getAgentPrice(selected, pkg.size, pkg.price);
                 return (
-                  <div key={pkg.size} className={disabled ? "opacity-50 pointer-events-none" : ""}>
-                    {disabled && (
-                      <div className="text-xs text-destructive font-medium mb-1 flex items-center gap-1">
-                        <AlertTriangle className="w-3 h-3" /> Currently unavailable
-                      </div>
-                    )}
-                    <DataPackageCard
-                      size={pkg.size}
-                      price={getAgentPrice(selected, pkg.size, pkg.price)}
-                      validity={pkg.validity}
-                      popular={pkg.popular}
-                      isSelected={selectedPkg === key}
-                      phone={selectedPkg === key ? phone : ""}
-                      onPhoneChange={(val) => setPhone(val)}
-                      isPhoneValid={isPhoneValid}
-                      fee={selectedPkg === key ? fee : undefined}
-                      total={selectedPkg === key ? total : undefined}
-                      buying={buyingPkg === key}
-                      onSelect={() => handleSelectPackage(selected, pkg.size)}
-                      onBuy={() => handleBuyClick(selected, pkg.size, pkg.price)}
-                    />
+                  <div
+                    key={pkg.size}
+                    className={`bg-amber-400 rounded-xl p-3 flex flex-col gap-2 ${disabled ? "opacity-50 pointer-events-none" : ""}`}
+                  >
+                    <div className="flex justify-between items-start">
+                      <span className="text-black/70 text-xs font-semibold">{selected}</span>
+                      <span className="text-black/70 text-xs">Price</span>
+                    </div>
+                    <div className="flex justify-between items-end">
+                      <span className="text-black text-2xl font-black">{pkg.size}</span>
+                      <span className="text-black font-bold text-sm">GH&#8373; {agentPriceStr}</span>
+                    </div>
+                    <button
+                      onClick={() => handleBuyClick(selected, pkg.size, pkg.price)}
+                      disabled={buyingPkg === key || disabled}
+                      className="w-full bg-amber-100 hover:bg-white disabled:opacity-50 text-black text-sm font-semibold py-1.5 rounded-lg transition-colors"
+                    >
+                      {buyingPkg === key ? "Processing..." : "Buy"}
+                    </button>
                   </div>
                 );
               })}
@@ -380,21 +379,34 @@ const AgentStore = () => {
         </div>
       </main>
 
-      <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+      <AlertDialog open={confirmOpen} onOpenChange={(open) => { if (!open) setPhone(""); setConfirmOpen(open); }}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Confirm Recipient Number</AlertDialogTitle>
+            <AlertDialogTitle>Enter Recipient Number</AlertDialogTitle>
             <AlertDialogDescription>
-              You are about to purchase data for:
-              <span className="block text-foreground font-bold text-lg mt-2">{phone}</span>
-              <span className="block mt-2">Please make sure this is the correct number before proceeding.</span>
+              {pendingOrder && `${pendingOrder.network} — ${pendingOrder.size} · GH₵ ${getAgentPrice(pendingOrder.network, pendingOrder.size, pendingOrder.basePrice)}`}
             </AlertDialogDescription>
           </AlertDialogHeader>
+          <div className="py-2 px-1">
+            <label className="block text-sm font-medium text-foreground mb-1.5">Phone Number</label>
+            <input
+              type="tel"
+              placeholder="e.g. 0241234567"
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+              maxLength={10}
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-amber-400 bg-transparent text-foreground"
+            />
+          </div>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleConfirmBuy}>
+            <AlertDialogCancel onClick={() => setPhone("")}>Cancel</AlertDialogCancel>
+            <button
+              onClick={() => { if (isPhoneValid) handleConfirmBuy(); }}
+              disabled={!isPhoneValid}
+              className="inline-flex items-center justify-center rounded-md bg-amber-400 px-4 py-2 text-sm font-semibold text-black hover:bg-amber-300 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
               Buy Now
-            </AlertDialogAction>
+            </button>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

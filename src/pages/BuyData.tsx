@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import NetworkCard from "@/components/NetworkCard";
-import DataPackageCard from "@/components/DataPackageCard";
+import DataPackageCard from "@/components/DataPackageCard"; // kept for reference
 import { basePackages, networks, getPublicPrice } from "@/lib/data";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -100,6 +100,7 @@ const BuyData = () => {
       });
       return;
     }
+    setPhone("");
     setPendingOrder({ network, size, price: publicPrice });
     setConfirmOpen(true);
   };
@@ -151,68 +152,82 @@ const BuyData = () => {
         <h1 className="font-display text-3xl md:text-4xl font-bold mb-2">Buy Data</h1>
         <p className="text-muted-foreground mb-8">Select a network and choose your data package.</p>
         {systemSettings.holiday_mode_enabled && (
-          <div className="mb-6 rounded-lg border border-yellow-500/40 bg-yellow-500/10 p-4 text-sm text-yellow-200">
+          <div className="mb-6 rounded-lg border border-yellow-500/40 bg-yellow-500/10 p-4 text-sm text-yellow-800">
             {systemSettings.holiday_message}
           </div>
         )}
 
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-10">
+        <div className="flex flex-wrap gap-2 mb-8">
           {networks.map((n) => (
             <NetworkCard
               key={n.name}
               name={n.name}
               color={n.color}
               selected={selected === n.name}
-              onClick={() => { setSelected(n.name); setSelectedPkg(null); setPhone(""); }}
+              onClick={() => { setSelected(n.name); setPhone(""); }}
             />
           ))}
         </div>
 
         <h2 className="font-display text-xl font-semibold mb-4">{selected} Data Packages</h2>
-        <div className="space-y-4">
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
           {basePackages[selected]?.map((pkg) => {
             const key = `${selected}-${pkg.size}`;
             const gs = globalSettings[key];
             const isUnavailable = gs?.is_unavailable || false;
             if (isUnavailable) return null;
-
             const publicPrice = gs?.public_price ?? getPublicPrice(pkg.price);
-            const { fee, total } = getTotal(publicPrice);
             return (
-              <DataPackageCard
-                key={pkg.size}
-                size={pkg.size}
-                price={publicPrice.toFixed(2)}
-                validity={pkg.validity}
-                popular={pkg.popular}
-                isSelected={selectedPkg === key}
-                phone={selectedPkg === key ? phone : ""}
-                onPhoneChange={(val) => setPhone(val)}
-                isPhoneValid={isPhoneValid}
-                fee={selectedPkg === key ? fee : undefined}
-                total={selectedPkg === key ? total : undefined}
-                buying={buyingPkg === key}
-                onSelect={() => handleSelectPackage(selected, pkg.size)}
-                onBuy={() => handleBuyClick(selected, pkg.size, publicPrice)}
-              />
+              <div key={pkg.size} className="bg-amber-400 rounded-xl p-3 flex flex-col gap-2">
+                <div className="flex justify-between items-start">
+                  <span className="text-black/70 text-xs font-semibold">{selected}</span>
+                  <span className="text-black/70 text-xs">Price</span>
+                </div>
+                <div className="flex justify-between items-end">
+                  <span className="text-black text-2xl font-black">{pkg.size}</span>
+                  <span className="text-black font-bold text-sm">GH&#8373; {publicPrice.toFixed(2)}</span>
+                </div>
+                <button
+                  onClick={() => handleBuyClick(selected, pkg.size, publicPrice)}
+                  disabled={buyingPkg === key}
+                  className="w-full bg-amber-100 hover:bg-white disabled:opacity-50 text-black text-sm font-semibold py-1.5 rounded-lg transition-colors"
+                >
+                  {buyingPkg === key ? "Processing..." : "Buy"}
+                </button>
+              </div>
             );
           })}
         </div>
       </div>
 
-      <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+      <AlertDialog open={confirmOpen} onOpenChange={(open) => { if (!open) setPhone(""); setConfirmOpen(open); }}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Confirm Recipient Number</AlertDialogTitle>
+            <AlertDialogTitle>Enter Recipient Number</AlertDialogTitle>
             <AlertDialogDescription>
-              You are about to purchase data for:
-              <span className="block text-foreground font-bold text-lg mt-2">{phone}</span>
-              <span className="block mt-2">Please make sure this is the correct number before proceeding.</span>
+              {pendingOrder && `${pendingOrder.network} — ${pendingOrder.size} · GH₵ ${pendingOrder.price.toFixed(2)}`}
             </AlertDialogDescription>
           </AlertDialogHeader>
+          <div className="py-2 px-1">
+            <label className="block text-sm font-medium text-foreground mb-1.5">Phone Number</label>
+            <input
+              type="tel"
+              placeholder="e.g. 0241234567"
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+              maxLength={10}
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-amber-400 bg-transparent text-foreground"
+            />
+          </div>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleConfirmBuy}>Buy Now</AlertDialogAction>
+            <AlertDialogCancel onClick={() => setPhone("")}>Cancel</AlertDialogCancel>
+            <button
+              onClick={() => { if (isPhoneValid) handleConfirmBuy(); }}
+              disabled={!isPhoneValid}
+              className="inline-flex items-center justify-center rounded-md bg-amber-400 px-4 py-2 text-sm font-semibold text-black hover:bg-amber-300 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              Confirm &amp; Pay
+            </button>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
