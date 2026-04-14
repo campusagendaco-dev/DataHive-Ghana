@@ -44,6 +44,8 @@ import AdminPackages from "./pages/AdminPackages";
 import AdminWalletTopup from "./pages/AdminWalletTopup";
 import AdminSystemHealth from "./pages/AdminSystemHealth";
 import AdminSettings from "./pages/AdminSettings";
+import SubAgentSignup from "./pages/SubAgentSignup";
+import SubAgentPending from "./pages/SubAgentPending";
 import Maintenance from "./pages/Maintenance";
 import NotFound from "./pages/NotFound";
 
@@ -68,14 +70,30 @@ const OnboardingRoute = ({ children }: { children: React.ReactNode }) => {
   return <>{children}</>;
 };
 
-/** Agent dashboard guard — must be onboarded AND approved */
+/** Agent dashboard guard — must be onboarded AND approved (also allows activated sub agents) */
 const DashboardGuard = ({ children }: { children: React.ReactNode }) => {
   const { user, profile, loading } = useAuth();
   if (loading) return <div className="min-h-screen flex items-center justify-center text-muted-foreground">Loading...</div>;
   if (!user) return <Navigate to="/login" replace />;
+  // Sub-agent path
+  if (profile?.is_sub_agent) {
+    if (!profile?.sub_agent_approved) return <Navigate to="/sub-agent/pending" replace />;
+    return <>{children}</>;
+  }
+  // Regular agent path
   if (!profile?.is_agent) return <Navigate to="/agent-program" replace />;
   if (!profile?.agent_approved) return <Navigate to="/agent/pending" replace />;
   if (!profile?.onboarding_complete) return <Navigate to="/onboarding" replace />;
+  return <>{children}</>;
+};
+
+/** Sub-agent pending guard */
+const SubAgentPendingGuard = ({ children }: { children: React.ReactNode }) => {
+  const { user, profile, loading } = useAuth();
+  if (loading) return <div className="min-h-screen flex items-center justify-center text-muted-foreground">Loading...</div>;
+  if (!user) return <Navigate to="/login" replace />;
+  if (!profile?.is_sub_agent) return <Navigate to="/" replace />;
+  if (profile?.sub_agent_approved) return <Navigate to="/dashboard" replace />;
   return <>{children}</>;
 };
 
@@ -221,6 +239,10 @@ const AppContent = () => {
 
         {/* Protected: buy data requires login */}
         <Route path="/buy-data" element={<AuthGuard><BuyData /></AuthGuard>} />
+
+        {/* Sub agent routes */}
+        <Route path="/store/:slug/sub-agent" element={<SubAgentSignup />} />
+        <Route path="/sub-agent/pending" element={<SubAgentPendingGuard><SubAgentPending /></SubAgentPendingGuard>} />
 
         {/* Agent flow */}
         <Route path="/onboarding" element={<OnboardingRoute><Onboarding /></OnboardingRoute>} />

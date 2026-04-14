@@ -48,12 +48,21 @@ serve(async (req) => {
       .maybeSingle();
 
     if (settings?.disable_ordering) {
-      return new Response(JSON.stringify({
-        error: settings.holiday_message || "Ordering is currently disabled. Please try again later.",
-      }), {
-        status: 403,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      // Read order type from body to decide whether to bypass — parse body early
+      let earlyOrderType = "data";
+      try {
+        const earlyBody = await req.clone().json();
+        earlyOrderType = earlyBody?.metadata?.order_type || "data";
+      } catch { /* ignore */ }
+      const bypassTypes = ["agent_activation", "sub_agent_activation", "wallet_topup"];
+      if (!bypassTypes.includes(earlyOrderType)) {
+        return new Response(JSON.stringify({
+          error: settings.holiday_message || "Ordering is currently disabled. Please try again later.",
+        }), {
+          status: 403,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
     }
 
     const payload = await req.json();

@@ -291,6 +291,48 @@ serve(async (req) => {
       });
     }
 
+    if (orderType === "sub_agent_activation") {
+      const subAgentId = metadata?.sub_agent_id;
+      const parentAgentId = metadata?.parent_agent_id;
+      const agentProfit = Number(metadata?.agent_profit || 0);
+      if (subAgentId) {
+        // Fetch parent's sub_agent_prices to copy as the sub agent's agent_prices
+        const { data: parentProfile } = await supabase
+          .from("profiles")
+          .select("sub_agent_prices")
+          .eq("user_id", parentAgentId)
+          .maybeSingle();
+        const subAgentPrices = parentProfile?.sub_agent_prices || {};
+
+        await supabase.from("profiles").update({
+          is_agent: true,
+          agent_approved: true,
+          sub_agent_approved: true,
+          onboarding_complete: true,
+          agent_prices: subAgentPrices,
+        }).eq("user_id", subAgentId);
+
+        // Credit parent agent wallet with the activation markup profit
+        if (parentAgentId && agentProfit > 0) {
+          const { data: parentWallet } = await supabase
+            .from("wallets").select("balance").eq("agent_id", parentAgentId).maybeSingle();
+          if (parentWallet) {
+            const newBalance = parseFloat(((Number(parentWallet.balance) || 0) + agentProfit).toFixed(2));
+            await supabase.from("wallets").update({ balance: newBalance }).eq("agent_id", parentAgentId);
+          } else {
+            await supabase.from("wallets").insert({ agent_id: parentAgentId, balance: agentProfit });
+          }
+        }
+
+        await supabase.from("orders").update({ status: "fulfilled", failure_reason: null }).eq("id", orderId);
+        console.log("Sub agent activated via webhook:", subAgentId, "parent:", parentAgentId);
+      }
+      return new Response(JSON.stringify({ received: true, fulfilled: true }), {
+        status: 200,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     if (orderType === "wallet_topup") {
       const { data: order } = await supabase.from("orders").select("amount, agent_id").eq("id", orderId).maybeSingle();
       if (order) {

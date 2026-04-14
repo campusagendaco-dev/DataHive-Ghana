@@ -354,6 +354,34 @@ serve(async (req) => {
       });
     }
 
+    if (orderType === "sub_agent_activation") {
+      const subAgentId = metadata?.sub_agent_id || agentId;
+      const parentAgentId = metadata?.parent_agent_id;
+      const agentProfit = Number(metadata?.agent_profit || 0);
+      if (subAgentId) {
+        const { data: parentProfile } = await supabase
+          .from("profiles").select("sub_agent_prices").eq("user_id", parentAgentId).maybeSingle();
+        const subAgentPrices = parentProfile?.sub_agent_prices || {};
+        await supabase.from("profiles").update({
+          is_agent: true, agent_approved: true, sub_agent_approved: true,
+          onboarding_complete: true, agent_prices: subAgentPrices,
+        }).eq("user_id", subAgentId);
+        if (parentAgentId && agentProfit > 0) {
+          const { data: pw } = await supabase.from("wallets").select("balance").eq("agent_id", parentAgentId).maybeSingle();
+          if (pw) {
+            await supabase.from("wallets").update({ balance: parseFloat(((Number(pw.balance) || 0) + agentProfit).toFixed(2)) }).eq("agent_id", parentAgentId);
+          } else {
+            await supabase.from("wallets").insert({ agent_id: parentAgentId, balance: agentProfit });
+          }
+        }
+        await supabase.from("orders").update({ status: "fulfilled", failure_reason: null }).eq("id", reference);
+      }
+      return new Response(JSON.stringify({ status: "fulfilled" }), {
+        status: 200,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     if (orderType === "wallet_topup") {
       const creditAmount = Number(metadata.wallet_credit || order?.amount || paidAmount);
       const { data: wallet } = await supabase.from("wallets").select("balance").eq("agent_id", agentId).maybeSingle();

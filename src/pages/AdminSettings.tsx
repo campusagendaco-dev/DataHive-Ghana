@@ -21,6 +21,7 @@ type SystemSettings = {
   customer_service_number: string;
   support_channel_link: string;
   table_ready: boolean;
+  sub_agent_base_fee: number;
 };
 
 const defaultSettings: SystemSettings = {
@@ -34,6 +35,7 @@ const defaultSettings: SystemSettings = {
   customer_service_number: "+233203256540",
   support_channel_link: "https://whatsapp.com/channel/0029Vb6Xwed60eBaztkH2B3m",
   table_ready: true,
+  sub_agent_base_fee: 80,
 };
 
 const toUiSettings = (data: any): SystemSettings => ({
@@ -47,6 +49,7 @@ const toUiSettings = (data: any): SystemSettings => ({
   customer_service_number: String(data?.customer_service_number || defaultSettings.customer_service_number),
   support_channel_link: String(data?.support_channel_link || defaultSettings.support_channel_link),
   table_ready: Boolean(data?.table_ready ?? true),
+  sub_agent_base_fee: Number(data?.sub_agent_base_fee ?? 80) || 80,
 });
 
 const AdminSettings = () => {
@@ -124,6 +127,7 @@ const AdminSettings = () => {
         dark_mode_enabled: settings.dark_mode_enabled,
         customer_service_number: settings.customer_service_number.trim() || defaultSettings.customer_service_number,
         support_channel_link: settings.support_channel_link.trim() || defaultSettings.support_channel_link,
+        sub_agent_base_fee: settings.sub_agent_base_fee,
       },
       headers: {
         Authorization: `Bearer ${accessToken}`,
@@ -143,6 +147,7 @@ const AdminSettings = () => {
         dark_mode_enabled: settings.dark_mode_enabled,
         customer_service_number: settings.customer_service_number.trim() || defaultSettings.customer_service_number,
         support_channel_link: settings.support_channel_link.trim() || defaultSettings.support_channel_link,
+        sub_agent_base_fee: settings.sub_agent_base_fee,
         updated_at: new Date().toISOString(),
       });
 
@@ -345,6 +350,27 @@ const AdminSettings = () => {
             <Switch
               checked={settings.dark_mode_enabled}
               onCheckedChange={(checked) => setSettings((prev) => ({ ...prev, dark_mode_enabled: checked }))}
+            />
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg">Sub Agent Settings</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div>
+            <Label htmlFor="sub-agent-base-fee">Sub Agent Activation Base Fee (GH₵)</Label>
+            <p className="text-xs text-muted-foreground mb-2">Platform base fee agents pay to activate a sub agent. Agents can add their own markup on top.</p>
+            <Input
+              id="sub-agent-base-fee"
+              type="number"
+              min={0}
+              step={0.01}
+              value={settings.sub_agent_base_fee}
+              onChange={(e) => setSettings((prev) => ({ ...prev, sub_agent_base_fee: Math.max(0, Number(e.target.value)) }))}
+              className="mt-1 bg-secondary max-w-[180px]"
             />
           </div>
         </CardContent>

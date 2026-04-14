@@ -23,6 +23,11 @@ export interface Profile {
   onboarding_complete: boolean;
   agent_approved: boolean;
   topup_reference: string | null;
+  is_sub_agent: boolean;
+  sub_agent_approved: boolean;
+  parent_agent_id: string | null;
+  sub_agent_activation_markup: number;
+  sub_agent_prices: Record<string, Record<string, string>>;
 }
 
 interface AuthContextType {

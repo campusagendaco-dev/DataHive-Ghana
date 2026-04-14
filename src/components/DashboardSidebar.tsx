@@ -87,7 +87,9 @@ const DashboardSidebar = ({ open, onClose }: DashboardSidebarProps) => {
         <nav className="flex-1 p-3 overflow-y-auto">
           <p className="text-white/30 text-[10px] font-semibold uppercase tracking-wider px-3 mb-2">Menu</p>
           <div className="space-y-0.5">
-            {navItems.map((item) => {
+            {navItems.filter((item) =>
+              !((profile as any)?.is_sub_agent && item.to === "/dashboard/sub-agents")
+            ).map((item) => {
               const isActive = location.pathname === item.to;
               return (
                 <Link
