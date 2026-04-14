@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Outlet, Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
+import AdminNotifications from "@/components/AdminNotifications";
 import { LayoutDashboard, Users, ShieldCheck, ShoppingCart, LogOut, Menu, Wallet, Bell, Package, CreditCard, Activity, Settings } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
