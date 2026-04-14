@@ -178,19 +178,19 @@ const BuyData = () => {
             if (isUnavailable) return null;
             const publicPrice = gs?.public_price ?? getPublicPrice(pkg.price);
             return (
-              <div key={pkg.size} className="bg-amber-400 rounded-xl p-3 flex flex-col gap-2">
+              <div key={pkg.size} className={`${getNetworkCardColors(selected).card} rounded-xl p-3 flex flex-col gap-2`}>
                 <div className="flex justify-between items-start">
-                  <span className="text-black/70 text-xs font-semibold">{selected}</span>
-                  <span className="text-black/70 text-xs">Price</span>
+                  <span className={`${getNetworkCardColors(selected).label} text-xs font-semibold`}>{selected}</span>
+                  <span className={`${getNetworkCardColors(selected).price} text-xs`}>Price</span>
                 </div>
                 <div className="flex justify-between items-end">
-                  <span className="text-black text-2xl font-black">{pkg.size}</span>
-                  <span className="text-black font-bold text-sm">GH&#8373; {publicPrice.toFixed(2)}</span>
+                  <span className={`${getNetworkCardColors(selected).size} text-2xl font-black`}>{pkg.size}</span>
+                  <span className={`${getNetworkCardColors(selected).size} font-bold text-sm`}>GH&#8373; {publicPrice.toFixed(2)}</span>
                 </div>
                 <button
                   onClick={() => handleBuyClick(selected, pkg.size, publicPrice)}
                   disabled={buyingPkg === key}
-                  className="w-full bg-amber-100 hover:bg-white disabled:opacity-50 text-black text-sm font-semibold py-1.5 rounded-lg transition-colors"
+                  className={`w-full ${getNetworkCardColors(selected).btn} disabled:opacity-50 text-sm font-semibold py-1.5 rounded-lg transition-colors`}
                 >
                   {buyingPkg === key ? "Processing..." : "Buy"}
                 </button>

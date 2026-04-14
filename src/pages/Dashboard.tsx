@@ -5,6 +5,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
+import { getNetworkCardColors } from "@/lib/utils";
 import { basePackages } from "@/lib/data";
 
 interface DashboardStats {
@@ -195,19 +196,20 @@ const Dashboard = () => {
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
         {packages.map((pkg) => {
           const displayPrice = getDisplayPrice(pkg.price);
+          const c = getNetworkCardColors(activeNetwork);
           return (
-            <div key={pkg.size} className="bg-amber-400 rounded-xl p-3 flex flex-col gap-2">
+            <div key={pkg.size} className={`${c.card} rounded-xl p-3 flex flex-col gap-2`}>
               <div className="flex justify-between items-start">
-                <span className="text-black/70 text-xs font-semibold">{activeNetwork}</span>
-                <span className="text-black/70 text-xs">Price</span>
+                <span className={`${c.label} text-xs font-semibold`}>{activeNetwork}</span>
+                <span className={`${c.price} text-xs`}>Price</span>
               </div>
               <div className="flex justify-between items-end">
-                <span className="text-black text-2xl font-black">{pkg.size}</span>
-                <span className="text-black font-bold text-sm">GH₵ {displayPrice.toFixed(2)}</span>
+                <span className={`${c.size} text-2xl font-black`}>{pkg.size}</span>
+                <span className={`${c.size} font-bold text-sm`}>GH₵ {displayPrice.toFixed(2)}</span>
               </div>
               <button
                 onClick={() => openBuy(pkg)}
-                className="w-full bg-amber-100 hover:bg-white text-black text-sm font-semibold py-1.5 rounded-lg transition-colors"
+                className={`w-full ${c.btn} text-sm font-semibold py-1.5 rounded-lg transition-colors`}
               >
                 Buy
               </button>
