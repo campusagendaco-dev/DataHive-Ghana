@@ -140,7 +140,7 @@ const Dashboard = () => {
       {/* Title row */}
       <div className="flex items-center gap-3 mb-5">
         <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
-        <Home className="w-5 h-5 text-gray-400" />
+        <Home className="w-5 h-5 text-gray-600" />
         <span className="bg-green-100 text-green-700 text-xs font-semibold px-2 py-0.5 rounded-full">Open now</span>
       </div>
 
@@ -224,16 +224,16 @@ const Dashboard = () => {
               <h2 className="font-bold text-lg text-gray-900">
                 Buy {buyDialog.pkg.size} — {activeNetwork}
               </h2>
-              <button onClick={() => setBuyDialog({ open: false })} className="text-gray-400 hover:text-gray-600">
+              <button onClick={() => setBuyDialog({ open: false })} className="text-gray-600 hover:text-gray-900">
                 <X className="w-5 h-5" />
               </button>
             </div>
-            <p className="text-sm text-gray-500 mb-4">
+            <p className="text-sm text-gray-900 mb-4">
               Price: <span className="font-semibold text-gray-900">GH₵ {getDisplayPrice(buyDialog.pkg.price).toFixed(2)}</span>
             </p>
             <label className="block text-sm font-medium text-gray-700 mb-1">Customer Phone Number</label>
             <div className="flex items-center border border-gray-300 rounded-lg px-3 py-2 gap-2 mb-4 focus-within:border-amber-400">
-              <Phone className="w-4 h-4 text-gray-400 shrink-0" />
+              <Phone className="w-4 h-4 text-gray-600 shrink-0" />
               <input
                 type="tel"
                 placeholder="e.g. 0241234567"

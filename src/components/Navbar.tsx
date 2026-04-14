@@ -1,5 +1,5 @@
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { Menu, X, Zap, LogOut } from "lucide-react";
+import { Menu, X, LogOut } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
@@ -25,50 +25,60 @@ const Navbar = () => {
   };
 
   return (
-    <nav className="fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-xl border-b border-border">
+    <nav className="fixed top-0 left-0 right-0 z-50 bg-[#162316] shadow-lg">
       <div className="container mx-auto flex items-center justify-between h-16 px-4">
-        <Link to="/" className="flex items-center gap-2 font-display font-bold text-xl">
-          <Zap className="w-6 h-6 text-primary" />
-          <span className="text-foreground">Data</span>
-          <span className="text-gradient">Hive</span>
-          <span className="text-muted-foreground text-sm font-medium ml-1">GH</span>
+        {/* Logo */}
+        <Link to="/" className="flex items-center gap-2.5">
+          <div className="w-9 h-9 rounded-full bg-white flex items-center justify-center shrink-0">
+            <span className="text-[#162316] font-black text-[9px] text-center leading-tight">DATA<br/>HIVE</span>
+          </div>
+          <div className="leading-tight">
+            <span className="text-white font-bold text-sm block leading-none">DataHive GH</span>
+            <span className="text-amber-400 text-[10px] leading-none">Data Reselling Platform</span>
+          </div>
         </Link>
 
-        {/* Desktop */}
+        {/* Desktop nav */}
         <div className="hidden md:flex items-center gap-1">
           {navLinks.map((link) => (
             <Link
               key={link.to}
               to={link.to}
-              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+              className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
                 location.pathname === link.to
-                  ? "text-primary bg-primary/10"
-                  : "text-muted-foreground hover:text-foreground hover:bg-secondary"
+                  ? "bg-white/10 text-white"
+                  : "text-white/70 hover:text-white hover:bg-white/10"
               }`}
             >
               {link.label}
             </Link>
           ))}
           {user ? (
-            <Button size="sm" variant="outline" className="ml-3" onClick={handleSignOut}>
-              <LogOut className="w-4 h-4 mr-1" /> Sign Out
-            </Button>
+            <button
+              onClick={handleSignOut}
+              className="ml-2 flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium text-white/70 hover:text-white hover:bg-white/10 transition-colors"
+            >
+              <LogOut className="w-4 h-4" /> Sign Out
+            </button>
           ) : (
-            <Button size="sm" className="ml-3" asChild>
-              <Link to="/login">Get Started</Link>
-            </Button>
+            <Link
+              to="/login"
+              className="ml-2 bg-amber-400 hover:bg-amber-300 text-black text-sm font-bold px-4 py-2 rounded-lg transition-colors"
+            >
+              Get Started
+            </Link>
           )}
         </div>
 
         {/* Mobile toggle */}
-        <button className="md:hidden text-foreground" onClick={() => setOpen(!open)}>
+        <button className="md:hidden text-white/80 hover:text-white" onClick={() => setOpen(!open)}>
           {open ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
         </button>
       </div>
 
       {/* Mobile menu */}
       {open && (
-        <div className="md:hidden bg-background border-b border-border px-4 pb-4">
+        <div className="md:hidden bg-[#1a2e1a] border-t border-white/10 px-4 pb-4">
           {navLinks.map((link) => (
             <Link
               key={link.to}
@@ -76,21 +86,28 @@ const Navbar = () => {
               onClick={() => setOpen(false)}
               className={`block px-4 py-3 rounded-lg text-sm font-medium transition-colors ${
                 location.pathname === link.to
-                  ? "text-primary bg-primary/10"
-                  : "text-muted-foreground hover:text-foreground"
+                  ? "bg-white/10 text-white"
+                  : "text-white/70 hover:text-white hover:bg-white/10"
               }`}
             >
               {link.label}
             </Link>
           ))}
           {user ? (
-            <Button size="sm" variant="outline" className="w-full mt-2" onClick={() => { handleSignOut(); setOpen(false); }}>
-              <LogOut className="w-4 h-4 mr-1" /> Sign Out
-            </Button>
+            <button
+              onClick={() => { handleSignOut(); setOpen(false); }}
+              className="w-full flex items-center gap-2 px-4 py-3 rounded-lg text-sm font-medium text-white/70 hover:text-white hover:bg-white/10 transition-colors mt-1"
+            >
+              <LogOut className="w-4 h-4" /> Sign Out
+            </button>
           ) : (
-            <Button size="sm" className="w-full mt-2" asChild>
-              <Link to="/login" onClick={() => setOpen(false)}>Get Started</Link>
-            </Button>
+            <Link
+              to="/login"
+              onClick={() => setOpen(false)}
+              className="block w-full text-center mt-2 bg-amber-400 hover:bg-amber-300 text-black text-sm font-bold px-4 py-2.5 rounded-lg transition-colors"
+            >
+              Get Started
+            </Link>
           )}
         </div>
       )}
