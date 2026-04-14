@@ -34,6 +34,7 @@ const Dashboard = () => {
   const [phone, setPhone] = useState("");
   const [loading, setLoading] = useState(false);
   const [agentMarkups, setAgentMarkups] = useState<Record<string, number>>({ MTN: 0, Telecel: 0, AirtelTigo: 0 });
+  const [globalCostPrices, setGlobalCostPrices] = useState<Record<string, Record<string, number>>>({});
 
   const apiNetwork = NETWORK_API_NAME[activeNetwork];
   const packages = basePackages[apiNetwork] ?? [];
@@ -44,10 +45,11 @@ const Dashboard = () => {
     const fetchData = async () => {
       const today = new Date().toISOString().split("T")[0];
 
-      const [walletRes, ordersRes, markupRes] = await Promise.all([
+      const [walletRes, ordersRes, markupRes, globalSettingsRes] = await Promise.all([
         supabase.from("wallets").select("balance").eq("user_id", user.id).single(),
         supabase.from("orders").select("amount, package_size, status, created_at").eq("agent_id", user.id).gte("created_at", `${today}T00:00:00`),
-      supabase.from("profiles").select("markups").eq("id", user.id).single(),
+        supabase.from("profiles").select("markups").eq("id", user.id).single(),
+        supabase.from("global_package_settings").select("network, package_size, agent_price"),
       ]);
 
       const balance = walletRes.data ? Number(walletRes.data.balance) : 0;
@@ -67,6 +69,16 @@ const Dashboard = () => {
           AirtelTigo: parseFloat(String(raw.AirtelTigo ?? 0)),
         });
       }
+
+      // Build lookup of admin-configured cost prices per network/package
+      const costMap: Record<string, Record<string, number>> = {};
+      (globalSettingsRes.data ?? []).forEach((row: any) => {
+        const price = parseFloat(String(row.agent_price));
+        if (!Number.isFinite(price) || price <= 0) return;
+        if (!costMap[row.network]) costMap[row.network] = {};
+        costMap[row.network][row.package_size] = price;
+      });
+      setGlobalCostPrices(costMap);
     };
 
     fetchData();
@@ -80,6 +92,11 @@ const Dashboard = () => {
 
     return () => { supabase.removeChannel(walletChannel); };
   }, [user]);
+
+  const getCostPrice = (pkg: { size: string; price: number }) => {
+    const costFromGlobal = globalCostPrices[apiNetwork]?.[pkg.size];
+    return costFromGlobal && costFromGlobal > 0 ? costFromGlobal : pkg.price;
+  };
 
   const getDisplayPrice = (basePrice: number) => basePrice + (agentMarkups[apiNetwork] ?? 0);
 
@@ -96,9 +113,9 @@ const Dashboard = () => {
     }
     setLoading(true);
     try {
-      const amount = getDisplayPrice(buyDialog.pkg.price);
+      const costPrice = getCostPrice(buyDialog.pkg);
       const { data, error } = await supabase.functions.invoke("wallet-buy-data", {
-        body: { network: apiNetwork, package_size: buyDialog.pkg.size, customer_phone: phone, amount },
+        body: { network: apiNetwork, package_size: buyDialog.pkg.size, customer_phone: phone, amount: costPrice },
       });
       if (error || data?.error) throw new Error(error?.message || data?.error || "Purchase failed");
       toast({ title: "Order placed!", description: `${buyDialog.pkg.size} for ${phone}` });

@@ -347,6 +347,20 @@ serve(async (req) => {
     const newBalance = parseFloat((Number(wallet.balance) - expectedAmount).toFixed(2));
     await supabaseAdmin.from("wallets").update({ balance: newBalance }).eq("agent_id", user.id);
 
+    // Calculate profit: agent's selling price for this package minus the cost base
+    const normalizedNetworkKey = normalizeNetworkForPricing(network);
+    const normalizedPackageKey = package_size.replace(/\s+/g, "").toUpperCase();
+    const { data: agentProfile } = await supabaseAdmin
+      .from("profiles")
+      .select("agent_prices")
+      .eq("user_id", user.id)
+      .maybeSingle();
+    const agentPricesMap = (agentProfile?.agent_prices || {}) as Record<string, Record<string, string | number>>;
+    const agentSellPrice = parseFloat(String(agentPricesMap[normalizedNetworkKey]?.[normalizedPackageKey] || 0));
+    const walletProfit = Number.isFinite(agentSellPrice) && agentSellPrice > expectedAmount
+      ? parseFloat((agentSellPrice - expectedAmount).toFixed(2))
+      : 0;
+
     const orderId = crypto.randomUUID();
     await supabaseAdmin.from("orders").insert({
       id: orderId,
@@ -356,7 +370,7 @@ serve(async (req) => {
       package_size,
       customer_phone,
       amount: expectedAmount,
-      profit: 0,
+      profit: walletProfit,
       status: "paid",
       failure_reason: null,
     });

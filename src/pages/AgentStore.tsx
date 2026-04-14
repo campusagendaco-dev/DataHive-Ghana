@@ -167,7 +167,11 @@ const AgentStore = () => {
     setBuyingPkg(key);
 
     const { agentPrice, total, fee } = getTotal(network, size, basePrice);
-    const profit = agentPrice - basePrice;
+    // Use admin-configured agent price as cost base if available; fallback to basePackages price
+    const costBase = Number(globalSettings[key]?.agent_price) > 0
+      ? Number(globalSettings[key].agent_price)
+      : basePrice;
+    const profit = parseFloat((agentPrice - costBase).toFixed(2));
     const orderId = crypto.randomUUID();
 
     const { error } = await supabase.from("orders").insert({
@@ -201,7 +205,7 @@ const AgentStore = () => {
           customer_phone: phone.replace(/\s/g, ""),
           fee,
           agent_id: agent.user_id,
-          base_price: basePrice,
+          base_price: costBase,
           payment_source: "agent_store",
           deduct_agent_wallet: false,
           wallet_settlement_mode: RESELLER_STORE_SETTLEMENT_MODE,
