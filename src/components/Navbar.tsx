@@ -29,9 +29,7 @@ const Navbar = () => {
       <div className="container mx-auto flex items-center justify-between h-16 px-4">
         {/* Logo */}
         <Link to="/" className="flex items-center gap-2.5">
-          <div className="w-9 h-9 rounded-full bg-white flex items-center justify-center shrink-0">
-            <span className="text-[#162316] font-black text-[9px] text-center leading-tight">SWIFT<br/>DATA</span>
-          </div>
+          <img src="/logo.png" alt="SwiftData Ghana" className="w-9 h-9 shrink-0" />
           <div className="leading-tight">
             <span className="text-white font-bold text-sm block leading-none">SwiftData GH</span>
             <span className="text-amber-400 text-[10px] leading-none">Data Reselling Platform</span>

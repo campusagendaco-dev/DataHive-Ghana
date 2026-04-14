@@ -80,9 +80,7 @@ const AuthAgent = () => {
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
           <div className="flex items-center justify-center mb-4">
-            <div className="w-16 h-16 rounded-full bg-[#162316] flex items-center justify-center shadow-lg">
-              <span className="text-white font-black text-[11px] text-center leading-tight">SWIFT<br/>DATA</span>
-            </div>
+            <img src="/logo.png" alt="SwiftData Ghana" className="w-16 h-16 shrink-0" />
           </div>
           <h1 className="font-display text-2xl font-bold mb-2">
             {isSignUp ? "Agent Sign Up" : "Agent Sign In"}

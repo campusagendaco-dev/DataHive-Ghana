@@ -33,9 +33,7 @@ const SidebarContent = ({ onNavigate }: { onNavigate?: () => void }) => {
     <div className="flex flex-col h-full bg-[#162316]">
       {/* Logo */}
       <div className="p-5 flex items-center gap-3 border-b border-white/10">
-        <div className="w-12 h-12 rounded-full bg-white flex items-center justify-center shrink-0 shadow-md">
-          <span className="text-[#162316] font-black text-[10px] text-center leading-tight">SWIFT<br/>DATA</span>
-        </div>
+        <img src="/logo.png" alt="SwiftData Ghana" className="w-12 h-12 shrink-0" />
         <div>
           <p className="text-white font-bold text-sm leading-tight">SwiftData GH</p>
           <p className="text-white/50 text-xs">Admin Console</p>
@@ -103,9 +101,7 @@ const AdminLayout = () => {
             </SheetContent>
           </Sheet>
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-full bg-white flex items-center justify-center shrink-0">
-              <span className="text-[#162316] font-black text-[8px] text-center leading-tight">SWIFT<br/>DATA</span>
-            </div>
+            <img src="/logo.png" alt="SwiftData Ghana" className="w-8 h-8 shrink-0" />
             <span className="font-display text-base font-bold text-white">Admin</span>
           </div>
         </header>

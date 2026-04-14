@@ -25,9 +25,7 @@ const Footer = () => {
         <div className="grid grid-cols-1 md:grid-cols-4 gap-8 mb-10">
           <div>
             <div className="flex items-center gap-2.5 mb-4">
-              <div className="w-10 h-10 rounded-full bg-white flex items-center justify-center shrink-0">
-                <span className="text-[#162316] font-black text-[9px] text-center leading-tight">SWIFT<br/>DATA</span>
-              </div>
+              <img src="/logo.png" alt="SwiftData Ghana" className="w-10 h-10 shrink-0" />
               <div>
                 <p className="text-white font-bold text-sm leading-none">SwiftData GH</p>
                 <p className="text-amber-400 text-[10px]">Data Reselling Platform</p>

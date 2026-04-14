@@ -233,9 +233,7 @@ const AgentStore = () => {
       <header className="sticky top-0 z-50 bg-[#162316]">
         <div className="container mx-auto max-w-3xl flex items-center justify-between px-4 h-16">
           <div className="flex items-center gap-2.5">
-            <div className="w-9 h-9 rounded-full bg-white flex items-center justify-center shrink-0">
-              <span className="text-[#162316] font-black text-[8px] text-center leading-tight">SWIFT<br/>DATA</span>
-            </div>
+            <img src="/logo.png" alt="SwiftData Ghana" className="w-9 h-9 shrink-0" />
             <h1 className="font-display text-lg font-bold text-white truncate">
               {agent.store_name}
             </h1>
