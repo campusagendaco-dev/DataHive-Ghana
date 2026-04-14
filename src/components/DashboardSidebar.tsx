@@ -1,6 +1,6 @@
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
-import { LayoutDashboard, ShoppingCart, UserPlus, LogOut, X, Settings, ClipboardList, Wallet, CreditCard, FileText, User } from "lucide-react";
+import { LayoutDashboard, ShoppingCart, UserPlus, LogOut, X, Settings, ClipboardList, Wallet, CreditCard, FileText, User, Users2, Smartphone, GraduationCap } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const navItems = [
@@ -11,6 +11,9 @@ const navItems = [
   { to: "/dashboard/withdraw", label: "Withdrawals", icon: Wallet },
   { to: "/dashboard/pricing", label: "Store Pricing", icon: CreditCard },
   { to: "/dashboard/flyer", label: "Flyer Generator", icon: FileText },
+  { to: "/dashboard/sub-agents", label: "Sub Agents", icon: Users2 },
+  { to: "/dashboard/buy-airtime", label: "Buy Airtime", icon: Smartphone },
+  { to: "/dashboard/result-checkers", label: "Result Checkers", icon: GraduationCap },
   { to: "/dashboard/settings", label: "Store Settings", icon: Settings },
 ];
 

@@ -1,0 +1,21 @@
+import { Smartphone, Clock } from "lucide-react";
+
+const DashboardBuyAirtime = () => {
+  return (
+    <div className="flex flex-col items-center justify-center min-h-[60vh] px-4 text-center">
+      <div className="w-20 h-20 rounded-full bg-amber-400/15 flex items-center justify-center mb-6">
+        <Smartphone className="w-10 h-10 text-amber-500" />
+      </div>
+      <div className="inline-flex items-center gap-2 bg-amber-400/10 border border-amber-400/30 rounded-full px-4 py-1.5 mb-4">
+        <Clock className="w-3.5 h-3.5 text-amber-500" />
+        <span className="text-amber-600 text-xs font-semibold uppercase tracking-widest">Coming Soon</span>
+      </div>
+      <h1 className="font-display text-3xl font-black text-foreground mb-3">Buy Airtime</h1>
+      <p className="text-muted-foreground text-sm max-w-sm">
+        Top up airtime for any network instantly from your wallet. We're putting the finishing touches on this feature.
+      </p>
+    </div>
+  );
+};
+
+export default DashboardBuyAirtime;

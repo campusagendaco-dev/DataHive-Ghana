@@ -21,6 +21,9 @@ import DashboardWithdraw from "./pages/DashboardWithdraw";
 import DashboardWallet from "./pages/DashboardWallet";
 import DashboardFlyer from "./pages/DashboardFlyer";
 import DashboardSettings from "./pages/DashboardSettings";
+import DashboardSubAgents from "./pages/DashboardSubAgents";
+import DashboardBuyAirtime from "./pages/DashboardBuyAirtime";
+import DashboardResultCheckers from "./pages/DashboardResultCheckers";
 import AuthPage from "./pages/AuthPage";
 import AuthCallback from "./pages/AuthCallback";
 import ForgotPassword from "./pages/ForgotPassword";
@@ -232,6 +235,9 @@ const AppContent = () => {
           <Route path="wallet" element={<DashboardWallet />} />
           <Route path="withdraw" element={<DashboardWithdraw />} />
           <Route path="flyer" element={<DashboardFlyer />} />
+          <Route path="sub-agents" element={<DashboardSubAgents />} />
+          <Route path="buy-airtime" element={<DashboardBuyAirtime />} />
+          <Route path="result-checkers" element={<DashboardResultCheckers />} />
           <Route path="settings" element={<DashboardSettings />} />
         </Route>
 
