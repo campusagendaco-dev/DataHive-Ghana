@@ -42,43 +42,74 @@ const isMissingTableError = (message: string) => {
 
 const saveSettingsRow = async (supabaseAdmin: ReturnType<typeof createClient>, row: Record<string, unknown>) => {
   let payload = { ...row };
+  const droppedColumns = new Set<string>();
 
-  for (let attempt = 0; attempt < 4; attempt += 1) {
+  const extractMissingColumn = (message: string): string | null => {
+    const normalized = String(message || "").replace(/"/g, "");
+    const patterns = [
+      /column\s+([a-zA-Z0-9_]+)\s+does not exist/i,
+      /Could not find the\s+([a-zA-Z0-9_]+)\s+column/i,
+      /column\s+([a-zA-Z0-9_]+)\s+of relation\s+system_settings\s+does not exist/i,
+    ];
+
+    for (const pattern of patterns) {
+      const match = normalized.match(pattern);
+      if (match?.[1]) {
+        return match[1];
+      }
+    }
+
+    return null;
+  };
+
+  for (let attempt = 0; attempt < 10; attempt += 1) {
     const { error } = await supabaseAdmin.from("system_settings").upsert(payload);
     if (!error) {
-      return { error: null, payload };
+      return { error: null, payload, droppedColumns: Array.from(droppedColumns) };
     }
 
     const msg = String(error.message || "");
 
+    const missingColumn = extractMissingColumn(msg);
+    if (missingColumn && Object.prototype.hasOwnProperty.call(payload, missingColumn)) {
+      const { [missingColumn]: _drop, ...next } = payload;
+      payload = next;
+      droppedColumns.add(missingColumn);
+      continue;
+    }
+
     if (payload.updated_by && isMissingColumnError(msg, "updated_by")) {
       const { updated_by: _drop, ...next } = payload;
       payload = next;
+      droppedColumns.add("updated_by");
       continue;
     }
 
     if (payload.active_api_source && isMissingColumnError(msg, "active_api_source")) {
       const { active_api_source: _drop, ...next } = payload;
       payload = next;
+      droppedColumns.add("active_api_source");
       continue;
     }
 
     if (payload.secondary_price_markup_pct && isMissingColumnError(msg, "secondary_price_markup_pct")) {
       const { secondary_price_markup_pct: _drop, ...next } = payload;
       payload = next;
+      droppedColumns.add("secondary_price_markup_pct");
       continue;
     }
 
     if (payload.sub_agent_base_fee && isMissingColumnError(msg, "sub_agent_base_fee")) {
       const { sub_agent_base_fee: _drop, ...next } = payload;
       payload = next;
+      droppedColumns.add("sub_agent_base_fee");
       continue;
     }
 
-    return { error, payload };
+    return { error, payload, droppedColumns: Array.from(droppedColumns) };
   }
 
-  return { error: { message: "Unable to save settings with current schema" }, payload };
+  return { error: { message: "Unable to save settings with current schema" }, payload, droppedColumns: Array.from(droppedColumns) };
 };
 
 serve(async (req) => {
@@ -230,7 +261,7 @@ serve(async (req) => {
       updated_by: user.id,
     };
 
-    const { error: saveError, payload: persistedRow } = await saveSettingsRow(supabaseAdmin, row);
+    const { error: saveError, payload: persistedRow, droppedColumns } = await saveSettingsRow(supabaseAdmin, row);
 
     if (saveError) {
       return new Response(JSON.stringify({ error: saveError.message }), {
@@ -246,7 +277,7 @@ serve(async (req) => {
       secondary_price_markup_pct: Number(persistedRow.secondary_price_markup_pct ?? secondaryMarkupPct),
       sub_agent_base_fee: Number(persistedRow.sub_agent_base_fee ?? subAgentBaseFee),
       table_ready: true,
-      warning: null,
+      warning: droppedColumns.length > 0 ? `Saved with legacy schema. Dropped columns: ${droppedColumns.join(", ")}` : null,
     }), {
       status: 200,
       headers: { ...corsHeaders, "Content-Type": "application/json" },

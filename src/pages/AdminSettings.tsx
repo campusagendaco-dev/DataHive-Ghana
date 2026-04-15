@@ -59,6 +59,24 @@ const toUiSettings = (data: any): SystemSettings => ({
   sub_agent_base_fee: Number(data?.sub_agent_base_fee ?? 80) || 80,
 });
 
+const extractMissingColumnFromError = (message: string): string | null => {
+  const normalized = String(message || "").replace(/"/g, "");
+  const patterns = [
+    /column\s+([a-zA-Z0-9_]+)\s+does not exist/i,
+    /Could not find the\s+([a-zA-Z0-9_]+)\s+column/i,
+    /column\s+([a-zA-Z0-9_]+)\s+of relation\s+system_settings\s+does not exist/i,
+  ];
+
+  for (const pattern of patterns) {
+    const match = normalized.match(pattern);
+    if (match?.[1]) {
+      return match[1];
+    }
+  }
+
+  return null;
+};
+
 const AdminSettings = () => {
   const { toast } = useToast();
   const [settings, setSettings] = useState<SystemSettings>(defaultSettings);
@@ -150,7 +168,7 @@ const AdminSettings = () => {
 
     if (error || data?.error) {
       // Always attempt direct DB fallback so admin settings remain operable.
-      const { error: upsertError } = await supabase.from("system_settings").upsert({
+      let fallbackPayload: Record<string, any> = {
         id: 1,
         auto_api_switch: settings.auto_api_switch,
         preferred_provider: settings.active_api_source,
@@ -165,12 +183,33 @@ const AdminSettings = () => {
         support_channel_link: settings.support_channel_link.trim() || defaultSettings.support_channel_link,
         sub_agent_base_fee: settings.sub_agent_base_fee,
         updated_at: new Date().toISOString(),
-      });
+      };
+
+      let upsertError: { message?: string } | null = null;
+
+      for (let attempt = 0; attempt < 10; attempt += 1) {
+        const { error: fallbackError } = await supabase.from("system_settings").upsert(fallbackPayload);
+        if (!fallbackError) {
+          upsertError = null;
+          break;
+        }
+
+        const missingColumn = extractMissingColumnFromError(String(fallbackError.message || ""));
+        if (missingColumn && Object.prototype.hasOwnProperty.call(fallbackPayload, missingColumn)) {
+          const { [missingColumn]: _drop, ...next } = fallbackPayload;
+          fallbackPayload = next;
+          upsertError = fallbackError;
+          continue;
+        }
+
+        upsertError = fallbackError;
+        break;
+      }
 
       if (upsertError) {
         toast({
           title: "Failed to save settings",
-          description: data?.error || error?.message || upsertError.message || "Unknown error",
+          description: upsertError.message || functionErrorMessage || "Unknown error",
           variant: "destructive",
         });
         setSaving(false);
