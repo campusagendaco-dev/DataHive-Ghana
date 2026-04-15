@@ -96,8 +96,9 @@ function buildProviderUrls(baseUrl: string, endpoint: string): string[] {
     urls.add(`${clean}/${endpoint}`);
     urls.add(`${clean.replace(/\/api$/, "")}/api/${endpoint}`);
   } else {
-    urls.add(`${clean}/${endpoint}`);
+    // Provider expects /api/purchase as canonical endpoint.
     urls.add(`${clean}/api/${endpoint}`);
+    urls.add(`${clean}/${endpoint}`);
   }
 
   return Array.from(urls);
@@ -287,7 +288,7 @@ serve(async (req) => {
   const authHeader = req.headers.get("Authorization");
   if (!authHeader) {
     return new Response(JSON.stringify({ error: "Unauthorized" }), {
-      status: 401,
+      status: 200,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
@@ -301,7 +302,7 @@ serve(async (req) => {
     const { data: { user }, error: userError } = await supabaseUser.auth.getUser();
     if (userError || !user) {
       return new Response(JSON.stringify({ error: "Unauthorized" }), {
-        status: 401,
+        status: 200,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
@@ -433,7 +434,7 @@ serve(async (req) => {
   } catch (error) {
     console.error("Wallet buy data error:", error);
     return new Response(JSON.stringify({ error: error instanceof Error ? error.message : "Internal error" }), {
-      status: 500,
+      status: 200,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
