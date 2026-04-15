@@ -271,9 +271,15 @@ async function sendPaymentSms(customerPhone: string) {
   const smsApiKey = getFirstEnvValue(["TXTCONNECT_API_KEY"]);
   const smsUrl = getFirstEnvValue(["TXTCONNECT_SMS_URL"]) || "https://api.txtconnect.net/dev/api/sms/send";
   const senderId = getFirstEnvValue(["TXTCONNECT_SENDER_ID"]) || "SwiftDataGh";
-  const smsType = getFirstEnvValue(["TXTCONNECT_SMS_TYPE"]) || "regular";
+  const smsType = getFirstEnvValue(["TXTCONNECT_SMS_TYPE"]).toLowerCase();
+  const unicode = smsType === "true" || smsType === "1" || smsType === "unicode";
 
-  if (!smsApiKey || !customerPhone.trim()) return;
+  const digits = customerPhone.replace(/\D+/g, "");
+  const recipient = digits.startsWith("0") && digits.length === 10
+    ? `233${digits.slice(1)}`
+    : (digits.startsWith("233") ? digits : digits);
+
+  if (!smsApiKey || !recipient) return;
 
   try {
     const res = await fetch(smsUrl, {
@@ -283,9 +289,9 @@ async function sendPaymentSms(customerPhone: string) {
         "Authorization": `Bearer ${smsApiKey}`,
       },
       body: JSON.stringify({
-        to: customerPhone.trim(),
+        to: recipient,
         from: senderId,
-        unicode: smsType,
+        unicode,
         sms: "Your data bundle is being processed. Thanks for choosing SwiftData GH",
       }),
     });
