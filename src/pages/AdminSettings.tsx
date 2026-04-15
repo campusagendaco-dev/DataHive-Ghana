@@ -149,22 +149,14 @@ const AdminSettings = () => {
     );
 
     if (error || data?.error) {
-      // Fallback to direct table upsert only for genuine network/unreachable errors.
-      if (!edgeFunctionUnreachable) {
-        toast({
-          title: "Failed to save settings",
-          description: functionErrorMessage || "Unknown error",
-          variant: "destructive",
-        });
-        setSaving(false);
-        return;
-      }
-
+      // Always attempt direct DB fallback so admin settings remain operable.
       const { error: upsertError } = await supabase.from("system_settings").upsert({
         id: 1,
         auto_api_switch: settings.auto_api_switch,
         preferred_provider: settings.active_api_source,
         backup_provider: settings.backup_provider,
+        active_api_source: settings.active_api_source,
+        secondary_price_markup_pct: settings.secondary_price_markup_pct,
         holiday_mode_enabled: settings.holiday_mode_enabled,
         holiday_message: settings.holiday_message.trim() || defaultSettings.holiday_message,
         disable_ordering: settings.disable_ordering,
@@ -187,7 +179,9 @@ const AdminSettings = () => {
 
       toast({
         title: "Settings saved with fallback",
-        description: "Edge Function unreachable, saved directly to database.",
+        description: edgeFunctionUnreachable
+          ? "Edge function was unreachable, saved directly to database."
+          : `Edge function error: ${functionErrorMessage || "non-2xx response"}. Saved directly to database.`,
       });
       setSaving(false);
       return;

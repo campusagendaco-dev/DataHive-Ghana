@@ -24,7 +24,20 @@ const DEFAULT_SETTINGS = {
 
 const isMissingColumnError = (message: string, column: string) => {
   const lower = message.toLowerCase();
-  return lower.includes("could not find") && lower.includes(column.toLowerCase());
+  const hasColumn = lower.includes(column.toLowerCase());
+  const indicatesMissing =
+    lower.includes("could not find") ||
+    lower.includes("does not exist") ||
+    (lower.includes("column") && lower.includes("schema cache"));
+  return hasColumn && indicatesMissing;
+};
+
+const isMissingTableError = (message: string) => {
+  const lower = message.toLowerCase();
+  return (
+    (lower.includes("relation") && lower.includes("system_settings") && lower.includes("does not exist")) ||
+    (lower.includes("could not find") && lower.includes("system_settings") && lower.includes("schema cache"))
+  );
 };
 
 const saveSettingsRow = async (supabaseAdmin: ReturnType<typeof createClient>, row: Record<string, unknown>) => {
@@ -87,14 +100,27 @@ serve(async (req) => {
   const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
   const readSettings = async () => {
-    const { data, error } = await supabaseAdmin
+    const fullSelect =
+      "auto_api_switch, preferred_provider, backup_provider, holiday_mode_enabled, holiday_message, disable_ordering, dark_mode_enabled, customer_service_number, support_channel_link, active_api_source, secondary_price_markup_pct, sub_agent_base_fee";
+    const legacySelect =
+      "auto_api_switch, preferred_provider, backup_provider, holiday_mode_enabled, holiday_message, disable_ordering, dark_mode_enabled, customer_service_number, support_channel_link";
+
+    const { data: fullData, error: fullError } = await supabaseAdmin
       .from("system_settings")
-      .select("auto_api_switch, preferred_provider, backup_provider, holiday_mode_enabled, holiday_message, disable_ordering, dark_mode_enabled, customer_service_number, support_channel_link, active_api_source, secondary_price_markup_pct, sub_agent_base_fee")
+      .select(fullSelect)
       .eq("id", 1)
       .maybeSingle();
 
+    const { data, error } = fullError
+      ? await supabaseAdmin
+          .from("system_settings")
+          .select(legacySelect)
+          .eq("id", 1)
+          .maybeSingle()
+      : { data: fullData, error: null as { message?: string } | null };
+
     if (error) {
-      const missingTable = error.message.toLowerCase().includes("system_settings");
+      const missingTable = isMissingTableError(String(error.message || ""));
       return {
         ...DEFAULT_SETTINGS,
         table_ready: !missingTable,
