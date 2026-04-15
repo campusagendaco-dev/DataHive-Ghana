@@ -5,6 +5,7 @@ import { useToast } from "@/hooks/use-toast";
 import { basePackages, networks } from "@/lib/data";
 import { Users2, Settings2, DollarSign, CheckCircle, Clock, Loader2, Save, RefreshCw } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { fetchApiPricingContext, applyPriceMultiplier } from "@/lib/api-source-pricing";
 
 interface SubAgent {
   user_id: string;
@@ -40,6 +41,7 @@ const DashboardSubAgents = () => {
   const [pushingPrices, setPushingPrices] = useState(false);
   const [loadingSubAgents, setLoadingSubAgents] = useState(true);
   const [selectedNetwork, setSelectedNetwork] = useState(networks[0].name);
+  const [priceMultiplier, setPriceMultiplier] = useState(1);
 
   const fetchAll = useCallback(async () => {
     if (!user) return;
@@ -66,6 +68,10 @@ const DashboardSubAgents = () => {
     fetchAll();
   }, [fetchAll]);
 
+  useEffect(() => {
+    fetchApiPricingContext().then((ctx) => setPriceMultiplier(ctx.multiplier));
+  }, []);
+
   // Init local markup + prices from profile
   useEffect(() => {
     if (!profile) return;
@@ -88,9 +94,9 @@ const DashboardSubAgents = () => {
 
   const getAdminAgentPrice = (network: string, size: string): number => {
     const gs = globalSettings.find((s) => s.network === network && s.package_size === size);
-    if (gs?.agent_price && gs.agent_price > 0) return gs.agent_price;
+    if (gs?.agent_price && gs.agent_price > 0) return applyPriceMultiplier(gs.agent_price, priceMultiplier);
     const pkg = basePackages[network]?.find((p) => p.size === size);
-    return pkg?.price ?? 0;
+    return pkg ? applyPriceMultiplier(pkg.price, priceMultiplier) : 0;
   };
 
   const handleSaveMarkup = async () => {

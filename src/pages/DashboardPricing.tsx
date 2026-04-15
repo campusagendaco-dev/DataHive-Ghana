@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
+import { fetchApiPricingContext, applyPriceMultiplier } from "@/lib/api-source-pricing";
 
 type AgentPrices = Record<string, Record<string, string>>;
 type DisabledPackages = Record<string, string[]>;
@@ -34,11 +35,12 @@ const DashboardPricing = () => {
 
   useEffect(() => {
     const loadBasePrices = async () => {
+      const pricingContext = await fetchApiPricingContext();
       const nextBasePrices: PackageBasePrices = {};
       for (const [network, pkgs] of Object.entries(basePackages)) {
         nextBasePrices[network] = {};
         for (const pkg of pkgs) {
-          nextBasePrices[network][pkg.size] = pkg.price;
+          nextBasePrices[network][pkg.size] = applyPriceMultiplier(pkg.price, pricingContext.multiplier);
         }
       }
 
@@ -50,7 +52,7 @@ const DashboardPricing = () => {
         const numericAgentPrice = Number(row?.agent_price);
         if (!Number.isFinite(numericAgentPrice) || numericAgentPrice <= 0) return;
         if (!nextBasePrices[row.network]) nextBasePrices[row.network] = {};
-        nextBasePrices[row.network][row.package_size] = numericAgentPrice;
+        nextBasePrices[row.network][row.package_size] = applyPriceMultiplier(numericAgentPrice, pricingContext.multiplier);
       });
 
       setPackageBasePrices(nextBasePrices);

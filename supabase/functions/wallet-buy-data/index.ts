@@ -349,9 +349,7 @@ async function placeDataOrder(
   if (providerSource !== "secondary" && providerWebhookUrl) {
     requestBody.webhook_url = providerWebhookUrl;
   }
-  if (providerSource === "secondary" && providerWebhookUrl) {
-    requestBody.callback = providerWebhookUrl;
-  }
+  // API 2 integration intentionally omits callback.
 
   let lastFailure: ProviderResult = {
     ok: false,

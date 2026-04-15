@@ -296,7 +296,7 @@ async function callProviderApi(
       size: capacityValue,
       network: mapSecondaryNetwork(networkValue),
     };
-    if (providerWebhookUrl) baseRequestBody.callback = providerWebhookUrl;
+    // API 2 integration intentionally omits callback.
   } else if (endpoint === "purchase" && providerWebhookUrl && !Object.prototype.hasOwnProperty.call(body, "webhook_url")) {
     baseRequestBody = { ...body, webhook_url: providerWebhookUrl };
   }
