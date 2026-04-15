@@ -60,17 +60,25 @@ const toUiSettings = (data: any): SystemSettings => ({
 });
 
 const extractMissingColumnFromError = (message: string): string | null => {
-  const normalized = String(message || "").replace(/"/g, "");
+  const normalizeColumnName = (raw: string) =>
+    String(raw || "")
+      .trim()
+      .toLowerCase()
+      .replace(/["'`]/g, "")
+      .replace(/\s+/g, "_")
+      .replace(/[^a-z0-9_]/g, "");
+
+  const normalized = String(message || "").replace(/["'`]/g, "");
   const patterns = [
-    /column\s+([a-zA-Z0-9_]+)\s+does not exist/i,
-    /Could not find the\s+([a-zA-Z0-9_]+)\s+column/i,
-    /column\s+([a-zA-Z0-9_]+)\s+of relation\s+system_settings\s+does not exist/i,
+    /column\s+(.+?)\s+does not exist/i,
+    /Could not find the\s+(.+?)\s+column/i,
+    /column\s+(.+?)\s+of relation\s+system_settings\s+does not exist/i,
   ];
 
   for (const pattern of patterns) {
     const match = normalized.match(pattern);
     if (match?.[1]) {
-      return match[1];
+      return normalizeColumnName(match[1]);
     }
   }
 

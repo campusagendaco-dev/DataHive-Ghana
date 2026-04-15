@@ -21,13 +21,13 @@ export async function fetchApiPricingContext(): Promise<{ source: ApiSource; mul
   if (error || data?.error) {
     const { data: row } = await supabase
       .from("system_settings")
-      .select("preferred_provider, secondary_price_markup_pct")
+      .select("preferred_provider")
       .eq("id", 1)
       .maybeSingle();
 
     if (row) {
       source = row.preferred_provider === "secondary" ? "secondary" : "primary";
-      customMarkupPct = Number(row.secondary_price_markup_pct);
+      customMarkupPct = API2_MARKUP_MULTIPLIER * 100 - 100;
     }
   }
 
