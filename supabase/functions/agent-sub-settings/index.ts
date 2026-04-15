@@ -7,29 +7,15 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-// Simple JWT decoder (doesn't verify signature, but token came from Supabase so it's safe)
-function decodeJWT(token: string): any {
-  try {
-    const parts = token.split(".");
-    if (parts.length !== 3) throw new Error("Invalid token format");
-    const payload = parts[1];
-    const decoded = atob(payload);
-    return JSON.parse(decoded);
-  } catch (e) {
-    console.error("JWT decode error:", e);
-    throw e;
-  }
-}
-
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
   const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
-  const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+  const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY");
 
-  if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
+  if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
     return new Response(JSON.stringify({ error: "Server misconfigured" }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -44,29 +30,21 @@ serve(async (req) => {
     });
   }
 
-  // Extract and decode JWT token
-  let userId: string;
-  try {
-    const token = authHeader.replace("Bearer ", "");
-    const decoded = decodeJWT(token);
-    userId = decoded.sub as string;
-    
-    if (!userId) {
-      return new Response(JSON.stringify({ error: "Unauthorized: missing user in token" }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-  } catch (err) {
-    console.error("Token decode failed:", err);
-    return new Response(JSON.stringify({ error: `Unauthorized: ${String(err)}` }), {
+  // Create client with the user's auth cookie/token
+  const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+    global: { headers: { Authorization: authHeader } },
+  });
+
+  // Verify user is authenticated
+  const { data: { user }, error: authError } = await supabase.auth.getUser();
+  if (authError || !user) {
+    return new Response(JSON.stringify({ error: `Unauthorized: ${authError?.message || "no user"}` }), {
       status: 401,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
 
-  // Service-role client bypasses PostgREST schema cache issues for new columns
-  const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+  const userId = user.id;
 
   try {
     const body = await req.json();
@@ -81,7 +59,7 @@ serve(async (req) => {
         });
       }
 
-      const { error } = await supabaseAdmin
+      const { error } = await supabase
         .from("profiles")
         .update({ sub_agent_activation_markup: markup })
         .eq("user_id", userId);
@@ -109,7 +87,7 @@ serve(async (req) => {
         });
       }
 
-      const { error } = await supabaseAdmin
+      const { error } = await supabase
         .from("profiles")
         .update({ sub_agent_prices: prices })
         .eq("user_id", userId);
@@ -140,7 +118,7 @@ serve(async (req) => {
       }
 
       // Fetch approved sub agents
-      const { data: subAgents, error: fetchErr } = await supabaseAdmin
+      const { data: subAgents, error: fetchErr } = await supabase
         .from("profiles")
         .select("user_id")
         .eq("parent_agent_id", userId)
@@ -154,7 +132,7 @@ serve(async (req) => {
       }
 
       const updates = (subAgents || []).map((sa: { user_id: string }) =>
-        supabaseAdmin
+        supabase
           .from("profiles")
           .update({ agent_prices: prices })
           .eq("user_id", sa.user_id)
