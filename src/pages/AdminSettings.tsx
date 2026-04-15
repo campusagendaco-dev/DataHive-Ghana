@@ -143,8 +143,23 @@ const AdminSettings = () => {
       },
     });
 
+    const functionErrorMessage = String(data?.error || error?.message || "");
+    const edgeFunctionUnreachable = /(failed to fetch|failed to send a request to the edge function|network)/i.test(
+      functionErrorMessage,
+    );
+
     if (error || data?.error) {
-      // Fallback: direct table upsert if Edge Function is unreachable.
+      // Fallback to direct table upsert only for genuine network/unreachable errors.
+      if (!edgeFunctionUnreachable) {
+        toast({
+          title: "Failed to save settings",
+          description: functionErrorMessage || "Unknown error",
+          variant: "destructive",
+        });
+        setSaving(false);
+        return;
+      }
+
       const { error: upsertError } = await supabase.from("system_settings").upsert({
         id: 1,
         auto_api_switch: settings.auto_api_switch,

@@ -8,6 +8,8 @@ const corsHeaders = {
 };
 
 const DEFAULT_SETTINGS = {
+  active_api_source: "primary",
+  secondary_price_markup_pct: 8.11,
   auto_api_switch: false,
   preferred_provider: "primary",
   backup_provider: "secondary",
@@ -17,6 +19,53 @@ const DEFAULT_SETTINGS = {
   dark_mode_enabled: false,
   customer_service_number: "+233203256540",
   support_channel_link: "https://whatsapp.com/channel/0029Vb6Xwed60eBaztkH2B3m",
+  sub_agent_base_fee: 80,
+};
+
+const isMissingColumnError = (message: string, column: string) => {
+  const lower = message.toLowerCase();
+  return lower.includes("could not find") && lower.includes(column.toLowerCase());
+};
+
+const saveSettingsRow = async (supabaseAdmin: ReturnType<typeof createClient>, row: Record<string, unknown>) => {
+  let payload = { ...row };
+
+  for (let attempt = 0; attempt < 4; attempt += 1) {
+    const { error } = await supabaseAdmin.from("system_settings").upsert(payload);
+    if (!error) {
+      return { error: null, payload };
+    }
+
+    const msg = String(error.message || "");
+
+    if (payload.updated_by && isMissingColumnError(msg, "updated_by")) {
+      const { updated_by: _drop, ...next } = payload;
+      payload = next;
+      continue;
+    }
+
+    if (payload.active_api_source && isMissingColumnError(msg, "active_api_source")) {
+      const { active_api_source: _drop, ...next } = payload;
+      payload = next;
+      continue;
+    }
+
+    if (payload.secondary_price_markup_pct && isMissingColumnError(msg, "secondary_price_markup_pct")) {
+      const { secondary_price_markup_pct: _drop, ...next } = payload;
+      payload = next;
+      continue;
+    }
+
+    if (payload.sub_agent_base_fee && isMissingColumnError(msg, "sub_agent_base_fee")) {
+      const { sub_agent_base_fee: _drop, ...next } = payload;
+      payload = next;
+      continue;
+    }
+
+    return { error, payload };
+  }
+
+  return { error: { message: "Unable to save settings with current schema" }, payload };
 };
 
 serve(async (req) => {
@@ -40,7 +89,7 @@ serve(async (req) => {
   const readSettings = async () => {
     const { data, error } = await supabaseAdmin
       .from("system_settings")
-      .select("auto_api_switch, preferred_provider, backup_provider, holiday_mode_enabled, holiday_message, disable_ordering, dark_mode_enabled, customer_service_number, support_channel_link")
+      .select("auto_api_switch, preferred_provider, backup_provider, holiday_mode_enabled, holiday_message, disable_ordering, dark_mode_enabled, customer_service_number, support_channel_link, active_api_source, secondary_price_markup_pct, sub_agent_base_fee")
       .eq("id", 1)
       .maybeSingle();
 
@@ -57,14 +106,15 @@ serve(async (req) => {
       auto_api_switch: Boolean(data?.auto_api_switch),
       preferred_provider: String(data?.preferred_provider || DEFAULT_SETTINGS.preferred_provider),
       backup_provider: String(data?.backup_provider || DEFAULT_SETTINGS.backup_provider),
-      active_api_source: String(data?.preferred_provider || DEFAULT_SETTINGS.preferred_provider),
-      secondary_price_markup_pct: 8.11,
+      active_api_source: String(data?.active_api_source || data?.preferred_provider || DEFAULT_SETTINGS.active_api_source),
+      secondary_price_markup_pct: Number(data?.secondary_price_markup_pct ?? DEFAULT_SETTINGS.secondary_price_markup_pct),
       holiday_mode_enabled: Boolean(data?.holiday_mode_enabled),
       holiday_message: String(data?.holiday_message || DEFAULT_SETTINGS.holiday_message),
       disable_ordering: Boolean(data?.disable_ordering),
       dark_mode_enabled: Boolean(data?.dark_mode_enabled),
       customer_service_number: String(data?.customer_service_number || DEFAULT_SETTINGS.customer_service_number),
       support_channel_link: String(data?.support_channel_link || DEFAULT_SETTINGS.support_channel_link),
+      sub_agent_base_fee: Number(data?.sub_agent_base_fee ?? DEFAULT_SETTINGS.sub_agent_base_fee),
       table_ready: true,
       warning: null,
     };
@@ -123,6 +173,12 @@ serve(async (req) => {
     const preferredProvider = payload?.preferred_provider === "secondary" ? "secondary" : "primary";
     const backupProvider = payload?.backup_provider === "primary" ? "primary" : "secondary";
     const activeApiSource = payload?.active_api_source === "secondary" ? "secondary" : "primary";
+    const markupPct = Number(payload?.secondary_price_markup_pct);
+    const secondaryMarkupPct = Number.isFinite(markupPct) ? Math.max(0, markupPct) : DEFAULT_SETTINGS.secondary_price_markup_pct;
+    const subAgentBaseFeeRaw = Number(payload?.sub_agent_base_fee);
+    const subAgentBaseFee = Number.isFinite(subAgentBaseFeeRaw)
+      ? Math.max(0, Number(subAgentBaseFeeRaw.toFixed(2)))
+      : DEFAULT_SETTINGS.sub_agent_base_fee;
     const holidayMessage =
       String(payload?.holiday_message || DEFAULT_SETTINGS.holiday_message).trim() || DEFAULT_SETTINGS.holiday_message;
     const customerServiceNumber =
@@ -135,17 +191,20 @@ serve(async (req) => {
       auto_api_switch: Boolean(payload?.auto_api_switch),
       preferred_provider: activeApiSource || preferredProvider,
       backup_provider: backupProvider,
+      active_api_source: activeApiSource,
+      secondary_price_markup_pct: secondaryMarkupPct,
       holiday_mode_enabled: Boolean(payload?.holiday_mode_enabled),
       holiday_message: holidayMessage,
       disable_ordering: Boolean(payload?.disable_ordering),
       dark_mode_enabled: Boolean(payload?.dark_mode_enabled),
       customer_service_number: customerServiceNumber,
       support_channel_link: supportChannelLink,
+      sub_agent_base_fee: subAgentBaseFee,
       updated_at: new Date().toISOString(),
       updated_by: user.id,
     };
 
-    const { error: saveError } = await supabaseAdmin.from("system_settings").upsert(row);
+    const { error: saveError, payload: persistedRow } = await saveSettingsRow(supabaseAdmin, row);
 
     if (saveError) {
       return new Response(JSON.stringify({ error: saveError.message }), {
@@ -156,9 +215,10 @@ serve(async (req) => {
 
     return new Response(JSON.stringify({
       success: true,
-      ...row,
-      active_api_source: row.preferred_provider,
-      secondary_price_markup_pct: 8.11,
+      ...persistedRow,
+      active_api_source: String((persistedRow.active_api_source as string) || (persistedRow.preferred_provider as string) || activeApiSource),
+      secondary_price_markup_pct: Number(persistedRow.secondary_price_markup_pct ?? secondaryMarkupPct),
+      sub_agent_base_fee: Number(persistedRow.sub_agent_base_fee ?? subAgentBaseFee),
       table_ready: true,
       warning: null,
     }), {
