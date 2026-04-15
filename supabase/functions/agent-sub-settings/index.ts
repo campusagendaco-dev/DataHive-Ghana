@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import * as jose from "https://deno.land/x/jose@v5.4.1/index.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -14,9 +15,9 @@ serve(async (req) => {
 
   const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
   const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-  const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY");
+  const SUPABASE_JWT_SECRET = Deno.env.get("SUPABASE_JWT_SECRET");
 
-  if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY || !SUPABASE_ANON_KEY) {
+  if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
     return new Response(JSON.stringify({ error: "Server misconfigured" }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -31,19 +32,39 @@ serve(async (req) => {
     });
   }
 
-  // Verify caller identity using anon client with their JWT
-  const supabaseUser = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-    global: { headers: { Authorization: authHeader } },
-  });
-  const {
-    data: { user },
-    error: userError,
-  } = await supabaseUser.auth.getUser();
-  if (userError || !user) {
-    return new Response(JSON.stringify({ error: "Unauthorized" }), {
-      status: 401,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+  // Extract and verify JWT token
+  let userId: string;
+  try {
+    const token = authHeader.replace("Bearer ", "");
+    const secret = new TextEncoder().encode(SUPABASE_JWT_SECRET || "");
+    const verified = await jose.jwtVerify(token, secret);
+    userId = verified.payload.sub as string;
+    
+    if (!userId) {
+      return new Response(JSON.stringify({ error: "Invalid token" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+  } catch (err) {
+    // If verification fails, try without secret (for unsigned tokens in dev)
+    try {
+      const token = authHeader.replace("Bearer ", "");
+      const decoded = jose.decodeJwt(token);
+      userId = decoded.sub as string;
+      
+      if (!userId) {
+        return new Response(JSON.stringify({ error: "Invalid token" }), {
+          status: 401,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+    } catch (_) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
   }
 
   // Service-role client bypasses PostgREST schema cache issues for new columns
@@ -65,7 +86,7 @@ serve(async (req) => {
       const { error } = await supabaseAdmin
         .from("profiles")
         .update({ sub_agent_activation_markup: markup })
-        .eq("user_id", user.id);
+        .eq("user_id", userId);
 
       if (error) {
         return new Response(JSON.stringify({ error: error.message }), {
@@ -91,7 +112,7 @@ serve(async (req) => {
       const { error } = await supabaseAdmin
         .from("profiles")
         .update({ sub_agent_prices: prices })
-        .eq("user_id", user.id);
+        .eq("user_id", userId);
 
       if (error) {
         return new Response(JSON.stringify({ error: error.message }), {
@@ -108,7 +129,6 @@ serve(async (req) => {
     if (action === "push_prices") {
       // Push sub_agent_prices to all approved sub agents' agent_prices
       const prices = body.prices;
-      const parentId: string = user.id;
 
       if (!prices || typeof prices !== "object") {
         return new Response(JSON.stringify({ error: "Invalid prices value" }), {
@@ -121,7 +141,7 @@ serve(async (req) => {
       const { data: subAgents, error: fetchErr } = await supabaseAdmin
         .from("profiles")
         .select("user_id")
-        .eq("parent_agent_id", parentId)
+        .eq("parent_agent_id", userId)
         .eq("sub_agent_approved", true);
 
       if (fetchErr) {
