@@ -461,9 +461,46 @@ serve(async (req) => {
     }
 
     const orderId = metadata?.order_id || reference;
-    const orderType = metadata?.order_type;
+    const verifiedAmount = Number(verifyData?.data?.amount || 0) / 100;
+    const orderTypeFromMetadata = typeof metadata?.order_type === "string" ? metadata.order_type : null;
 
-    await supabase.from("orders").update({ status: "paid", failure_reason: null }).eq("id", orderId);
+    let { data: existingOrder } = await supabase
+      .from("orders")
+      .select("id, order_type, agent_id, network, package_size, customer_phone, amount")
+      .eq("id", orderId)
+      .maybeSingle();
+
+    if (!existingOrder) {
+      const recreatedOrder = {
+        id: orderId,
+        agent_id: typeof metadata?.agent_id === "string" ? metadata.agent_id : "00000000-0000-0000-0000-000000000000",
+        order_type: orderTypeFromMetadata || "data",
+        amount: Number.isFinite(verifiedAmount) && verifiedAmount > 0 ? verifiedAmount : Number(metadata?.amount || 0),
+        profit: 0,
+        status: "paid",
+        failure_reason: null,
+        network: typeof metadata?.network === "string" ? metadata.network : null,
+        package_size: typeof metadata?.package_size === "string" ? metadata.package_size : null,
+        customer_phone: typeof metadata?.customer_phone === "string" ? metadata.customer_phone : null,
+        afa_full_name: typeof metadata?.afa_full_name === "string" ? metadata.afa_full_name : null,
+        afa_ghana_card: typeof metadata?.afa_ghana_card === "string" ? metadata.afa_ghana_card : null,
+        afa_occupation: typeof metadata?.afa_occupation === "string" ? metadata.afa_occupation : null,
+        afa_email: typeof metadata?.afa_email === "string" ? metadata.afa_email : null,
+        afa_residence: typeof metadata?.afa_residence === "string" ? metadata.afa_residence : null,
+        afa_date_of_birth: typeof metadata?.afa_date_of_birth === "string" ? metadata.afa_date_of_birth : null,
+      };
+
+      const { error: recreateError } = await supabase.from("orders").insert(recreatedOrder);
+      if (recreateError) {
+        console.error("Webhook failed to recreate missing order:", recreateError);
+      } else {
+        existingOrder = recreatedOrder;
+      }
+    } else {
+      await supabase.from("orders").update({ status: "paid", failure_reason: null }).eq("id", orderId);
+    }
+
+    const orderType = (existingOrder?.order_type || orderTypeFromMetadata || "data") as string;
 
     if (orderType === "agent_activation") {
       const agentId = metadata?.agent_id;
@@ -581,9 +618,15 @@ serve(async (req) => {
       });
     }
 
-    const network = typeof metadata?.network === "string" ? metadata.network : "";
-    const packageSize = typeof metadata?.package_size === "string" ? metadata.package_size : "";
-    const customerPhone = typeof metadata?.customer_phone === "string" ? metadata.customer_phone : "";
+    const network = typeof existingOrder?.network === "string"
+      ? existingOrder.network
+      : (typeof metadata?.network === "string" ? metadata.network : "");
+    const packageSize = typeof existingOrder?.package_size === "string"
+      ? existingOrder.package_size
+      : (typeof metadata?.package_size === "string" ? metadata.package_size : "");
+    const customerPhone = typeof existingOrder?.customer_phone === "string"
+      ? existingOrder.customer_phone
+      : (typeof metadata?.customer_phone === "string" ? metadata.customer_phone : "");
 
     if (!network || !packageSize || !customerPhone) {
       await supabase.from("orders").update({

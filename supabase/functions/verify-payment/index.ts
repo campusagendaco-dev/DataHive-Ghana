@@ -512,12 +512,12 @@ serve(async (req) => {
     const agentId = order?.agent_id || metadata.agent_id;
     const paidAmount = Number(order?.amount || (verifyData.data.amount / 100));
 
-    if (!order && agentId) {
+    if (!order) {
       console.log("Recreating order from Paystack metadata:", { reference, orderType, agentId });
       const walletCredit = Number(metadata.wallet_credit || metadata.amount || paidAmount);
       await supabase.from("orders").insert({
         id: reference,
-        agent_id: agentId,
+        agent_id: agentId || "00000000-0000-0000-0000-000000000000",
         order_type: orderType || "wallet_topup",
         amount: orderType === "wallet_topup" ? walletCredit : paidAmount,
         profit: 0,
