@@ -29,8 +29,15 @@ function mapNetworkKey(network: string): string {
 }
 
 function parseCapacity(packageSize: string): number {
-  const match = packageSize.replace(/\s+/g, "").match(/^(\d+(?:\.\d+)?)/)
+  const match = packageSize.replace(/\s+/g, "").match(/(\d+(?:\.\d+)?)/)
   return match ? parseFloat(match[1]) : 0;
+}
+
+function normalizeRecipient(phone: string): string {
+  const digits = phone.replace(/\D+/g, "");
+  if (digits.startsWith("233") && digits.length === 12) return `0${digits.slice(3)}`;
+  if (digits.length === 9) return `0${digits}`;
+  return digits || phone.trim();
 }
 
 function normalizeProviderBaseUrl(baseUrl: string): string {
@@ -51,6 +58,7 @@ function buildProviderUrls(baseUrl: string, endpoint: string): string[] {
   if (!clean) return [];
 
   const urls = new Set<string>();
+  const endpointAliases = endpoint === "purchase" ? ["purchase", "order"] : [endpoint];
   let rootUrl = "";
 
   try {
@@ -60,22 +68,28 @@ function buildProviderUrls(baseUrl: string, endpoint: string): string[] {
     rootUrl = "";
   }
 
-  if (clean.endsWith(`/${endpoint}`) || clean.endsWith(`/api/${endpoint}`)) {
-    urls.add(clean);
+  for (const alias of endpointAliases) {
+    if (clean.endsWith(`/${alias}`) || clean.endsWith(`/api/${alias}`)) {
+      urls.add(clean);
+    }
   }
 
-  if (clean.endsWith("/api")) {
-    urls.add(`${clean}/${endpoint}`);
-    urls.add(`${clean.replace(/\/api$/, "")}/api/${endpoint}`);
-  } else {
-    urls.add(`${clean}/api/${endpoint}`);
-    urls.add(`${clean}/${endpoint}`);
+  for (const alias of endpointAliases) {
+    if (clean.endsWith("/api")) {
+      urls.add(`${clean}/${alias}`);
+      urls.add(`${clean.replace(/\/api$/, "")}/api/${alias}`);
+    } else {
+      urls.add(`${clean}/api/${alias}`);
+      urls.add(`${clean}/${alias}`);
+    }
   }
 
   // Also try host-root endpoints in case the configured base URL contains an extra path segment.
   if (rootUrl) {
-    urls.add(`${rootUrl}/api/${endpoint}`);
-    urls.add(`${rootUrl}/${endpoint}`);
+    for (const alias of endpointAliases) {
+      urls.add(`${rootUrl}/api/${alias}`);
+      urls.add(`${rootUrl}/${alias}`);
+    }
   }
 
   return Array.from(urls);
@@ -481,7 +495,7 @@ serve(async (req) => {
       "purchase",
       {
         networkKey: mapNetworkKey(network),
-        recipient: customerPhone,
+        recipient: normalizeRecipient(customerPhone),
         capacity: parseCapacity(packageSize),
       },
     );
