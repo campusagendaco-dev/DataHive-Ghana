@@ -6,6 +6,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { getFunctionErrorMessage } from "@/lib/function-errors";
 import { getAppBaseUrl } from "@/lib/app-base-url";
+import { fetchApiPricingContext, applyPriceMultiplier } from "@/lib/api-source-pricing";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -49,6 +50,7 @@ const BuyData = () => {
     holiday_message: "Holiday mode is active. Orders will resume soon.",
     disable_ordering: false,
   });
+  const [priceMultiplier, setPriceMultiplier] = useState(1);
 
   useEffect(() => {
     const fetchSettings = async () => {
@@ -69,6 +71,9 @@ const BuyData = () => {
           disable_ordering: Boolean(systemData.disable_ordering),
         });
       }
+
+      const pricingContext = await fetchApiPricingContext();
+      setPriceMultiplier(pricingContext.multiplier);
     };
     fetchSettings();
   }, []);
@@ -176,7 +181,8 @@ const BuyData = () => {
             const gs = globalSettings[key];
             const isUnavailable = gs?.is_unavailable || false;
             if (isUnavailable) return null;
-            const publicPrice = gs?.public_price ?? getPublicPrice(pkg.price);
+            const basePublicPrice = gs?.public_price ?? getPublicPrice(pkg.price);
+            const publicPrice = applyPriceMultiplier(basePublicPrice, priceMultiplier);
             return (
               <div key={pkg.size} className={`${getNetworkCardColors(selected).card} rounded-xl p-3 flex flex-col gap-2`}>
                 <div className="flex justify-between items-start">

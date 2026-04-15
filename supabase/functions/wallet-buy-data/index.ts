@@ -27,6 +27,42 @@ function getFirstEnvValue(keys: string[]): string {
   return "";
 }
 
+type ProviderSource = "primary" | "secondary";
+
+function getProviderCredentials(source: ProviderSource): { apiKey: string; baseUrl: string } {
+  const primaryApiKey = getFirstEnvValue([
+    "PRIMARY_DATA_PROVIDER_API_KEY",
+    "DATA_PROVIDER_API_KEY",
+    "DATA_PROVIDER_PRIMARY_API_KEY",
+  ]);
+  const secondaryApiKey = getFirstEnvValue([
+    "SECONDARY_DATA_PROVIDER_API_KEY",
+    "DATA_PROVIDER_SECONDARY_API_KEY",
+  ]);
+
+  const primaryBaseUrl = getFirstEnvValue([
+    "PRIMARY_DATA_PROVIDER_BASE_URL",
+    "DATA_PROVIDER_BASE_URL",
+    "DATA_PROVIDER_PRIMARY_BASE_URL",
+  ]).replace(/\/+$/, "");
+  const secondaryBaseUrl = getFirstEnvValue([
+    "SECONDARY_DATA_PROVIDER_BASE_URL",
+    "DATA_PROVIDER_SECONDARY_BASE_URL",
+  ]).replace(/\/+$/, "");
+
+  if (source === "secondary") {
+    return {
+      apiKey: secondaryApiKey || primaryApiKey,
+      baseUrl: secondaryBaseUrl || primaryBaseUrl,
+    };
+  }
+
+  return {
+    apiKey: primaryApiKey || secondaryApiKey,
+    baseUrl: primaryBaseUrl || secondaryBaseUrl,
+  };
+}
+
 function normalizeNetworkForPricing(network: string): "MTN" | "Telecel" | "AirtelTigo" {
   const normalized = network.trim().toUpperCase();
   if (normalized === "AT" || normalized === "AIRTEL TIGO" || normalized === "AIRTELTIGO") return "AirtelTigo";
@@ -35,7 +71,7 @@ function normalizeNetworkForPricing(network: string): "MTN" | "Telecel" | "Airte
 }
 
 // deno-lint-ignore no-explicit-any
-async function resolveExpectedAmount(supabaseAdmin: any, network: string, packageSize: string): Promise<number | null> {
+async function resolveExpectedAmount(supabaseAdmin: any, network: string, packageSize: string, multiplier: number): Promise<number | null> {
   const normalizedNetwork = normalizeNetworkForPricing(network);
   const normalizedPackage = packageSize.replace(/\s+/g, "").toUpperCase();
 
@@ -48,12 +84,32 @@ async function resolveExpectedAmount(supabaseAdmin: any, network: string, packag
 
   const configuredPrice = Number(globalRow?.agent_price);
   if (Number.isFinite(configuredPrice) && configuredPrice > 0) {
-    return Number(configuredPrice.toFixed(2));
+    return Number((configuredPrice * multiplier).toFixed(2));
   }
 
   const basePrice = BASE_PACKAGE_PRICES[normalizedNetwork]?.[normalizedPackage];
   if (!basePrice) return null;
-  return Number(basePrice.toFixed(2));
+  return Number((basePrice * multiplier).toFixed(2));
+}
+
+// deno-lint-ignore no-explicit-any
+async function getPricingContext(supabaseAdmin: any): Promise<{ source: ProviderSource; multiplier: number }> {
+  const { data } = await supabaseAdmin
+    .from("system_settings")
+    .select("preferred_provider")
+    .eq("id", 1)
+    .maybeSingle();
+
+  const source: ProviderSource = data?.preferred_provider === "secondary"
+    ? "secondary"
+    : "primary";
+
+  const pct = 8.11;
+  const multiplier = source === "secondary"
+    ? Number.isFinite(pct) ? Number((1 + pct / 100).toFixed(6)) : 1.0811
+    : 1;
+
+  return { source, multiplier };
 }
 
 function mapNetworkKey(network: string): string {
@@ -329,27 +385,13 @@ serve(async (req) => {
   const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
   const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
   const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY");
-  const DATA_PROVIDER_API_KEY = getFirstEnvValue([
-    "DATA_PROVIDER_API_KEY",
-    "PRIMARY_DATA_PROVIDER_API_KEY",
-    "SECONDARY_DATA_PROVIDER_API_KEY",
-    "DATA_PROVIDER_PRIMARY_API_KEY",
-    "DATA_PROVIDER_SECONDARY_API_KEY",
-  ]);
-  const DATA_PROVIDER_BASE_URL = getFirstEnvValue([
-    "DATA_PROVIDER_BASE_URL",
-    "PRIMARY_DATA_PROVIDER_BASE_URL",
-    "SECONDARY_DATA_PROVIDER_BASE_URL",
-    "DATA_PROVIDER_PRIMARY_BASE_URL",
-    "DATA_PROVIDER_SECONDARY_BASE_URL",
-  ]).replace(/\/+$/, "");
   const DATA_PROVIDER_WEBHOOK_URL = getFirstEnvValue([
     "DATA_PROVIDER_WEBHOOK_URL",
     "PRIMARY_DATA_PROVIDER_WEBHOOK_URL",
     "SECONDARY_DATA_PROVIDER_WEBHOOK_URL",
   ]);
 
-  if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY || !SUPABASE_ANON_KEY || !DATA_PROVIDER_API_KEY || !DATA_PROVIDER_BASE_URL) {
+  if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY || !SUPABASE_ANON_KEY) {
     return new Response(JSON.stringify({ error: "Server misconfigured" }), {
       status: 200,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -406,7 +448,19 @@ serve(async (req) => {
       });
     }
 
-    const expectedAmount = await resolveExpectedAmount(supabaseAdmin, network, package_size);
+    const pricingContext = await getPricingContext(supabaseAdmin);
+    const providerConfig = getProviderCredentials(pricingContext.source);
+    const DATA_PROVIDER_API_KEY = providerConfig.apiKey;
+    const DATA_PROVIDER_BASE_URL = providerConfig.baseUrl;
+
+    if (!DATA_PROVIDER_API_KEY || !DATA_PROVIDER_BASE_URL) {
+      return new Response(JSON.stringify({ error: "Data provider not configured" }), {
+        status: 200,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const expectedAmount = await resolveExpectedAmount(supabaseAdmin, network, package_size, pricingContext.multiplier);
     if (!expectedAmount) {
       return new Response(JSON.stringify({ error: "Package price not configured" }), {
         status: 200,
@@ -450,7 +504,10 @@ serve(async (req) => {
       .eq("user_id", user.id)
       .maybeSingle();
     const agentPricesMap = (agentProfile?.agent_prices || {}) as Record<string, Record<string, string | number>>;
-    const agentSellPrice = parseFloat(String(agentPricesMap[normalizedNetworkKey]?.[normalizedPackageKey] || 0));
+    const rawAgentSellPrice = parseFloat(String(agentPricesMap[normalizedNetworkKey]?.[normalizedPackageKey] || 0));
+    const agentSellPrice = Number.isFinite(rawAgentSellPrice)
+      ? Number((rawAgentSellPrice * pricingContext.multiplier).toFixed(2))
+      : 0;
     const walletProfit = Number.isFinite(agentSellPrice) && agentSellPrice > expectedAmount
       ? parseFloat((agentSellPrice - expectedAmount).toFixed(2))
       : 0;

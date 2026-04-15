@@ -57,6 +57,8 @@ serve(async (req) => {
       auto_api_switch: Boolean(data?.auto_api_switch),
       preferred_provider: String(data?.preferred_provider || DEFAULT_SETTINGS.preferred_provider),
       backup_provider: String(data?.backup_provider || DEFAULT_SETTINGS.backup_provider),
+      active_api_source: String(data?.preferred_provider || DEFAULT_SETTINGS.preferred_provider),
+      secondary_price_markup_pct: 8.11,
       holiday_mode_enabled: Boolean(data?.holiday_mode_enabled),
       holiday_message: String(data?.holiday_message || DEFAULT_SETTINGS.holiday_message),
       disable_ordering: Boolean(data?.disable_ordering),
@@ -120,6 +122,7 @@ serve(async (req) => {
 
     const preferredProvider = payload?.preferred_provider === "secondary" ? "secondary" : "primary";
     const backupProvider = payload?.backup_provider === "primary" ? "primary" : "secondary";
+    const activeApiSource = payload?.active_api_source === "secondary" ? "secondary" : "primary";
     const holidayMessage =
       String(payload?.holiday_message || DEFAULT_SETTINGS.holiday_message).trim() || DEFAULT_SETTINGS.holiday_message;
     const customerServiceNumber =
@@ -130,7 +133,7 @@ serve(async (req) => {
     const row = {
       id: 1,
       auto_api_switch: Boolean(payload?.auto_api_switch),
-      preferred_provider: preferredProvider,
+      preferred_provider: activeApiSource || preferredProvider,
       backup_provider: backupProvider,
       holiday_mode_enabled: Boolean(payload?.holiday_mode_enabled),
       holiday_message: holidayMessage,
@@ -151,7 +154,14 @@ serve(async (req) => {
       });
     }
 
-    return new Response(JSON.stringify({ success: true, ...row, table_ready: true, warning: null }), {
+    return new Response(JSON.stringify({
+      success: true,
+      ...row,
+      active_api_source: row.preferred_provider,
+      secondary_price_markup_pct: 8.11,
+      table_ready: true,
+      warning: null,
+    }), {
       status: 200,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });

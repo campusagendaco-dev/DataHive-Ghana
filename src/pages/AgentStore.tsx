@@ -9,6 +9,7 @@ import AfaOrderForm from "@/components/AfaOrderForm";
 import { useToast } from "@/hooks/use-toast";
 import { getFunctionErrorMessage } from "@/lib/function-errors";
 import { getAppBaseUrl } from "@/lib/app-base-url";
+import { fetchApiPricingContext, applyPriceMultiplier } from "@/lib/api-source-pricing";
 import { Menu, X, Users, Shield, AlertTriangle, Zap, TrendingUp, ChevronRight } from "lucide-react";
 import {
   AlertDialog,
@@ -60,6 +61,7 @@ const AgentStore = () => {
   const [globalSettings, setGlobalSettings] = useState<Record<string, GlobalPkgSetting>>({});
   const [globalAfaPrice, setGlobalAfaPrice] = useState(DEFAULT_AFA_PRICE);
   const [subAgentBaseFee, setSubAgentBaseFee] = useState<number | null>(null);
+  const [priceMultiplier, setPriceMultiplier] = useState(1);
 
   useEffect(() => {
     const fetchAgent = async () => {
@@ -92,6 +94,9 @@ const AgentStore = () => {
 
       // Sub agent fee: fetch separately to avoid schema cache issues
       try {
+        const pricingContext = await fetchApiPricingContext();
+        setPriceMultiplier(pricingContext.multiplier);
+
         if (agentRes.data?.user_id) {
           const { data: agentProfile } = await supabase
             .from("profiles")
@@ -150,10 +155,11 @@ const AgentStore = () => {
 
   const getAgentPrice = (network: string, size: string, basePrice: number) => {
     const price = agentPrices[network]?.[size];
-    return price || basePrice.toFixed(2);
+    const numeric = Number(price || basePrice);
+    return applyPriceMultiplier(numeric, priceMultiplier).toFixed(2);
   };
 
-  const afaPrice = globalAfaPrice.toFixed(2);
+  const afaPrice = applyPriceMultiplier(globalAfaPrice, priceMultiplier).toFixed(2);
 
   const handleSelectPackage = (network: string, size: string) => {
     if (isPackageDisabled(network, size)) return;
@@ -194,9 +200,10 @@ const AgentStore = () => {
 
     const { agentPrice, total, fee } = getTotal(network, size, basePrice);
     // Use admin-configured agent price as cost base if available; fallback to basePackages price
-    const costBase = Number(globalSettings[key]?.agent_price) > 0
+    const rawCostBase = Number(globalSettings[key]?.agent_price) > 0
       ? Number(globalSettings[key].agent_price)
       : basePrice;
+    const costBase = applyPriceMultiplier(rawCostBase, priceMultiplier);
     const profit = parseFloat((agentPrice - costBase).toFixed(2));
     const orderId = crypto.randomUUID();
 

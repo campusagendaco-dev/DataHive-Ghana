@@ -264,6 +264,7 @@ export type Database = {
       }
       system_settings: {
         Row: {
+          active_api_source: string
           auto_api_switch: boolean
           backup_provider: string
           customer_service_number: string
@@ -273,10 +274,12 @@ export type Database = {
           holiday_mode_enabled: boolean
           id: number
           preferred_provider: string
+          secondary_price_markup_pct: number
           support_channel_link: string
           updated_at: string
         }
         Insert: {
+          active_api_source?: string
           auto_api_switch?: boolean
           backup_provider?: string
           customer_service_number?: string
@@ -286,10 +289,12 @@ export type Database = {
           holiday_mode_enabled?: boolean
           id?: number
           preferred_provider?: string
+          secondary_price_markup_pct?: number
           support_channel_link?: string
           updated_at?: string
         }
         Update: {
+          active_api_source?: string
           auto_api_switch?: boolean
           backup_provider?: string
           customer_service_number?: string
@@ -299,6 +304,7 @@ export type Database = {
           holiday_mode_enabled?: boolean
           id?: number
           preferred_provider?: string
+          secondary_price_markup_pct?: number
           support_channel_link?: string
           updated_at?: string
         }

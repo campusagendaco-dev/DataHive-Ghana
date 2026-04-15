@@ -14,6 +14,55 @@ function getFirstEnvValue(keys: string[]): string {
   return "";
 }
 
+type ProviderSource = "primary" | "secondary";
+
+function getProviderCredentials(source: ProviderSource): { apiKey: string; baseUrl: string } {
+  const primaryApiKey = getFirstEnvValue([
+    "PRIMARY_DATA_PROVIDER_API_KEY",
+    "DATA_PROVIDER_API_KEY",
+    "DATA_PROVIDER_PRIMARY_API_KEY",
+  ]);
+  const secondaryApiKey = getFirstEnvValue([
+    "SECONDARY_DATA_PROVIDER_API_KEY",
+    "DATA_PROVIDER_SECONDARY_API_KEY",
+  ]);
+
+  const primaryBaseUrl = getFirstEnvValue([
+    "PRIMARY_DATA_PROVIDER_BASE_URL",
+    "DATA_PROVIDER_BASE_URL",
+    "DATA_PROVIDER_PRIMARY_BASE_URL",
+  ]).replace(/\/+$/, "");
+  const secondaryBaseUrl = getFirstEnvValue([
+    "SECONDARY_DATA_PROVIDER_BASE_URL",
+    "DATA_PROVIDER_SECONDARY_BASE_URL",
+  ]).replace(/\/+$/, "");
+
+  if (source === "secondary") {
+    return {
+      apiKey: secondaryApiKey || primaryApiKey,
+      baseUrl: secondaryBaseUrl || primaryBaseUrl,
+    };
+  }
+
+  return {
+    apiKey: primaryApiKey || secondaryApiKey,
+    baseUrl: primaryBaseUrl || secondaryBaseUrl,
+  };
+}
+
+// deno-lint-ignore no-explicit-any
+async function getActiveProviderSource(supabase: any): Promise<ProviderSource> {
+  const { data } = await supabase
+    .from("system_settings")
+    .select("preferred_provider")
+    .eq("id", 1)
+    .maybeSingle();
+
+  return data?.preferred_provider === "secondary"
+    ? "secondary"
+    : "primary";
+}
+
 function mapNetworkKey(network: string): string {
   const normalized = network.trim().toUpperCase();
   if (
@@ -287,20 +336,6 @@ serve(async (req) => {
   }
 
   const PAYSTACK_SECRET_KEY = Deno.env.get("PAYSTACK_SECRET_KEY");
-  const DATA_PROVIDER_API_KEY = getFirstEnvValue([
-    "DATA_PROVIDER_API_KEY",
-    "PRIMARY_DATA_PROVIDER_API_KEY",
-    "SECONDARY_DATA_PROVIDER_API_KEY",
-    "DATA_PROVIDER_PRIMARY_API_KEY",
-    "DATA_PROVIDER_SECONDARY_API_KEY",
-  ]);
-  const DATA_PROVIDER_BASE_URL = getFirstEnvValue([
-    "DATA_PROVIDER_BASE_URL",
-    "PRIMARY_DATA_PROVIDER_BASE_URL",
-    "SECONDARY_DATA_PROVIDER_BASE_URL",
-    "DATA_PROVIDER_PRIMARY_BASE_URL",
-    "DATA_PROVIDER_SECONDARY_BASE_URL",
-  ]).replace(/\/+$/, "");
   const DATA_PROVIDER_WEBHOOK_URL = getFirstEnvValue([
     "DATA_PROVIDER_WEBHOOK_URL",
     "PRIMARY_DATA_PROVIDER_WEBHOOK_URL",
@@ -319,6 +354,11 @@ serve(async (req) => {
   const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
   try {
+    const activeSource = await getActiveProviderSource(supabase);
+    const providerConfig = getProviderCredentials(activeSource);
+    const DATA_PROVIDER_API_KEY = providerConfig.apiKey;
+    const DATA_PROVIDER_BASE_URL = providerConfig.baseUrl;
+
     const payload = await req.json().catch(() => null);
     const reference = typeof payload?.reference === "string" ? payload.reference.trim() : "";
 

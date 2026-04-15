@@ -4,6 +4,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { getFunctionErrorMessage } from "@/lib/function-errors";
 import { getAppBaseUrl } from "@/lib/app-base-url";
+import { fetchApiPricingContext, applyPriceMultiplier } from "@/lib/api-source-pricing";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -35,6 +36,7 @@ const DashboardWallet = () => {
   const [loading, setLoading] = useState(true);
   const [copied, setCopied] = useState(false);
   const [globalSettings, setGlobalSettings] = useState<GlobalPackageSetting[]>([]);
+  const [priceMultiplier, setPriceMultiplier] = useState(1);
 
   // Buy data form
   const [selectedNetwork, setSelectedNetwork] = useState("");
@@ -56,6 +58,7 @@ const DashboardWallet = () => {
     supabase.from("global_package_settings").select("*").then(({ data }) => {
       if (data) setGlobalSettings(data as GlobalPackageSetting[]);
     });
+    fetchApiPricingContext().then((ctx) => setPriceMultiplier(ctx.multiplier));
   }, []);
 
   const getAgentPrice = (network: string, size: string): number => {
@@ -63,10 +66,10 @@ const DashboardWallet = () => {
     const setting = globalSettings.find(
       (s) => s.network === network && s.package_size === size.replace(/\s+/g, "").toUpperCase()
     );
-    if (setting?.agent_price && setting.agent_price > 0) return setting.agent_price;
+    if (setting?.agent_price && setting.agent_price > 0) return applyPriceMultiplier(setting.agent_price, priceMultiplier);
     // Fallback to base price
     const basePkg = basePackages[network]?.find((p) => p.size === size);
-    return basePkg ? basePkg.price : 0;
+    return basePkg ? applyPriceMultiplier(basePkg.price, priceMultiplier) : 0;
   };
 
   const fetchBalance = useCallback(async () => {

@@ -11,6 +11,8 @@ import { useToast } from "@/hooks/use-toast";
 import { Loader2 } from "lucide-react";
 
 type SystemSettings = {
+  active_api_source: "primary" | "secondary";
+  secondary_price_markup_pct: number;
   auto_api_switch: boolean;
   preferred_provider: "primary" | "secondary";
   backup_provider: "primary" | "secondary";
@@ -25,6 +27,8 @@ type SystemSettings = {
 };
 
 const defaultSettings: SystemSettings = {
+  active_api_source: "primary",
+  secondary_price_markup_pct: 8.11,
   auto_api_switch: false,
   preferred_provider: "primary",
   backup_provider: "secondary",
@@ -39,6 +43,8 @@ const defaultSettings: SystemSettings = {
 };
 
 const toUiSettings = (data: any): SystemSettings => ({
+  active_api_source: data?.active_api_source === "secondary" ? "secondary" : "primary",
+  secondary_price_markup_pct: Number(data?.secondary_price_markup_pct ?? 8.11) || 8.11,
   auto_api_switch: Boolean(data?.auto_api_switch),
   preferred_provider: data?.preferred_provider === "secondary" ? "secondary" : "primary",
   backup_provider: data?.backup_provider === "primary" ? "primary" : "secondary",
@@ -118,6 +124,8 @@ const AdminSettings = () => {
     const { data, error } = await supabase.functions.invoke("system-settings", {
       body: {
         action: "set",
+        active_api_source: settings.active_api_source,
+        secondary_price_markup_pct: settings.secondary_price_markup_pct,
         auto_api_switch: settings.auto_api_switch,
         preferred_provider: settings.preferred_provider,
         backup_provider: settings.backup_provider,
@@ -139,7 +147,7 @@ const AdminSettings = () => {
       const { error: upsertError } = await supabase.from("system_settings").upsert({
         id: 1,
         auto_api_switch: settings.auto_api_switch,
-        preferred_provider: settings.preferred_provider,
+        preferred_provider: settings.active_api_source,
         backup_provider: settings.backup_provider,
         holiday_mode_enabled: settings.holiday_mode_enabled,
         holiday_message: settings.holiday_message.trim() || defaultSettings.holiday_message,
@@ -183,9 +191,51 @@ const AdminSettings = () => {
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-lg">Automation</CardTitle>
+          <CardTitle className="text-lg">API Source & Automation</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <Label>Active data API source</Label>
+              <Select
+                value={settings.active_api_source}
+                onValueChange={(value: "primary" | "secondary") =>
+                  setSettings((prev) => ({ ...prev, active_api_source: value, preferred_provider: value }))
+                }
+              >
+                <SelectTrigger className="mt-1 bg-secondary">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="primary">API 1 (Primary)</SelectItem>
+                  <SelectItem value="secondary">API 2 (Secondary)</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground mt-1">
+                When API 2 is active, storefront data prices are auto-adjusted by the secondary markup.
+              </p>
+            </div>
+
+            <div>
+              <Label htmlFor="secondary-markup">API 2 markup (%)</Label>
+              <Input
+                id="secondary-markup"
+                type="number"
+                min={0}
+                step={0.01}
+                value={settings.secondary_price_markup_pct}
+                onChange={(e) =>
+                  setSettings((prev) => ({
+                    ...prev,
+                    secondary_price_markup_pct: Math.max(0, Number(e.target.value) || 0),
+                  }))
+                }
+                className="mt-1 bg-secondary"
+              />
+              <p className="text-xs text-muted-foreground mt-1">Default: 8.11%</p>
+            </div>
+          </div>
+
           <div className="flex items-center justify-between rounded-lg border border-border p-3">
             <div>
               <Label className="text-sm font-medium">Auto API switch</Label>
