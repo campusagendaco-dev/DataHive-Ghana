@@ -125,6 +125,19 @@ function mapNetworkKey(network: string): string {
   return normalized;
 }
 
+function mapSecondaryNetwork(network: string): string {
+  const normalized = network.trim().toUpperCase();
+  if (
+    normalized === "AIRTELTIGO" ||
+    normalized === "AIRTEL TIGO" ||
+    normalized === "AIRTEL-TIGO" ||
+    normalized === "AT" ||
+    normalized === "AIRTELTIGO_ISHARE"
+  ) return "AIRTELTIGO_ISHARE";
+  if (normalized === "TELECEL" || normalized === "VODAFONE") return "TELECEL";
+  return "MTN";
+}
+
 function parseCapacity(packageSize: string): number {
   const match = packageSize.replace(/\s+/g, "").match(/(\d+(?:\.\d+)?)/)
   return match ? parseFloat(match[1]) : 0;
@@ -136,6 +149,32 @@ function normalizeRecipient(phone: string): string {
   if (digits.length === 9) return `0${digits}`;
   if (digits.length === 10 && digits.startsWith("0")) return digits;
   return phone.trim();
+}
+
+function normalizeSecondaryPhone(phone: string): string {
+  const digits = phone.replace(/\D+/g, "");
+  if (digits.startsWith("233") && digits.length === 12) return `0${digits.slice(3)}`;
+  if (digits.length === 9) return `0${digits}`;
+  if (digits.length === 10 && digits.startsWith("0")) return digits;
+  return digits;
+}
+
+function buildSecondaryOrderUrls(baseUrl: string, apiKey: string): string[] {
+  const clean = normalizeProviderBaseUrl(baseUrl);
+  if (!clean) return [];
+
+  const urls = new Set<string>();
+  const token = apiKey.trim();
+
+  urls.add(`${clean}/order`);
+  urls.add(`${clean}/api/order`);
+
+  if (token) {
+    urls.add(`${clean}/${token}/order`);
+    urls.add(`${clean}/api/${token}/order`);
+  }
+
+  return Array.from(urls);
 }
 
 function normalizeProviderBaseUrl(baseUrl: string): string {
@@ -283,6 +322,7 @@ type ProviderResult = {
 };
 
 async function placeDataOrder(
+  providerSource: ProviderSource,
   baseUrl: string,
   apiKey: string,
   network: string,
@@ -290,15 +330,28 @@ async function placeDataOrder(
   customerPhone: string,
   providerWebhookUrl: string,
 ): Promise<ProviderResult> {
-  const urls = buildProviderUrls(baseUrl, "purchase");
+  const urls = providerSource === "secondary"
+    ? buildSecondaryOrderUrls(baseUrl, apiKey)
+    : buildProviderUrls(baseUrl, "purchase");
   const networkKey = mapNetworkKey(network);
   const capacity = parseCapacity(packageSize);
-  const requestBody: Record<string, unknown> = {
-    networkKey,
-    recipient: normalizeRecipient(customerPhone),
-    capacity,
-  };
-  if (providerWebhookUrl) requestBody.webhook_url = providerWebhookUrl;
+  const requestBody: Record<string, unknown> = providerSource === "secondary"
+    ? {
+      phone: normalizeSecondaryPhone(customerPhone),
+      size: capacity,
+      network: mapSecondaryNetwork(network),
+    }
+    : {
+      networkKey,
+      recipient: normalizeRecipient(customerPhone),
+      capacity,
+    };
+  if (providerSource !== "secondary" && providerWebhookUrl) {
+    requestBody.webhook_url = providerWebhookUrl;
+  }
+  if (providerSource === "secondary" && providerWebhookUrl) {
+    requestBody.callback = providerWebhookUrl;
+  }
 
   let lastFailure: ProviderResult = {
     ok: false,
@@ -529,6 +582,7 @@ serve(async (req) => {
     console.log("Wallet buy data:", { orderId, network, package_size, customer_phone });
 
     const fulfillmentResult = await placeDataOrder(
+      pricingContext.source,
       DATA_PROVIDER_BASE_URL,
       DATA_PROVIDER_API_KEY,
       network,

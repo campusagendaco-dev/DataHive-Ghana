@@ -77,6 +77,19 @@ function mapNetworkKey(network: string): string {
   return normalized;
 }
 
+function mapSecondaryNetwork(network: string): string {
+  const normalized = network.trim().toUpperCase();
+  if (
+    normalized === "AIRTELTIGO" ||
+    normalized === "AIRTEL TIGO" ||
+    normalized === "AIRTEL-TIGO" ||
+    normalized === "AT" ||
+    normalized === "AIRTELTIGO_ISHARE"
+  ) return "AIRTELTIGO_ISHARE";
+  if (normalized === "TELECEL" || normalized === "VODAFONE") return "TELECEL";
+  return "MTN";
+}
+
 function parseCapacity(packageSize: string): number {
   const match = packageSize.replace(/\s+/g, "").match(/(\d+(?:\.\d+)?)/)
   return match ? parseFloat(match[1]) : 0;
@@ -88,6 +101,14 @@ function normalizeRecipient(phone: string): string {
   if (digits.length === 9) return `0${digits}`;
   if (digits.length === 10 && digits.startsWith("0")) return digits;
   return phone.trim();
+}
+
+function normalizeSecondaryPhone(phone: string): string {
+  const digits = phone.replace(/\D+/g, "");
+  if (digits.startsWith("233") && digits.length === 12) return `0${digits.slice(3)}`;
+  if (digits.length === 9) return `0${digits}`;
+  if (digits.length === 10 && digits.startsWith("0")) return digits;
+  return digits;
 }
 
 function normalizeProviderBaseUrl(baseUrl: string): string {
@@ -140,6 +161,24 @@ function buildProviderUrls(baseUrl: string, endpoint: string): string[] {
       urls.add(`${rootUrl}/api/${alias}`);
       urls.add(`${rootUrl}/${alias}`);
     }
+  }
+
+  return Array.from(urls);
+}
+
+function buildSecondaryOrderUrls(baseUrl: string, apiKey: string): string[] {
+  const clean = normalizeProviderBaseUrl(baseUrl);
+  if (!clean) return [];
+
+  const urls = new Set<string>();
+  const token = apiKey.trim();
+
+  urls.add(`${clean}/order`);
+  urls.add(`${clean}/api/order`);
+
+  if (token) {
+    urls.add(`${clean}/${token}/order`);
+    urls.add(`${clean}/api/${token}/order`);
   }
 
   return Array.from(urls);
@@ -234,16 +273,34 @@ type ProviderResult = {
 };
 
 async function callProviderApi(
+  providerSource: ProviderSource,
   baseUrl: string,
   apiKey: string,
   endpoint: "purchase" | "afa-registration",
   body: Record<string, unknown>,
   providerWebhookUrl = "",
 ): Promise<ProviderResult> {
-  const urls = buildProviderUrls(baseUrl, endpoint);
-  const baseRequestBody = endpoint === "purchase" && providerWebhookUrl && !Object.prototype.hasOwnProperty.call(body, "webhook_url")
-    ? { ...body, webhook_url: providerWebhookUrl }
-    : body;
+  const urls = providerSource === "secondary" && endpoint === "purchase"
+    ? buildSecondaryOrderUrls(baseUrl, apiKey)
+    : buildProviderUrls(baseUrl, endpoint);
+
+  let baseRequestBody: Record<string, unknown> = body;
+
+  if (endpoint === "purchase" && providerSource === "secondary") {
+    const networkValue = typeof body.networkRaw === "string"
+      ? body.networkRaw
+      : (typeof body.networkKey === "string" ? body.networkKey : "MTN");
+    const recipientValue = typeof body.recipient === "string" ? body.recipient : "";
+    const capacityValue = Number(body.capacity || 0);
+    baseRequestBody = {
+      phone: normalizeSecondaryPhone(recipientValue),
+      size: capacityValue,
+      network: mapSecondaryNetwork(networkValue),
+    };
+    if (providerWebhookUrl) baseRequestBody.callback = providerWebhookUrl;
+  } else if (endpoint === "purchase" && providerWebhookUrl && !Object.prototype.hasOwnProperty.call(body, "webhook_url")) {
+    baseRequestBody = { ...body, webhook_url: providerWebhookUrl };
+  }
 
   let lastFailure: ProviderResult = {
     ok: false,
@@ -495,6 +552,7 @@ serve(async (req) => {
 
     if (orderType === "afa") {
       const result = await callProviderApi(
+        activeSource,
         DATA_PROVIDER_BASE_URL,
         DATA_PROVIDER_API_KEY,
         "afa-registration",
@@ -539,10 +597,12 @@ serve(async (req) => {
     }
 
     const result = await callProviderApi(
+      activeSource,
       DATA_PROVIDER_BASE_URL,
       DATA_PROVIDER_API_KEY,
       "purchase",
       {
+        networkRaw: network,
         networkKey: mapNetworkKey(network),
         recipient: normalizeRecipient(customerPhone),
         capacity: parseCapacity(packageSize),
