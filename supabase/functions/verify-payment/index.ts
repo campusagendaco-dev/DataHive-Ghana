@@ -39,6 +39,40 @@ function normalizeRecipient(phone: string): string {
   return digits || phone.trim();
 }
 
+function buildRecipientVariants(phone: string): string[] {
+  const raw = phone.trim();
+  const digits = raw.replace(/\D+/g, "");
+  const values = new Set<string>();
+
+  if (raw) values.add(raw);
+
+  if (digits) {
+    values.add(digits);
+
+    if (digits.startsWith("233") && digits.length === 12) {
+      const local = `0${digits.slice(3)}`;
+      values.add(local);
+      values.add(`+${digits}`);
+    }
+
+    if (digits.startsWith("0") && digits.length === 10) {
+      const international = `233${digits.slice(1)}`;
+      values.add(international);
+      values.add(`+${international}`);
+    }
+
+    if (!digits.startsWith("0") && !digits.startsWith("233") && digits.length === 9) {
+      const local = `0${digits}`;
+      const international = `233${digits}`;
+      values.add(local);
+      values.add(international);
+      values.add(`+${international}`);
+    }
+  }
+
+  return Array.from(values);
+}
+
 function normalizeProviderBaseUrl(baseUrl: string): string {
   const clean = baseUrl.trim().replace(/\/+$/, "");
   if (!clean) return "";
@@ -190,9 +224,14 @@ async function callProviderApi(
   providerWebhookUrl = "",
 ): Promise<ProviderResult> {
   const urls = buildProviderUrls(baseUrl, endpoint);
-  const requestBody = endpoint === "purchase" && providerWebhookUrl && !Object.prototype.hasOwnProperty.call(body, "webhook_url")
+  const baseRequestBody = endpoint === "purchase" && providerWebhookUrl && !Object.prototype.hasOwnProperty.call(body, "webhook_url")
     ? { ...body, webhook_url: providerWebhookUrl }
     : body;
+
+  const requestBodies: Record<string, unknown>[] =
+    endpoint === "purchase" && typeof baseRequestBody.recipient === "string"
+      ? buildRecipientVariants(baseRequestBody.recipient).map((recipient) => ({ ...baseRequestBody, recipient }))
+      : [baseRequestBody];
 
   let lastFailure: ProviderResult = {
     ok: false,
@@ -202,8 +241,10 @@ async function callProviderApi(
     url: null,
   };
 
-  for (const url of urls) {
-    for (let attempt = 1; attempt <= 2; attempt++) {
+  payloadLoop:
+  for (const requestBody of requestBodies) {
+    for (const url of urls) {
+      for (let attempt = 1; attempt <= 2; attempt++) {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 25000);
 
@@ -238,6 +279,17 @@ async function callProviderApi(
         const reason = getProviderFailureReason(res.status, text, contentType);
         lastFailure = { ok: false, status: res.status, text, reason, url };
 
+        const normalizedReason = reason.toLowerCase();
+        const tryAnotherRecipient = endpoint === "purchase" && res.status === 400 && (
+          normalizedReason.includes("invalid phone") ||
+          normalizedReason.includes("order processing failed") ||
+          normalizedReason.includes("networkkey, recipient, and capacity are required")
+        );
+
+        if (tryAnotherRecipient) {
+          continue payloadLoop;
+        }
+
         const retryable = res.status >= 500 || res.status === 429;
         const tryNextUrl = res.status === 404 || (isHtmlResponse(contentType, text) && res.status !== 401 && res.status !== 403);
 
@@ -248,19 +300,20 @@ async function callProviderApi(
 
         if (tryNextUrl) break;
         return lastFailure;
-      } catch (error) {
-        clearTimeout(timeoutId);
-        lastFailure = {
-          ok: false,
-          status: 502,
-          text: "",
-          reason: error instanceof Error ? `Provider request failed: ${error.message}` : "Provider request failed",
-          url,
-        };
+        } catch (error) {
+          clearTimeout(timeoutId);
+          lastFailure = {
+            ok: false,
+            status: 502,
+            text: "",
+            reason: error instanceof Error ? `Provider request failed: ${error.message}` : "Provider request failed",
+            url,
+          };
 
-        if (attempt < 2) {
-          await new Promise((resolve) => setTimeout(resolve, 1000 * attempt));
-          continue;
+          if (attempt < 2) {
+            await new Promise((resolve) => setTimeout(resolve, 1000 * attempt));
+            continue;
+          }
         }
       }
     }
