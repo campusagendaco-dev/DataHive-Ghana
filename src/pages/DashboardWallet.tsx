@@ -178,7 +178,8 @@ const DashboardWallet = () => {
       });
 
       if (error || data?.error) {
-        toast({ title: "Purchase failed", description: data?.error || error?.message, variant: "destructive" });
+        const description = data?.error || await getFunctionErrorMessage(error, "Could not complete wallet purchase.");
+        toast({ title: "Purchase failed", description, variant: "destructive" });
       } else if (data?.status === "fulfilled") {
         toast({ title: "Data delivered successfully!" });
         setCustomerPhone("");

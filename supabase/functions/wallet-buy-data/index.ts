@@ -279,7 +279,7 @@ serve(async (req) => {
 
   if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY || !SUPABASE_ANON_KEY || !DATA_PROVIDER_API_KEY || !DATA_PROVIDER_BASE_URL) {
     return new Response(JSON.stringify({ error: "Server misconfigured" }), {
-      status: 500,
+      status: 200,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
@@ -322,14 +322,14 @@ serve(async (req) => {
       return new Response(JSON.stringify({
         error: settings.holiday_message || "Ordering is currently disabled. Please try again later.",
       }), {
-        status: 403,
+        status: 200,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
     if (!network || !package_size || !customer_phone || !Number.isFinite(requestedAmount) || requestedAmount <= 0) {
       return new Response(JSON.stringify({ error: "Missing required fields" }), {
-        status: 400,
+        status: 200,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
@@ -337,7 +337,7 @@ serve(async (req) => {
     const expectedAmount = await resolveExpectedAmount(supabaseAdmin, network, package_size);
     if (!expectedAmount) {
       return new Response(JSON.stringify({ error: "Package price not configured" }), {
-        status: 400,
+        status: 200,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
@@ -346,7 +346,7 @@ serve(async (req) => {
       return new Response(JSON.stringify({
         error: `Invalid amount for ${network} ${package_size}. Expected GHS ${expectedAmount.toFixed(2)}.`,
       }), {
-        status: 400,
+        status: 200,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
@@ -361,7 +361,7 @@ serve(async (req) => {
       return new Response(JSON.stringify({
         error: `Insufficient wallet balance. Available: GHS ${Number(wallet?.balance || 0).toFixed(2)}`,
       }), {
-        status: 400,
+        status: 200,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }

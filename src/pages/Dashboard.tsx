@@ -7,6 +7,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
 import { getNetworkCardColors } from "@/lib/utils";
 import { basePackages } from "@/lib/data";
+import { getFunctionErrorMessage } from "@/lib/function-errors";
 
 interface DashboardStats {
   walletBalance: number;
@@ -118,7 +119,10 @@ const Dashboard = () => {
       const { data, error } = await supabase.functions.invoke("wallet-buy-data", {
         body: { network: apiNetwork, package_size: buyDialog.pkg.size, customer_phone: phone, amount: costPrice },
       });
-      if (error || data?.error) throw new Error(error?.message || data?.error || "Purchase failed");
+      if (error || data?.error) {
+        const message = data?.error || await getFunctionErrorMessage(error, "Purchase failed");
+        throw new Error(message);
+      }
       toast({ title: "Order placed!", description: `${buyDialog.pkg.size} for ${phone}` });
       setBuyDialog({ open: false });
       setPhone("");
