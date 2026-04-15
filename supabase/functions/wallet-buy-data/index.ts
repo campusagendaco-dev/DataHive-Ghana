@@ -137,10 +137,6 @@ function buildProviderUrls(baseUrl: string, endpoint: string): string[] {
 }
 
 function parseProviderResponse(body: string, contentType: string | null): { ok: boolean; reason?: string } {
-  if (isHtmlResponse(contentType, body)) {
-    return { ok: false, reason: "Provider returned an HTML response. Check API URL configuration." };
-  }
-
   try {
     const parsed = JSON.parse(body);
     const status = String(parsed?.status || "").toLowerCase();
@@ -154,6 +150,10 @@ function parseProviderResponse(body: string, contentType: string | null): { ok: 
     // Non-JSON responses are handled below.
   }
 
+  if (isHtmlResponse(contentType, body)) {
+    return { ok: false, reason: "Provider returned an HTML response. Check API URL configuration." };
+  }
+
   // If provider doesn't include a status field but responded with 2xx JSON/text, treat as success.
   return { ok: true };
 }
@@ -161,7 +161,6 @@ function parseProviderResponse(body: string, contentType: string | null): { ok: 
 function isHtmlResponse(contentType: string | null, body: string): boolean {
   const preview = body.trim().slice(0, 200).toLowerCase();
   return Boolean(
-    contentType?.includes("text/html") ||
     preview.startsWith("<!doctype html") ||
     preview.startsWith("<html") ||
     preview.includes("<title>")
