@@ -50,6 +50,14 @@ function buildProviderUrls(baseUrl: string, endpoint: string): string[] {
   if (!clean) return [];
 
   const urls = new Set<string>();
+  let rootUrl = "";
+
+  try {
+    const parsed = new URL(clean);
+    rootUrl = parsed.origin;
+  } catch {
+    rootUrl = "";
+  }
 
   if (clean.endsWith(`/${endpoint}`) || clean.endsWith(`/api/${endpoint}`)) {
     urls.add(clean);
@@ -61,6 +69,12 @@ function buildProviderUrls(baseUrl: string, endpoint: string): string[] {
   } else {
     urls.add(`${clean}/api/${endpoint}`);
     urls.add(`${clean}/${endpoint}`);
+  }
+
+  // Also try host-root endpoints in case the configured base URL contains an extra path segment.
+  if (rootUrl) {
+    urls.add(`${rootUrl}/api/${endpoint}`);
+    urls.add(`${rootUrl}/${endpoint}`);
   }
 
   return Array.from(urls);

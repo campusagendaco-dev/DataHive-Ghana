@@ -58,7 +58,12 @@ async function resolveExpectedAmount(supabaseAdmin: any, network: string, packag
 
 function mapNetworkKey(network: string): string {
   const normalized = network.trim().toUpperCase();
-  if (normalized === "AIRTELTIGO" || normalized === "AIRTEL TIGO" || normalized === "AT") return "AT_PREMIUM";
+  if (
+    normalized === "AIRTELTIGO" ||
+    normalized === "AIRTEL TIGO" ||
+    normalized === "AIRTEL-TIGO" ||
+    normalized === "AT"
+  ) return "AT_PREMIUM";
   if (normalized === "TELECEL" || normalized === "VODAFONE") return "TELECEL";
   if (normalized === "MTN") return "YELLO";
   return normalized;
@@ -87,6 +92,14 @@ function buildProviderUrls(baseUrl: string, endpoint: string): string[] {
   if (!clean) return [];
 
   const urls = new Set<string>();
+  let rootUrl = "";
+
+  try {
+    const parsed = new URL(clean);
+    rootUrl = parsed.origin;
+  } catch {
+    rootUrl = "";
+  }
 
   if (clean.endsWith(`/${endpoint}`) || clean.endsWith(`/api/${endpoint}`)) {
     urls.add(clean);
@@ -99,6 +112,12 @@ function buildProviderUrls(baseUrl: string, endpoint: string): string[] {
     // Provider expects /api/purchase as canonical endpoint.
     urls.add(`${clean}/api/${endpoint}`);
     urls.add(`${clean}/${endpoint}`);
+  }
+
+  // Also try host-root endpoints in case the configured base URL contains an extra path segment.
+  if (rootUrl) {
+    urls.add(`${rootUrl}/api/${endpoint}`);
+    urls.add(`${rootUrl}/${endpoint}`);
   }
 
   return Array.from(urls);
