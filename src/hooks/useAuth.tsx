@@ -58,6 +58,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
   const appBaseUrl = isLocalDevHost ? window.location.origin : (envSiteUrl || window.location.origin);
 
+  const normalizeEmailInput = (value: string) =>
+    value
+      .replace(/[\u200B-\u200D\uFEFF]/g, "")
+      .trim()
+      .toLowerCase();
+
   const fetchProfile = async (userId: string) => {
     const { data } = await supabase
       .from("profiles")
@@ -139,8 +145,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   const signUp = async (email: string, password: string, fullName: string) => {
+    const normalizedEmail = normalizeEmailInput(email);
     const { error } = await supabase.auth.signUp({
-      email,
+      email: normalizedEmail,
       password,
       options: {
         emailRedirectTo: appBaseUrl,
@@ -151,7 +158,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const signIn = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    const normalizedEmail = normalizeEmailInput(email);
+    const { error } = await supabase.auth.signInWithPassword({
+      email: normalizedEmail,
+      password,
+    });
     return { error };
   };
 
@@ -167,8 +178,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const requestPasswordReset = async (email: string, redirectPath = "/reset-password") => {
+    const normalizedEmail = normalizeEmailInput(email);
     const normalizedPath = redirectPath.startsWith("/") ? redirectPath : `/${redirectPath}`;
-    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+    const { error } = await supabase.auth.resetPasswordForEmail(normalizedEmail, {
       redirectTo: `${appBaseUrl}${normalizedPath}`,
     });
     return { error };
