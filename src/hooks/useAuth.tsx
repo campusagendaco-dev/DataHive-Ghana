@@ -64,6 +64,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       .trim()
       .toLowerCase();
 
+  const cleanPasswordInput = (value: string) =>
+    value
+      .replace(/[\u200B-\u200D\uFEFF]/g, "")
+      .trim();
+
   const fetchProfile = async (userId: string) => {
     const { data } = await supabase
       .from("profiles")
@@ -163,6 +168,21 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       email: normalizedEmail,
       password,
     });
+
+    if (!error) return { error: null };
+
+    const message = String(error.message || "").toLowerCase();
+    const fallbackPassword = cleanPasswordInput(password);
+
+    // Retry once with cleaned password for copy/paste hidden-char issues.
+    if (message.includes("invalid login credentials") && fallbackPassword && fallbackPassword !== password) {
+      const { error: retryError } = await supabase.auth.signInWithPassword({
+        email: normalizedEmail,
+        password: fallbackPassword,
+      });
+      return { error: retryError };
+    }
+
     return { error };
   };
 
