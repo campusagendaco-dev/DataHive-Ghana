@@ -39,11 +39,8 @@ const AdminOrders = () => {
     const { data } = await supabase
       .from("orders")
       .select("*")
-      .neq("order_type", "wallet_topup")
-      .neq("order_type", "agent_activation")
-      .neq("status", "pending")
       .order("created_at", { ascending: false })
-      .limit(500);
+      .limit(2000);
     setOrders((data as OrderRow[]) || []);
     setLoading(false);
   };
@@ -88,8 +85,9 @@ const AdminOrders = () => {
       .some((v) => v!.toLowerCase().includes(search.toLowerCase()))
   );
 
-  const unfulfilled = orders.filter((o) => o.status === "fulfillment_failed").length;
-  const pending = orders.filter((o) => o.status === "pending" || o.status === "paid").length;
+  const failed = orders.filter((o) => o.status === "fulfillment_failed").length;
+  const pending = orders.filter((o) => o.status === "pending").length;
+  const paid = orders.filter((o) => o.status === "paid").length;
 
   if (loading) return <div className="text-muted-foreground">Loading orders...</div>;
 
@@ -97,13 +95,16 @@ const AdminOrders = () => {
     <div>
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
         <div>
-          <h1 className="font-display text-2xl font-bold">All Data Orders</h1>
+          <h1 className="font-display text-2xl font-bold">All Orders</h1>
           <div className="flex flex-wrap gap-3 mt-1 text-sm">
-            {unfulfilled > 0 && (
-              <span className="text-red-400">⚠ {unfulfilled} failed — retry needed</span>
+            {failed > 0 && (
+              <span className="text-red-400">⚠ {failed} failed</span>
             )}
             {pending > 0 && (
-              <span className="text-yellow-400">⏳ {pending} pending/paid</span>
+              <span className="text-yellow-400">⏳ {pending} pending</span>
+            )}
+            {paid > 0 && (
+              <span className="text-blue-400">💳 {paid} paid awaiting fulfillment</span>
             )}
             <span className="text-muted-foreground">{orders.length} total</span>
           </div>
