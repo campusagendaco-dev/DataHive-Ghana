@@ -18,7 +18,10 @@ interface OrderInfo {
 
 const OrderStatus = () => {
   const [searchParams] = useSearchParams();
-  const [orderId, setOrderId] = useState(searchParams.get("reference") || "");
+  const getSearchReference = () =>
+    searchParams.get("reference") || searchParams.get("trxref") || "";
+
+  const [orderId, setOrderId] = useState(getSearchReference());
   const [order, setOrder] = useState<OrderInfo | null>(null);
   const [loading, setLoading] = useState(false);
   const [verifying, setVerifying] = useState(false);
@@ -99,7 +102,7 @@ const OrderStatus = () => {
   }, [orderId]);
 
   useEffect(() => {
-    const ref = searchParams.get("reference");
+    const ref = getSearchReference();
     if (ref) {
       setOrderId(ref);
       lookupOrder(ref);
