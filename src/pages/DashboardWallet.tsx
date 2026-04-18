@@ -28,6 +28,14 @@ interface GlobalPackageSetting {
   is_unavailable: boolean;
 }
 
+const PAYSTACK_FEE_RATE = 0.0195;
+const PAYSTACK_FEE_CAP = 100;
+
+const calculatePaystackFee = (amount: number) => {
+  const fee = amount * PAYSTACK_FEE_RATE;
+  return Math.min(fee, PAYSTACK_FEE_CAP);
+};
+
 const DashboardWallet = () => {
   const { user, profile } = useAuth();
   const { toast } = useToast();
@@ -137,17 +145,20 @@ const DashboardWallet = () => {
   }, [fetchBalance, fetchRecentTopups, toast]);
 
   const handlePaystackTopup = async () => {
-    const amount = Number(topupAmount);
-    if (!Number.isFinite(amount) || amount < 1) {
+    const requestedCredit = Number(topupAmount);
+    if (!Number.isFinite(requestedCredit) || requestedCredit < 1) {
       toast({ title: "Enter a valid top-up amount (minimum GHS 1)", variant: "destructive" });
       return;
     }
 
+    const paystackFee = Math.round(calculatePaystackFee(requestedCredit) * 100) / 100;
+    const chargeAmount = Math.round((requestedCredit + paystackFee) * 100) / 100;
+
     setToppingUp(true);
     const { data, error } = await supabase.functions.invoke("wallet-topup", {
       body: {
-        amount,
-        wallet_credit: amount,
+        amount: chargeAmount,
+        wallet_credit: requestedCredit,
         callback_url: `${getAppBaseUrl()}/dashboard/wallet`,
       },
     });
@@ -172,6 +183,13 @@ const DashboardWallet = () => {
 
   const selectedPkg = agentPackages.find((p) => p.size === selectedPackage);
   const totalFunds = parseFloat((balance + availableProfit).toFixed(2));
+  const topupRequestedAmount = Number(topupAmount);
+  const topupFee = Number.isFinite(topupRequestedAmount) && topupRequestedAmount > 0
+    ? Math.round(calculatePaystackFee(topupRequestedAmount) * 100) / 100
+    : 0;
+  const topupChargeTotal = Number.isFinite(topupRequestedAmount) && topupRequestedAmount > 0
+    ? Math.round((topupRequestedAmount + topupFee) * 100) / 100
+    : 0;
 
   const paystackFee = (() => {
     if (!selectedPkg || paymentMethod !== "paystack") return 0;
@@ -309,7 +327,7 @@ const DashboardWallet = () => {
             <CardTitle className="text-sm font-medium text-accent-foreground">Top Up with Paystack</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
-            <Label htmlFor="topup-amount" className="text-xs text-muted-foreground">Amount (GHS)</Label>
+            <Label htmlFor="topup-amount" className="text-xs text-muted-foreground">Wallet Credit Amount (GHS)</Label>
             <Input
               id="topup-amount"
               type="number"
@@ -320,9 +338,25 @@ const DashboardWallet = () => {
               onChange={(e) => setTopupAmount(e.target.value)}
               className="bg-secondary"
             />
+            {topupChargeTotal > 0 && (
+              <div className="rounded-lg border border-border/60 bg-background/60 p-3 text-xs space-y-1">
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Wallet Credit</span>
+                  <span className="font-medium">GHS {topupRequestedAmount.toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Paystack Fee (1.95%)</span>
+                  <span className="font-medium">GHS {topupFee.toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between border-t border-border pt-1">
+                  <span className="text-muted-foreground font-medium">Total to Pay</span>
+                  <span className="font-bold">GHS {topupChargeTotal.toFixed(2)}</span>
+                </div>
+              </div>
+            )}
             <Button onClick={handlePaystackTopup} disabled={toppingUp} className="w-full gap-2">
               {toppingUp ? <Loader2 className="w-4 h-4 animate-spin" /> : <CreditCard className="w-4 h-4" />}
-              {toppingUp ? "Initializing..." : "Top Up Now"}
+              {toppingUp ? "Initializing..." : topupChargeTotal > 0 ? `Pay GHS ${topupChargeTotal.toFixed(2)}` : "Top Up Now"}
             </Button>
           </CardContent>
         </Card>
