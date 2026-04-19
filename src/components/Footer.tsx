@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 
 const Footer = () => {
-  const [customerServiceNumber, setCustomerServiceNumber] = useState("+233 560 042 269");
+  const [customerServiceNumber, setCustomerServiceNumber] = useState("0547636024");
   const [supportChannelLink, setSupportChannelLink] = useState("https://whatsapp.com/channel/0029Vb6Xwed60eBaztkH2B3m");
 
   useEffect(() => {
