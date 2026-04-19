@@ -6,6 +6,7 @@ import { getNetworkCardColors } from "@/lib/utils";
 import NetworkCard from "@/components/NetworkCard";
 import DataPackageCard from "@/components/DataPackageCard";
 import AfaOrderForm from "@/components/AfaOrderForm";
+import PhoneOrderTracker from "@/components/PhoneOrderTracker";
 import { useToast } from "@/hooks/use-toast";
 import { getFunctionErrorMessage } from "@/lib/function-errors";
 import { getAppBaseUrl } from "@/lib/app-base-url";
@@ -309,6 +310,13 @@ const AgentStore = () => {
       {/* Main content */}
       <main className="flex-1 px-4 pb-10">
         <div className="container mx-auto max-w-3xl">
+          <div className="mb-8">
+            <PhoneOrderTracker
+              title="Track Your Data Order"
+              subtitle="Enter your purchase phone number for live delivery updates."
+            />
+          </div>
+
           <div className="mb-8">
             <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-3">Choose Network</p>
             <div className="flex flex-wrap gap-2">

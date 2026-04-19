@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import PhoneOrderTracker from "@/components/PhoneOrderTracker";
 
 const networks = [
   { name: "MTN", color: "#FFCC00" },
@@ -79,6 +80,13 @@ const Index = () => {
                 <span className="text-sm font-semibold text-foreground">{n.name}</span>
               </div>
             ))}
+          </div>
+
+          <div className="mt-10 max-w-2xl mx-auto animate-fade-in" style={{ animationDelay: "0.45s" }}>
+            <PhoneOrderTracker
+              title="Track Data Delivery by Phone"
+              subtitle="See live updates: Payment Verified, Pending Delivery, and Data Delivered."
+            />
           </div>
         </div>
       </section>
