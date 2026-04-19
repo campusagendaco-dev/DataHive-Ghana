@@ -3,7 +3,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
+  "Access-Control-Allow-Headers": "authorization, x-user-access-token, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
 serve(async (req) => {
@@ -21,7 +21,9 @@ serve(async (req) => {
     });
   }
 
-  const authHeader = req.headers.get("Authorization");
+  const payload = await req.json().catch(() => null);
+  const rawToken = req.headers.get("x-user-access-token") || (typeof payload?.access_token === "string" ? payload.access_token.trim() : "");
+  const authHeader = req.headers.get("Authorization") || (rawToken ? `Bearer ${rawToken}` : null);
   if (!authHeader) {
     return new Response(JSON.stringify({ error: "Unauthorized" }), {
       status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -41,7 +43,7 @@ serve(async (req) => {
       });
     }
 
-    const { amount, wallet_credit, callback_url } = await req.json();
+    const { amount, wallet_credit, callback_url } = payload || {};
     const chargeAmount = amount;
     const creditAmount = wallet_credit || amount;
     if (!chargeAmount || chargeAmount < 1) {

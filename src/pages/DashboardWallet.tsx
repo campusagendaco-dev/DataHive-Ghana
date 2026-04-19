@@ -5,7 +5,7 @@ import { useToast } from "@/hooks/use-toast";
 import { getFunctionErrorMessage } from "@/lib/function-errors";
 import { getAppBaseUrl } from "@/lib/app-base-url";
 import { fetchApiPricingContext, applyPriceMultiplier } from "@/lib/api-source-pricing";
-import { invokePublicFunction } from "@/lib/public-function-client";
+import { invokePublicFunction, invokePublicFunctionAsUser } from "@/lib/public-function-client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -147,7 +147,7 @@ const DashboardWallet = () => {
     const params = new URLSearchParams(window.location.search);
     const reference = params.get("reference") || params.get("trxref");
     if (reference) {
-      invokePublicFunction("verify-payment", { body: { reference } }).then(async (res) => {
+      invokePublicFunctionAsUser("verify-payment", { body: { reference } }).then(async (res) => {
         const status = res.data?.status;
         if (status === "fulfilled") {
           toast({ title: "Wallet topped up successfully!" });
@@ -183,7 +183,7 @@ const DashboardWallet = () => {
     const chargeAmount = Math.round((requestedCredit + paystackFee) * 100) / 100;
 
     setToppingUp(true);
-    const { data, error } = await supabase.functions.invoke("wallet-topup", {
+    const { data, error } = await invokePublicFunctionAsUser("wallet-topup", {
       body: {
         amount: chargeAmount,
         wallet_credit: requestedCredit,
@@ -239,7 +239,7 @@ const DashboardWallet = () => {
         return;
       }
       setBuying(true);
-      const { data, error } = await supabase.functions.invoke("wallet-buy-data", {
+      const { data, error } = await invokePublicFunctionAsUser("wallet-buy-data", {
         body: {
           network: selectedNetwork,
           package_size: selectedPackage,
@@ -304,7 +304,7 @@ const DashboardWallet = () => {
       if (!pendingRows || pendingRows.length === 0) { toast({ title: "No pending deposits found" }); return; }
 
       const checks = await Promise.allSettled(
-        pendingRows.map((row) => invokePublicFunction("verify-payment", { body: { reference: row.id } })),
+        pendingRows.map((row) => invokePublicFunctionAsUser("verify-payment", { body: { reference: row.id } })),
       );
 
       const fulfilledCount = checks.filter((result) => result.status === "fulfilled" && result.value?.data?.status === "fulfilled").length;

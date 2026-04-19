@@ -3,7 +3,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
+  "Access-Control-Allow-Headers": "authorization, x-user-access-token, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
 function getFirstEnvValue(keys: string[]): string {
@@ -463,7 +463,6 @@ serve(async (req) => {
   }
 
   const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
-  const authHeader = req.headers.get("Authorization") || "";
 
   try {
     const activeSource = await getActiveProviderSource(supabase);
@@ -472,6 +471,8 @@ serve(async (req) => {
     const DATA_PROVIDER_BASE_URL = providerConfig.baseUrl;
 
     const payload = await req.json().catch(() => null);
+    const rawToken = req.headers.get("x-user-access-token") || (typeof payload?.access_token === "string" ? payload.access_token.trim() : "");
+    const authHeader = req.headers.get("Authorization") || (rawToken ? `Bearer ${rawToken}` : "");
     const reference = typeof payload?.reference === "string" ? payload.reference.trim() : "";
 
     if (!reference) {

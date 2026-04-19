@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils";
 import { getNetworkCardColors } from "@/lib/utils";
 import { basePackages } from "@/lib/data";
 import { getFunctionErrorMessage } from "@/lib/function-errors";
+import { invokePublicFunctionAsUser } from "@/lib/public-function-client";
 import { applyPriceMultiplier, fetchApiPricingContext } from "@/lib/api-source-pricing";
 
 interface DashboardStats {
@@ -124,7 +125,7 @@ const Dashboard = () => {
     setLoading(true);
     try {
       const costPrice = getCostPrice(buyDialog.pkg);
-      const { data, error } = await supabase.functions.invoke("wallet-buy-data", {
+      const { data, error } = await invokePublicFunctionAsUser("wallet-buy-data", {
         body: { network: apiNetwork, package_size: buyDialog.pkg.size, customer_phone: phone, amount: costPrice },
       });
       if (error || data?.error) {
@@ -174,7 +175,6 @@ const Dashboard = () => {
           Top Up Wallet
         </button>
       </div>
-
       {/* Stats row */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
         {statItems.map((s) => (

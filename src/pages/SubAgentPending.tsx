@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { getAppBaseUrl } from "@/lib/app-base-url";
-import { invokePublicFunction } from "@/lib/public-function-client";
+import { invokePublicFunction, invokePublicFunctionAsUser } from "@/lib/public-function-client";
 import { Loader2, CreditCard, Clock, Zap } from "lucide-react";
 
 const SubAgentPending = () => {
@@ -44,7 +44,7 @@ const SubAgentPending = () => {
     if (!reference) return;
 
     setVerifying(true);
-    invokePublicFunction("verify-payment", { body: { reference } }).then(async (res) => {
+    invokePublicFunctionAsUser("verify-payment", { body: { reference } }).then(async (res) => {
       if (res.data?.status === "fulfilled") {
         toast({ title: "Activation successful!", description: "Welcome to the team!" });
         await refreshProfile();

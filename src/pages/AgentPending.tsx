@@ -5,7 +5,7 @@ import { useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { getAppBaseUrl } from "@/lib/app-base-url";
-import { invokePublicFunction } from "@/lib/public-function-client";
+import { invokePublicFunction, invokePublicFunctionAsUser } from "@/lib/public-function-client";
 
 const ACTIVATION_FEE = 80;
 const PAYSTACK_FEE_RATE = 0.0195;
@@ -27,7 +27,7 @@ const AgentPending = () => {
     const reference = params.get("reference") || params.get("trxref");
     if (reference) {
       setVerifying(true);
-      invokePublicFunction("verify-payment", { body: { reference } }).then(async (res) => {
+      invokePublicFunctionAsUser("verify-payment", { body: { reference } }).then(async (res) => {
         if (res.data?.status === "fulfilled") {
           toast({ title: "Activation successful!", description: "Your reseller account is now active." });
           await refreshProfile();
