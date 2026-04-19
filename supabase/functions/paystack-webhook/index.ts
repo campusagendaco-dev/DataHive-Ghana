@@ -15,17 +15,11 @@ function getFirstEnvValue(keys: string[]): string {
   return "";
 }
 
-type ProviderSource = "primary" | "secondary";
-
-function getProviderCredentials(source: ProviderSource): { apiKey: string; baseUrl: string } {
+function getProviderCredentials(): { apiKey: string; baseUrl: string } {
   const primaryApiKey = getFirstEnvValue([
     "PRIMARY_DATA_PROVIDER_API_KEY",
     "DATA_PROVIDER_API_KEY",
     "DATA_PROVIDER_PRIMARY_API_KEY",
-  ]);
-  const secondaryApiKey = getFirstEnvValue([
-    "SECONDARY_DATA_PROVIDER_API_KEY",
-    "DATA_PROVIDER_SECONDARY_API_KEY",
   ]);
 
   const primaryBaseUrl = getFirstEnvValue([
@@ -33,35 +27,11 @@ function getProviderCredentials(source: ProviderSource): { apiKey: string; baseU
     "DATA_PROVIDER_BASE_URL",
     "DATA_PROVIDER_PRIMARY_BASE_URL",
   ]).replace(/\/+$/, "");
-  const secondaryBaseUrl = getFirstEnvValue([
-    "SECONDARY_DATA_PROVIDER_BASE_URL",
-    "DATA_PROVIDER_SECONDARY_BASE_URL",
-  ]).replace(/\/+$/, "");
-
-  if (source === "secondary") {
-    return {
-      apiKey: secondaryApiKey || primaryApiKey,
-      baseUrl: secondaryBaseUrl || primaryBaseUrl,
-    };
-  }
 
   return {
-    apiKey: primaryApiKey || secondaryApiKey,
-    baseUrl: primaryBaseUrl || secondaryBaseUrl,
+    apiKey: primaryApiKey,
+    baseUrl: primaryBaseUrl,
   };
-}
-
-// deno-lint-ignore no-explicit-any
-async function getActiveProviderSource(supabase: any): Promise<ProviderSource> {
-  const { data } = await supabase
-    .from("system_settings")
-    .select("preferred_provider")
-    .eq("id", 1)
-    .maybeSingle();
-
-  return data?.preferred_provider === "secondary"
-    ? "secondary"
-    : "primary";
 }
 
 function mapNetworkKey(network: string): string {
@@ -77,21 +47,6 @@ function mapNetworkKey(network: string): string {
   return normalized;
 }
 
-function mapSecondaryNetwork(network: string): string {
-  const normalized = network.trim().toUpperCase();
-  if (normalized.includes("BIGTIME")) return "AIRTELTIGO_BIGTIME";
-  if (normalized.includes("ISHARE")) return "AIRTELTIGO_ISHARE";
-  if (
-    normalized === "AIRTELTIGO" ||
-    normalized === "AIRTEL TIGO" ||
-    normalized === "AIRTEL-TIGO" ||
-    normalized === "AT" ||
-    normalized === "AIRTELTIGO_ISHARE"
-  ) return "AIRTELTIGO_ISHARE";
-  if (normalized === "TELECEL" || normalized === "VODAFONE") return "TELECEL";
-  return "MTN";
-}
-
 function parseCapacity(packageSize: string): number {
   const match = packageSize.replace(/\s+/g, "").match(/(\d+(?:\.\d+)?)/)
   return match ? parseFloat(match[1]) : 0;
@@ -103,14 +58,6 @@ function normalizeRecipient(phone: string): string {
   if (digits.length === 9) return `0${digits}`;
   if (digits.length === 10 && digits.startsWith("0")) return digits;
   return phone.trim();
-}
-
-function normalizeSecondaryPhone(phone: string): string {
-  const digits = phone.replace(/\D+/g, "");
-  if (digits.startsWith("233") && digits.length === 12) return `0${digits.slice(3)}`;
-  if (digits.length === 9) return `0${digits}`;
-  if (digits.length === 10 && digits.startsWith("0")) return digits;
-  return digits;
 }
 
 function normalizeProviderBaseUrl(baseUrl: string): string {
@@ -164,17 +111,6 @@ function buildProviderUrls(baseUrl: string, endpoint: string): string[] {
       urls.add(`${rootUrl}/${alias}`);
     }
   }
-
-  return Array.from(urls);
-}
-
-function buildSecondaryOrderUrls(baseUrl: string): string[] {
-  const clean = normalizeProviderBaseUrl(baseUrl);
-  if (!clean) return [];
-
-  const urls = new Set<string>();
-  urls.add(`${clean}/api/order`);
-  urls.add(`${clean}/order`);
 
   return Array.from(urls);
 }
@@ -317,34 +253,17 @@ type ProviderResult = {
 };
 
 async function callProviderApi(
-  providerSource: ProviderSource,
   baseUrl: string,
   apiKey: string,
   endpoint: "purchase" | "afa-registration",
   body: Record<string, unknown>,
   providerWebhookUrl = "",
 ): Promise<ProviderResult> {
-  const urls = providerSource === "secondary" && endpoint === "purchase"
-    ? buildSecondaryOrderUrls(baseUrl)
-    : buildProviderUrls(baseUrl, endpoint);
+  const urls = buildProviderUrls(baseUrl, endpoint);
 
   let baseRequestBody: Record<string, unknown> = body;
 
-  if (endpoint === "purchase" && providerSource === "secondary") {
-    const networkValue = typeof body.networkRaw === "string"
-      ? body.networkRaw
-      : (typeof body.networkKey === "string" ? body.networkKey : "MTN");
-    const recipientValue = typeof body.recipient === "string" ? body.recipient : "";
-    const capacityValue = Number(body.capacity || 0);
-    baseRequestBody = {
-      phone: normalizeSecondaryPhone(recipientValue),
-      size: capacityValue,
-      network: mapSecondaryNetwork(networkValue),
-    };
-    if (providerWebhookUrl) {
-      baseRequestBody.callback = providerWebhookUrl;
-    }
-  } else if (endpoint === "purchase" && providerWebhookUrl && !Object.prototype.hasOwnProperty.call(body, "webhook_url")) {
+  if (endpoint === "purchase" && providerWebhookUrl && !Object.prototype.hasOwnProperty.call(body, "webhook_url")) {
     baseRequestBody = { ...body, webhook_url: providerWebhookUrl };
   }
 
@@ -393,11 +312,9 @@ async function callProviderApi(
         lastFailure = { ok: false, status: response.status, body: text, reason, url };
 
         const retryable = response.status >= 500 || response.status === 429;
-        const secondaryAuthFailure = providerSource === "secondary" && (response.status === 401 || response.status === 403);
         const tryNextUrl =
           response.status === 404 ||
-          (isHtmlResponse(contentType, text) && response.status !== 401 && response.status !== 403) ||
-          secondaryAuthFailure;
+          (isHtmlResponse(contentType, text) && response.status !== 401 && response.status !== 403);
 
         if (retryable && attempt < 3) {
           await new Promise((resolve) => setTimeout(resolve, 1000 * attempt));
@@ -485,8 +402,7 @@ serve(async (req) => {
   const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
   try {
-    const activeSource = await getActiveProviderSource(supabase);
-    const providerConfig = getProviderCredentials(activeSource);
+    const providerConfig = getProviderCredentials();
     const DATA_PROVIDER_API_KEY = providerConfig.apiKey;
     const DATA_PROVIDER_BASE_URL = providerConfig.baseUrl;
 
@@ -762,7 +678,6 @@ serve(async (req) => {
 
     if (orderType === "afa") {
       const result = await callProviderApi(
-        activeSource,
         DATA_PROVIDER_BASE_URL,
         DATA_PROVIDER_API_KEY,
         "afa-registration",
@@ -813,7 +728,6 @@ serve(async (req) => {
     }
 
     const result = await callProviderApi(
-      activeSource,
       DATA_PROVIDER_BASE_URL,
       DATA_PROVIDER_API_KEY,
       "purchase",

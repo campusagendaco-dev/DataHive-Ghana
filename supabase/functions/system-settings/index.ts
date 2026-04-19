@@ -9,10 +9,10 @@ const corsHeaders = {
 
 const DEFAULT_SETTINGS = {
   active_api_source: "primary",
-  secondary_price_markup_pct: 8.11,
+  secondary_price_markup_pct: 0,
   auto_api_switch: false,
   preferred_provider: "primary",
-  backup_provider: "secondary",
+  backup_provider: "primary",
   holiday_mode_enabled: false,
   holiday_message: "Holiday mode is active. Orders will resume soon.",
   disable_ordering: false,
@@ -183,11 +183,11 @@ serve(async (req) => {
     }
 
     return {
-      auto_api_switch: Boolean(data?.auto_api_switch),
-      preferred_provider: String(data?.preferred_provider || DEFAULT_SETTINGS.preferred_provider),
-      backup_provider: String(data?.backup_provider || DEFAULT_SETTINGS.backup_provider),
-      active_api_source: String(data?.active_api_source || data?.preferred_provider || DEFAULT_SETTINGS.active_api_source),
-      secondary_price_markup_pct: Number(data?.secondary_price_markup_pct ?? DEFAULT_SETTINGS.secondary_price_markup_pct),
+      auto_api_switch: false,
+      preferred_provider: "primary",
+      backup_provider: "primary",
+      active_api_source: "primary",
+      secondary_price_markup_pct: 0,
       holiday_mode_enabled: Boolean(data?.holiday_mode_enabled),
       holiday_message: String(data?.holiday_message || DEFAULT_SETTINGS.holiday_message),
       disable_ordering: Boolean(data?.disable_ordering),
@@ -250,11 +250,10 @@ serve(async (req) => {
       });
     }
 
-    const preferredProvider = payload?.preferred_provider === "secondary" ? "secondary" : "primary";
-    const backupProvider = payload?.backup_provider === "primary" ? "primary" : "secondary";
-    const activeApiSource = payload?.active_api_source === "secondary" ? "secondary" : "primary";
-    const markupPct = Number(payload?.secondary_price_markup_pct);
-    const secondaryMarkupPct = Number.isFinite(markupPct) ? Math.max(0, markupPct) : DEFAULT_SETTINGS.secondary_price_markup_pct;
+    const preferredProvider = "primary";
+    const backupProvider = "primary";
+    const activeApiSource = "primary";
+    const secondaryMarkupPct = 0;
     const subAgentBaseFeeRaw = Number(payload?.sub_agent_base_fee);
     const subAgentBaseFee = Number.isFinite(subAgentBaseFeeRaw)
       ? Math.max(0, Number(subAgentBaseFeeRaw.toFixed(2)))
@@ -266,7 +265,7 @@ serve(async (req) => {
 
     const row = {
       id: 1,
-      auto_api_switch: Boolean(payload?.auto_api_switch),
+      auto_api_switch: false,
       preferred_provider: activeApiSource || preferredProvider,
       backup_provider: backupProvider,
       active_api_source: activeApiSource,

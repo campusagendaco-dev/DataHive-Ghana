@@ -107,12 +107,7 @@ serve(async (req) => {
     const agentId = metadata.agent_id || "00000000-0000-0000-0000-000000000000";
     const isAgentLinkedOrder = hasValidAgentId(agentId);
 
-    const { data: providerSettings } = await supabaseAdmin
-      .from("system_settings")
-      .select("preferred_provider")
-      .eq("id", 1)
-      .maybeSingle();
-    const priceMultiplier = providerSettings?.preferred_provider === "secondary" ? 1.0811 : 1;
+    const priceMultiplier = 1;
 
     if (orderType === "data") {
       const network = typeof metadata.network === "string" ? metadata.network : "";

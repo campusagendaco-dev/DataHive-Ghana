@@ -27,17 +27,11 @@ function getFirstEnvValue(keys: string[]): string {
   return "";
 }
 
-type ProviderSource = "primary" | "secondary";
-
-function getProviderCredentials(source: ProviderSource): { apiKey: string; baseUrl: string } {
+function getProviderCredentials(): { apiKey: string; baseUrl: string } {
   const primaryApiKey = getFirstEnvValue([
     "PRIMARY_DATA_PROVIDER_API_KEY",
     "DATA_PROVIDER_API_KEY",
     "DATA_PROVIDER_PRIMARY_API_KEY",
-  ]);
-  const secondaryApiKey = getFirstEnvValue([
-    "SECONDARY_DATA_PROVIDER_API_KEY",
-    "DATA_PROVIDER_SECONDARY_API_KEY",
   ]);
 
   const primaryBaseUrl = getFirstEnvValue([
@@ -45,21 +39,10 @@ function getProviderCredentials(source: ProviderSource): { apiKey: string; baseU
     "DATA_PROVIDER_BASE_URL",
     "DATA_PROVIDER_PRIMARY_BASE_URL",
   ]).replace(/\/+$/, "");
-  const secondaryBaseUrl = getFirstEnvValue([
-    "SECONDARY_DATA_PROVIDER_BASE_URL",
-    "DATA_PROVIDER_SECONDARY_BASE_URL",
-  ]).replace(/\/+$/, "");
-
-  if (source === "secondary") {
-    return {
-      apiKey: secondaryApiKey || primaryApiKey,
-      baseUrl: secondaryBaseUrl || primaryBaseUrl,
-    };
-  }
 
   return {
-    apiKey: primaryApiKey || secondaryApiKey,
-    baseUrl: primaryBaseUrl || secondaryBaseUrl,
+    apiKey: primaryApiKey,
+    baseUrl: primaryBaseUrl,
   };
 }
 
@@ -130,23 +113,8 @@ async function resolveExpectedAmountForUser(
 }
 
 // deno-lint-ignore no-explicit-any
-async function getPricingContext(supabaseAdmin: any): Promise<{ source: ProviderSource; multiplier: number }> {
-  const { data } = await supabaseAdmin
-    .from("system_settings")
-    .select("preferred_provider, secondary_price_markup_pct")
-    .eq("id", 1)
-    .maybeSingle();
-
-  const source: ProviderSource = data?.preferred_provider === "secondary"
-    ? "secondary"
-    : "primary";
-
-  const pct = Number(data?.secondary_price_markup_pct);
-  const multiplier = source === "secondary"
-    ? Number.isFinite(pct) ? Number((1 + pct / 100).toFixed(6)) : 1.0811
-    : 1;
-
-  return { source, multiplier };
+async function getPricingContext(_supabaseAdmin: any): Promise<{ source: "primary"; multiplier: number }> {
+  return { source: "primary", multiplier: 1 };
 }
 
 function mapNetworkKey(network: string): string {
@@ -162,21 +130,6 @@ function mapNetworkKey(network: string): string {
   return normalized;
 }
 
-function mapSecondaryNetwork(network: string): string {
-  const normalized = network.trim().toUpperCase();
-  if (normalized.includes("BIGTIME")) return "AIRTELTIGO_BIGTIME";
-  if (normalized.includes("ISHARE")) return "AIRTELTIGO_ISHARE";
-  if (
-    normalized === "AIRTELTIGO" ||
-    normalized === "AIRTEL TIGO" ||
-    normalized === "AIRTEL-TIGO" ||
-    normalized === "AT" ||
-    normalized === "AIRTELTIGO_ISHARE"
-  ) return "AIRTELTIGO_ISHARE";
-  if (normalized === "TELECEL" || normalized === "VODAFONE") return "TELECEL";
-  return "MTN";
-}
-
 function parseCapacity(packageSize: string): number {
   const match = packageSize.replace(/\s+/g, "").match(/(\d+(?:\.\d+)?)/)
   return match ? parseFloat(match[1]) : 0;
@@ -188,25 +141,6 @@ function normalizeRecipient(phone: string): string {
   if (digits.length === 9) return `0${digits}`;
   if (digits.length === 10 && digits.startsWith("0")) return digits;
   return phone.trim();
-}
-
-function normalizeSecondaryPhone(phone: string): string {
-  const digits = phone.replace(/\D+/g, "");
-  if (digits.startsWith("233") && digits.length === 12) return `0${digits.slice(3)}`;
-  if (digits.length === 9) return `0${digits}`;
-  if (digits.length === 10 && digits.startsWith("0")) return digits;
-  return digits;
-}
-
-function buildSecondaryOrderUrls(baseUrl: string): string[] {
-  const clean = normalizeProviderBaseUrl(baseUrl);
-  if (!clean) return [];
-
-  const urls = new Set<string>();
-  urls.add(`${clean}/api/order`);
-  urls.add(`${clean}/order`);
-
-  return Array.from(urls);
 }
 
 function normalizeProviderBaseUrl(baseUrl: string): string {
@@ -403,7 +337,6 @@ type ProviderResult = {
 };
 
 async function placeDataOrder(
-  providerSource: ProviderSource,
   baseUrl: string,
   apiKey: string,
   network: string,
@@ -411,26 +344,15 @@ async function placeDataOrder(
   customerPhone: string,
   providerWebhookUrl: string,
 ): Promise<ProviderResult> {
-  const urls = providerSource === "secondary"
-    ? buildSecondaryOrderUrls(baseUrl)
-    : buildProviderUrls(baseUrl, "purchase");
+  const urls = buildProviderUrls(baseUrl, "purchase");
   const networkKey = mapNetworkKey(network);
   const capacity = parseCapacity(packageSize);
-  const requestBody: Record<string, unknown> = providerSource === "secondary"
-    ? {
-      phone: normalizeSecondaryPhone(customerPhone),
-      size: capacity,
-      network: mapSecondaryNetwork(network),
-    }
-    : {
-      networkKey,
-      recipient: normalizeRecipient(customerPhone),
-      capacity,
-    };
-  if (providerSource === "secondary" && providerWebhookUrl) {
-    requestBody.callback = providerWebhookUrl;
-  }
-  if (providerSource !== "secondary" && providerWebhookUrl) {
+  const requestBody: Record<string, unknown> = {
+    networkKey,
+    recipient: normalizeRecipient(customerPhone),
+    capacity,
+  };
+  if (providerWebhookUrl) {
     requestBody.webhook_url = providerWebhookUrl;
   }
 
@@ -481,11 +403,9 @@ async function placeDataOrder(
         lastFailure = { ok: false, status: response.status, body, reason, url };
 
         const retryable = response.status >= 500 || response.status === 429;
-        const secondaryAuthFailure = providerSource === "secondary" && (response.status === 401 || response.status === 403);
         const tryNextUrl =
           response.status === 404 ||
-          (isHtmlResponse(contentType, body) && response.status !== 401 && response.status !== 403) ||
-          secondaryAuthFailure;
+          (isHtmlResponse(contentType, body) && response.status !== 401 && response.status !== 403);
 
         if (retryable && attempt < 2) {
           await new Promise((resolve) => setTimeout(resolve, 1000 * attempt));
@@ -588,7 +508,7 @@ serve(async (req) => {
     }
 
     const pricingContext = await getPricingContext(supabaseAdmin);
-    const providerConfig = getProviderCredentials(pricingContext.source);
+    const providerConfig = getProviderCredentials();
     const DATA_PROVIDER_API_KEY = providerConfig.apiKey;
     const DATA_PROVIDER_BASE_URL = providerConfig.baseUrl;
 
@@ -676,7 +596,6 @@ serve(async (req) => {
     console.log("Wallet buy data:", { orderId, network, package_size, customer_phone });
 
     const fulfillmentResult = await placeDataOrder(
-      pricingContext.source,
       DATA_PROVIDER_BASE_URL,
       DATA_PROVIDER_API_KEY,
       network,

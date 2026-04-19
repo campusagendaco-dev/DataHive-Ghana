@@ -27,14 +27,10 @@ const AdminPackages = () => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [userDiscountPercent, setUserDiscountPercent] = useState("");
-  const [activeApiSource, setActiveApiSource] = useState<"primary" | "secondary">("primary");
-  const [activeMultiplier, setActiveMultiplier] = useState(1);
 
   useEffect(() => {
     const fetch = async () => {
-      const pricingContext = await fetchApiPricingContext();
-      setActiveApiSource(pricingContext.source);
-      setActiveMultiplier(pricingContext.multiplier);
+      await fetchApiPricingContext();
 
       const { data } = await supabase
         .from("global_package_settings")
@@ -218,12 +214,6 @@ const AdminPackages = () => {
         Override prices for agents and users (public site). Leave blank to use default prices.
         Toggle unavailable to hide packages site-wide.
       </p>
-
-      {activeApiSource === "secondary" && (
-        <div className="rounded-lg border border-amber-400/30 bg-amber-400/10 p-3 text-sm">
-          API 2 is active. Storefront data prices are automatically increased by {((activeMultiplier - 1) * 100).toFixed(2)}%.
-        </div>
-      )}
 
       <Card>
         <CardHeader>
