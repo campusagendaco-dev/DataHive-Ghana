@@ -22,6 +22,21 @@ const DEFAULT_SETTINGS = {
   sub_agent_base_fee: 80,
 };
 
+const LEGACY_SUPPORT_NUMBERS = new Set([
+  "+23356042269",
+  "+233560042269",
+  "+233203256540",
+]);
+
+const normalizeSupportNumber = (value: unknown): string => {
+  const raw = String(value || "").trim();
+  if (!raw) return DEFAULT_SETTINGS.customer_service_number;
+  const compact = raw.replace(/\s+/g, "");
+  return LEGACY_SUPPORT_NUMBERS.has(compact)
+    ? DEFAULT_SETTINGS.customer_service_number
+    : raw;
+};
+
 const isMissingColumnError = (message: string, column: string) => {
   const lower = message.toLowerCase();
   const hasColumn = lower.includes(column.toLowerCase());
@@ -177,7 +192,7 @@ serve(async (req) => {
       holiday_message: String(data?.holiday_message || DEFAULT_SETTINGS.holiday_message),
       disable_ordering: Boolean(data?.disable_ordering),
       dark_mode_enabled: Boolean(data?.dark_mode_enabled),
-      customer_service_number: String(data?.customer_service_number || DEFAULT_SETTINGS.customer_service_number),
+      customer_service_number: normalizeSupportNumber(data?.customer_service_number),
       support_channel_link: String(data?.support_channel_link || DEFAULT_SETTINGS.support_channel_link),
       sub_agent_base_fee: Number(data?.sub_agent_base_fee ?? DEFAULT_SETTINGS.sub_agent_base_fee),
       table_ready: true,
@@ -246,9 +261,7 @@ serve(async (req) => {
       : DEFAULT_SETTINGS.sub_agent_base_fee;
     const holidayMessage =
       String(payload?.holiday_message || DEFAULT_SETTINGS.holiday_message).trim() || DEFAULT_SETTINGS.holiday_message;
-    const customerServiceNumber =
-      String(payload?.customer_service_number || DEFAULT_SETTINGS.customer_service_number).trim() ||
-      DEFAULT_SETTINGS.customer_service_number;
+    const customerServiceNumber = normalizeSupportNumber(payload?.customer_service_number);
     const supportChannelLink = String(payload?.support_channel_link || "").trim() || DEFAULT_SETTINGS.support_channel_link;
 
     const row = {
