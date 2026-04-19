@@ -84,11 +84,6 @@ const DashboardWallet = () => {
   const [topupAmount, setTopupAmount] = useState("");
   const [toppingUp, setToppingUp] = useState(false);
 
-  const verifyHeaders = () => {
-    const anonKey = (supabase as any)?.supabaseKey as string | undefined;
-    return anonKey ? { Authorization: `Bearer ${anonKey}` } : undefined;
-  };
-
   // Fetch global package settings (admin-set agent prices)
   useEffect(() => {
     supabase.from("global_package_settings").select("*").then(({ data }) => {
@@ -151,7 +146,7 @@ const DashboardWallet = () => {
     const params = new URLSearchParams(window.location.search);
     const reference = params.get("reference") || params.get("trxref");
     if (reference) {
-      supabase.functions.invoke("verify-payment", { body: { reference }, headers: verifyHeaders() }).then(async (res) => {
+      supabase.functions.invoke("verify-payment", { body: { reference } }).then(async (res) => {
         const status = res.data?.status;
         if (status === "fulfilled") {
           toast({ title: "Wallet topped up successfully!" });
@@ -308,7 +303,7 @@ const DashboardWallet = () => {
       if (!pendingRows || pendingRows.length === 0) { toast({ title: "No pending deposits found" }); return; }
 
       const checks = await Promise.allSettled(
-        pendingRows.map((row) => supabase.functions.invoke("verify-payment", { body: { reference: row.id }, headers: verifyHeaders() })),
+        pendingRows.map((row) => supabase.functions.invoke("verify-payment", { body: { reference: row.id } })),
       );
 
       const fulfilledCount = checks.filter((result) => result.status === "fulfilled" && result.value?.data?.status === "fulfilled").length;
