@@ -508,6 +508,13 @@ serve(async (req) => {
       .eq("id", orderId)
       .maybeSingle();
 
+    if (existingOrder?.status === "fulfilled") {
+      return new Response(JSON.stringify({ received: true, fulfilled: true }), {
+        status: 200,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     let shouldSendDataPaymentSms = false;
     let smsPhone = "";
 
@@ -516,11 +523,15 @@ serve(async (req) => {
       const normalizedProfit = Number.isFinite(metadataProfit) && metadataProfit > 0
         ? parseFloat(metadataProfit.toFixed(2))
         : 0;
+      const walletCredit = Number(metadata?.wallet_credit || metadata?.amount || verifiedAmount || 0);
+      const normalizedAmount = (orderTypeFromMetadata || "data") === "wallet_topup"
+        ? walletCredit
+        : (Number.isFinite(verifiedAmount) && verifiedAmount > 0 ? verifiedAmount : Number(metadata?.amount || 0));
       const recreatedOrder = {
         id: orderId,
         agent_id: typeof metadata?.agent_id === "string" ? metadata.agent_id : "00000000-0000-0000-0000-000000000000",
         order_type: orderTypeFromMetadata || "data",
-        amount: Number.isFinite(verifiedAmount) && verifiedAmount > 0 ? verifiedAmount : Number(metadata?.amount || 0),
+        amount: normalizedAmount,
         profit: normalizedProfit,
         status: "paid",
         failure_reason: null,
@@ -546,7 +557,7 @@ serve(async (req) => {
     } else {
       shouldSendDataPaymentSms = existingOrder.status === "pending" && (existingOrder.order_type || "") === "data";
       smsPhone = String(existingOrder.customer_phone || metadata?.customer_phone || "");
-      const patch: Record<string, unknown> = { status: "paid", failure_reason: null };
+      const patch: Record<string, unknown> = { failure_reason: null };
       const recoveredAgentId = typeof metadata?.agent_id === "string" ? metadata.agent_id : "";
       const hasPlaceholderAgentId = !existingOrder.agent_id || existingOrder.agent_id === "00000000-0000-0000-0000-000000000000";
 
@@ -556,6 +567,10 @@ serve(async (req) => {
       if (!existingOrder.customer_phone && typeof metadata?.customer_phone === "string") patch.customer_phone = metadata.customer_phone;
       if ((!existingOrder.profit || Number(existingOrder.profit) === 0) && Number.isFinite(Number(metadata?.profit))) {
         patch.profit = parseFloat(Number(metadata.profit).toFixed(2));
+      }
+
+      if (existingOrder.status === "pending" || existingOrder.status === "fulfillment_failed") {
+        patch.status = "paid";
       }
 
       await supabase.from("orders").update(patch).eq("id", orderId);

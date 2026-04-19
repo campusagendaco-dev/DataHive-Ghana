@@ -612,7 +612,7 @@ serve(async (req) => {
     const resolvedAgentId = order?.agent_id || metadata.agent_id || "00000000-0000-0000-0000-000000000000";
 
     if (!order) {
-      console.log("Recreating order from Paystack metadata:", { reference, orderType, agentId });
+      console.log("Recreating order from Paystack metadata:", { reference, orderType, agentId: resolvedAgentId });
       const walletCredit = Number(metadata.wallet_credit || metadata.amount || paidAmount);
       const metadataProfit = Number(metadata.profit);
       const normalizedProfit = Number.isFinite(metadataProfit) && metadataProfit > 0

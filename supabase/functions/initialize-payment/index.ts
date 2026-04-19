@@ -124,6 +124,27 @@ serve(async (req) => {
         });
       }
       console.log("Order created server-side:", reference, orderType);
+    } else {
+      const metadataProfit = Number(metadata.profit);
+      const patch: Record<string, unknown> = {};
+
+      if (metadata.agent_id) patch.agent_id = metadata.agent_id;
+      if (metadata.customer_phone) patch.customer_phone = metadata.customer_phone;
+      if (metadata.network) patch.network = metadata.network;
+      if (metadata.package_size) patch.package_size = metadata.package_size;
+      if (metadata.afa_full_name) patch.afa_full_name = metadata.afa_full_name;
+      if (metadata.afa_ghana_card) patch.afa_ghana_card = metadata.afa_ghana_card;
+      if (metadata.afa_occupation) patch.afa_occupation = metadata.afa_occupation;
+      if (metadata.afa_email) patch.afa_email = metadata.afa_email;
+      if (metadata.afa_residence) patch.afa_residence = metadata.afa_residence;
+      if (metadata.afa_date_of_birth) patch.afa_date_of_birth = metadata.afa_date_of_birth;
+      if (Number.isFinite(metadataProfit) && metadataProfit > 0) {
+        patch.profit = parseFloat(metadataProfit.toFixed(2));
+      }
+
+      if (Object.keys(patch).length > 0) {
+        await supabaseAdmin.from("orders").update(patch).eq("id", reference);
+      }
     }
 
     const amountInPesewas = Math.round(amount * 100);
