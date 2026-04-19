@@ -4,15 +4,13 @@ import { supabase } from "@/integrations/supabase/client";
 import { basePackages, networks } from "@/lib/data";
 import { getNetworkCardColors } from "@/lib/utils";
 import NetworkCard from "@/components/NetworkCard";
-import DataPackageCard from "@/components/DataPackageCard";
-import AfaOrderForm from "@/components/AfaOrderForm";
 import PhoneOrderTracker from "@/components/PhoneOrderTracker";
 import { useToast } from "@/hooks/use-toast";
 import { getFunctionErrorMessage } from "@/lib/function-errors";
 import { getAppBaseUrl } from "@/lib/app-base-url";
 import { fetchApiPricingContext, applyPriceMultiplier } from "@/lib/api-source-pricing";
 import { invokePublicFunction } from "@/lib/public-function-client";
-import { Menu, X, Users, Shield, AlertTriangle, Zap, TrendingUp, ChevronRight } from "lucide-react";
+import { Menu, X, Users, Zap, TrendingUp, ChevronRight } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -44,8 +42,6 @@ interface GlobalPkgSetting {
   is_unavailable: boolean;
 }
 
-const DEFAULT_AFA_PRICE = 12.5;
-
 const AgentStore = () => {
   const RESELLER_STORE_SETTLEMENT_MODE: "automatic" | "manual" = "automatic";
   const { slug } = useParams<{ slug: string }>();
@@ -61,7 +57,6 @@ const AgentStore = () => {
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [pendingOrder, setPendingOrder] = useState<{ network: string; size: string; basePrice: number } | null>(null);
   const [globalSettings, setGlobalSettings] = useState<Record<string, GlobalPkgSetting>>({});
-  const [globalAfaPrice, setGlobalAfaPrice] = useState(DEFAULT_AFA_PRICE);
   const [subAgentBaseFee, setSubAgentBaseFee] = useState<number | null>(null);
   const [priceMultiplier, setPriceMultiplier] = useState(1);
 
@@ -84,10 +79,6 @@ const AgentStore = () => {
       const gsMap: Record<string, GlobalPkgSetting> = {};
       (packageSettingsRes.data || []).forEach((r: any) => { gsMap[`${r.network}-${r.package_size}`] = r; });
       setGlobalSettings(gsMap);
-      const numericAfa = Number((gsMap["AFA-BUNDLE"] as any)?.agent_price ?? (gsMap["AFA-BUNDLE"] as any)?.public_price);
-      if (Number.isFinite(numericAfa) && numericAfa >= 0) {
-        setGlobalAfaPrice(numericAfa);
-      }
 
       // Sub agent fee: fetch separately to avoid schema cache issues
       try {
@@ -153,20 +144,6 @@ const AgentStore = () => {
     const price = agentPrices[network]?.[size];
     const numeric = Number(price || basePrice);
     return applyPriceMultiplier(numeric, priceMultiplier).toFixed(2);
-  };
-
-  const afaPrice = applyPriceMultiplier(globalAfaPrice, priceMultiplier).toFixed(2);
-
-  const handleSelectPackage = (network: string, size: string) => {
-    if (isPackageDisabled(network, size)) return;
-    const key = `${network}-${size}`;
-    if (selectedPkg === key) {
-      setSelectedPkg(null);
-      setPhone("");
-    } else {
-      setSelectedPkg(key);
-      setPhone("");
-    }
   };
 
   const handleBuyClick = (network: string, size: string, basePrice: number) => {
@@ -261,18 +238,6 @@ const AgentStore = () => {
 
         {menuOpen && (
           <div className="border-t border-border bg-card px-4 py-3 space-y-1 animate-fade-in">
-            {afaPrice && (
-              <button
-                onClick={() => {
-                  setMenuOpen(false);
-                  document.getElementById("afa-section")?.scrollIntoView({ behavior: "smooth" });
-                }}
-                className="flex items-center gap-2 w-full px-3 py-2.5 rounded-lg text-sm font-medium text-foreground hover:bg-accent transition-colors"
-              >
-                <Shield className="w-4 h-4 text-primary" />
-                AFA Registration
-              </button>
-            )}
             {agent.whatsapp_group_link && (
               <a
                 href={agent.whatsapp_group_link}
@@ -285,7 +250,7 @@ const AgentStore = () => {
                 Join WhatsApp Group
               </a>
             )}
-            {!agent.whatsapp_group_link && !afaPrice && (
+            {!agent.whatsapp_group_link && (
               <p className="text-sm text-muted-foreground px-3 py-2">No links available</p>
             )}
           </div>
@@ -368,31 +333,6 @@ const AgentStore = () => {
               })}
             </div>
           </div>
-
-          {afaPrice && (
-            <div id="afa-section" className="pt-8">
-              <div className="rounded-2xl border border-primary/20 bg-primary/5 p-6 md:p-8">
-                <div className="flex items-center gap-2 mb-1">
-                  <Shield className="w-5 h-5 text-primary" />
-                  <h2 className="font-display text-xl font-bold">AFA Bundle Registration</h2>
-                </div>
-                <p className="text-sm text-muted-foreground mb-6">
-                  Fill in all required details to order an AFA bundle.
-                </p>
-                <div className="bg-card border border-border rounded-xl p-5">
-                  <div className="flex items-center justify-between mb-5">
-                    <p className="font-medium text-foreground">AFA Bundle</p>
-                    <p className="font-display text-xl font-bold text-primary">GH₵ {afaPrice}</p>
-                  </div>
-                  <AfaOrderForm
-                    price={afaPrice}
-                    agentId={agent.user_id}
-                    profit={0}
-                  />
-                </div>
-              </div>
-            </div>
-          )}
 
           {/* Sub Agent Recruitment Banner */}
           <div className="mt-10 rounded-2xl border border-amber-400/30 bg-amber-400/5 p-6 md:p-8">

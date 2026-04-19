@@ -12,10 +12,8 @@ const Navbar = () => {
 
   const navLinks = [
     { to: "/", label: "Home" },
-    { to: "/buy-data", label: "Buy Data" },
-    { to: "/afa-bundles", label: "AFA Bundle" },
-    { to: "/agent-program", label: "Become a Reseller" },
-    ...(user && profile?.is_agent ? [{ to: "/dashboard", label: "Dashboard" }] : []),
+    ...(user ? [{ to: "/dashboard", label: "Dashboard" }] : []),
+    ...(user && !profile?.agent_approved ? [{ to: "/agent-program", label: "Become an Agent" }] : []),
     ...(user && isAdmin ? [{ to: "/admin", label: "Admin" }] : []),
   ];
 

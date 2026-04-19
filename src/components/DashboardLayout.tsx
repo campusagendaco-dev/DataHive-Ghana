@@ -13,7 +13,7 @@ const DashboardLayout = () => {
   const navigate = useNavigate();
   const [walletBalance, setWalletBalance] = useState<number>(0);
 
-  const firstName = profile?.full_name?.split(" ")[0] || "Agent";
+  const firstName = profile?.full_name?.split(" ")[0] || "User";
 
   const getGreeting = () => {
     const h = new Date().getHours();
@@ -28,7 +28,7 @@ const DashboardLayout = () => {
       const { data } = await supabase
         .from("wallets")
         .select("balance")
-        .eq("user_id", user.id)
+        .eq("agent_id", user.id)
         .single();
       if (data) setWalletBalance(Number(data.balance));
     };
@@ -36,7 +36,7 @@ const DashboardLayout = () => {
 
     const channel = supabase
       .channel("wallet-balance-header")
-      .on("postgres_changes", { event: "*", schema: "public", table: "wallets", filter: `user_id=eq.${user.id}` }, (payload: any) => {
+      .on("postgres_changes", { event: "*", schema: "public", table: "wallets", filter: `agent_id=eq.${user.id}` }, (payload: any) => {
         if (payload.new?.balance !== undefined) setWalletBalance(Number(payload.new.balance));
       })
       .subscribe();

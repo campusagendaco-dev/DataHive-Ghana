@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ClipboardList, RefreshCw } from "lucide-react";
+import PhoneOrderTracker from "@/components/PhoneOrderTracker";
 
 interface Order {
   id: string;
@@ -12,7 +13,6 @@ interface Order {
   customer_phone: string | null;
   network: string | null;
   package_size: string | null;
-  afa_full_name: string | null;
   amount: number;
   profit: number;
   status: string;
@@ -54,7 +54,7 @@ const DashboardOrders = () => {
       .limit(200);
 
     if (filter !== "all") {
-      query = filter === "data" || filter === "afa"
+      query = filter === "data"
         ? query.eq("order_type", filter)
         : query.eq("status", filter);
     }
@@ -78,12 +78,19 @@ const DashboardOrders = () => {
 
   return (
     <div className="p-6 md:p-8 max-w-5xl">
+      <div className="mb-6">
+        <PhoneOrderTracker
+          title="Order Status Tracker"
+          subtitle="Track delivery status by customer phone number before reviewing your transaction list."
+        />
+      </div>
+
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6 gap-4">
         <div>
           <h1 className="font-display text-3xl font-bold flex items-center gap-2">
-            <ClipboardList className="w-7 h-7 text-primary" /> Orders
+            <ClipboardList className="w-7 h-7 text-primary" /> Transactions
           </h1>
-          <p className="text-muted-foreground text-sm">View and track all your orders.</p>
+          <p className="text-muted-foreground text-sm">View all wallet topups and data purchase transactions.</p>
         </div>
         <div className="flex items-center gap-2">
           <Select value={filter} onValueChange={setFilter}>
@@ -93,7 +100,6 @@ const DashboardOrders = () => {
             <SelectContent>
               <SelectItem value="all">All Orders</SelectItem>
               <SelectItem value="data">Data Only</SelectItem>
-              <SelectItem value="afa">AFA Only</SelectItem>
               <SelectItem value="pending">Pending</SelectItem>
               <SelectItem value="paid">Paid</SelectItem>
               <SelectItem value="fulfilled">Fulfilled</SelectItem>
@@ -110,7 +116,7 @@ const DashboardOrders = () => {
       <div className="grid grid-cols-3 gap-4 mb-6">
         <div className="bg-card border border-border rounded-xl p-4 text-center">
           <p className="text-2xl font-bold font-display">{orders.length}</p>
-          <p className="text-xs text-muted-foreground">Orders</p>
+          <p className="text-xs text-muted-foreground">Transactions</p>
         </div>
         <div className="bg-card border border-border rounded-xl p-4 text-center">
           <p className="text-2xl font-bold font-display text-primary">GH₵ {totals.amount.toFixed(2)}</p>
@@ -150,14 +156,12 @@ const DashboardOrders = () => {
                     </td>
                     <td className="py-3 px-4">
                       <Badge variant="outline" className="text-xs">
-                        {o.order_type === "afa" ? "AFA" : "Data"}
+                          {o.order_type === "wallet_topup" ? "Topup" : "Data"}
                       </Badge>
                     </td>
-                    <td className="py-3 px-4">
-                      {o.order_type === "afa" ? o.afa_full_name : o.customer_phone}
-                    </td>
+                      <td className="py-3 px-4">{o.customer_phone || "Wallet"}</td>
                     <td className="py-3 px-4 text-muted-foreground">
-                      {o.order_type === "data" ? `${o.network} — ${o.package_size}` : "AFA Bundle"}
+                        {o.order_type === "data" ? `${o.network} — ${o.package_size}` : "Wallet topup"}
                     </td>
                     <td className="py-3 px-4 text-right font-medium">GH₵ {Number(o.amount).toFixed(2)}</td>
                     <td className="py-3 px-4 text-right font-medium text-primary">+GH₵ {Number(o.profit).toFixed(2)}</td>

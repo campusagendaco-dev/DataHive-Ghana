@@ -8,10 +8,8 @@ const read = (relativePath: string) =>
 describe("purchase flow guardrails", () => {
   it("does not perform direct order inserts in public checkout UIs", () => {
     const agentStore = read("src/pages/AgentStore.tsx");
-    const afaOrderForm = read("src/components/AfaOrderForm.tsx");
 
     expect(agentStore).not.toContain('from("orders").insert');
-    expect(afaOrderForm).not.toContain('from("orders").insert');
   });
 
   it("keeps webhook idempotent for already fulfilled orders", () => {
@@ -92,7 +90,6 @@ describe("purchase flow guardrails", () => {
     const agentStore = read("src/pages/AgentStore.tsx");
     const agentPending = read("src/pages/AgentPending.tsx");
     const subAgentPending = read("src/pages/SubAgentPending.tsx");
-    const afaOrderForm = read("src/components/AfaOrderForm.tsx");
     const dashboardWallet = read("src/pages/DashboardWallet.tsx");
 
     expect(buyData).toContain("invokePublicFunction(\"initialize-payment\"");
@@ -101,10 +98,9 @@ describe("purchase flow guardrails", () => {
     expect(agentPending).toContain("invokePublicFunctionAsUser(\"verify-payment\"");
     expect(subAgentPending).toContain("invokePublicFunction(\"initialize-payment\"");
     expect(subAgentPending).toContain("invokePublicFunctionAsUser(\"verify-payment\"");
-    expect(afaOrderForm).toContain("invokePublicFunction(\"initialize-payment\"");
-    expect(dashboardWallet).toContain("invokePublicFunction(\"initialize-payment\"");
     expect(dashboardWallet).toContain("invokePublicFunctionAsUser(\"verify-payment\"");
     expect(dashboardWallet).toContain("invokePublicFunctionAsUser(\"wallet-topup\"");
     expect(dashboardWallet).toContain("invokePublicFunctionAsUser(\"wallet-buy-data\"");
+    expect(dashboardWallet).not.toContain("invokePublicFunction(\"initialize-payment\"");
   });
 });

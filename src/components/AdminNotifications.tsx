@@ -21,7 +21,7 @@ const AdminNotifications = () => {
         { event: "INSERT", schema: "public", table: "orders" },
         (payload) => {
           const order = payload.new as any;
-          const title = `New Order: ${order.order_type === "afa" ? "AFA Bundle" : `${order.network} ${order.package_size}`}`;
+          const title = `New Order: ${order.network || "Wallet"} ${order.package_size || order.order_type || "Order"}`;
           const body = `Amount: GH₵${Number(order.amount).toFixed(2)} | Phone: ${order.customer_phone || "N/A"}`;
 
           toast({ title, description: body });

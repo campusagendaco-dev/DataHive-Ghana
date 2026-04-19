@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { Link } from "react-router-dom";
 import NetworkCard from "@/components/NetworkCard";
 import { basePackages, networks, getPublicPrice } from "@/lib/data";
 import { getNetworkCardColors } from "@/lib/utils";
@@ -157,6 +158,22 @@ const BuyData = () => {
       <div className="container mx-auto max-w-3xl">
         <h1 className="font-display text-3xl md:text-4xl font-bold mb-2">Buy Data</h1>
         <p className="text-muted-foreground mb-8">Select a network and choose your data package.</p>
+
+        <div className="mb-6 rounded-xl border border-primary/25 bg-primary/5 p-4">
+          <p className="text-sm text-foreground mb-3">
+            Agents get cheaper bundle rates and their own store. Create an account to access your dashboard,
+            then activate agent access when ready.
+          </p>
+          <div className="flex gap-2 flex-wrap">
+            <Link to="/login" className="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:opacity-90">
+              Sign In / Create Account
+            </Link>
+            <Link to="/agent-program" className="inline-flex items-center justify-center rounded-md border border-border bg-card px-4 py-2 text-sm font-semibold hover:bg-accent">
+              Become an Agent
+            </Link>
+          </div>
+        </div>
+
         {systemSettings.holiday_mode_enabled && (
           <div className="mb-6 rounded-lg border border-yellow-500/40 bg-yellow-500/10 p-4 text-sm text-yellow-800">
             {systemSettings.holiday_message}

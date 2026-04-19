@@ -51,9 +51,9 @@ const Dashboard = () => {
       const today = new Date().toISOString().split("T")[0];
 
       const [walletRes, ordersRes, markupRes, globalSettingsRes, pricingContext] = await Promise.all([
-        supabase.from("wallets").select("balance").eq("user_id", user.id).single(),
+        supabase.from("wallets").select("balance").eq("agent_id", user.id).single(),
         supabase.from("orders").select("amount, package_size, status, created_at").eq("agent_id", user.id).gte("created_at", `${today}T00:00:00`),
-        supabase.from("profiles").select("markups").eq("id", user.id).single(),
+        supabase.from("profiles").select("markups").eq("user_id", user.id).single(),
         supabase.from("global_package_settings").select("network, package_size, agent_price"),
         fetchApiPricingContext(),
       ]);
@@ -92,7 +92,7 @@ const Dashboard = () => {
 
     const walletChannel = supabase
       .channel("dashboard-wallet")
-      .on("postgres_changes", { event: "*", schema: "public", table: "wallets", filter: `user_id=eq.${user.id}` }, (p: any) => {
+      .on("postgres_changes", { event: "*", schema: "public", table: "wallets", filter: `agent_id=eq.${user.id}` }, (p: any) => {
         if (p.new?.balance !== undefined) setStats((prev) => ({ ...prev, walletBalance: Number(p.new.balance) }));
       })
       .subscribe();

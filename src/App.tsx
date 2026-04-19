@@ -11,28 +11,28 @@ import Footer from "@/components/Footer";
 import DashboardLayout from "@/components/DashboardLayout";
 import AdminLayout from "@/components/AdminLayout";
 import Index from "./pages/Index";
-import BuyData from "./pages/BuyData";
 import AgentProgram from "./pages/AgentProgram";
 import Dashboard from "./pages/Dashboard";
 import DashboardPricing from "./pages/DashboardPricing";
-import DashboardAfa from "./pages/DashboardAfa";
 import DashboardOrders from "./pages/DashboardOrders";
 import DashboardWithdraw from "./pages/DashboardWithdraw";
 import DashboardWallet from "./pages/DashboardWallet";
 import DashboardFlyer from "./pages/DashboardFlyer";
 import DashboardSettings from "./pages/DashboardSettings";
 import DashboardSubAgents from "./pages/DashboardSubAgents";
-import DashboardBuyAirtime from "./pages/DashboardBuyAirtime";
 import DashboardResultCheckers from "./pages/DashboardResultCheckers";
+import DashboardBuyDataNetwork from "./pages/DashboardBuyDataNetwork";
+import DashboardMyStore from "./pages/DashboardMyStore";
+import DashboardReportIssue from "./pages/DashboardReportIssue";
+import DashboardAccountSettings from "./pages/DashboardAccountSettings";
+import DashboardSubAgentPricing from "./pages/DashboardSubAgentPricing";
 import AuthPage from "./pages/AuthPage";
 import AuthCallback from "./pages/AuthCallback";
 import ForgotPassword from "./pages/ForgotPassword";
 import VerifyOtp from "./pages/VerifyOtp";
 import ResetPassword from "./pages/ResetPassword";
-import Onboarding from "./pages/Onboarding";
 import AgentPending from "./pages/AgentPending";
 import AgentStore from "./pages/AgentStore";
-import AfaBundles from "./pages/AfaBundles";
 import OrderStatus from "./pages/OrderStatus";
 import AdminOverview from "./pages/AdminOverview";
 import AdminAgents from "./pages/AdminAgents";
@@ -59,31 +59,13 @@ const AuthGuard = ({ children, redirectTo = "/login" }: { children: React.ReactN
   return <>{children}</>;
 };
 
-/** Agent onboarding guard */
-const OnboardingRoute = ({ children }: { children: React.ReactNode }) => {
+/** Agent-only feature guard */
+const AgentFeatureGuard = ({ children }: { children: React.ReactNode }) => {
   const { user, profile, loading } = useAuth();
   if (loading) return <div className="min-h-screen flex items-center justify-center text-muted-foreground">Loading...</div>;
   if (!user) return <Navigate to="/login" replace />;
-  if (!profile?.is_agent) return <Navigate to="/agent-program" replace />;
-  if (!profile?.agent_approved) return <Navigate to="/agent/pending" replace />;
-  if (profile?.onboarding_complete) return <Navigate to="/dashboard" replace />;
-  return <>{children}</>;
-};
-
-/** Agent dashboard guard — must be onboarded AND approved (also allows activated sub agents) */
-const DashboardGuard = ({ children }: { children: React.ReactNode }) => {
-  const { user, profile, loading } = useAuth();
-  if (loading) return <div className="min-h-screen flex items-center justify-center text-muted-foreground">Loading...</div>;
-  if (!user) return <Navigate to="/login" replace />;
-  // Sub-agent path
-  if (profile?.is_sub_agent) {
-    if (!profile?.sub_agent_approved) return <Navigate to="/sub-agent/pending" replace />;
-    return <>{children}</>;
-  }
-  // Regular agent path
-  if (!profile?.is_agent) return <Navigate to="/agent-program" replace />;
-  if (!profile?.agent_approved) return <Navigate to="/agent/pending" replace />;
-  if (!profile?.onboarding_complete) return <Navigate to="/onboarding" replace />;
+  const isPaidAgent = Boolean(profile?.agent_approved || profile?.sub_agent_approved);
+  if (!isPaidAgent) return <Navigate to="/dashboard/my-store" replace />;
   return <>{children}</>;
 };
 
@@ -112,8 +94,7 @@ const PendingGuard = ({ children }: { children: React.ReactNode }) => {
   if (loading) return <div className="min-h-screen flex items-center justify-center text-muted-foreground">Loading...</div>;
   if (!user) return <Navigate to="/login" replace />;
   if (!profile?.is_agent) return <Navigate to="/agent-program" replace />;
-  if (profile?.agent_approved && !profile?.onboarding_complete) return <Navigate to="/onboarding" replace />;
-  if (profile?.agent_approved && profile?.onboarding_complete) return <Navigate to="/dashboard" replace />;
+  if (profile?.agent_approved) return <Navigate to="/dashboard" replace />;
   return <>{children}</>;
 };
 
@@ -224,7 +205,6 @@ const AppContent = () => {
         {/* Public pages */}
         <Route path="/" element={<Index />} />
         <Route path="/agent-program" element={<AgentProgram />} />
-        <Route path="/afa-bundles" element={<AfaBundles />} />
         <Route path="/store/:slug" element={<AgentStore />} />
         <Route path="/order-status" element={<OrderStatus />} />
 
@@ -237,30 +217,45 @@ const AppContent = () => {
         <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="/auth" element={<Navigate to="/login" replace />} />
 
-        {/* Protected: buy data requires login */}
-        <Route path="/buy-data" element={<AuthGuard><BuyData /></AuthGuard>} />
+        {/* Legacy buy-data path now routes into dashboard buy flow */}
+        <Route path="/buy-data" element={<AuthGuard><Navigate to="/dashboard/buy-data/mtn" replace /></AuthGuard>} />
 
         {/* Sub agent routes */}
         <Route path="/store/:slug/sub-agent" element={<SubAgentSignup />} />
         <Route path="/sub-agent/pending" element={<SubAgentPendingGuard><SubAgentPending /></SubAgentPendingGuard>} />
 
         {/* Agent flow */}
-        <Route path="/onboarding" element={<OnboardingRoute><Onboarding /></OnboardingRoute>} />
         <Route path="/agent/pending" element={<PendingGuard><AgentPending /></PendingGuard>} />
 
-        {/* Agent dashboard — requires approval */}
-        <Route path="/dashboard" element={<DashboardGuard><DashboardLayout /></DashboardGuard>}>
+        {/* User dashboard */}
+        <Route path="/dashboard" element={<AuthGuard><DashboardLayout /></AuthGuard>}>
           <Route index element={<Dashboard />} />
-          <Route path="pricing" element={<DashboardPricing />} />
-          <Route path="afa" element={<DashboardAfa />} />
-          <Route path="orders" element={<DashboardOrders />} />
           <Route path="wallet" element={<DashboardWallet />} />
-          <Route path="withdraw" element={<DashboardWithdraw />} />
-          <Route path="flyer" element={<DashboardFlyer />} />
-          <Route path="sub-agents" element={<DashboardSubAgents />} />
-          <Route path="buy-airtime" element={<DashboardBuyAirtime />} />
-          <Route path="result-checkers" element={<DashboardResultCheckers />} />
-          <Route path="settings" element={<DashboardSettings />} />
+          <Route path="transactions" element={<DashboardOrders />} />
+          <Route path="buy-data" element={<Navigate to="/dashboard/buy-data/mtn" replace />} />
+          <Route path="buy-data/mtn" element={<DashboardBuyDataNetwork network="MTN" />} />
+          <Route path="buy-data/telecel" element={<DashboardBuyDataNetwork network="Telecel" />} />
+          <Route path="buy-data/airteltigo" element={<DashboardBuyDataNetwork network="AirtelTigo" />} />
+          <Route path="my-store" element={<DashboardMyStore />} />
+          <Route path="report-issue" element={<DashboardReportIssue />} />
+          <Route path="account-settings" element={<DashboardAccountSettings />} />
+
+          {/* Paid agent-only pages */}
+          <Route path="cheaper-prices" element={<AgentFeatureGuard><DashboardPricing /></AgentFeatureGuard>} />
+          <Route path="withdrawals" element={<AgentFeatureGuard><DashboardWithdraw /></AgentFeatureGuard>} />
+          <Route path="store-settings" element={<AgentFeatureGuard><DashboardSettings /></AgentFeatureGuard>} />
+          <Route path="subagents" element={<AgentFeatureGuard><DashboardSubAgents /></AgentFeatureGuard>} />
+          <Route path="subagent-pricing" element={<AgentFeatureGuard><DashboardSubAgentPricing /></AgentFeatureGuard>} />
+          <Route path="flyer" element={<AgentFeatureGuard><DashboardFlyer /></AgentFeatureGuard>} />
+          <Route path="result-checker" element={<AgentFeatureGuard><DashboardResultCheckers /></AgentFeatureGuard>} />
+
+          {/* Legacy aliases */}
+          <Route path="orders" element={<Navigate to="/dashboard/transactions" replace />} />
+          <Route path="withdraw" element={<Navigate to="/dashboard/withdrawals" replace />} />
+          <Route path="pricing" element={<Navigate to="/dashboard/cheaper-prices" replace />} />
+          <Route path="sub-agents" element={<Navigate to="/dashboard/subagents" replace />} />
+          <Route path="result-checkers" element={<Navigate to="/dashboard/result-checker" replace />} />
+          <Route path="settings" element={<Navigate to="/dashboard/store-settings" replace />} />
         </Route>
 
         {/* Admin dashboard */}

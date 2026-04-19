@@ -5,7 +5,7 @@ import { useToast } from "@/hooks/use-toast";
 import { getFunctionErrorMessage } from "@/lib/function-errors";
 import { getAppBaseUrl } from "@/lib/app-base-url";
 import { fetchApiPricingContext, applyPriceMultiplier } from "@/lib/api-source-pricing";
-import { invokePublicFunction, invokePublicFunctionAsUser } from "@/lib/public-function-client";
+import { invokePublicFunctionAsUser } from "@/lib/public-function-client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -65,6 +65,8 @@ const getAssignedSubAgentPrice = (
   return null;
 };
 
+const normalizePackageSize = (size: string) => size.replace(/\s+/g, "").toUpperCase();
+
 const DashboardWallet = () => {
   const { user, profile } = useAuth();
   const { toast } = useToast();
@@ -78,7 +80,6 @@ const DashboardWallet = () => {
   const [selectedNetwork, setSelectedNetwork] = useState("");
   const [selectedPackage, setSelectedPackage] = useState("");
   const [customerPhone, setCustomerPhone] = useState("");
-  const [paymentMethod, setPaymentMethod] = useState<"wallet" | "paystack">("wallet");
   const [buying, setBuying] = useState(false);
   const [syncingDeposits, setSyncingDeposits] = useState(false);
   const [recentTopups, setRecentTopups] = useState<WalletTopupRow[]>([]);
@@ -94,15 +95,30 @@ const DashboardWallet = () => {
   }, []);
 
   const getAgentPrice = (network: string, size: string): number => {
+    const isPaidAgent = Boolean(profile?.agent_approved || profile?.sub_agent_approved);
+
     // Sub-agents must use parent-assigned base prices.
     const assignedPrice = getAssignedSubAgentPrice(profile, network, size);
     if (assignedPrice && assignedPrice > 0) return applyPriceMultiplier(assignedPrice, priceMultiplier);
 
-    // First check admin-set agent price from global_package_settings
+    // Admin-set package prices drive dashboard pricing by role.
     const setting = globalSettings.find(
-      (s) => s.network === network && s.package_size === size.replace(/\s+/g, "").toUpperCase()
+      (s) => s.network === network && normalizePackageSize(s.package_size) === normalizePackageSize(size)
     );
-    if (setting?.agent_price && setting.agent_price > 0) return applyPriceMultiplier(setting.agent_price, priceMultiplier);
+
+    if (isPaidAgent && setting?.agent_price && setting.agent_price > 0) {
+      return applyPriceMultiplier(setting.agent_price, priceMultiplier);
+    }
+
+    if (!isPaidAgent && setting?.public_price && setting.public_price > 0) {
+      return applyPriceMultiplier(setting.public_price, priceMultiplier);
+    }
+
+    if (!isPaidAgent) {
+      const basePkg = basePackages[network]?.find((p) => p.size === size);
+      if (basePkg) return applyPriceMultiplier(getPublicPrice(basePkg.price), priceMultiplier);
+    }
+
     // Fallback to base price
     const basePkg = basePackages[network]?.find((p) => p.size === size);
     return basePkg ? applyPriceMultiplier(basePkg.price, priceMultiplier) : 0;
@@ -219,76 +235,39 @@ const DashboardWallet = () => {
     ? Math.round((topupRequestedAmount + topupFee) * 100) / 100
     : 0;
 
-  const paystackFee = (() => {
-    if (!selectedPkg || paymentMethod !== "paystack") return 0;
-    const fee = Math.round(selectedPkg.price * 0.0195 * 100) / 100;
-    return Math.min(fee, 100);
-  })();
-
-  const totalPaystack = selectedPkg ? Math.round((selectedPkg.price + paystackFee) * 100) / 100 : 0;
-
   const handleBuyData = async () => {
     if (!selectedNetwork || !selectedPackage || !customerPhone || !selectedPkg) {
       toast({ title: "Fill in all fields", variant: "destructive" });
       return;
     }
 
-    if (paymentMethod === "wallet") {
-      if (balance < selectedPkg.price) {
-        toast({ title: "Insufficient wallet balance", variant: "destructive" });
-        return;
-      }
-      setBuying(true);
-      const { data, error } = await invokePublicFunctionAsUser("wallet-buy-data", {
-        body: {
-          network: selectedNetwork,
-          package_size: selectedPackage,
-          customer_phone: customerPhone,
-          amount: selectedPkg.price,
-        },
-      });
-
-      if (error || data?.error) {
-        const description = data?.error || await getFunctionErrorMessage(error, "Could not complete wallet purchase.");
-        toast({ title: "Purchase failed", description, variant: "destructive" });
-      } else if (data?.status === "fulfilled") {
-        toast({ title: "Data delivered successfully!" });
-        setCustomerPhone("");
-        setSelectedPackage("");
-      } else {
-        toast({ title: "Order placed", description: data?.failure_reason || "Fulfillment pending", variant: "destructive" });
-      }
-      await fetchBalance();
-      setBuying(false);
-    } else {
-      setBuying(true);
-      const orderId = crypto.randomUUID();
-
-      // Order is created server-side by initialize-payment
-
-      const { data: paymentData, error: paymentError } = await invokePublicFunction("initialize-payment", {
-        body: {
-          email: profile?.email || `${user!.id}@agent.swiftdata.gh`,
-          amount: totalPaystack,
-          reference: orderId,
-          callback_url: `${getAppBaseUrl()}/dashboard/wallet`,
-          metadata: {
-            order_id: orderId, order_type: "data", network: selectedNetwork, package_size: selectedPackage,
-            customer_phone: customerPhone.replace(/\s/g, ""), fee: paystackFee, agent_id: user!.id,
-            base_price: selectedPkg.price, payment_source: "dashboard_wallet", deduct_agent_wallet: false,
-          },
-        },
-      });
-
-      if (paymentError || !paymentData?.authorization_url) {
-        const description = paymentData?.error || await getFunctionErrorMessage(paymentError, "Could not initialize payment.");
-        toast({ title: "Payment failed", description, variant: "destructive" });
-        setBuying(false);
-        return;
-      }
-
-      window.location.href = paymentData.authorization_url;
+    if (balance < selectedPkg.price) {
+      toast({ title: "Insufficient wallet balance", variant: "destructive" });
+      return;
     }
+
+    setBuying(true);
+    const { data, error } = await invokePublicFunctionAsUser("wallet-buy-data", {
+      body: {
+        network: selectedNetwork,
+        package_size: selectedPackage,
+        customer_phone: customerPhone,
+        amount: selectedPkg.price,
+      },
+    });
+
+    if (error || data?.error) {
+      const description = data?.error || await getFunctionErrorMessage(error, "Could not complete wallet purchase.");
+      toast({ title: "Purchase failed", description, variant: "destructive" });
+    } else if (data?.status === "fulfilled") {
+      toast({ title: "Data delivered successfully!" });
+      setCustomerPhone("");
+      setSelectedPackage("");
+    } else {
+      toast({ title: "Order placed", description: data?.failure_reason || "Fulfillment pending", variant: "destructive" });
+    }
+    await fetchBalance();
+    setBuying(false);
   };
 
   const handleSyncPendingDeposits = async () => {
@@ -326,7 +305,7 @@ const DashboardWallet = () => {
 
   return (
     <div className="space-y-6 p-6 md:p-8 max-w-4xl">
-      <h1 className="font-display text-2xl font-black">Reseller Wallet</h1>
+      <h1 className="font-display text-2xl font-black">Wallet</h1>
       <p className="text-sm text-muted-foreground -mt-3">
         Top up with Paystack instantly, then use your wallet balance to buy data directly from your dashboard.
       </p>
@@ -340,9 +319,7 @@ const DashboardWallet = () => {
           </CardHeader>
           <CardContent>
             <p className="font-display text-3xl font-black text-primary">GHS {totalFunds.toFixed(2)}</p>
-            <p className="text-xs text-muted-foreground mt-1">
-              Wallet: GHS {balance.toFixed(2)} + Profit: GHS {availableProfit.toFixed(2)}
-            </p>
+            <p className="text-xs text-muted-foreground mt-1">Wallet: GHS {balance.toFixed(2)}</p>
             <Button variant="outline" size="sm" className="mt-3" onClick={handleSyncPendingDeposits} disabled={syncingDeposits}>
               {syncingDeposits ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
               Verify Pending Deposit
@@ -443,40 +420,17 @@ const DashboardWallet = () => {
             <Input placeholder="e.g. 0241234567" value={customerPhone} onChange={(e) => setCustomerPhone(e.target.value)} className="bg-secondary mt-1" />
           </div>
 
-          <div>
-            <Label>Payment Method</Label>
-            <div className="flex gap-3 mt-1">
-              <button onClick={() => setPaymentMethod("wallet")} className={`flex-1 py-3 px-4 rounded-lg border text-sm font-medium transition-colors ${paymentMethod === "wallet" ? "border-primary bg-primary/10 text-primary" : "border-border bg-secondary text-muted-foreground hover:text-foreground"}`}>
-                <Wallet className="w-4 h-4 inline mr-2" />Wallet (GHS {balance.toFixed(2)})
-              </button>
-              <button onClick={() => setPaymentMethod("paystack")} className={`flex-1 py-3 px-4 rounded-lg border text-sm font-medium transition-colors ${paymentMethod === "paystack" ? "border-primary bg-primary/10 text-primary" : "border-border bg-secondary text-muted-foreground hover:text-foreground"}`}>
-                Paystack
-              </button>
-            </div>
-          </div>
-
           {selectedPkg && (
             <div className="bg-muted/50 rounded-lg p-3 text-sm space-y-1">
               <div className="flex justify-between"><span className="text-muted-foreground">Package</span><span className="font-medium">{selectedNetwork} {selectedPkg.size}</span></div>
               <div className="flex justify-between"><span className="text-muted-foreground">Agent Price</span><span className="font-medium">GHS {selectedPkg.price.toFixed(2)}</span></div>
-              {paymentMethod === "paystack" && (
-                <>
-                  <div className="flex justify-between"><span className="text-muted-foreground">Paystack Fee (1.95%)</span><span className="font-medium">GHS {paystackFee.toFixed(2)}</span></div>
-                  <div className="flex justify-between border-t pt-1"><span className="text-muted-foreground font-medium">Total</span><span className="font-bold">GHS {totalPaystack.toFixed(2)}</span></div>
-                </>
-              )}
-              {paymentMethod === "wallet" && (
-                <div className="flex justify-between"><span className="text-muted-foreground">Balance After</span><span className="font-medium">GHS {(balance - selectedPkg.price).toFixed(2)}</span></div>
-              )}
+              <div className="flex justify-between"><span className="text-muted-foreground">Balance After</span><span className="font-medium">GHS {(balance - selectedPkg.price).toFixed(2)}</span></div>
             </div>
           )}
 
           <Button onClick={handleBuyData} disabled={buying || !selectedPkg || !customerPhone} className="w-full gap-2">
             {buying ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-            {paymentMethod === "wallet"
-              ? `Buy with Wallet (GHS ${selectedPkg?.price.toFixed(2) || "0.00"})`
-              : `Pay with Paystack (GHS ${totalPaystack.toFixed(2)})`
-            }
+            {`Buy with Wallet (GHS ${selectedPkg?.price.toFixed(2) || "0.00"})`}
           </Button>
         </CardContent>
       </Card>

@@ -5,14 +5,10 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ArrowRight, Eye, EyeOff, Zap, Store } from "lucide-react";
+import { ArrowRight, Eye, EyeOff } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
-type Role = "customer" | "reseller";
-
 const AuthPage = () => {
-  const [role, setRole] = useState<Role>("customer");
   const [isSignUp, setIsSignUp] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -25,12 +21,12 @@ const AuthPage = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
 
-  const getPostLoginRoute = async (selectedRole: Role) => {
+  const getPostLoginRoute = async () => {
     const {
       data: { user },
     } = await supabase.auth.getUser();
 
-    if (!user) return selectedRole === "reseller" ? "/agent/login" : "/buy-data";
+    if (!user) return "/dashboard";
 
     const { data: profile } = await supabase
       .from("profiles")
@@ -43,10 +39,9 @@ const AuthPage = () => {
     if (profile?.is_sub_agent && profile?.sub_agent_approved) return "/dashboard";
 
     if (profile?.is_agent && !profile?.agent_approved) return "/agent/pending";
-    if (profile?.is_agent && profile?.agent_approved && !profile?.onboarding_complete) return "/onboarding";
-    if (profile?.is_agent && profile?.agent_approved && profile?.onboarding_complete) return "/dashboard";
+    if (profile?.is_agent && profile?.agent_approved) return "/dashboard";
 
-    return selectedRole === "reseller" ? "/agent-program" : "/buy-data";
+    return "/dashboard";
   };
 
   const resetForm = () => {
@@ -78,36 +73,8 @@ const AuthPage = () => {
       } else {
         const { error: signInError } = await signIn(email, password);
         if (!signInError) {
-          if (role === "reseller") {
-            const { data: authData } = await supabase.auth.getUser();
-            const signedInUserId = authData.user?.id;
-
-            if (!signedInUserId) {
-              toast({
-                title: "Account created",
-                description: "We could not complete reseller setup automatically. Please sign in again.",
-                variant: "destructive",
-              });
-            } else {
-              const { error: roleUpgradeError } = await supabase
-                .from("profiles")
-                .update({ is_agent: true })
-                .eq("user_id", signedInUserId);
-
-              if (roleUpgradeError) {
-                toast({
-                  title: "Reseller setup pending",
-                  description: "Your account was created but reseller setup failed. Contact support if this continues.",
-                  variant: "destructive",
-                });
-              } else {
-                navigate("/agent/pending");
-              }
-            }
-          } else {
-            toast({ title: "Welcome!", description: "Your account is ready." });
-            navigate("/buy-data");
-          }
+          toast({ title: "Welcome!", description: "Your account is ready." });
+          navigate("/dashboard");
         }
       }
     } else {
@@ -115,7 +82,7 @@ const AuthPage = () => {
       if (error) {
         toast({ title: "Sign in failed", description: error.message, variant: "destructive" });
       } else {
-        const route = await getPostLoginRoute(role);
+        const route = await getPostLoginRoute();
         navigate(route);
       }
     }
@@ -125,13 +92,12 @@ const AuthPage = () => {
   const handleForgotPassword = () => {
     const normalizedEmail = email.trim().toLowerCase();
     const prefill = normalizedEmail ? `&email=${encodeURIComponent(normalizedEmail)}` : "";
-    navigate(`/forgot-password?role=${role === "reseller" ? "agent" : "user"}${prefill}`);
+    navigate(`/forgot-password?role=user${prefill}`);
   };
 
   const handleOAuthSignIn = async (provider: "google") => {
     setOauthLoading(provider);
-    const callbackRole = role === "reseller" ? "agent" : "user";
-    const { error } = await signInWithOAuth(provider, `/auth/callback?role=${callbackRole}`);
+    const { error } = await signInWithOAuth(provider, "/auth/callback?role=user");
     if (error) {
       toast({ title: "Social sign in failed", description: error.message, variant: "destructive" });
       setOauthLoading(null);
@@ -150,49 +116,16 @@ const AuthPage = () => {
           </div>
         </div>
 
-        {/* Role Tabs */}
-        <Tabs
-          value={role}
-          onValueChange={(v) => {
-            setRole(v as Role);
-            resetForm();
-            setIsSignUp(false);
-          }}
-          className="w-full"
-        >
-          <TabsList className="grid w-full grid-cols-2 h-12 mb-4 bg-secondary/80">
-            <TabsTrigger value="customer" className="gap-2 text-sm font-semibold data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
-              <Zap className="w-4 h-4" />
-              Buy Data
-            </TabsTrigger>
-            <TabsTrigger value="reseller" className="gap-2 text-sm font-semibold data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
-              <Store className="w-4 h-4" />
-              Reseller
-            </TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="customer">
-            <p className="text-center text-muted-foreground text-sm mb-4">
-              {isSignUp
-                ? "Create an account to buy affordable data bundles"
-                : "Sign in to buy data quickly and easily"}
-            </p>
-          </TabsContent>
-          <TabsContent value="reseller">
-            <p className="text-center text-muted-foreground text-sm mb-4">
-              {isSignUp
-                ? "Register to start your data reselling business"
-                : "Sign in to access your reseller dashboard"}
-            </p>
-          </TabsContent>
-        </Tabs>
+        <p className="text-center text-muted-foreground text-sm mb-4">
+          {isSignUp
+            ? "Create your account to access your dashboard"
+            : "Sign in to continue to your dashboard"}
+        </p>
 
         {/* Form Card */}
-        <div className={`bg-card border rounded-2xl p-6 sm:p-8 ${role === "reseller" ? "border-primary/40 glow-yellow" : "border-border"}`}>
+        <div className="bg-card border border-border rounded-2xl p-6 sm:p-8">
           <h2 className="font-display text-lg font-bold text-center mb-5">
-            {isSignUp
-              ? role === "reseller" ? "Create Reseller Account" : "Create Account"
-              : role === "reseller" ? "Reseller Sign In" : "Customer Sign In"}
+            {isSignUp ? "Create Account" : "Sign In"}
           </h2>
 
           <form onSubmit={handleSubmit} className="space-y-3.5">
@@ -305,14 +238,11 @@ const AuthPage = () => {
             </button>
           </div>
 
-          {/* Link to other role */}
-          {role === "customer" && (
-            <div className="mt-3 text-center border-t border-border pt-3">
-              <Link to="/agent-program" className="text-xs text-primary hover:underline">
-                Want to become a reseller? Learn more →
-              </Link>
-            </div>
-          )}
+          <div className="mt-3 text-center border-t border-border pt-3">
+            <Link to="/agent-program" className="text-xs text-primary hover:underline">
+              Want to become an agent? Learn more →
+            </Link>
+          </div>
         </div>
       </div>
     </div>
