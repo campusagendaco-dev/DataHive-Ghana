@@ -511,102 +511,100 @@ serve(async (req) => {
         }
       }
 
+      // If caller is not a trusted actor, fall through to normal Paystack verification
+      // and fulfillment path below instead of exiting early. This prevents paid orders
+      // from getting stuck when users check status from a non-authenticated session.
       if (!canRetryPaidOrder) {
-        return new Response(JSON.stringify({
-          status: order.status,
-          failure_reason: "Retry requires authenticated order owner or admin.",
-        }), {
-          status: 200,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
+        // no-op: continue to standard verification flow
+      } else {
 
-      if (!DATA_PROVIDER_BASE_URL || !DATA_PROVIDER_API_KEY) {
-        return new Response(JSON.stringify({ status: "fulfillment_failed", failure_reason: "Data provider not configured" }), {
-          status: 200,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
+        if (!DATA_PROVIDER_BASE_URL || !DATA_PROVIDER_API_KEY) {
+          return new Response(JSON.stringify({ status: "fulfillment_failed", failure_reason: "Data provider not configured" }), {
+            status: 200,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
 
-      let fulfilled = false;
-      let recoveredMetadata: Record<string, unknown> = {};
+        let fulfilled = false;
+        let recoveredMetadata: Record<string, unknown> = {};
 
       // Some legacy rows can be paid but missing fulfillment fields.
       // Recover metadata from Paystack so retries can still reach the provider API.
-      const needsMetadataRecovery =
-        (order.order_type === "data" && (!order.network || !order.package_size || !order.customer_phone)) ||
-        (order.order_type === "afa" && (!order.afa_full_name || !order.afa_ghana_card || !order.afa_email));
+        const needsMetadataRecovery =
+          (order.order_type === "data" && (!order.network || !order.package_size || !order.customer_phone)) ||
+          (order.order_type === "afa" && (!order.afa_full_name || !order.afa_ghana_card || !order.afa_email));
 
-      if (needsMetadataRecovery) {
-        try {
-          const verifyRes = await fetch(`https://api.paystack.co/transaction/verify/${reference}`, {
-            headers: { Authorization: `Bearer ${PAYSTACK_SECRET_KEY}`, Accept: "application/json" },
-          });
-          const verifyData = await verifyRes.json().catch(() => null);
-          recoveredMetadata = (verifyData?.data?.metadata || {}) as Record<string, unknown>;
+        if (needsMetadataRecovery) {
+          try {
+            const verifyRes = await fetch(`https://api.paystack.co/transaction/verify/${reference}`, {
+              headers: { Authorization: `Bearer ${PAYSTACK_SECRET_KEY}`, Accept: "application/json" },
+            });
+            const verifyData = await verifyRes.json().catch(() => null);
+            recoveredMetadata = (verifyData?.data?.metadata || {}) as Record<string, unknown>;
 
-          const recoveredFields: Record<string, unknown> = {};
-          const recoveredAgentId = typeof recoveredMetadata.agent_id === "string" ? recoveredMetadata.agent_id : "";
-          const hasPlaceholderAgentId = !order.agent_id || order.agent_id === "00000000-0000-0000-0000-000000000000";
-          if (hasPlaceholderAgentId && recoveredAgentId) recoveredFields.agent_id = recoveredAgentId;
-          if (!order.network && typeof recoveredMetadata.network === "string") recoveredFields.network = recoveredMetadata.network;
-          if (!order.package_size && typeof recoveredMetadata.package_size === "string") recoveredFields.package_size = recoveredMetadata.package_size;
-          if (!order.customer_phone && typeof recoveredMetadata.customer_phone === "string") recoveredFields.customer_phone = recoveredMetadata.customer_phone;
-          if (!order.afa_full_name && typeof recoveredMetadata.afa_full_name === "string") recoveredFields.afa_full_name = recoveredMetadata.afa_full_name;
-          if (!order.afa_ghana_card && typeof recoveredMetadata.afa_ghana_card === "string") recoveredFields.afa_ghana_card = recoveredMetadata.afa_ghana_card;
-          if (!order.afa_occupation && typeof recoveredMetadata.afa_occupation === "string") recoveredFields.afa_occupation = recoveredMetadata.afa_occupation;
-          if (!order.afa_email && typeof recoveredMetadata.afa_email === "string") recoveredFields.afa_email = recoveredMetadata.afa_email;
-          if (!order.afa_residence && typeof recoveredMetadata.afa_residence === "string") recoveredFields.afa_residence = recoveredMetadata.afa_residence;
-          if (!order.afa_date_of_birth && typeof recoveredMetadata.afa_date_of_birth === "string") recoveredFields.afa_date_of_birth = recoveredMetadata.afa_date_of_birth;
+            const recoveredFields: Record<string, unknown> = {};
+            const recoveredAgentId = typeof recoveredMetadata.agent_id === "string" ? recoveredMetadata.agent_id : "";
+            const hasPlaceholderAgentId = !order.agent_id || order.agent_id === "00000000-0000-0000-0000-000000000000";
+            if (hasPlaceholderAgentId && recoveredAgentId) recoveredFields.agent_id = recoveredAgentId;
+            if (!order.network && typeof recoveredMetadata.network === "string") recoveredFields.network = recoveredMetadata.network;
+            if (!order.package_size && typeof recoveredMetadata.package_size === "string") recoveredFields.package_size = recoveredMetadata.package_size;
+            if (!order.customer_phone && typeof recoveredMetadata.customer_phone === "string") recoveredFields.customer_phone = recoveredMetadata.customer_phone;
+            if (!order.afa_full_name && typeof recoveredMetadata.afa_full_name === "string") recoveredFields.afa_full_name = recoveredMetadata.afa_full_name;
+            if (!order.afa_ghana_card && typeof recoveredMetadata.afa_ghana_card === "string") recoveredFields.afa_ghana_card = recoveredMetadata.afa_ghana_card;
+            if (!order.afa_occupation && typeof recoveredMetadata.afa_occupation === "string") recoveredFields.afa_occupation = recoveredMetadata.afa_occupation;
+            if (!order.afa_email && typeof recoveredMetadata.afa_email === "string") recoveredFields.afa_email = recoveredMetadata.afa_email;
+            if (!order.afa_residence && typeof recoveredMetadata.afa_residence === "string") recoveredFields.afa_residence = recoveredMetadata.afa_residence;
+            if (!order.afa_date_of_birth && typeof recoveredMetadata.afa_date_of_birth === "string") recoveredFields.afa_date_of_birth = recoveredMetadata.afa_date_of_birth;
 
-          if (Object.keys(recoveredFields).length > 0) {
-            await supabase.from("orders").update(recoveredFields).eq("id", reference);
-            order = { ...order, ...recoveredFields };
+            if (Object.keys(recoveredFields).length > 0) {
+              await supabase.from("orders").update(recoveredFields).eq("id", reference);
+              order = { ...order, ...recoveredFields };
+            }
+          } catch (error) {
+            console.error("Metadata recovery failed for paid order:", reference, error);
           }
-        } catch (error) {
-          console.error("Metadata recovery failed for paid order:", reference, error);
         }
-      }
 
-      if (order.order_type === "afa") {
-        const afaData = buildAfaPayload(order);
-        const result = await callProviderApi(activeSource, DATA_PROVIDER_BASE_URL, DATA_PROVIDER_API_KEY, "afa-registration", afaData);
-        if (result.ok) {
-          await supabase.from("orders").update({ status: "fulfilled", failure_reason: null }).eq("id", reference);
-          fulfilled = true;
-        } else {
-          await supabase.from("orders").update({ status: "fulfillment_failed", failure_reason: result.reason }).eq("id", reference);
-        }
-      } else {
-        const network = order.network || (typeof recoveredMetadata.network === "string" ? recoveredMetadata.network : null);
-        const packageSize = order.package_size || (typeof recoveredMetadata.package_size === "string" ? recoveredMetadata.package_size : null);
-        const customerPhone = order.customer_phone || (typeof recoveredMetadata.customer_phone === "string" ? recoveredMetadata.customer_phone : null);
-        if (!network || !packageSize || !customerPhone) {
-          await supabase.from("orders").update({ status: "fulfillment_failed", failure_reason: "Missing order details" }).eq("id", reference);
-        } else {
-          const result = await callProviderApi(activeSource, DATA_PROVIDER_BASE_URL, DATA_PROVIDER_API_KEY, "purchase", {
-            networkRaw: network,
-            networkKey: mapNetworkKey(network),
-            recipient: normalizeRecipient(customerPhone),
-            capacity: parseCapacity(packageSize),
-          }, DATA_PROVIDER_WEBHOOK_URL);
+        if (order.order_type === "afa") {
+          const afaData = buildAfaPayload(order);
+          const result = await callProviderApi(activeSource, DATA_PROVIDER_BASE_URL, DATA_PROVIDER_API_KEY, "afa-registration", afaData);
           if (result.ok) {
             await supabase.from("orders").update({ status: "fulfilled", failure_reason: null }).eq("id", reference);
             fulfilled = true;
           } else {
             await supabase.from("orders").update({ status: "fulfillment_failed", failure_reason: result.reason }).eq("id", reference);
           }
+        } else {
+          const network = order.network || (typeof recoveredMetadata.network === "string" ? recoveredMetadata.network : null);
+          const packageSize = order.package_size || (typeof recoveredMetadata.package_size === "string" ? recoveredMetadata.package_size : null);
+          const customerPhone = order.customer_phone || (typeof recoveredMetadata.customer_phone === "string" ? recoveredMetadata.customer_phone : null);
+          if (!network || !packageSize || !customerPhone) {
+            await supabase.from("orders").update({ status: "fulfillment_failed", failure_reason: "Missing order details" }).eq("id", reference);
+          } else {
+            const result = await callProviderApi(activeSource, DATA_PROVIDER_BASE_URL, DATA_PROVIDER_API_KEY, "purchase", {
+              networkRaw: network,
+              networkKey: mapNetworkKey(network),
+              recipient: normalizeRecipient(customerPhone),
+              capacity: parseCapacity(packageSize),
+            }, DATA_PROVIDER_WEBHOOK_URL);
+            if (result.ok) {
+              await supabase.from("orders").update({ status: "fulfilled", failure_reason: null }).eq("id", reference);
+              fulfilled = true;
+            } else {
+              await supabase.from("orders").update({ status: "fulfillment_failed", failure_reason: result.reason }).eq("id", reference);
+            }
+          }
         }
-      }
 
-      const { data: updatedOrder } = await supabase.from("orders").select("status, failure_reason").eq("id", reference).maybeSingle();
-      return new Response(JSON.stringify({
-        status: updatedOrder?.status || (fulfilled ? "fulfilled" : "fulfillment_failed"),
-        failure_reason: updatedOrder?.failure_reason || null,
-      }), {
-        status: 200,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+        const { data: updatedOrder } = await supabase.from("orders").select("status, failure_reason").eq("id", reference).maybeSingle();
+        return new Response(JSON.stringify({
+          status: updatedOrder?.status || (fulfilled ? "fulfilled" : "fulfillment_failed"),
+          failure_reason: updatedOrder?.failure_reason || null,
+        }), {
+          status: 200,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
     }
 
     const verifyRes = await fetch(`https://api.paystack.co/transaction/verify/${reference}`, {

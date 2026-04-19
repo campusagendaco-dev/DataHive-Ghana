@@ -72,4 +72,18 @@ describe("purchase flow guardrails", () => {
     expect(initializePayment).toContain("Invalid amount for");
     expect(initializePayment).toContain("Invalid wallet top-up amount");
   });
+
+  it("uses verified Paystack metadata fallback in webhook", () => {
+    const webhook = read("supabase/functions/paystack-webhook/index.ts");
+
+    expect(webhook).toContain("const verifiedMetadata");
+    expect(webhook).toContain("...verifiedMetadata");
+    expect(webhook).toContain("metadata?.order_id");
+  });
+
+  it("does not block paid-order verification for unauthenticated status checks", () => {
+    const verifyPayment = read("supabase/functions/verify-payment/index.ts");
+
+    expect(verifyPayment).toContain("fall through to normal Paystack verification");
+  });
 });

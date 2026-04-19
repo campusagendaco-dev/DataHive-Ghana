@@ -498,7 +498,7 @@ serve(async (req) => {
       });
     }
 
-    const { reference, metadata = {} } = body.data;
+    const { reference, metadata: webhookMetadata = {} } = body.data;
     console.log("Webhook: Payment successful for reference:", reference);
 
     const verifyRes = await fetch(`https://api.paystack.co/transaction/verify/${reference}`, {
@@ -514,7 +514,16 @@ serve(async (req) => {
       });
     }
 
-    const orderId = metadata?.order_id || reference;
+    const verifiedMetadata = (verifyData?.data?.metadata || {}) as Record<string, unknown>;
+    const metadata = {
+      ...(webhookMetadata as Record<string, unknown>),
+      ...verifiedMetadata,
+    };
+
+    const orderId =
+      (typeof metadata?.order_id === "string" && metadata.order_id) ||
+      (typeof verifiedMetadata?.order_id === "string" && verifiedMetadata.order_id) ||
+      reference;
     const verifiedAmount = Number(verifyData?.data?.amount || 0) / 100;
     const orderTypeFromMetadata = typeof metadata?.order_type === "string" ? metadata.order_type : null;
 
