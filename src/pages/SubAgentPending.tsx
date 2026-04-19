@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { getAppBaseUrl } from "@/lib/app-base-url";
+import { invokePublicFunction } from "@/lib/public-function-client";
 import { Loader2, CreditCard, Clock, Zap } from "lucide-react";
 
 const SubAgentPending = () => {
@@ -43,7 +44,7 @@ const SubAgentPending = () => {
     if (!reference) return;
 
     setVerifying(true);
-    supabase.functions.invoke("verify-payment", { body: { reference } }).then(async (res) => {
+    invokePublicFunction("verify-payment", { body: { reference } }).then(async (res) => {
       if (res.data?.status === "fulfilled") {
         toast({ title: "Activation successful!", description: "Welcome to the team!" });
         await refreshProfile();
@@ -74,7 +75,7 @@ const SubAgentPending = () => {
     const agentProfitShare = parseFloat((totalFee * 0.5).toFixed(2));
     const swiftDataShare = parseFloat((totalFee - agentProfitShare).toFixed(2));
 
-    const { data: paymentData, error: paymentError } = await supabase.functions.invoke("initialize-payment", {
+    const { data: paymentData, error: paymentError } = await invokePublicFunction("initialize-payment", {
       body: {
         email: profile.email || `${user.id}@subagent.swiftdata.gh`,
         amount: totalFee,

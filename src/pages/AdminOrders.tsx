@@ -7,6 +7,7 @@ import { Search, RotateCcw, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { getFunctionErrorMessage } from "@/lib/function-errors";
 import PhoneOrderTracker from "@/components/PhoneOrderTracker";
+import { invokePublicFunction } from "@/lib/public-function-client";
 
 interface OrderRow {
   id: string;
@@ -51,7 +52,7 @@ const AdminOrders = () => {
   const handleRetry = async (orderId: string) => {
     setRetrying(orderId);
     try {
-      const { data, error } = await supabase.functions.invoke("verify-payment", {
+      const { data, error } = await invokePublicFunction("verify-payment", {
         body: { reference: orderId },
       });
 

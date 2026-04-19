@@ -6,6 +6,7 @@ import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { getFunctionErrorMessage } from "@/lib/function-errors";
 import { getAppBaseUrl } from "@/lib/app-base-url";
+import { invokePublicFunction } from "@/lib/public-function-client";
 import { Shield } from "lucide-react";
 
 interface AfaOrderFormProps {
@@ -72,7 +73,7 @@ const AfaOrderForm = ({ price, agentId, profit = 0, onOrderSaved }: AfaOrderForm
     const resolvedAgentId = agentId || "00000000-0000-0000-0000-000000000000";
 
     // Initialize Paystack payment
-    const { data: paymentData, error: paymentError } = await supabase.functions.invoke("initialize-payment", {
+    const { data: paymentData, error: paymentError } = await invokePublicFunction("initialize-payment", {
       body: {
         email: form.email.trim(),
         amount: total,

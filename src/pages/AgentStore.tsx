@@ -11,6 +11,7 @@ import { useToast } from "@/hooks/use-toast";
 import { getFunctionErrorMessage } from "@/lib/function-errors";
 import { getAppBaseUrl } from "@/lib/app-base-url";
 import { fetchApiPricingContext, applyPriceMultiplier } from "@/lib/api-source-pricing";
+import { invokePublicFunction } from "@/lib/public-function-client";
 import { Menu, X, Users, Shield, AlertTriangle, Zap, TrendingUp, ChevronRight } from "lucide-react";
 import {
   AlertDialog,
@@ -202,7 +203,7 @@ const AgentStore = () => {
     const profit = parseFloat((agentPrice - costBase).toFixed(2));
     const orderId = crypto.randomUUID();
 
-    const { data: paymentData, error: paymentError } = await supabase.functions.invoke("initialize-payment", {
+    const { data: paymentData, error: paymentError } = await invokePublicFunction("initialize-payment", {
       body: {
         email: `${phone.replace(/\s/g, "")}@customer.swiftdata.gh`,
         amount: total,

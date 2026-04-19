@@ -5,6 +5,7 @@ import { useToast } from "@/hooks/use-toast";
 import { getFunctionErrorMessage } from "@/lib/function-errors";
 import { getAppBaseUrl } from "@/lib/app-base-url";
 import { fetchApiPricingContext, applyPriceMultiplier } from "@/lib/api-source-pricing";
+import { invokePublicFunction } from "@/lib/public-function-client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -146,7 +147,7 @@ const DashboardWallet = () => {
     const params = new URLSearchParams(window.location.search);
     const reference = params.get("reference") || params.get("trxref");
     if (reference) {
-      supabase.functions.invoke("verify-payment", { body: { reference } }).then(async (res) => {
+      invokePublicFunction("verify-payment", { body: { reference } }).then(async (res) => {
         const status = res.data?.status;
         if (status === "fulfilled") {
           toast({ title: "Wallet topped up successfully!" });
@@ -265,7 +266,7 @@ const DashboardWallet = () => {
 
       // Order is created server-side by initialize-payment
 
-      const { data: paymentData, error: paymentError } = await supabase.functions.invoke("initialize-payment", {
+      const { data: paymentData, error: paymentError } = await invokePublicFunction("initialize-payment", {
         body: {
           email: profile?.email || `${user!.id}@agent.swiftdata.gh`,
           amount: totalPaystack,
@@ -303,7 +304,7 @@ const DashboardWallet = () => {
       if (!pendingRows || pendingRows.length === 0) { toast({ title: "No pending deposits found" }); return; }
 
       const checks = await Promise.allSettled(
-        pendingRows.map((row) => supabase.functions.invoke("verify-payment", { body: { reference: row.id } })),
+        pendingRows.map((row) => invokePublicFunction("verify-payment", { body: { reference: row.id } })),
       );
 
       const fulfilledCount = checks.filter((result) => result.status === "fulfilled" && result.value?.data?.status === "fulfilled").length;

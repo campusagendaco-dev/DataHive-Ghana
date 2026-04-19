@@ -7,6 +7,7 @@ import { useToast } from "@/hooks/use-toast";
 import { getFunctionErrorMessage } from "@/lib/function-errors";
 import { getAppBaseUrl } from "@/lib/app-base-url";
 import { fetchApiPricingContext, applyPriceMultiplier } from "@/lib/api-source-pricing";
+import { invokePublicFunction } from "@/lib/public-function-client";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -124,7 +125,7 @@ const BuyData = () => {
 
     const { total, fee } = getTotal(price);
 
-    const { data: paymentData, error: paymentError } = await supabase.functions.invoke("initialize-payment", {
+    const { data: paymentData, error: paymentError } = await invokePublicFunction("initialize-payment", {
       body: {
         email: `${phone.replace(/\s/g, "")}@customer.swiftdata.gh`,
         amount: total,

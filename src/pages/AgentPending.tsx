@@ -3,9 +3,9 @@ import { Button } from "@/components/ui/button";
 import { CreditCard, Clock, CheckCircle, LogOut, Loader2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { getAppBaseUrl } from "@/lib/app-base-url";
+import { invokePublicFunction } from "@/lib/public-function-client";
 
 const ACTIVATION_FEE = 80;
 const PAYSTACK_FEE_RATE = 0.0195;
@@ -27,7 +27,7 @@ const AgentPending = () => {
     const reference = params.get("reference") || params.get("trxref");
     if (reference) {
       setVerifying(true);
-      supabase.functions.invoke("verify-payment", { body: { reference } }).then(async (res) => {
+      invokePublicFunction("verify-payment", { body: { reference } }).then(async (res) => {
         if (res.data?.status === "fulfilled") {
           toast({ title: "Activation successful!", description: "Your reseller account is now active." });
           await refreshProfile();
@@ -58,7 +58,7 @@ const AgentPending = () => {
 
     // Order is created server-side by initialize-payment
 
-    const { data: paymentData, error: paymentError } = await supabase.functions.invoke("initialize-payment", {
+    const { data: paymentData, error: paymentError } = await invokePublicFunction("initialize-payment", {
       body: {
         email: profile.email || `${user.id}@agent.swiftdata.gh`,
         amount: ACTIVATION_TOTAL,

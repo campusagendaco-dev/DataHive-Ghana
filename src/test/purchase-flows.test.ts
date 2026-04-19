@@ -86,4 +86,23 @@ describe("purchase flow guardrails", () => {
 
     expect(verifyPayment).toContain("fall through to normal Paystack verification");
   });
+
+  it("uses public function invoker for initialize/verify checkout flows", () => {
+    const buyData = read("src/pages/BuyData.tsx");
+    const agentStore = read("src/pages/AgentStore.tsx");
+    const agentPending = read("src/pages/AgentPending.tsx");
+    const subAgentPending = read("src/pages/SubAgentPending.tsx");
+    const afaOrderForm = read("src/components/AfaOrderForm.tsx");
+    const dashboardWallet = read("src/pages/DashboardWallet.tsx");
+
+    expect(buyData).toContain("invokePublicFunction(\"initialize-payment\"");
+    expect(agentStore).toContain("invokePublicFunction(\"initialize-payment\"");
+    expect(agentPending).toContain("invokePublicFunction(\"initialize-payment\"");
+    expect(agentPending).toContain("invokePublicFunction(\"verify-payment\"");
+    expect(subAgentPending).toContain("invokePublicFunction(\"initialize-payment\"");
+    expect(subAgentPending).toContain("invokePublicFunction(\"verify-payment\"");
+    expect(afaOrderForm).toContain("invokePublicFunction(\"initialize-payment\"");
+    expect(dashboardWallet).toContain("invokePublicFunction(\"initialize-payment\"");
+    expect(dashboardWallet).toContain("invokePublicFunction(\"verify-payment\"");
+  });
 });
