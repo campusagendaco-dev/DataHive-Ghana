@@ -39,7 +39,7 @@ function normalizePhoneForQuery(phone: string): string[] {
 }
 
 type DisplayState = {
-  key: "payment_verified" | "pending_delivery" | "delivered" | "payment_processing";
+  key: "payment_verified" | "pending_delivery" | "delivered" | "payment_processing" | "delivery_failed";
   label: string;
   icon: typeof ShieldCheck;
   className: string;
@@ -47,22 +47,10 @@ type DisplayState = {
 
 function getDisplayState(order: TrackedOrder): DisplayState {
   const now = Date.now();
-  const createdAt = new Date(order.created_at).getTime();
   const updatedAt = new Date(order.updated_at || order.created_at).getTime();
   const deliveryAt = updatedAt + DELIVERED_AFTER_MINUTES * 60 * 1000;
-  const pendingFallbackAt = createdAt + DELIVERED_AFTER_MINUTES * 60 * 1000;
 
   if (order.status === "paid") {
-    // Some legacy rows can remain in `paid`; still advance to success after timeout.
-    if (now >= pendingFallbackAt) {
-      return {
-        key: "delivered",
-        label: "Order Successful",
-        icon: CheckCircle2,
-        className: "text-green-600",
-      };
-    }
-
     return {
       key: "payment_verified",
       label: "Payment Verified",
@@ -71,7 +59,16 @@ function getDisplayState(order: TrackedOrder): DisplayState {
     };
   }
 
-  if (order.status === "fulfilled" || order.status === "fulfillment_failed") {
+  if (order.status === "fulfillment_failed") {
+    return {
+      key: "delivery_failed",
+      label: "Delivery Failed",
+      icon: AlertTriangle,
+      className: "text-red-600",
+    };
+  }
+
+  if (order.status === "fulfilled") {
     if (now < deliveryAt) {
       return {
         key: "pending_delivery",

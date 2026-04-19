@@ -79,8 +79,31 @@ const AuthPage = () => {
         const { error: signInError } = await signIn(email, password);
         if (!signInError) {
           if (role === "reseller") {
-            await supabase.from("profiles").update({ is_agent: true }).eq("email", email.trim().toLowerCase());
-            navigate("/agent/pending");
+            const { data: authData } = await supabase.auth.getUser();
+            const signedInUserId = authData.user?.id;
+
+            if (!signedInUserId) {
+              toast({
+                title: "Account created",
+                description: "We could not complete reseller setup automatically. Please sign in again.",
+                variant: "destructive",
+              });
+            } else {
+              const { error: roleUpgradeError } = await supabase
+                .from("profiles")
+                .update({ is_agent: true })
+                .eq("user_id", signedInUserId);
+
+              if (roleUpgradeError) {
+                toast({
+                  title: "Reseller setup pending",
+                  description: "Your account was created but reseller setup failed. Contact support if this continues.",
+                  variant: "destructive",
+                });
+              } else {
+                navigate("/agent/pending");
+              }
+            }
           } else {
             toast({ title: "Welcome!", description: "Your account is ready." });
             navigate("/buy-data");

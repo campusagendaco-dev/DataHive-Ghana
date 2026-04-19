@@ -511,11 +511,14 @@ serve(async (req) => {
         }
       }
 
-      // If caller is not a trusted actor, fall through to normal Paystack verification
-      // and fulfillment path below instead of exiting early. This prevents paid orders
-      // from getting stuck when users check status from a non-authenticated session.
       if (!canRetryPaidOrder) {
-        // no-op: continue to standard verification flow
+        return new Response(JSON.stringify({
+          status: order.status,
+          failure_reason: "Retry requires authenticated order owner or admin.",
+        }), {
+          status: 200,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
       } else {
 
         if (!DATA_PROVIDER_BASE_URL || !DATA_PROVIDER_API_KEY) {
@@ -726,6 +729,37 @@ serve(async (req) => {
 
     console.log("Payment verified for:", reference, "type:", orderType);
 
+    const claimableStatuses = ["pending", "paid", "fulfillment_failed"];
+    const { data: claimedOrder, error: claimError } = await supabase
+      .from("orders")
+      .update({ status: "processing", failure_reason: null })
+      .eq("id", reference)
+      .in("status", claimableStatuses)
+      .select("*")
+      .maybeSingle();
+
+    if (claimError) {
+      console.error("Failed to claim order for fulfillment:", reference, claimError);
+    }
+
+    if (!claimedOrder) {
+      const { data: latestOrder } = await supabase
+        .from("orders")
+        .select("status, failure_reason")
+        .eq("id", reference)
+        .maybeSingle();
+
+      return new Response(JSON.stringify({
+        status: latestOrder?.status || order?.status || "unknown",
+        failure_reason: latestOrder?.failure_reason || null,
+      }), {
+        status: 200,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    order = claimedOrder;
+
     if (orderType === "agent_activation" && resolvedAgentId) {
       console.log("Processing agent activation for:", resolvedAgentId);
       await supabase.from("profiles").update({ is_agent: true, agent_approved: true }).eq("user_id", resolvedAgentId);
@@ -796,14 +830,6 @@ serve(async (req) => {
         status: "fulfillment_failed",
         failure_reason: "Data provider not configured",
       }), {
-        status: 200,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    const needsFulfillment = !order || order.status === "pending" || order.status === "paid" || order.status === "fulfillment_failed";
-    if (!needsFulfillment) {
-      return new Response(JSON.stringify({ status: order?.status || "unknown" }), {
         status: 200,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });

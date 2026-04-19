@@ -133,7 +133,7 @@ async function resolveExpectedAmountForUser(
 async function getPricingContext(supabaseAdmin: any): Promise<{ source: ProviderSource; multiplier: number }> {
   const { data } = await supabaseAdmin
     .from("system_settings")
-    .select("preferred_provider")
+    .select("preferred_provider, secondary_price_markup_pct")
     .eq("id", 1)
     .maybeSingle();
 
@@ -141,7 +141,7 @@ async function getPricingContext(supabaseAdmin: any): Promise<{ source: Provider
     ? "secondary"
     : "primary";
 
-  const pct = 8.11;
+  const pct = Number(data?.secondary_price_markup_pct);
   const multiplier = source === "secondary"
     ? Number.isFinite(pct) ? Number((1 + pct / 100).toFixed(6)) : 1.0811
     : 1;

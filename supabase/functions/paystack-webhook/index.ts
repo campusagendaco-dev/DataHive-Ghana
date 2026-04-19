@@ -636,6 +636,39 @@ serve(async (req) => {
       });
     }
 
+    const claimableStatuses = ["pending", "paid", "fulfillment_failed"];
+    const { data: claimedOrder, error: claimError } = await supabase
+      .from("orders")
+      .update({ status: "processing", failure_reason: null })
+      .eq("id", orderId)
+      .in("status", claimableStatuses)
+      .select("*")
+      .maybeSingle();
+
+    if (claimError) {
+      console.error("Webhook failed to claim order for fulfillment:", orderId, claimError);
+    }
+
+    if (!claimedOrder) {
+      const { data: latestOrder } = await supabase
+        .from("orders")
+        .select("status, failure_reason")
+        .eq("id", orderId)
+        .maybeSingle();
+
+      return new Response(JSON.stringify({
+        received: true,
+        fulfilled: latestOrder?.status === "fulfilled",
+        status: latestOrder?.status || existingOrder?.status || "unknown",
+        failure_reason: latestOrder?.failure_reason || null,
+      }), {
+        status: 200,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    existingOrder = claimedOrder;
+
     if (orderType === "agent_activation") {
       const agentId = metadata?.agent_id;
       if (agentId) {

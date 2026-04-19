@@ -84,7 +84,7 @@ describe("purchase flow guardrails", () => {
   it("does not block paid-order verification for unauthenticated status checks", () => {
     const verifyPayment = read("supabase/functions/verify-payment/index.ts");
 
-    expect(verifyPayment).toContain("fall through to normal Paystack verification");
+    expect(verifyPayment).toContain("Retry requires authenticated order owner or admin.");
   });
 
   it("uses public function invoker for initialize/verify checkout flows", () => {
