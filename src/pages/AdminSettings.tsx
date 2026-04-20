@@ -91,17 +91,8 @@ const AdminSettings = () => {
 
   const loadSettings = useCallback(async () => {
     setLoading(true);
-    const { data, error } = await supabase.functions.invoke("system-settings", {
-      body: { action: "get" },
-    });
-
-    if (!error && !data?.error) {
-      setSettings(toUiSettings(data));
-      setLoading(false);
-      return;
-    }
-
-    // Fallback: direct table read if Edge Function is unreachable.
+    // Source of truth for admin-edited values (including support contact fields)
+    // stays in the system_settings table.
     const { data: row, error: rowError } = await supabase
       .from("system_settings")
       .select("auto_api_switch, preferred_provider, backup_provider, holiday_mode_enabled, holiday_message, disable_ordering, dark_mode_enabled, customer_service_number, support_channel_link, sub_agent_base_fee")
@@ -109,11 +100,7 @@ const AdminSettings = () => {
       .maybeSingle();
 
     if (rowError) {
-      toast({
-        title: "Failed to load settings",
-        description: data?.error || error?.message || rowError.message || "Unknown error",
-        variant: "destructive",
-      });
+      toast({ title: "Failed to load settings", description: rowError.message || "Unknown error", variant: "destructive" });
       setLoading(false);
       return;
     }
@@ -146,87 +133,48 @@ const AdminSettings = () => {
       return;
     }
 
-    const { data, error } = await supabase.functions.invoke("system-settings", {
-      body: {
-        action: "set",
-        active_api_source: "primary",
-        secondary_price_markup_pct: 0,
-        auto_api_switch: false,
-        preferred_provider: "primary",
-        backup_provider: "primary",
-        holiday_mode_enabled: settings.holiday_mode_enabled,
-        holiday_message: settings.holiday_message.trim() || defaultSettings.holiday_message,
-        disable_ordering: settings.disable_ordering,
-        dark_mode_enabled: settings.dark_mode_enabled,
-        customer_service_number: settings.customer_service_number.trim() || defaultSettings.customer_service_number,
-        support_channel_link: settings.support_channel_link.trim() || defaultSettings.support_channel_link,
-        sub_agent_base_fee: settings.sub_agent_base_fee,
-      },
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-      },
-    });
+    let payload: Record<string, any> = {
+      id: 1,
+      auto_api_switch: false,
+      preferred_provider: "primary",
+      backup_provider: "primary",
+      active_api_source: "primary",
+      secondary_price_markup_pct: 0,
+      holiday_mode_enabled: settings.holiday_mode_enabled,
+      holiday_message: settings.holiday_message.trim() || defaultSettings.holiday_message,
+      disable_ordering: settings.disable_ordering,
+      dark_mode_enabled: settings.dark_mode_enabled,
+      customer_service_number: settings.customer_service_number.trim() || defaultSettings.customer_service_number,
+      support_channel_link: settings.support_channel_link.trim() || defaultSettings.support_channel_link,
+      sub_agent_base_fee: settings.sub_agent_base_fee,
+      updated_at: new Date().toISOString(),
+    };
 
-    const functionErrorMessage = String(data?.error || error?.message || "");
-    const edgeFunctionUnreachable = /(failed to fetch|failed to send a request to the edge function|network)/i.test(
-      functionErrorMessage,
-    );
-
-    if (error || data?.error) {
-      // Always attempt direct DB fallback so admin settings remain operable.
-      let fallbackPayload: Record<string, any> = {
-        id: 1,
-        auto_api_switch: false,
-        preferred_provider: "primary",
-        backup_provider: "primary",
-        active_api_source: "primary",
-        secondary_price_markup_pct: 0,
-        holiday_mode_enabled: settings.holiday_mode_enabled,
-        holiday_message: settings.holiday_message.trim() || defaultSettings.holiday_message,
-        disable_ordering: settings.disable_ordering,
-        dark_mode_enabled: settings.dark_mode_enabled,
-        customer_service_number: settings.customer_service_number.trim() || defaultSettings.customer_service_number,
-        support_channel_link: settings.support_channel_link.trim() || defaultSettings.support_channel_link,
-        sub_agent_base_fee: settings.sub_agent_base_fee,
-        updated_at: new Date().toISOString(),
-      };
-
-      let upsertError: { message?: string } | null = null;
-
-      for (let attempt = 0; attempt < 10; attempt += 1) {
-        const { error: fallbackError } = await supabase.from("system_settings").upsert(fallbackPayload);
-        if (!fallbackError) {
-          upsertError = null;
-          break;
-        }
-
-        const missingColumn = extractMissingColumnFromError(String(fallbackError.message || ""));
-        if (missingColumn && Object.prototype.hasOwnProperty.call(fallbackPayload, missingColumn)) {
-          const { [missingColumn]: _drop, ...next } = fallbackPayload;
-          fallbackPayload = next;
-          upsertError = fallbackError;
-          continue;
-        }
-
-        upsertError = fallbackError;
+    let upsertError: { message?: string } | null = null;
+    for (let attempt = 0; attempt < 10; attempt += 1) {
+      const { error } = await supabase.from("system_settings").upsert(payload);
+      if (!error) {
+        upsertError = null;
         break;
       }
 
-      if (upsertError) {
-        toast({
-          title: "Failed to save settings",
-          description: upsertError.message || functionErrorMessage || "Unknown error",
-          variant: "destructive",
-        });
-        setSaving(false);
-        return;
+      const missingColumn = extractMissingColumnFromError(String(error.message || ""));
+      if (missingColumn && Object.prototype.hasOwnProperty.call(payload, missingColumn)) {
+        const { [missingColumn]: _drop, ...next } = payload;
+        payload = next;
+        upsertError = error;
+        continue;
       }
 
+      upsertError = error;
+      break;
+    }
+
+    if (upsertError) {
       toast({
-        title: "Settings saved with fallback",
-        description: edgeFunctionUnreachable
-          ? "Edge function was unreachable, saved directly to database."
-          : `Edge function error: ${functionErrorMessage || "non-2xx response"}. Saved directly to database.`,
+        title: "Failed to save settings",
+        description: upsertError.message || "Unknown error",
+        variant: "destructive",
       });
       setSaving(false);
       return;
