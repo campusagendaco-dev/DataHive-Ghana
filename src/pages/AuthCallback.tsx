@@ -56,6 +56,18 @@ const AuthCallback = () => {
         return;
       }
 
+      const { data: adminRole } = await supabase
+        .from("user_roles")
+        .select("role")
+        .eq("user_id", user.id)
+        .eq("role", "admin")
+        .maybeSingle();
+
+      if (adminRole?.role === "admin") {
+        navigate("/admin", { replace: true });
+        return;
+      }
+
       const { data: profile } = await supabase
         .from("profiles")
         .select("is_sub_agent, sub_agent_approved, is_agent, agent_approved, onboarding_complete")

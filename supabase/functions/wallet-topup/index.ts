@@ -23,7 +23,7 @@ serve(async (req) => {
 
   const payload = await req.json().catch(() => null);
   const rawToken = req.headers.get("x-user-access-token") || (typeof payload?.access_token === "string" ? payload.access_token.trim() : "");
-  const authHeader = req.headers.get("Authorization") || (rawToken ? `Bearer ${rawToken}` : null);
+  const authHeader = rawToken ? `Bearer ${rawToken}` : (req.headers.get("Authorization") || null);
   if (!authHeader) {
     return new Response(JSON.stringify({ error: "Unauthorized" }), {
       status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },

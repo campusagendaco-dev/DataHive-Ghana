@@ -59,6 +59,15 @@ const AuthGuard = ({ children, redirectTo = "/login" }: { children: React.ReactN
   return <>{children}</>;
 };
 
+/** Authenticated dashboard guard that keeps admins on the admin dashboard */
+const DashboardGuard = ({ children }: { children: React.ReactNode }) => {
+  const { user, isAdmin, loading } = useAuth();
+  if (loading) return <div className="min-h-screen flex items-center justify-center text-muted-foreground">Loading...</div>;
+  if (!user) return <Navigate to="/login" replace />;
+  if (isAdmin) return <Navigate to="/admin" replace />;
+  return <>{children}</>;
+};
+
 /** Agent-only feature guard */
 const AgentFeatureGuard = ({ children }: { children: React.ReactNode }) => {
   const { user, profile, loading } = useAuth();
@@ -66,6 +75,17 @@ const AgentFeatureGuard = ({ children }: { children: React.ReactNode }) => {
   if (!user) return <Navigate to="/login" replace />;
   const isPaidAgent = Boolean(profile?.agent_approved || profile?.sub_agent_approved);
   if (!isPaidAgent) return <Navigate to="/dashboard/my-store" replace />;
+  return <>{children}</>;
+};
+
+/** Parent agent-only guard (sub-agents cannot recruit or manage sub-agent network) */
+const ParentAgentOnlyGuard = ({ children }: { children: React.ReactNode }) => {
+  const { user, profile, loading } = useAuth();
+  if (loading) return <div className="min-h-screen flex items-center justify-center text-muted-foreground">Loading...</div>;
+  if (!user) return <Navigate to="/login" replace />;
+  const isPaidAgent = Boolean(profile?.agent_approved || profile?.sub_agent_approved);
+  if (!isPaidAgent) return <Navigate to="/dashboard/my-store" replace />;
+  if (profile?.is_sub_agent) return <Navigate to="/dashboard" replace />;
   return <>{children}</>;
 };
 
@@ -228,7 +248,7 @@ const AppContent = () => {
         <Route path="/agent/pending" element={<PendingGuard><AgentPending /></PendingGuard>} />
 
         {/* User dashboard */}
-        <Route path="/dashboard" element={<AuthGuard><DashboardLayout /></AuthGuard>}>
+        <Route path="/dashboard" element={<DashboardGuard><DashboardLayout /></DashboardGuard>}>
           <Route index element={<Dashboard />} />
           <Route path="wallet" element={<DashboardWallet />} />
           <Route path="transactions" element={<DashboardOrders />} />
@@ -244,8 +264,8 @@ const AppContent = () => {
           <Route path="cheaper-prices" element={<AgentFeatureGuard><DashboardPricing /></AgentFeatureGuard>} />
           <Route path="withdrawals" element={<AgentFeatureGuard><DashboardWithdraw /></AgentFeatureGuard>} />
           <Route path="store-settings" element={<AgentFeatureGuard><DashboardSettings /></AgentFeatureGuard>} />
-          <Route path="subagents" element={<AgentFeatureGuard><DashboardSubAgents /></AgentFeatureGuard>} />
-          <Route path="subagent-pricing" element={<AgentFeatureGuard><DashboardSubAgentPricing /></AgentFeatureGuard>} />
+          <Route path="subagents" element={<ParentAgentOnlyGuard><DashboardSubAgents /></ParentAgentOnlyGuard>} />
+          <Route path="subagent-pricing" element={<ParentAgentOnlyGuard><DashboardSubAgentPricing /></ParentAgentOnlyGuard>} />
           <Route path="flyer" element={<AgentFeatureGuard><DashboardFlyer /></AgentFeatureGuard>} />
           <Route path="result-checker" element={<AgentFeatureGuard><DashboardResultCheckers /></AgentFeatureGuard>} />
 

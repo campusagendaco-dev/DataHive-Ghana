@@ -25,6 +25,25 @@ function normalizeNetwork(network: string): string {
   return "MTN";
 }
 
+function resolvePriceFromMap(
+  prices: Record<string, Record<string, string | number>>,
+  normalizedNetwork: string,
+  network: string,
+  normalizedPackage: string,
+  packageSize: string,
+): number {
+  const candidates = [normalizedPackage, packageSize, packageSize.replace(/\s+/g, "")];
+  const byNetwork = prices[normalizedNetwork] || prices[network] || null;
+  if (!byNetwork || typeof byNetwork !== "object") return 0;
+
+  for (const candidate of candidates) {
+    const value = Number(byNetwork[candidate]);
+    if (Number.isFinite(value) && value > 0) return value;
+  }
+
+  return 0;
+}
+
 function hasValidAgentId(agentId: unknown): agentId is string {
   return typeof agentId === "string" && agentId.length > 0 && agentId !== "00000000-0000-0000-0000-000000000000";
 }
@@ -126,21 +145,36 @@ serve(async (req) => {
       if (isAgentLinkedOrder) {
         const { data: agentProfile } = await supabaseAdmin
           .from("profiles")
-          .select("agent_prices")
+          .select("is_sub_agent, parent_agent_id, agent_prices")
           .eq("user_id", agentId)
           .maybeSingle();
 
-        const agentPrices = (agentProfile?.agent_prices || {}) as Record<string, Record<string, string | number>>;
-        const candidates = [normalizedPackage, packageSize, packageSize.replace(/\s+/g, "")];
-        const byNetwork = agentPrices[normalizedNetwork] || agentPrices[network] || null;
-        if (byNetwork && typeof byNetwork === "object") {
-          for (const candidate of candidates) {
-            const value = Number(byNetwork[candidate]);
-            if (Number.isFinite(value) && value > 0) {
-              basePrice = value;
-              break;
-            }
-          }
+        if (agentProfile?.is_sub_agent && agentProfile.parent_agent_id) {
+          const { data: parentProfile } = await supabaseAdmin
+            .from("profiles")
+            .select("sub_agent_prices")
+            .eq("user_id", agentProfile.parent_agent_id)
+            .maybeSingle();
+
+          const parentSubAgentPrices = (parentProfile?.sub_agent_prices || {}) as Record<string, Record<string, string | number>>;
+          basePrice = resolvePriceFromMap(
+            parentSubAgentPrices,
+            normalizedNetwork,
+            network,
+            normalizedPackage,
+            packageSize,
+          );
+        }
+
+        if (!(Number.isFinite(basePrice) && basePrice > 0)) {
+          const agentPrices = (agentProfile?.agent_prices || {}) as Record<string, Record<string, string | number>>;
+          basePrice = resolvePriceFromMap(
+            agentPrices,
+            normalizedNetwork,
+            network,
+            normalizedPackage,
+            packageSize,
+          );
         }
 
         if (!(Number.isFinite(basePrice) && basePrice > 0)) {

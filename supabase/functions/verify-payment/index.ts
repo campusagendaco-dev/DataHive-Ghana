@@ -388,7 +388,7 @@ serve(async (req) => {
 
     const payload = await req.json().catch(() => null);
     const rawToken = req.headers.get("x-user-access-token") || (typeof payload?.access_token === "string" ? payload.access_token.trim() : "");
-    const authHeader = req.headers.get("Authorization") || (rawToken ? `Bearer ${rawToken}` : "");
+    const authHeader = rawToken ? `Bearer ${rawToken}` : (req.headers.get("Authorization") || "");
     const reference = typeof payload?.reference === "string" ? payload.reference.trim() : "";
 
     if (!reference) {

@@ -26,6 +26,34 @@ interface GlobalPkgSetting {
 
 type Tab = "sub-agents" | "activation-fee" | "pricing";
 
+const normalizePackageSize = (size: string) => size.replace(/\s+/g, "").toUpperCase();
+
+const getProfileAssignedPrice = (
+  agentPrices: Record<string, any> | undefined,
+  network: string,
+  size: string,
+): number | null => {
+  if (!agentPrices || typeof agentPrices !== "object") return null;
+
+  const networkCandidates = [
+    network,
+    network.replace(/\s+/g, ""),
+    network === "AT iShare" ? "AirtelTigo" : network,
+  ];
+  const sizeCandidates = [size, size.replace(/\s+/g, ""), size.toUpperCase()];
+
+  for (const n of networkCandidates) {
+    const byNetwork = agentPrices[n] as Record<string, string | number> | undefined;
+    if (!byNetwork) continue;
+    for (const s of sizeCandidates) {
+      const value = Number(byNetwork[s]);
+      if (Number.isFinite(value) && value > 0) return value;
+    }
+  }
+
+  return null;
+};
+
 const DashboardSubAgents = () => {
   const { user, profile, refreshProfile } = useAuth();
   const { toast } = useToast();
@@ -80,17 +108,25 @@ const DashboardSubAgents = () => {
       for (const n of networks) {
         defaults[n.name] = {};
         for (const pkg of basePackages[n.name] || []) {
-          const gs = globalSettings.find((s) => s.network === n.name && s.package_size === pkg.size);
-          defaults[n.name][pkg.size] = (gs?.agent_price ?? pkg.price).toFixed(2);
+          const base = getParentAgentBasePrice(n.name, pkg.size);
+          defaults[n.name][pkg.size] = base.toFixed(2);
         }
       }
       setSubAgentPrices(defaults);
     }
-  }, [profile, globalSettings]);
+  }, [profile, globalSettings, priceMultiplier]);
 
-  const getAdminAgentPrice = (network: string, size: string): number => {
-    const gs = globalSettings.find((s) => s.network === network && s.package_size === size);
+  const getParentAgentBasePrice = (network: string, size: string): number => {
+    const assignedFromParent = getProfileAssignedPrice((profile as any)?.agent_prices, network, size);
+    if (assignedFromParent && assignedFromParent > 0) {
+      return applyPriceMultiplier(assignedFromParent, priceMultiplier);
+    }
+
+    const gs = globalSettings.find(
+      (s) => s.network === network && normalizePackageSize(s.package_size) === normalizePackageSize(size),
+    );
     if (gs?.agent_price && gs.agent_price > 0) return applyPriceMultiplier(gs.agent_price, priceMultiplier);
+
     const pkg = basePackages[network]?.find((p) => p.size === size);
     return pkg ? applyPriceMultiplier(pkg.price, priceMultiplier) : 0;
   };
@@ -314,8 +350,8 @@ const DashboardSubAgents = () => {
           <Card>
             <CardContent className="p-4">
               <p className="text-sm text-muted-foreground">
-                Set the prices your sub agents charge their customers. Admin agent prices (shown as base) are the
-                minimum — your sub agents earn the difference.
+                Set the prices your sub agents charge their customers. Your own agent prices are used as base.
+                Sub agents then use these assigned prices as their base in their own store pricing page.
               </p>
             </CardContent>
           </Card>
@@ -340,21 +376,21 @@ const DashboardSubAgents = () => {
           {/* Price grid */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {(basePackages[selectedNetwork] || []).map((pkg) => {
-              const adminPrice = getAdminAgentPrice(selectedNetwork, pkg.size);
-              const currentVal = subAgentPrices[selectedNetwork]?.[pkg.size] ?? adminPrice.toFixed(2);
-              const profit = parseFloat((Number(currentVal) - adminPrice).toFixed(2));
+              const parentBasePrice = getParentAgentBasePrice(selectedNetwork, pkg.size);
+              const currentVal = subAgentPrices[selectedNetwork]?.[pkg.size] ?? parentBasePrice.toFixed(2);
+              const profit = parseFloat((Number(currentVal) - parentBasePrice).toFixed(2));
               return (
                 <div key={pkg.size} className="rounded-xl border border-border bg-card p-3 flex items-center gap-3">
                   <div className="flex-1">
                     <div className="flex items-center gap-2 mb-1">
                       <span className="font-bold text-sm">{pkg.size}</span>
-                      <span className="text-xs text-muted-foreground">base: GH₵ {adminPrice.toFixed(2)}</span>
+                      <span className="text-xs text-muted-foreground">agent base: GH₵ {parentBasePrice.toFixed(2)}</span>
                     </div>
                     <div className="flex items-center gap-2">
                       <span className="text-xs text-muted-foreground">GH₵</span>
                       <input
                         type="number"
-                        min={adminPrice}
+                        min={parentBasePrice}
                         step={0.01}
                         value={currentVal}
                         onChange={(e) => {

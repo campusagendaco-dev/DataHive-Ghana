@@ -53,6 +53,28 @@ function normalizeNetworkForPricing(network: string): "MTN" | "Telecel" | "Airte
   return "MTN";
 }
 
+function resolvePriceFromMap(
+  prices: Record<string, Record<string, string | number>>,
+  normalizedNetwork: string,
+  network: string,
+  normalizedPackage: string,
+  packageSize: string,
+): number {
+  const networkCandidates = [normalizedNetwork, network, network.replace(/\s+/g, "")];
+  const packageCandidates = [normalizedPackage, packageSize, packageSize.replace(/\s+/g, "")];
+
+  for (const n of networkCandidates) {
+    const byNetwork = prices[n];
+    if (!byNetwork || typeof byNetwork !== "object") continue;
+    for (const p of packageCandidates) {
+      const value = Number(byNetwork[p]);
+      if (Number.isFinite(value) && value > 0) return value;
+    }
+  }
+
+  return 0;
+}
+
 // deno-lint-ignore no-explicit-any
 async function resolveExpectedAmount(supabaseAdmin: any, network: string, packageSize: string, multiplier: number): Promise<number | null> {
   const normalizedNetwork = normalizeNetworkForPricing(network);
@@ -88,26 +110,43 @@ async function resolveExpectedAmountForUser(
 
   const { data: profile } = await supabaseAdmin
     .from("profiles")
-    .select("is_sub_agent, agent_prices")
+    .select("is_sub_agent, parent_agent_id, agent_prices")
     .eq("user_id", userId)
     .maybeSingle();
 
   if (profile?.is_sub_agent) {
-    const assigned = (profile.agent_prices || {}) as Record<string, Record<string, string | number>>;
-    const networkCandidates = [normalizedNetwork, network, network.replace(/\s+/g, "")];
-    const packageCandidates = [normalizedPackage, packageSize, packageSize.replace(/\s+/g, "")];
+    if (profile.parent_agent_id) {
+      const { data: parentProfile } = await supabaseAdmin
+        .from("profiles")
+        .select("sub_agent_prices")
+        .eq("user_id", profile.parent_agent_id)
+        .maybeSingle();
 
-    for (const n of networkCandidates) {
-      const byNetwork = assigned[n];
-      if (!byNetwork || typeof byNetwork !== "object") continue;
-      for (const p of packageCandidates) {
-        const assignedPrice = Number(byNetwork[p]);
-        if (Number.isFinite(assignedPrice) && assignedPrice > 0) {
-          return Number((assignedPrice * multiplier).toFixed(2));
-        }
-      }
+      const parentAssigned = (parentProfile?.sub_agent_prices || {}) as Record<string, Record<string, string | number>>;
+      const parentAssignedPrice = resolvePriceFromMap(
+        parentAssigned,
+        normalizedNetwork,
+        network,
+        normalizedPackage,
+        packageSize,
+      );
+      if (Number.isFinite(parentAssignedPrice) && parentAssignedPrice > 0) {
+        return Number((parentAssignedPrice * multiplier).toFixed(2));
     }
   }
+
+    // Fallback to copied prices on sub-agent profile.
+    const assigned = (profile.agent_prices || {}) as Record<string, Record<string, string | number>>;
+    const assignedPrice = resolvePriceFromMap(
+      assigned,
+      normalizedNetwork,
+      network,
+      normalizedPackage,
+      packageSize,
+    );
+    if (Number.isFinite(assignedPrice) && assignedPrice > 0) {
+      return Number((assignedPrice * multiplier).toFixed(2));
+    }
 
   return await resolveExpectedAmount(supabaseAdmin, network, packageSize, multiplier);
 }
@@ -458,7 +497,7 @@ serve(async (req) => {
 
   const payload = await req.json().catch(() => null);
   const rawToken = req.headers.get("x-user-access-token") || (typeof payload?.access_token === "string" ? payload.access_token.trim() : "");
-  const authHeader = req.headers.get("Authorization") || (rawToken ? `Bearer ${rawToken}` : null);
+  const authHeader = rawToken ? `Bearer ${rawToken}` : (req.headers.get("Authorization") || null);
   if (!authHeader) {
     return new Response(JSON.stringify({ error: "Unauthorized" }), {
       status: 200,

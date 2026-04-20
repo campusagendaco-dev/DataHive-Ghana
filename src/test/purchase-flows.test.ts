@@ -40,6 +40,15 @@ describe("purchase flow guardrails", () => {
     expect(walletBuyData).toContain("resolveExpectedAmountForUser");
     expect(walletBuyData).toContain("is_sub_agent");
     expect(walletBuyData).toContain("agent_prices");
+    expect(walletBuyData).toContain("parent_agent_id");
+    expect(walletBuyData).toContain("sub_agent_prices");
+  });
+
+  it("prevents sub-agents from overriding assigned base prices in dashboard pricing", () => {
+    const dashboardPricing = read("src/pages/DashboardPricing.tsx");
+    expect(dashboardPricing).toContain("const isSubAgent");
+    expect(dashboardPricing).toContain("disabled={isSubAgent}");
+    expect(dashboardPricing).toContain("Base prices remain controlled by your parent agent");
   });
 
   it("uses assigned sub-agent pricing in dashboard wallet UI", () => {

@@ -140,7 +140,9 @@ const DashboardSidebar = ({ open, onClose }: DashboardSidebarProps) => {
               <p className="text-white/30 text-[10px] font-semibold uppercase tracking-wider px-3 mb-2">Agent Menu</p>
               <div className="space-y-0.5">
                 {agentNavItems
-                  .filter((item) => !((profile as any)?.is_sub_agent && item.to === "/dashboard/subagents"))
+                  .filter(
+                    (item) => !((profile as any)?.is_sub_agent && ["/dashboard/subagents", "/dashboard/subagent-pricing"].includes(item.to)),
+                  )
                   .map((item) => {
                     const isActive = location.pathname === item.to;
                     return (

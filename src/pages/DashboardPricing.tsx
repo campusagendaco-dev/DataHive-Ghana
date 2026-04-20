@@ -53,6 +53,7 @@ const getProfileAssignedPrice = (
 const DashboardPricing = () => {
   const { user, profile, refreshProfile } = useAuth();
   const { toast } = useToast();
+  const isSubAgent = Boolean(profile?.is_sub_agent);
   const [prices, setPrices] = useState<AgentPrices>({});
   const [disabledPkgs, setDisabledPkgs] = useState<DisabledPackages>({});
   const [packageBasePrices, setPackageBasePrices] = useState<PackageBasePrices>({});
@@ -166,19 +167,35 @@ const DashboardPricing = () => {
     }
 
     setSaving(true);
-    const existingPrices = (profile?.agent_prices || {}) as Record<string, any>;
-    const mergedPrices = { ...existingPrices, ...prices };
+    let error: any = null;
 
-    const { error } = await supabase
-      .from("profiles")
-      .update({ agent_prices: mergedPrices, disabled_packages: disabledPkgs } as any)
-      .eq("user_id", user.id);
+    if (isSubAgent) {
+      // Sub-agent base prices are assigned by parent agent and should not be overwritten here.
+      const result = await supabase
+        .from("profiles")
+        .update({ disabled_packages: disabledPkgs } as any)
+        .eq("user_id", user.id);
+      error = result.error;
+    } else {
+      const existingPrices = (profile?.agent_prices || {}) as Record<string, any>;
+      const mergedPrices = { ...existingPrices, ...prices };
+
+      const result = await supabase
+        .from("profiles")
+        .update({ agent_prices: mergedPrices, disabled_packages: disabledPkgs } as any)
+        .eq("user_id", user.id);
+      error = result.error;
+    }
 
     if (error) {
       toast({ title: "Error saving prices", description: error.message, variant: "destructive" });
     } else {
       await refreshProfile();
-      toast({ title: "Prices saved! Your store has been updated." });
+      toast({
+        title: isSubAgent
+          ? "Settings saved. Base prices remain controlled by your parent agent."
+          : "Prices saved! Your store has been updated.",
+      });
     }
 
     setSaving(false);
@@ -190,6 +207,12 @@ const DashboardPricing = () => {
         <h1 className="font-display text-3xl font-bold">Store Pricing</h1>
         <p className="text-muted-foreground">Set your selling price for each package. Toggle packages on/off for availability.</p>
       </div>
+
+      {isSubAgent && (
+        <div className="mb-6 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
+          Your base prices are assigned by your parent agent and cannot be edited here.
+        </div>
+      )}
 
       <div className="flex gap-2 mb-6">
         {networks.map((n) => (
@@ -240,6 +263,7 @@ const DashboardPricing = () => {
                         type="number"
                         step="0.50"
                         min={basePrice}
+                        disabled={isSubAgent}
                       />
                     </div>
                   </td>
