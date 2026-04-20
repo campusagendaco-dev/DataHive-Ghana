@@ -117,11 +117,6 @@ const DashboardSubAgents = () => {
   }, [profile, globalSettings, priceMultiplier]);
 
   const getParentAgentBasePrice = (network: string, size: string): number => {
-    const assignedFromParent = getProfileAssignedPrice((profile as any)?.agent_prices, network, size);
-    if (assignedFromParent && assignedFromParent > 0) {
-      return applyPriceMultiplier(assignedFromParent, priceMultiplier);
-    }
-
     const gs = globalSettings.find(
       (s) => s.network === network && normalizePackageSize(s.package_size) === normalizePackageSize(size),
     );
@@ -350,7 +345,7 @@ const DashboardSubAgents = () => {
           <Card>
             <CardContent className="p-4">
               <p className="text-sm text-muted-foreground">
-                Set the prices your sub agents charge their customers. Your own agent prices are used as base.
+                Set the prices your sub agents charge their customers. Admin-set agent package prices are used as base.
                 Sub agents then use these assigned prices as their base in their own store pricing page.
               </p>
             </CardContent>
