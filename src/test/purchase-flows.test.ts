@@ -35,13 +35,11 @@ describe("purchase flow guardrails", () => {
     expect(initializePayment).toContain("profit: normalizedProfit");
   });
 
-  it("enforces assigned parent pricing for sub-agent wallet buys", () => {
+  it("uses admin global pricing for wallet buys", () => {
     const walletBuyData = read("supabase/functions/wallet-buy-data/index.ts");
     expect(walletBuyData).toContain("resolveExpectedAmountForUser");
-    expect(walletBuyData).toContain("is_sub_agent");
-    expect(walletBuyData).toContain("agent_prices");
-    expect(walletBuyData).toContain("parent_agent_id");
-    expect(walletBuyData).toContain("sub_agent_prices");
+    expect(walletBuyData).toContain("global_package_settings");
+    expect(walletBuyData).toContain("agent_price");
   });
 
   it("prevents sub-agents from overriding assigned base prices in dashboard pricing", () => {
@@ -73,10 +71,11 @@ describe("purchase flow guardrails", () => {
     expect(webhook).toContain("Math.min(requestedWalletCredit, verifiedAmount)");
   });
 
-  it("validates initialize-payment amount server-side", () => {
+  it("uses configured admin pricing in initialize-payment", () => {
     const initializePayment = read("supabase/functions/initialize-payment/index.ts");
 
-    expect(initializePayment).toContain("Invalid amount for");
+    expect(initializePayment).toContain("Package price is not configured");
+    expect(initializePayment).toContain("global_package_settings");
     expect(initializePayment).toContain("Invalid wallet top-up amount");
   });
 

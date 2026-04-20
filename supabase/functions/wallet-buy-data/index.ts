@@ -6,19 +6,6 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-user-access-token, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-const BASE_PACKAGE_PRICES: Record<string, Record<string, number>> = {
-  MTN: {
-    "1GB": 4.45, "2GB": 8.9, "3GB": 13.1, "4GB": 17.3, "5GB": 21.2, "6GB": 25.7, "7GB": 29.6, "8GB": 33.2,
-    "10GB": 42.5, "15GB": 62.0, "20GB": 80.2, "25GB": 100.8, "30GB": 124.0, "40GB": 159.0, "50GB": 199.3, "100GB": 385.0,
-  },
-  Telecel: {
-    "5GB": 23.0, "10GB": 41.8, "12GB": 49.0, "15GB": 58.99, "18GB": 71.8, "20GB": 78.5, "22GB": 82.5, "25GB": 102.0, "30GB": 125.5, "40GB": 166.0, "50GB": 190.0,
-  },
-  AirtelTigo: {
-    "1GB": 4.3, "2GB": 8.2, "3GB": 12.0, "4GB": 15.8, "5GB": 19.85, "6GB": 23.49, "7GB": 27.0, "8GB": 30.59, "9GB": 34.2,
-  },
-};
-
 function getFirstEnvValue(keys: string[]): string {
   for (const key of keys) {
     const value = Deno.env.get(key)?.trim();
@@ -53,28 +40,6 @@ function normalizeNetworkForPricing(network: string): "MTN" | "Telecel" | "Airte
   return "MTN";
 }
 
-function resolvePriceFromMap(
-  prices: Record<string, Record<string, string | number>>,
-  normalizedNetwork: string,
-  network: string,
-  normalizedPackage: string,
-  packageSize: string,
-): number {
-  const networkCandidates = [normalizedNetwork, network, network.replace(/\s+/g, "")];
-  const packageCandidates = [normalizedPackage, packageSize, packageSize.replace(/\s+/g, "")];
-
-  for (const n of networkCandidates) {
-    const byNetwork = prices[n];
-    if (!byNetwork || typeof byNetwork !== "object") continue;
-    for (const p of packageCandidates) {
-      const value = Number(byNetwork[p]);
-      if (Number.isFinite(value) && value > 0) return value;
-    }
-  }
-
-  return 0;
-}
-
 // deno-lint-ignore no-explicit-any
 async function resolveExpectedAmount(supabaseAdmin: any, network: string, packageSize: string, multiplier: number): Promise<number | null> {
   const normalizedNetwork = normalizeNetworkForPricing(network);
@@ -91,64 +56,16 @@ async function resolveExpectedAmount(supabaseAdmin: any, network: string, packag
   if (Number.isFinite(configuredPrice) && configuredPrice > 0) {
     return Number((configuredPrice * multiplier).toFixed(2));
   }
-
-  const basePrice = BASE_PACKAGE_PRICES[normalizedNetwork]?.[normalizedPackage];
-  if (!basePrice) return null;
-  return Number((basePrice * multiplier).toFixed(2));
+  return null;
 }
 
 // deno-lint-ignore no-explicit-any
 async function resolveExpectedAmountForUser(
   supabaseAdmin: any,
-  userId: string,
   network: string,
   packageSize: string,
   multiplier: number,
 ): Promise<number | null> {
-  const normalizedNetwork = normalizeNetworkForPricing(network);
-  const normalizedPackage = packageSize.replace(/\s+/g, "").toUpperCase();
-
-  const { data: profile } = await supabaseAdmin
-    .from("profiles")
-    .select("is_sub_agent, parent_agent_id, agent_prices")
-    .eq("user_id", userId)
-    .maybeSingle();
-
-  if (profile?.is_sub_agent) {
-    if (profile.parent_agent_id) {
-      const { data: parentProfile } = await supabaseAdmin
-        .from("profiles")
-        .select("sub_agent_prices")
-        .eq("user_id", profile.parent_agent_id)
-        .maybeSingle();
-
-      const parentAssigned = (parentProfile?.sub_agent_prices || {}) as Record<string, Record<string, string | number>>;
-      const parentAssignedPrice = resolvePriceFromMap(
-        parentAssigned,
-        normalizedNetwork,
-        network,
-        normalizedPackage,
-        packageSize,
-      );
-      if (Number.isFinite(parentAssignedPrice) && parentAssignedPrice > 0) {
-        return Number((parentAssignedPrice * multiplier).toFixed(2));
-      }
-    }
-
-    // Fallback to copied prices on sub-agent profile.
-    const assigned = (profile.agent_prices || {}) as Record<string, Record<string, string | number>>;
-    const assignedPrice = resolvePriceFromMap(
-      assigned,
-      normalizedNetwork,
-      network,
-      normalizedPackage,
-      packageSize,
-    );
-    if (Number.isFinite(assignedPrice) && assignedPrice > 0) {
-      return Number((assignedPrice * multiplier).toFixed(2));
-    }
-  }
-
   return await resolveExpectedAmount(supabaseAdmin, network, packageSize, multiplier);
 }
 
@@ -561,22 +478,12 @@ serve(async (req) => {
 
     const expectedAmount = await resolveExpectedAmountForUser(
       supabaseAdmin,
-      user.id,
       network,
       package_size,
       pricingContext.multiplier,
     );
     if (!expectedAmount) {
       return new Response(JSON.stringify({ error: "Package price not configured" }), {
-        status: 200,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    if (Math.abs(requestedAmount - expectedAmount) > 0.01) {
-      return new Response(JSON.stringify({
-        error: `Invalid amount for ${network} ${package_size}. Expected GHS ${expectedAmount.toFixed(2)}.`,
-      }), {
         status: 200,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -600,22 +507,7 @@ serve(async (req) => {
     const newBalance = parseFloat((Number(wallet.balance) - expectedAmount).toFixed(2));
     await supabaseAdmin.from("wallets").update({ balance: newBalance }).eq("agent_id", user.id);
 
-    // Calculate profit: agent's selling price for this package minus the cost base
-    const normalizedNetworkKey = normalizeNetworkForPricing(network);
-    const normalizedPackageKey = package_size.replace(/\s+/g, "").toUpperCase();
-    const { data: agentProfile } = await supabaseAdmin
-      .from("profiles")
-      .select("agent_prices")
-      .eq("user_id", user.id)
-      .maybeSingle();
-    const agentPricesMap = (agentProfile?.agent_prices || {}) as Record<string, Record<string, string | number>>;
-    const rawAgentSellPrice = parseFloat(String(agentPricesMap[normalizedNetworkKey]?.[normalizedPackageKey] || 0));
-    const agentSellPrice = Number.isFinite(rawAgentSellPrice)
-      ? Number((rawAgentSellPrice * pricingContext.multiplier).toFixed(2))
-      : 0;
-    const walletProfit = Number.isFinite(agentSellPrice) && agentSellPrice > expectedAmount
-      ? parseFloat((agentSellPrice - expectedAmount).toFixed(2))
-      : 0;
+    const walletProfit = 0;
 
     const orderId = crypto.randomUUID();
     await supabaseAdmin.from("orders").insert({

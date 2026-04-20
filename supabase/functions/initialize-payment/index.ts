@@ -25,25 +25,6 @@ function normalizeNetwork(network: string): string {
   return "MTN";
 }
 
-function resolvePriceFromMap(
-  prices: Record<string, Record<string, string | number>>,
-  normalizedNetwork: string,
-  network: string,
-  normalizedPackage: string,
-  packageSize: string,
-): number {
-  const candidates = [normalizedPackage, packageSize, packageSize.replace(/\s+/g, "")];
-  const byNetwork = prices[normalizedNetwork] || prices[network] || null;
-  if (!byNetwork || typeof byNetwork !== "object") return 0;
-
-  for (const candidate of candidates) {
-    const value = Number(byNetwork[candidate]);
-    if (Number.isFinite(value) && value > 0) return value;
-  }
-
-  return 0;
-}
-
 function hasValidAgentId(agentId: unknown): agentId is string {
   return typeof agentId === "string" && agentId.length > 0 && agentId !== "00000000-0000-0000-0000-000000000000";
 }
@@ -114,7 +95,7 @@ serve(async (req) => {
     const callback_url = payload?.callback_url;
     const metadata = payload?.metadata || {};
 
-    if (!email || !reference || !Number.isFinite(amount) || amount <= 0) {
+    if (!email || !reference) {
       return new Response(JSON.stringify({ error: "Missing required fields" }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -127,6 +108,7 @@ serve(async (req) => {
     const isAgentLinkedOrder = hasValidAgentId(agentId);
 
     const priceMultiplier = 1;
+    let resolvedAmount = Number.isFinite(amount) && amount > 0 ? amount : 0;
 
     if (orderType === "data") {
       const network = typeof metadata.network === "string" ? metadata.network : "";
@@ -140,63 +122,13 @@ serve(async (req) => {
 
       const normalizedNetwork = normalizeNetwork(network);
       const normalizedPackage = packageSize.replace(/\s+/g, "").toUpperCase();
-      let basePrice = 0;
-
-      if (isAgentLinkedOrder) {
-        const { data: agentProfile } = await supabaseAdmin
-          .from("profiles")
-          .select("is_sub_agent, parent_agent_id, agent_prices")
-          .eq("user_id", agentId)
-          .maybeSingle();
-
-        if (agentProfile?.is_sub_agent && agentProfile.parent_agent_id) {
-          const { data: parentProfile } = await supabaseAdmin
-            .from("profiles")
-            .select("sub_agent_prices")
-            .eq("user_id", agentProfile.parent_agent_id)
-            .maybeSingle();
-
-          const parentSubAgentPrices = (parentProfile?.sub_agent_prices || {}) as Record<string, Record<string, string | number>>;
-          basePrice = resolvePriceFromMap(
-            parentSubAgentPrices,
-            normalizedNetwork,
-            network,
-            normalizedPackage,
-            packageSize,
-          );
-        }
-
-        if (!(Number.isFinite(basePrice) && basePrice > 0)) {
-          const agentPrices = (agentProfile?.agent_prices || {}) as Record<string, Record<string, string | number>>;
-          basePrice = resolvePriceFromMap(
-            agentPrices,
-            normalizedNetwork,
-            network,
-            normalizedPackage,
-            packageSize,
-          );
-        }
-
-        if (!(Number.isFinite(basePrice) && basePrice > 0)) {
-          const { data: globalRow } = await supabaseAdmin
-            .from("global_package_settings")
-            .select("agent_price")
-            .eq("network", normalizedNetwork)
-            .eq("package_size", normalizedPackage)
-            .maybeSingle();
-          const fallback = Number(globalRow?.agent_price);
-          if (Number.isFinite(fallback) && fallback > 0) basePrice = fallback;
-        }
-      } else {
-        const { data: globalRow } = await supabaseAdmin
-          .from("global_package_settings")
-          .select("public_price")
-          .eq("network", normalizedNetwork)
-          .eq("package_size", normalizedPackage)
-          .maybeSingle();
-        const fallback = Number(globalRow?.public_price);
-        if (Number.isFinite(fallback) && fallback > 0) basePrice = fallback;
-      }
+      const { data: globalRow } = await supabaseAdmin
+        .from("global_package_settings")
+        .select(isAgentLinkedOrder ? "agent_price" : "public_price")
+        .eq("network", normalizedNetwork)
+        .eq("package_size", normalizedPackage)
+        .maybeSingle();
+      const basePrice = Number(isAgentLinkedOrder ? globalRow?.agent_price : globalRow?.public_price);
 
       if (!(Number.isFinite(basePrice) && basePrice > 0)) {
         return new Response(JSON.stringify({ error: "Package price is not configured" }), {
@@ -206,15 +138,7 @@ serve(async (req) => {
       }
 
       const adjustedBase = Number((basePrice * priceMultiplier).toFixed(2));
-      const expectedTotal = Number((adjustedBase + calculatePaystackFee(adjustedBase)).toFixed(2));
-      if (!amountMatches(expectedTotal, amount)) {
-        return new Response(JSON.stringify({
-          error: `Invalid amount for ${network} ${packageSize}. Expected GHS ${expectedTotal.toFixed(2)}.`,
-        }), {
-          status: 400,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
+      resolvedAmount = Number((adjustedBase + calculatePaystackFee(adjustedBase)).toFixed(2));
     }
 
     if (orderType === "afa") {
@@ -262,6 +186,7 @@ serve(async (req) => {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
+      resolvedAmount = amount;
     }
 
     // Check if order already exists (idempotency)
@@ -281,7 +206,7 @@ serve(async (req) => {
         id: reference,
         agent_id: agentId,
         order_type: orderType,
-        amount,
+        amount: resolvedAmount,
         profit: normalizedProfit,
         status: "pending",
       };
@@ -328,8 +253,8 @@ serve(async (req) => {
       }
     }
 
-    const amountInPesewas = Math.round(amount * 100);
-    console.log("Initializing payment:", { email, amount, amountInPesewas, reference });
+  const amountInPesewas = Math.round(resolvedAmount * 100);
+  console.log("Initializing payment:", { email, amount: resolvedAmount, amountInPesewas, reference });
 
     const response = await fetch("https://api.paystack.co/transaction/initialize", {
       method: "POST",
