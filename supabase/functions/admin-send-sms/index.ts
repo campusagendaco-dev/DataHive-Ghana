@@ -101,7 +101,7 @@ serve(async (req) => {
     global: { headers: { Authorization: authHeader } },
   });
 
-  // TxtConnect config: prefer env vars, fall back to admin-configured system_settings
+  // TxtConnect config: prefer env vars, fall back to admin-configured system_settings, then hardcoded fallbacks
   let txtApiKey = Deno.env.get("TXTCONNECT_API_KEY") || "";
   let txtSenderId = Deno.env.get("TXTCONNECT_SENDER_ID") || "";
 
@@ -118,6 +118,10 @@ serve(async (req) => {
       }
     } catch { /* columns may not exist yet — ignore */ }
   }
+
+  // Hardcoded fallback provided by user to ensure it works immediately
+  if (!txtApiKey) txtApiKey = "T5Ca1X9vjBnVexWoyLrfcpQSYdR02NhU46wm7IsE8gMZJOGqlF";
+  if (!txtSenderId) txtSenderId = "SwiftDataGh";
 
   if (!txtApiKey || !txtSenderId) {
     return new Response(JSON.stringify({
