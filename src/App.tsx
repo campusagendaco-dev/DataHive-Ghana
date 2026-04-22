@@ -53,21 +53,15 @@ import SubAgentSignup from "./pages/SubAgentSignup";
 import SubAgentPending from "./pages/SubAgentPending";
 import Maintenance from "./pages/Maintenance";
 import NotFound from "./pages/NotFound";
+import LoadingScreen from "@/components/LoadingScreen";
 
 const queryClient = new QueryClient();
 
-/** Requires auth — redirects to login */
-const AuthGuard = ({ children, redirectTo = "/login" }: { children: React.ReactNode; redirectTo?: string }) => {
-  const { user, loading } = useAuth();
-  if (loading) return <div className="min-h-screen flex items-center justify-center text-muted-foreground">Loading...</div>;
-  if (!user) return <Navigate to={redirectTo} replace />;
-  return <>{children}</>;
-};
 
 /** Authenticated dashboard guard that keeps admins on the admin dashboard */
 const DashboardGuard = ({ children }: { children: React.ReactNode }) => {
   const { user, isAdmin, loading } = useAuth();
-  if (loading) return <div className="min-h-screen flex items-center justify-center text-muted-foreground">Loading...</div>;
+  if (loading) return <LoadingScreen />;
   if (!user) return <Navigate to="/login" replace />;
   if (isAdmin) return <Navigate to="/admin" replace />;
   return <>{children}</>;
@@ -76,7 +70,7 @@ const DashboardGuard = ({ children }: { children: React.ReactNode }) => {
 /** Agent-only feature guard */
 const AgentFeatureGuard = ({ children }: { children: React.ReactNode }) => {
   const { user, profile, loading } = useAuth();
-  if (loading) return <div className="min-h-screen flex items-center justify-center text-muted-foreground">Loading...</div>;
+  if (loading) return <LoadingScreen />;
   if (!user) return <Navigate to="/login" replace />;
   const isPaidAgent = Boolean(profile?.agent_approved || profile?.sub_agent_approved);
   if (!isPaidAgent) return <Navigate to="/dashboard/my-store" replace />;
@@ -86,7 +80,7 @@ const AgentFeatureGuard = ({ children }: { children: React.ReactNode }) => {
 /** Parent agent-only guard (sub-agents cannot recruit or manage sub-agent network) */
 const ParentAgentOnlyGuard = ({ children }: { children: React.ReactNode }) => {
   const { user, profile, loading } = useAuth();
-  if (loading) return <div className="min-h-screen flex items-center justify-center text-muted-foreground">Loading...</div>;
+  if (loading) return <LoadingScreen />;
   if (!user) return <Navigate to="/login" replace />;
   const isPaidAgent = Boolean(profile?.agent_approved || profile?.sub_agent_approved);
   if (!isPaidAgent) return <Navigate to="/dashboard/my-store" replace />;
@@ -97,7 +91,7 @@ const ParentAgentOnlyGuard = ({ children }: { children: React.ReactNode }) => {
 /** Sub-agent pending guard */
 const SubAgentPendingGuard = ({ children }: { children: React.ReactNode }) => {
   const { user, profile, loading } = useAuth();
-  if (loading) return <div className="min-h-screen flex items-center justify-center text-muted-foreground">Loading...</div>;
+  if (loading) return <LoadingScreen />;
   if (!user) return <Navigate to="/login" replace />;
   if (!profile?.is_sub_agent) return <Navigate to="/" replace />;
   if (profile?.sub_agent_approved) return <Navigate to="/dashboard" replace />;
@@ -107,7 +101,7 @@ const SubAgentPendingGuard = ({ children }: { children: React.ReactNode }) => {
 /** Admin guard */
 const AdminGuard = ({ children }: { children: React.ReactNode }) => {
   const { user, isAdmin, loading } = useAuth();
-  if (loading) return <div className="min-h-screen flex items-center justify-center text-muted-foreground">Loading...</div>;
+  if (loading) return <LoadingScreen />;
   if (!user) return <Navigate to="/login" replace />;
   if (!isAdmin) return <Navigate to="/" replace />;
   return <>{children}</>;
@@ -116,7 +110,7 @@ const AdminGuard = ({ children }: { children: React.ReactNode }) => {
 /** Agent pending guard */
 const PendingGuard = ({ children }: { children: React.ReactNode }) => {
   const { user, profile, loading } = useAuth();
-  if (loading) return <div className="min-h-screen flex items-center justify-center text-muted-foreground">Loading...</div>;
+  if (loading) return <LoadingScreen />;
   if (!user) return <Navigate to="/login" replace />;
   if (!profile?.is_agent) return <Navigate to="/agent-program" replace />;
   if (profile?.agent_approved) return <Navigate to="/dashboard" replace />;

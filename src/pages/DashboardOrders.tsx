@@ -20,16 +20,16 @@ interface Order {
   created_at: string;
 }
 
-const statusColors: Record<string, string> = {
-  pending: "bg-yellow-500/10 text-yellow-600 border-yellow-500/20",
-  paid: "bg-blue-500/10 text-blue-600 border-blue-500/20",
-  fulfilled: "bg-green-500/10 text-green-600 border-green-500/20",
-  fulfillment_failed: "bg-red-500/10 text-red-600 border-red-500/20",
+const STATUS_CONFIG: Record<string, { label: string; colors: string }> = {
+  pending:             { label: "Pending",         colors: "bg-yellow-400/10 text-yellow-600 border-yellow-400/20" },
+  paid:                { label: "Processing",      colors: "bg-blue-500/10 text-blue-600 border-blue-500/20" },
+  processing:          { label: "Processing",      colors: "bg-blue-500/10 text-blue-600 border-blue-500/20" },
+  fulfilled:           { label: "Delivered ✓",     colors: "bg-green-500/10 text-green-600 border-green-500/20" },
+  fulfillment_failed:  { label: "Not Fulfilled",   colors: "bg-red-500/10 text-red-600 border-red-500/20" },
 };
 
-const getDisplayStatus = (status: string) => {
-  return status;
-};
+const getStatusConfig = (status: string) =>
+  STATUS_CONFIG[status] ?? { label: status.replace(/_/g, " "), colors: "bg-secondary text-foreground border-border" };
 
 const DashboardOrders = () => {
   const { user, profile } = useAuth();
@@ -195,9 +195,11 @@ const DashboardOrders = () => {
                     <td className="py-3 px-4 text-right font-medium">GH₵ {Number(o.amount).toFixed(2)}</td>
                     <td className="py-3 px-4 text-right font-medium text-primary">+GH₵ {Number(o.profit).toFixed(2)}</td>
                     <td className="py-3 px-4 text-center">
-                      <span className={`inline-block px-2.5 py-0.5 rounded-full text-xs font-medium border ${statusColors[getDisplayStatus(o.status)] || "bg-secondary text-foreground border-border"}`}>
-                        {getDisplayStatus(o.status).replace("_", " ")}
-                      </span>
+                      {(() => { const cfg = getStatusConfig(o.status); return (
+                        <span className={`inline-block px-2.5 py-0.5 rounded-full text-xs font-semibold border ${cfg.colors}`}>
+                          {cfg.label}
+                        </span>
+                      ); })()}
                     </td>
                   </tr>
                 ))}
