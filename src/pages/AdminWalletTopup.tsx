@@ -6,6 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Search, Wallet, Loader2, CheckCircle, User } from "lucide-react";
+import { useAuth } from "@/hooks/useAuth";
+import { logAudit } from "@/utils/auditLogger";
 
 interface AgentResult {
   user_id: string;
@@ -20,6 +22,7 @@ interface AgentResult {
 
 const AdminWalletTopup = () => {
   const { toast } = useToast();
+  const { user: currentUser } = useAuth();
   const [searchRef, setSearchRef] = useState("");
   const [searching, setSearching] = useState(false);
   const [agent, setAgent] = useState<AgentResult | null>(null);
@@ -112,6 +115,17 @@ const AdminWalletTopup = () => {
       profit: 0,
       status: "fulfilled",
     });
+
+    // Log the audit action
+    if (currentUser) {
+      await logAudit(currentUser.id, "manual_wallet_topup", {
+        target_agent_id: agent.user_id,
+        target_agent_name: agent.full_name,
+        amount: amount,
+        previous_balance: wallet?.balance || 0,
+        new_balance: wallet?.balance ? wallet.balance + amount : amount
+      });
+    }
 
     toast({ title: `Successfully credited GH₵${amount.toFixed(2)} to ${agent.full_name}'s wallet!` });
     setWalletBalance((prev) => parseFloat((prev + amount).toFixed(2)));
