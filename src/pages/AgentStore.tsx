@@ -131,10 +131,19 @@ const AgentStore = () => {
 
   const resolveDisplayPrice = useCallback((network: string, size: string, fallbackPrice: number): number => {
     if (!agent) return fallbackPrice;
-    const agentOwn = Number(agent.agent_prices?.[network]?.[size]);
-    if (Number.isFinite(agentOwn) && agentOwn > 0) return applyPriceMultiplier(agentOwn, priceMultiplier);
+    
     const parentAssigned = Number(parentAssignedPrices?.[network]?.[size]);
-    if (Number.isFinite(parentAssigned) && parentAssigned > 0) return applyPriceMultiplier(parentAssigned, priceMultiplier);
+    const agentOwn = Number(agent.agent_prices?.[network]?.[size]);
+    
+    // For sub-agents, prioritize the price set by their parent agent
+    if (agent.is_sub_agent) {
+      if (Number.isFinite(parentAssigned) && parentAssigned > 0) return applyPriceMultiplier(parentAssigned, priceMultiplier);
+      if (Number.isFinite(agentOwn) && agentOwn > 0) return applyPriceMultiplier(agentOwn, priceMultiplier);
+    } else {
+      // For regular agents, use their own prices first
+      if (Number.isFinite(agentOwn) && agentOwn > 0) return applyPriceMultiplier(agentOwn, priceMultiplier);
+    }
+    
     const gs = globalSettings[`${network}-${size}`];
     const gsBase = Number(gs?.agent_price) > 0 ? Number(gs!.agent_price) : Number(gs?.public_price);
     if (Number.isFinite(gsBase) && gsBase > 0) return applyPriceMultiplier(gsBase, priceMultiplier);

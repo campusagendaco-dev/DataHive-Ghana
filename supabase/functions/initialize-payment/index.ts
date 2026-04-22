@@ -295,12 +295,22 @@ serve(async (req) => {
           }
 
           // Sub-agent's customer price:
-          // 1. Use their own listed price if set
-          // 2. Otherwise use the parent-assigned base (break-even for sub-agent)
-          chargeBase = Number.isFinite(sellerListed) && sellerListed > parentAssignedBase
-            ? sellerListed
-            : parentAssignedBase;
+          // 1. Strictly use parent-assigned price if set (Parent controls sub-agent retail)
+          // 2. Fallback to sub-agent's own listed price
+          // 3. Last fallback to parentAssignedBase (break-even)
+          if (Number.isFinite(parentAssignedBase) && parentAssignedBase > adminBase) {
+            chargeBase = parentAssignedBase;
+          } else {
+            chargeBase = Number.isFinite(sellerListed) && sellerListed > parentAssignedBase
+              ? sellerListed
+              : parentAssignedBase;
+          }
 
+          // Important: In this model, if the parent sets the price, the parent keeps the margin
+          // between parentAssignedBase and adminBase.
+          // The sub-agent profit would be chargeBase - parentAssignedBase.
+          // If we force chargeBase = parentAssignedBase, sub-agent profit = 0.
+          
           // Parent profit = parent's margin above admin wholesale
           resolvedParentProfit = Math.max(0, Number((parentAssignedBase - adminBase).toFixed(2)));
           // Sub-agent profit = their markup above what they pay parent
