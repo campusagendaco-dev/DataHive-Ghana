@@ -3,14 +3,16 @@ ALTER TABLE system_settings ADD COLUMN auto_pending_sms_message TEXT DEFAULT 'Yo
 ALTER TABLE orders ADD COLUMN sms_reminder_sent BOOLEAN DEFAULT false;
 
 -- Schedule the cron job using pg_cron to hit the Edge Function every 30 minutes
+CREATE EXTENSION IF NOT EXISTS pg_cron;
+
 SELECT cron.schedule(
   'auto-pending-sms-job',
   '*/30 * * * *',
-  
+  $$
   SELECT net.http_post(
       url:='https://lsocdjpflecduumopijn.supabase.co/functions/v1/cron-pending-sms',
       headers:='{"Content-Type": "application/json"}'::jsonb
   );
-  
+  $$
 );
 

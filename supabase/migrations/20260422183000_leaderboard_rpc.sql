@@ -10,7 +10,7 @@ RETURNS TABLE (
 LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = public
-AS $func
+AS $$
 BEGIN
     RETURN QUERY
     WITH weekly_data AS (
@@ -45,6 +45,6 @@ BEGIN
     ORDER BY r.rnk ASC
     LIMIT 50;
 END;
-$func;
+$$;
 
 GRANT EXECUTE ON FUNCTION get_agent_leaderboard() TO authenticated;
