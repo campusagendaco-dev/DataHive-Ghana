@@ -9,9 +9,10 @@ import { getAppBaseUrl } from "@/lib/app-base-url";
 import { fetchApiPricingContext, applyPriceMultiplier } from "@/lib/api-source-pricing";
 import { invokePublicFunction } from "@/lib/public-function-client";
 import PhoneOrderTracker from "@/components/PhoneOrderTracker";
+import StoreNavbar from "@/components/StoreNavbar";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
-  Zap, Loader2, Users, TrendingUp, ChevronRight,
+  Zap, Loader2, TrendingUp, ChevronRight,
   ShieldCheck, Phone, X, CreditCard, Star,
 } from "lucide-react";
 
@@ -229,40 +230,16 @@ const AgentStore = () => {
   return (
     <div className="min-h-screen flex flex-col" style={{ background: "#0d0d18" }}>
 
-      {/* ── Sticky header ── */}
-      <header className="sticky top-0 z-40 border-b border-white/8 backdrop-blur-xl" style={{ background: "rgba(13,13,24,0.92)" }}>
-        <div className="container mx-auto max-w-3xl flex items-center justify-between px-4 h-16">
-          <div className="flex items-center gap-2.5">
-            <img src="/logo.png" alt="" className="w-9 h-9 rounded-full shrink-0 ring-1 ring-white/10" />
-            <div className="leading-tight">
-              <p className="text-white font-bold text-sm leading-none truncate max-w-[140px] sm:max-w-none">{agent.store_name}</p>
-              <p className="text-[10px] mt-0.5 font-semibold" style={{ color: networkAccent }}>Data Reselling Store</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            {agent.whatsapp_number && (
-              <a
-                href={`https://wa.me/${agent.whatsapp_number.replace(/\D+/g, "")}`}
-                target="_blank" rel="noopener noreferrer"
-                className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-full transition-colors text-white"
-                style={{ background: "#25D366" }}
-              >
-                <svg viewBox="0 0 32 32" width="13" height="13" fill="white"><path d="M16.004 2.667C8.64 2.667 2.667 8.64 2.667 16c0 2.347.614 4.56 1.693 6.48L2.667 29.333l7.04-1.653A13.28 13.28 0 0016.004 29.333C23.36 29.333 29.333 23.36 29.333 16S23.36 2.667 16.004 2.667zm5.84 18.027c-.32-.16-1.893-.933-2.187-1.04-.293-.107-.507-.16-.72.16-.213.32-.827 1.04-.987 1.253-.16.213-.347.24-.667.08-.32-.16-1.36-.507-2.587-1.6-.96-.853-1.6-1.907-1.787-2.227-.187-.32 0-.48.147-.627.133-.133.32-.347.48-.52.16-.173.213-.32.32-.533.107-.213.053-.4-.027-.56-.08-.16-.72-1.733-.987-2.373-.253-.613-.52-.533-.72-.547h-.613c-.213 0-.56.08-.853.4-.293.32-1.12 1.093-1.12 2.667 0 1.573 1.147 3.093 1.307 3.307.16.213 2.267 3.467 5.493 4.853.773.333 1.373.533 1.84.68.773.24 1.48.213 2.027.133.627-.093 1.893-.773 2.16-1.52.267-.747.267-1.387.187-1.52-.08-.133-.293-.213-.613-.373z"/></svg>
-                <span className="hidden sm:inline">WhatsApp</span>
-              </a>
-            )}
-            {agent.whatsapp_group_link && (
-              <a
-                href={agent.whatsapp_group_link} target="_blank" rel="noopener noreferrer"
-                className="flex items-center gap-1.5 border border-white/15 text-white/70 hover:text-white hover:border-white/35 text-xs font-medium px-3 py-1.5 rounded-full transition-colors"
-              >
-                <Users className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">Group</span>
-              </a>
-            )}
-          </div>
-        </div>
-      </header>
+      <StoreNavbar
+        storeName={agent.store_name}
+        agentSlug={slug}
+        networkAccent={networkAccent}
+        whatsappNumber={agent.whatsapp_number}
+        whatsappGroupLink={agent.whatsapp_group_link ?? undefined}
+        supportNumber={agent.support_number}
+        email={agent.email}
+        showSubAgentLink={!agent.is_sub_agent}
+      />
 
       {/* ── Hero ── */}
       <div className="relative overflow-hidden py-10 px-4 text-center" style={{ background: "linear-gradient(180deg, #111124 0%, #0d0d18 100%)" }}>
