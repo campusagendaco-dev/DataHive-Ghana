@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Gift, X, Loader2, CheckCircle2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { invokePublicFunction } from "@/lib/public-function-client";
 
 const POS_KEY = "free-data-btn-pos";
 
@@ -37,6 +38,10 @@ const FreeDataButton = () => {
   const [phone, setPhone] = useState("");
   const [claiming, setClaiming] = useState(false);
   const [claimed, setClaimed] = useState(false);
+  
+  const [promoCode, setPromoCode] = useState("");
+  const [promoVerified, setPromoVerified] = useState(false);
+  const [verifying, setVerifying] = useState(false);
 
   // Drag state
   const [pos, setPos] = useState<{ x: number; y: number } | null>(loadSavedPos);
@@ -120,6 +125,28 @@ const FreeDataButton = () => {
 
   if (!campaign || !campaign.enabled) return null;
 
+  const handleVerifyCode = async () => {
+    if (!promoCode.trim()) return;
+    setVerifying(true);
+    const { data, error } = await invokePublicFunction("validate-promo", {
+      body: { code: promoCode.trim() },
+    });
+    setVerifying(false);
+    
+    if (error || !data || !(data as any).valid) {
+      toast({ title: "Verification failed", description: (data as any)?.error || "Invalid promo code.", variant: "destructive" });
+      return;
+    }
+    
+    if (!(data as any).is_free) {
+      toast({ title: "Not a Free Data code", description: "This code is for discounts, not free data.", variant: "destructive" });
+      return;
+    }
+
+    setPromoVerified(true);
+    toast({ title: "Code verified!", description: "Enter your phone number to receive your free data." });
+  };
+
   const handleClaim = async () => {
     const phoneDigits = phone.replace(/\D+/g, "");
     if (phoneDigits.length < 9 || phoneDigits.length > 12) {
@@ -129,26 +156,25 @@ const FreeDataButton = () => {
 
     setClaiming(true);
 
-    const { error } = await supabase.from("orders").insert({
-      order_type: "free_data_claim" as any,
-      network: campaign.network,
-      package_size: campaign.packageSize,
-      customer_phone: phoneDigits,
-      amount: 0,
-      profit: 0,
-      status: "pending",
-    } as any);
+    const { data, error } = await invokePublicFunction("claim-free-data", {
+      body: {
+        promo_code: promoCode.trim(),
+        phone: phoneDigits,
+        network: campaign.network,
+        package_size: campaign.packageSize,
+      },
+    });
 
-    if (error) {
-      toast({ title: "Claim failed", description: "Something went wrong. Try again.", variant: "destructive" });
+    if (error || !data || !(data as any).success) {
+      toast({ title: "Claim failed", description: (data as any)?.error || "Something went wrong. Try again.", variant: "destructive" });
     } else {
       setClaimed(true);
       localStorage.setItem("has_claimed_free_data", "true");
       toast({
         title: "Claimed successfully!",
-        description: `Your free ${campaign.packageSize} data is being processed.`,
+        description: `Your free ${campaign.packageSize} data has been sent!`,
       });
-      setTimeout(() => setIsOpen(false), 4000);
+      setTimeout(() => setIsOpen(false), 5000);
     }
     setClaiming(false);
   };
@@ -223,6 +249,29 @@ const FreeDataButton = () => {
                   <p className="font-bold text-green-400 text-lg">Claim Received!</p>
                   <p className="text-xs text-white/60 mt-1">Your data is being processed and will arrive shortly.</p>
                 </div>
+              ) : !promoVerified ? (
+                <div className="space-y-3">
+                  <div className="text-left">
+                    <label className="text-xs font-semibold text-white/50 ml-1 mb-1 block">Promo Code</label>
+                    <input
+                      type="text"
+                      placeholder="Enter Free Data Code"
+                      value={promoCode}
+                      onChange={(e) => setPromoCode(e.target.value.toUpperCase())}
+                      className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3.5 text-white placeholder-white/20 focus:outline-none focus:border-white/30 text-center font-bold tracking-widest uppercase transition-colors"
+                    />
+                  </div>
+                  <button
+                    onClick={handleVerifyCode}
+                    disabled={verifying || !promoCode.trim()}
+                    className="w-full flex items-center justify-center gap-2 py-3.5 rounded-xl font-black text-black transition-all hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 disabled:scale-100 shadow-lg"
+                    style={{ background: accentColor }}
+                  >
+                    {verifying ? <Loader2 className="w-5 h-5 animate-spin" /> : <CheckCircle2 className="w-5 h-5" />}
+                    {verifying ? "Verifying..." : "Verify Code"}
+                  </button>
+                  <p className="text-[10px] text-white/30 pt-2">You must have a valid code generated by Admin.</p>
+                </div>
               ) : (
                 <div className="space-y-3">
                   <div className="text-left">
@@ -245,7 +294,7 @@ const FreeDataButton = () => {
                     {claiming ? <Loader2 className="w-5 h-5 animate-spin" /> : <Gift className="w-5 h-5" />}
                     {claiming ? "Processing..." : `Claim ${campaign.packageSize} Now`}
                   </button>
-                  <p className="text-[10px] text-white/30 pt-2">One claim per person. Admin approval required.</p>
+                  <p className="text-[10px] text-white/30 pt-2">Data will be delivered instantly to this number.</p>
                 </div>
               )}
             </div>
