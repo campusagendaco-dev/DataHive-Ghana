@@ -34,7 +34,7 @@ serve(async (req) => {
 
   const { data: profile, error: authError } = await supabase
     .from("profiles")
-    .select("user_id, is_agent, agent_approved, sub_agent_approved")
+    .select("user_id, is_agent, agent_approved, sub_agent_approved, api_access_enabled")
     .eq("api_key", apiKey)
     .single();
 
@@ -46,10 +46,15 @@ serve(async (req) => {
   }
 
   const userId = profile.user_id;
-  const isAuthorized = profile.agent_approved || profile.sub_agent_approved;
+  
+  // They must be an approved agent/sub-agent AND explicitly granted API access by admin
+  const isAgent = profile.agent_approved || profile.sub_agent_approved;
+  const hasApiAccess = profile.api_access_enabled === true;
 
-  if (!isAuthorized) {
-    return new Response(JSON.stringify({ error: "Unauthorized: Account not approved for API access" }), {
+  if (!isAgent || !hasApiAccess) {
+    return new Response(JSON.stringify({ 
+      error: "Unauthorized: API access has not been granted or verified for this account." 
+    }), {
       status: 403,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
