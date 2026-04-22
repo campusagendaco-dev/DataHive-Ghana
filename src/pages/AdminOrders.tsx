@@ -276,9 +276,20 @@ const AdminOrders = () => {
                     <p className="text-[10px] text-white/30 truncate max-w-[120px]">{order.agent_email}</p>
                   </td>
                   <td className="px-4 py-3">
-                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${order.is_sub_agent ? "border-purple-500/30 text-purple-400 bg-purple-500/10" : "border-amber-500/30 text-amber-400 bg-amber-500/10"}`}>
-                      {order.is_sub_agent ? "Sub-Agent" : "Agent"}
-                    </span>
+                    <div className="flex flex-col items-start gap-1">
+                      <span className="text-xs font-bold text-white/90">
+                        {order.order_type === "wallet_topup" ? "Wallet Top-up" :
+                         order.order_type === "afa" ? "AFA Registration" :
+                         order.order_type === "api" ? "API Purchase" :
+                         order.order_type === "free_data_claim" ? "Free Promo Claim" :
+                         order.order_type === "sub_agent_activation" ? "Sub-Agent Activation" :
+                         order.order_type === "agent_activation" ? "Agent Activation" :
+                         "Data Purchase"}
+                      </span>
+                      <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded border ${order.is_sub_agent ? "border-purple-500/30 text-purple-400 bg-purple-500/10" : "border-amber-500/30 text-amber-400 bg-amber-500/10"}`}>
+                        {order.is_sub_agent ? "Sub-Agent" : "Agent"}
+                      </span>
+                    </div>
                   </td>
                   <td className="px-4 py-3 text-xs font-mono text-white/50 hidden sm:table-cell">{order.customer_phone || "—"}</td>
                   <td className="px-4 py-3 text-xs text-white/60 hidden md:table-cell">{order.network || "—"}</td>
