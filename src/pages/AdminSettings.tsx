@@ -1,4 +1,4 @@
-﻿import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
@@ -39,7 +39,7 @@ const defaultSettings: SystemSettings = {
   disable_ordering: false,
   dark_mode_enabled: false,
   customer_service_number: "0547636024",
-  support_channel_link: "https://whatsapp.com/channel/0029Vb6Xwed60eBaztkH2B3m",
+  support_channel_link: "https://whatsapp.com/channel/0029VbCx0q4KLaHfJaiHLN40",
   table_ready: true,
   sub_agent_base_fee: 80,
   twilio_account_sid: "",

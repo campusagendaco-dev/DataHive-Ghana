@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 
 const Footer = () => {
   const [customerServiceNumber, setCustomerServiceNumber] = useState("0547636024");
-  const [supportChannelLink, setSupportChannelLink] = useState("https://whatsapp.com/channel/0029Vb6Xwed60eBaztkH2B3m");
+  const [supportChannelLink, setSupportChannelLink] = useState("https://whatsapp.com/channel/0029VbCx0q4KLaHfJaiHLN40");
 
   useEffect(() => {
     const loadSupportSettings = async () => {

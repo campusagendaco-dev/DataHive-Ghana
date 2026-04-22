@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 
-const DEFAULT_LINK = "https://whatsapp.com/channel/0029Vb6Xwed60eBaztkH2B3m";
+const DEFAULT_LINK = "https://whatsapp.com/channel/0029VbCx0q4KLaHfJaiHLN40";
 const POS_KEY = "wa-btn-pos";
 const SIZE = 52;
 
