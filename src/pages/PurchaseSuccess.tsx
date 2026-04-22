@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { CheckCircle2, Home, ReceiptText, Wallet } from "lucide-react";
+import { CheckCircle2, Home, ReceiptText, Wallet, ShoppingBag } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 
@@ -37,6 +37,10 @@ const PurchaseSuccess = () => {
   const packageSize = searchParams.get("package") || "";
   const customerPhone = formatPhone(searchParams.get("phone") || "");
   const source = searchParams.get("source") || "";
+  const slug = searchParams.get("slug") || "";
+
+  const fromStore = Boolean(slug);
+  const storeUrl = fromStore ? `/store/${slug}` : null;
 
   const confetti = useMemo<ConfettiPiece[]>(
     () =>
@@ -103,34 +107,65 @@ const PurchaseSuccess = () => {
               </div>
             </div>
 
-            <div className="mt-6 rounded-xl border border-primary/30 bg-primary/10 px-4 py-3 text-sm">
-              <p className="font-semibold text-primary">Next step</p>
-              <p className="text-muted-foreground mt-1">
-                {source === "wallet"
-                  ? "Your wallet has already been charged. You can continue buying bundles right away."
-                  : "You can track this order at any time from the order status page."}
-              </p>
-            </div>
+            {/* Buy again banner — only when coming from an agent/sub-agent store */}
+            {storeUrl && (
+              <div className="mt-6 rounded-xl border border-primary/40 bg-primary/10 px-4 py-4 flex items-center justify-between gap-4">
+                <div>
+                  <p className="font-semibold text-primary text-sm">Want to buy more data?</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Return to the store and top up again in seconds.
+                  </p>
+                </div>
+                <Button asChild size="sm" className="shrink-0">
+                  <Link to={storeUrl}>
+                    <ShoppingBag className="h-4 w-4 mr-2" />
+                    Buy Again
+                  </Link>
+                </Button>
+              </div>
+            )}
+
+            {!storeUrl && (
+              <div className="mt-6 rounded-xl border border-primary/30 bg-primary/10 px-4 py-3 text-sm">
+                <p className="font-semibold text-primary">Next step</p>
+                <p className="text-muted-foreground mt-1">
+                  {source === "wallet"
+                    ? "Your wallet has already been charged. You can continue buying bundles right away."
+                    : "You can track this order at any time from the order status page."}
+                </p>
+              </div>
+            )}
 
             <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
               <Button asChild>
                 <Link to="/order-status">
                   <ReceiptText className="h-4 w-4 mr-2" />
-                  Track Another Order
+                  Track Order
                 </Link>
               </Button>
-              <Button asChild variant="outline">
-                <Link to="/dashboard/wallet">
-                  <Wallet className="h-4 w-4 mr-2" />
-                  Go to Wallet
-                </Link>
-              </Button>
-              <Button asChild variant="ghost">
-                <Link to="/">
-                  <Home className="h-4 w-4 mr-2" />
-                  Back Home
-                </Link>
-              </Button>
+              {fromStore ? (
+                <Button asChild variant="ghost">
+                  <Link to="/">
+                    <Home className="h-4 w-4 mr-2" />
+                    Back Home
+                  </Link>
+                </Button>
+              ) : (
+                <>
+                  <Button asChild variant="outline">
+                    <Link to="/dashboard/wallet">
+                      <Wallet className="h-4 w-4 mr-2" />
+                      Go to Wallet
+                    </Link>
+                  </Button>
+                  <Button asChild variant="ghost">
+                    <Link to="/">
+                      <Home className="h-4 w-4 mr-2" />
+                      Back Home
+                    </Link>
+                  </Button>
+                </>
+              )}
             </div>
           </CardContent>
         </Card>

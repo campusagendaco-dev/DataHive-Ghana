@@ -230,6 +230,7 @@ const AgentStore = () => {
     const orderId = crypto.randomUUID();
     const callbackParams = new URLSearchParams({
       reference: orderId, network: selectedNetwork, package: selectedPkg.size, phone: phoneDigits,
+      ...(slug ? { slug } : {}),
     });
 
     const { data: paymentData, error: paymentError } = await invokePublicFunction("initialize-payment", {
