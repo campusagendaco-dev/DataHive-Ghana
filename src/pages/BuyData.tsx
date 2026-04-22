@@ -1,6 +1,6 @@
-import { useState, useEffect, useRef, useCallback, Fragment } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { Link } from "react-router-dom";
-import { ShieldCheck, Zap, ChevronDown, ChevronUp, Loader2, AlertTriangle } from "lucide-react";
+import { ShieldCheck, Zap, Loader2, AlertTriangle, X, CreditCard } from "lucide-react";
 import { basePackages, getPublicPrice } from "@/lib/data";
 import { getNetworkCardColors } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
@@ -31,18 +31,6 @@ const networkTabStyles: Record<NetworkName, { active: string; idle: string }> = 
   AirtelTigo: { active: "bg-blue-600 text-white border-blue-600", idle: "border-border hover:border-blue-400/50" },
 };
 
-/* Detect grid columns based on viewport — matches Tailwind grid-cols-2/3/4 breakpoints */
-function useColsPerRow(): number {
-  const [cols, setCols] = useState(4);
-  useEffect(() => {
-    const update = () => setCols(window.innerWidth < 640 ? 2 : window.innerWidth < 1024 ? 3 : 4);
-    update();
-    window.addEventListener("resize", update, { passive: true });
-    return () => window.removeEventListener("resize", update);
-  }, []);
-  return cols;
-}
-
 const BuyData = () => {
   const { toast } = useToast();
   const { theme } = useAppTheme();
@@ -56,8 +44,6 @@ const BuyData = () => {
   const [holidayMessage, setHolidayMessage] = useState("");
   const [orderingDisabled, setOrderingDisabled] = useState(false);
   const [priceMultiplier, setPriceMultiplier] = useState(1);
-  const colsPerRow = useColsPerRow();
-  const stripRef = useRef<HTMLDivElement>(null);
   const phoneInputRef = useRef<HTMLInputElement>(null);
 
   const phoneDigits = phone.replace(/\D+/g, "");
@@ -85,7 +71,7 @@ const BuyData = () => {
     load();
   }, []);
 
-  useEffect(() => { setSelectedPkg(null); }, [selectedNetwork]);
+  useEffect(() => { setSelectedPkg(null); setPhone(""); }, [selectedNetwork]);
 
   const packages = (basePackages[selectedNetwork] || [])
     .map((pkg) => {
@@ -96,21 +82,12 @@ const BuyData = () => {
     })
     .filter(Boolean) as { size: string; price: number; validity: string; popular?: boolean }[];
 
-  /* Split packages into grid rows based on current column count */
-  const rows: typeof packages[] = [];
-  for (let i = 0; i < packages.length; i += colsPerRow) {
-    rows.push(packages.slice(i, i + colsPerRow));
-  }
-
-  const selectedIdx = selectedPkg ? packages.findIndex((p) => p.size === selectedPkg.size) : -1;
-  const selectedRow = selectedIdx >= 0 ? Math.floor(selectedIdx / colsPerRow) : -1;
-
   const fee = selectedPkg ? calcFee(selectedPkg.price) : 0;
   const total = selectedPkg ? parseFloat((selectedPkg.price + fee).toFixed(2)) : 0;
 
   const handleCardClick = useCallback((size: string, price: number) => {
     setSelectedPkg((prev) => (prev?.size === size ? null : { size, price }));
-    setTimeout(() => stripRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" }), 80);
+    setTimeout(() => phoneInputRef.current?.focus(), 120);
   }, []);
 
   const handlePay = async () => {
@@ -139,7 +116,14 @@ const BuyData = () => {
         amount: total,
         reference: orderId,
         callback_url: `${getAppBaseUrl()}/order-status?${callbackParams.toString()}`,
-        metadata: { order_id: orderId, order_type: "data", network: selectedNetwork, package_size: selectedPkg.size, customer_phone: phoneDigits, fee },
+        metadata: {
+          order_id: orderId,
+          order_type: "data",
+          network: selectedNetwork,
+          package_size: selectedPkg.size,
+          customer_phone: phoneDigits,
+          fee,
+        },
       },
     });
 
@@ -153,11 +137,10 @@ const BuyData = () => {
   };
 
   const colors = getNetworkCardColors(selectedNetwork);
-  const isGlass = !theme.isLight;
 
   return (
-    <div className="min-h-screen pt-20 pb-24 sm:pb-20">
-      {/* Dark header */}
+    <div className={`min-h-screen pt-20 transition-all duration-300 ${selectedPkg ? "pb-44" : "pb-24 sm:pb-20"}`}>
+      {/* Hero header */}
       <div className="text-white py-10 px-4 mb-6" style={{ background: theme.heroHex }}>
         <div className="container mx-auto max-w-5xl">
           <div className="flex items-center gap-2 mb-2">
@@ -166,7 +149,7 @@ const BuyData = () => {
           </div>
           <h1 className="font-display text-3xl md:text-5xl font-black mb-2">Buy Data Bundles</h1>
           <p className="text-white/60 text-sm md:text-base max-w-lg">
-            Pick a network, select a bundle, enter the recipient number &amp; pay instantly.
+            Pick a network, tap a bundle &amp; pay instantly with card or mobile money.
           </p>
           <div className="flex flex-wrap gap-x-5 gap-y-1.5 mt-4 text-xs text-white/45">
             <span className="flex items-center gap-1.5"><ShieldCheck className="w-3.5 h-3.5 text-green-400" /> Secured by Paystack</span>
@@ -177,9 +160,11 @@ const BuyData = () => {
       </div>
 
       <div className="container mx-auto max-w-5xl px-4">
-        {/* Announcement bar */}
-        <div className="mb-5 rounded-lg px-4 py-2.5 flex items-center gap-2 text-xs font-medium"
-          style={{ background: "rgba(239,68,68,0.12)", border: "1px solid rgba(239,68,68,0.25)", color: "rgb(252,165,165)" }}>
+        {/* Warning bar */}
+        <div
+          className="mb-5 rounded-lg px-4 py-2.5 flex items-center gap-2 text-xs font-medium"
+          style={{ background: "rgba(239,68,68,0.12)", border: "1px solid rgba(239,68,68,0.25)", color: "rgb(252,165,165)" }}
+        >
           <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
           Delivery times vary &bull; No refunds for wrong numbers &bull;{" "}
           <Link to="/order-status" className="underline underline-offset-2">Track order</Link>
@@ -206,120 +191,53 @@ const BuyData = () => {
           ))}
         </div>
 
-        {/* Package grid with inline buy strip */}
+        {/* Package grid */}
         {pkgLoading ? (
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
             {Array.from({ length: 8 }).map((_, i) => <Skeleton key={i} className="h-[140px] rounded-2xl" />)}
           </div>
         ) : (
-          <div className="space-y-0">
-            {rows.map((row, rowIdx) => (
-              <Fragment key={rowIdx}>
-                {/* Card row */}
-                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4 mb-3 sm:mb-4">
-                  {row.map((pkg) => {
-                    const isSelected = selectedPkg?.size === pkg.size;
-                    return (
-                      <button
-                        key={pkg.size}
-                        onClick={() => handleCardClick(pkg.size, pkg.price)}
-                        className={`${colors.card} rounded-2xl p-4 sm:p-5 flex flex-col gap-2.5 border-2 text-left transition-all duration-200 ${
-                          isSelected ? "border-white/70 shadow-xl scale-[1.02]" : "border-transparent hover:border-white/25 hover:scale-[1.01]"
-                        }`}
-                      >
-                        <div className="flex justify-between items-start">
-                          <span className={`${colors.label} text-[11px] font-bold uppercase tracking-wide`}>{selectedNetwork}</span>
-                          {isSelected
-                            ? <ChevronUp className="w-4 h-4 text-white/70" />
-                            : <ChevronDown className={`w-4 h-4 ${colors.label}`} />}
-                        </div>
-                        <p className={`${colors.size} text-3xl sm:text-4xl font-black leading-none`}>{pkg.size}</p>
-                        <div className="flex items-end justify-between mt-auto pt-1">
-                          <p className={`${colors.size} text-sm sm:text-base font-black`}>₵{pkg.price.toFixed(2)}</p>
-                          <p className={`${colors.label} text-[10px] font-medium`}>No Expiry</p>
-                        </div>
-                        {pkg.popular && (
-                          <span className="absolute top-2 right-2 text-[9px] font-black bg-black/25 text-white px-1.5 py-0.5 rounded">
-                            HOT
-                          </span>
-                        )}
-                      </button>
-                    );
-                  })}
-                </div>
-
-                {/* Buy strip — appears after the row containing the selected package */}
-                {rowIdx === selectedRow && selectedPkg && (
-                  <div ref={stripRef} className="buy-strip-enter mb-3 sm:mb-4 rounded-xl overflow-hidden border border-white/10"
-                    style={{
-                      background: isGlass
-                        ? `rgba(var(--glass-rgb), 0.88)`
-                        : "rgba(15, 15, 30, 0.92)",
-                      backdropFilter: "blur(24px)",
-                      WebkitBackdropFilter: "blur(24px)",
-                    }}>
-                    {/* Mobile: package + price summary row */}
-                    <div className="flex items-center justify-between px-4 pt-3.5 pb-1 sm:hidden">
-                      <span className="text-white font-bold text-sm">{selectedPkg.size}</span>
-                      <span className="font-bold text-sm" style={{ color: `hsl(${theme.primary})` }}>
-                        GH₵ {selectedPkg.price.toFixed(2)}
-                      </span>
-                    </div>
-                    <div className="flex flex-wrap sm:flex-nowrap items-center gap-2.5 p-3.5 sm:pt-3.5">
-                      {/* Network badge — desktop only */}
-                      <div className={`${colors.card} rounded-lg px-2.5 py-2 shrink-0 items-center justify-center hidden sm:flex`}>
-                        <span className={`${colors.size} text-xs font-black`}>{selectedNetwork}</span>
-                      </div>
-                      {/* Info — desktop only */}
-                      <div className="shrink-0 hidden sm:block">
-                        <span className="text-white font-bold text-sm">{selectedPkg.size}</span>
-                        <span className="text-white/40 mx-1.5">—</span>
-                        <span className="font-bold text-sm" style={{ color: `hsl(${theme.primary})` }}>
-                          GH₵ {selectedPkg.price.toFixed(2)}
-                        </span>
-                      </div>
-                      {/* Phone input */}
-                      <input
-                        ref={phoneInputRef}
-                        type="tel"
-                        inputMode="numeric"
-                        placeholder="Recipient number (0XXXXXXXXX)"
-                        value={phone}
-                        onChange={(e) => setPhone(e.target.value)}
-                        maxLength={12}
-                        className="flex-1 min-w-0 border border-white/15 rounded-xl px-4 py-3 sm:py-2.5 text-white placeholder-white/35 text-sm focus:outline-none focus:border-white/40 transition-colors"
-                        style={{ background: "rgba(255,255,255,0.08)" }}
-                      />
-                      {/* Buy button */}
-                      <button
-                        onClick={handlePay}
-                        disabled={buying}
-                        className="w-full sm:w-auto shrink-0 font-black px-5 py-3 sm:py-2.5 rounded-xl text-sm transition-all hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 flex items-center justify-center gap-1.5 whitespace-nowrap"
-                        style={{ background: `hsl(${theme.primary})`, color: "#000" }}
-                      >
-                        {buying
-                          ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Processing...</>
-                          : <>Pay ₵{total.toFixed(2)}</>}
-                      </button>
-                    </div>
-                    {!isPhoneValid && phone.length > 0 && (
-                      <p className="text-xs text-red-400 px-4 pb-3">Enter a valid 10-digit Ghana number</p>
-                    )}
-                    {!isPhoneValid && phone.length === 0 && (
-                      <p className="text-[11px] text-white/40 px-4 pb-3">Enter the recipient phone number above to proceed</p>
-                    )}
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
+            {packages.map((pkg) => {
+              const isSelected = selectedPkg?.size === pkg.size;
+              return (
+                <button
+                  key={pkg.size}
+                  onClick={() => handleCardClick(pkg.size, pkg.price)}
+                  className={`${colors.card} rounded-2xl p-4 sm:p-5 flex flex-col gap-2.5 border-2 text-left transition-all duration-200 relative ${
+                    isSelected
+                      ? "border-white/80 shadow-2xl scale-[1.04]"
+                      : "border-transparent hover:border-white/30 hover:scale-[1.02]"
+                  }`}
+                >
+                  {/* Selected indicator */}
+                  {isSelected && (
+                    <span className="absolute top-2.5 right-2.5 w-5 h-5 rounded-full bg-white flex items-center justify-center shadow">
+                      <span className="w-2.5 h-2.5 rounded-full bg-black" />
+                    </span>
+                  )}
+                  {pkg.popular && !isSelected && (
+                    <span className="absolute top-2 right-2 text-[9px] font-black bg-black/25 text-white px-1.5 py-0.5 rounded">
+                      HOT
+                    </span>
+                  )}
+                  <span className={`${colors.label} text-[11px] font-bold uppercase tracking-wide`}>{selectedNetwork}</span>
+                  <p className={`${colors.size} text-3xl sm:text-4xl font-black leading-none`}>{pkg.size}</p>
+                  <div className="flex items-end justify-between mt-auto pt-1">
+                    <p className={`${colors.size} text-sm sm:text-base font-black`}>₵{pkg.price.toFixed(2)}</p>
+                    <p className={`${colors.label} text-[10px] font-medium`}>No Expiry</p>
                   </div>
-                )}
-              </Fragment>
-            ))}
+                </button>
+              );
+            })}
           </div>
         )}
 
         {/* Footer promo */}
-        <div className="mt-8 rounded-2xl border border-border bg-card p-5 flex flex-col sm:flex-row sm:items-center gap-4">
+        <div className="mt-10 rounded-2xl border border-border bg-card p-5 flex flex-col sm:flex-row sm:items-center gap-4">
           <div className="flex-1">
             <p className="font-semibold text-sm mb-0.5">Want cheaper bundle prices?</p>
-            <p className="text-muted-foreground text-xs">Agents unlock wholesale rates + their own public Paystack-powered store.</p>
+            <p className="text-muted-foreground text-xs">Agents unlock wholesale rates + their own Paystack-powered store.</p>
           </div>
           <Link
             to="/login"
@@ -329,6 +247,75 @@ const BuyData = () => {
           </Link>
         </div>
       </div>
+
+      {/* ── Sticky Purchase Bar ── */}
+      {selectedPkg && (
+        <div
+          className="fixed bottom-0 left-0 right-0 z-50 border-t border-white/10"
+          style={{
+            background: "rgba(8, 8, 18, 0.97)",
+            backdropFilter: "blur(28px)",
+            WebkitBackdropFilter: "blur(28px)",
+          }}
+        >
+          <div className="container mx-auto max-w-5xl px-4 pt-3 pb-4 sm:pb-5">
+            {/* Package summary + dismiss */}
+            <div className="flex items-center justify-between mb-2.5">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-white font-black text-base">{selectedNetwork} {selectedPkg.size}</span>
+                <span className="text-white/30">·</span>
+                <span className="text-white/55 text-xs">
+                  GH₵ {selectedPkg.price.toFixed(2)} + GH₵ {fee.toFixed(2)} Paystack fee
+                </span>
+                <span className="text-white/30">·</span>
+                <span className="font-bold text-sm" style={{ color: `hsl(${theme.primary})` }}>
+                  Total GH₵ {total.toFixed(2)}
+                </span>
+              </div>
+              <button
+                onClick={() => { setSelectedPkg(null); setPhone(""); }}
+                className="text-white/35 hover:text-white/80 transition-colors p-1.5 rounded-lg hover:bg-white/10 ml-2 shrink-0"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Phone + Pay row */}
+            <div className="flex gap-2 sm:gap-3">
+              <input
+                ref={phoneInputRef}
+                type="tel"
+                inputMode="numeric"
+                placeholder="Recipient number (0XXXXXXXXX)"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                maxLength={12}
+                className="flex-1 min-w-0 border border-white/15 rounded-xl px-4 py-3 text-white placeholder-white/30 text-sm focus:outline-none focus:border-white/45 transition-colors"
+                style={{ background: "rgba(255,255,255,0.07)" }}
+              />
+              <button
+                onClick={handlePay}
+                disabled={buying}
+                className="shrink-0 font-black px-5 py-3 rounded-xl text-sm transition-all hover:scale-105 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 flex items-center gap-1.5 whitespace-nowrap"
+                style={{ background: `hsl(${theme.primary})`, color: "#000" }}
+              >
+                {buying ? (
+                  <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Processing...</>
+                ) : (
+                  <><CreditCard className="w-3.5 h-3.5" /> Pay GH₵ {total.toFixed(2)}</>
+                )}
+              </button>
+            </div>
+
+            {/* Validation hint */}
+            {phone.length > 0 && !isPhoneValid ? (
+              <p className="text-xs text-red-400 mt-1.5">Enter a valid 10-digit Ghana number</p>
+            ) : phone.length === 0 ? (
+              <p className="text-[11px] text-white/35 mt-1.5">Enter the recipient's phone number then tap Pay</p>
+            ) : null}
+          </div>
+        </div>
+      )}
     </div>
   );
 };
