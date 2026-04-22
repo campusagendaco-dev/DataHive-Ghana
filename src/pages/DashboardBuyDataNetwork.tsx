@@ -11,13 +11,22 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Wallet, Loader2, CreditCard, X, RefreshCw, ArrowRight } from "lucide-react";
+import { Wallet, Loader2, CreditCard, X, RefreshCw, ArrowRight, Tag, CheckCircle2, Gift } from "lucide-react";
 import { basePackages, getPublicPrice } from "@/lib/data";
 import { getNetworkCardColors } from "@/lib/utils";
 import OrderStatusBanner from "@/components/OrderStatusBanner";
 
 type NetworkName = "MTN" | "Telecel" | "AirtelTigo";
 type PayMethod = "wallet" | "paystack";
+
+interface PromoResult {
+  valid: boolean;
+  promo_id?: string;
+  code?: string;
+  discount_percentage?: number;
+  is_free?: boolean;
+  error?: string;
+}
 
 const NETWORKS: NetworkName[] = ["MTN", "Telecel", "AirtelTigo"];
 
@@ -88,6 +97,13 @@ const DashboardBuyDataNetwork = ({ network }: DashboardBuyDataNetworkProps) => {
     id: string; network: string; packageSize: string; phone: string; status: string;
   } | null>(null);
 
+  // Promo code state
+  const [promoOpen, setPromoOpen] = useState(false);
+  const [promoCode, setPromoCode] = useState("");
+  const [promoValidating, setPromoValidating] = useState(false);
+  const [promoResult, setPromoResult] = useState<PromoResult | null>(null);
+  const [claimingFree, setClaimingFree] = useState(false);
+
   const isPaidAgent = Boolean(profile?.agent_approved || profile?.sub_agent_approved);
 
   useEffect(() => {
@@ -156,7 +172,14 @@ const DashboardBuyDataNetwork = ({ network }: DashboardBuyDataNetworkProps) => {
   useEffect(() => { void refreshBalance(); }, [user]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Clear selection when network changes (via prop)
-  useEffect(() => { setSelectedSize(""); setPhone(""); setPayMethod("wallet"); }, [network]);
+  useEffect(() => { 
+    setSelectedSize(""); 
+    setPhone(""); 
+    setPayMethod("wallet"); 
+    setPromoResult(null); 
+    setPromoCode(""); 
+    setPromoOpen(false); 
+  }, [network]);
 
   const selectedPackage = packages.find((item) => item.size === selectedSize);
   const cardColors = getNetworkCardColors(network);
@@ -164,8 +187,15 @@ const DashboardBuyDataNetwork = ({ network }: DashboardBuyDataNetworkProps) => {
   const normalizedPhone = phone.replace(/\D+/g, "");
   const isPhoneValid = normalizedPhone.length === 10 || normalizedPhone.length === 12 || normalizedPhone.length === 9;
 
-  const paystackFee = selectedPackage ? calcPaystackFee(selectedPackage.price) : 0;
-  const paystackTotal = selectedPackage ? parseFloat((selectedPackage.price + paystackFee).toFixed(2)) : 0;
+  const validPromo = promoResult?.valid ? promoResult : null;
+  const isFreePromo = validPromo?.is_free === true;
+  
+  const basePrice = selectedPackage ? selectedPackage.price : 0;
+  // Currently we only support 100% Free promo codes for agents natively without wallet adjustments.
+  const displayPrice = isFreePromo ? 0 : basePrice;
+
+  const paystackFee = selectedPackage && !isFreePromo ? calcPaystackFee(basePrice) : 0;
+  const paystackTotal = selectedPackage ? parseFloat((displayPrice + paystackFee).toFixed(2)) : 0;
 
   const validate = (): boolean => {
     if (!selectedPackage) {
@@ -177,6 +207,67 @@ const DashboardBuyDataNetwork = ({ network }: DashboardBuyDataNetworkProps) => {
       return false;
     }
     return true;
+  };
+
+  const handleApplyPromo = async () => {
+    if (!promoCode.trim()) return;
+    if (!isPhoneValid) {
+      toast({ title: "Enter recipient phone number first", variant: "destructive" });
+      return;
+    }
+    setPromoValidating(true);
+    setPromoResult(null);
+    const { data, error } = await invokePublicFunction("validate-promo", {
+      body: { code: promoCode.trim(), phone: normalizedPhone },
+    });
+    setPromoValidating(false);
+    
+    if (error || !data) {
+      setPromoResult({ valid: false, error: "Could not validate code. Try again." });
+      return;
+    }
+    
+    const result = data as PromoResult;
+    setPromoResult(result);
+    
+    if (result.valid) {
+      if (result.is_free) {
+        toast({ title: "Free data code applied!", description: `${promoCode.trim().toUpperCase()} is valid.` });
+      } else {
+        // We warn them that partial discounts might not work properly via wallet yet
+        toast({ title: "Code applied", description: "Note: Partial discounts are only supported via Card/MoMo." });
+      }
+    }
+  };
+
+  const handleClaimFree = async () => {
+    if (!validate() || !validPromo?.is_free) return;
+    
+    setClaimingFree(true);
+    const { data, error } = await invokePublicFunction("claim-free-data", {
+      body: {
+        promo_code: promoCode.trim(),
+        phone: normalizedPhone,
+        network,
+        package_size: selectedPackage!.size,
+      },
+    });
+    
+    if (error || !data) {
+      toast({ title: "Claim failed", description: "Could not process your free data claim.", variant: "destructive" });
+      setClaimingFree(false);
+      return;
+    }
+    
+    if (data.success) {
+      toast({ title: "Free data sent!", description: "The data bundle is on its way." });
+      setLastOrder({ id: data.order_id, network, packageSize: selectedPackage!.size, phone, status: "fulfilled" });
+      setSelectedSize(""); setPhone(""); setPromoCode(""); setPromoResult(null); setPromoOpen(false);
+    } else {
+      toast({ title: "Claim failed", description: data.error || "Delivery failed.", variant: "destructive" });
+      setPromoResult(null); setPromoCode(""); 
+    }
+    setClaimingFree(false);
   };
 
   const handleWalletBuy = async () => {
@@ -240,6 +331,11 @@ const DashboardBuyDataNetwork = ({ network }: DashboardBuyDataNetworkProps) => {
           customer_phone: normalizedPhone,
           fee: paystackFee,
           agent_id: user?.id,
+          ...(validPromo && !validPromo.is_free ? {
+            promo_code: promoCode.trim(),
+            promo_id: validPromo.promo_id,
+            discount_percentage: validPromo.discount_percentage,
+          } : {}),
         },
       },
     });
@@ -366,10 +462,14 @@ const DashboardBuyDataNetwork = ({ network }: DashboardBuyDataNetworkProps) => {
           <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-secondary/30">
             <div className="flex items-center gap-2.5">
               <span className="font-bold text-sm">{network} {selectedPackage.size}</span>
-              <span className="text-muted-foreground text-xs">— GH₵ {selectedPackage.price.toFixed(2)}</span>
+              {isFreePromo ? (
+                <span className="bg-green-500/20 text-green-500 text-[10px] font-bold px-2 py-0.5 rounded-full">FREE</span>
+              ) : (
+                <span className="text-muted-foreground text-xs">— GH₵ {displayPrice.toFixed(2)}</span>
+              )}
             </div>
             <button
-              onClick={() => setSelectedSize("")}
+              onClick={() => { setSelectedSize(""); setPromoResult(null); setPromoCode(""); setPromoOpen(false); }}
               className="text-muted-foreground hover:text-foreground transition-colors p-1 rounded hover:bg-secondary"
             >
               <X className="w-4 h-4" />
@@ -395,52 +495,92 @@ const DashboardBuyDataNetwork = ({ network }: DashboardBuyDataNetworkProps) => {
               )}
             </div>
 
-            {/* Payment method */}
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">Payment Method</p>
-              <div className="grid grid-cols-2 gap-2">
-                <button
-                  onClick={() => setPayMethod("wallet")}
-                  className={`p-3 rounded-xl border-2 text-left transition-all ${
-                    payMethod === "wallet"
-                      ? "border-primary bg-primary/8"
-                      : "border-border hover:border-primary/40"
-                  }`}
-                >
-                  <div className="flex items-center gap-2 mb-0.5">
-                    <Wallet className="w-4 h-4 text-primary shrink-0" />
-                    <span className="text-sm font-semibold">Wallet</span>
+            {/* Promo Code Section */}
+            {!promoOpen && !validPromo ? (
+              <button onClick={() => setPromoOpen(true)} className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors mt-2">
+                <Tag className="w-3.5 h-3.5" /> Have a promo code?
+              </button>
+            ) : (
+              <div className="space-y-2 mt-2">
+                {validPromo ? (
+                  <div className={`flex items-center gap-2 px-3 py-2.5 rounded-xl text-xs font-semibold border ${validPromo.is_free ? "bg-green-500/10 border-green-500/30 text-green-500" : "bg-amber-500/10 border-amber-500/30 text-amber-500"}`}>
+                    <CheckCircle2 className="w-4 h-4 shrink-0" />
+                    {validPromo.is_free
+                      ? `Code ${validPromo.code}: 100% FREE`
+                      : `Code ${validPromo.code}: ${validPromo.discount_percentage}% off applied`}
+                    <button onClick={() => { setPromoResult(null); setPromoCode(""); setPromoOpen(true); }} className="ml-auto opacity-70 hover:opacity-100 p-1">
+                      <X className="w-3.5 h-3.5" />
+                    </button>
                   </div>
-                  <p className="text-xs text-muted-foreground pl-6">
-                    Balance: GH₵ {(walletBalance || 0).toFixed(2)}
-                  </p>
-                </button>
-
-                <button
-                  onClick={() => setPayMethod("paystack")}
-                  className={`p-3 rounded-xl border-2 text-left transition-all ${
-                    payMethod === "paystack"
-                      ? "border-primary bg-primary/8"
-                      : "border-border hover:border-primary/40"
-                  }`}
-                >
-                  <div className="flex items-center gap-2 mb-0.5">
-                    <CreditCard className="w-4 h-4 text-primary shrink-0" />
-                    <span className="text-sm font-semibold">Card / MoMo</span>
+                ) : (
+                  <div className="flex gap-2">
+                    <Input
+                      type="text"
+                      placeholder="Enter code"
+                      value={promoCode}
+                      onChange={(e) => { setPromoCode(e.target.value.toUpperCase()); setPromoResult(null); }}
+                      className="uppercase font-mono text-sm"
+                    />
+                    <Button onClick={handleApplyPromo} disabled={promoValidating || !promoCode.trim()} variant="secondary" className="font-bold">
+                      {promoValidating ? <Loader2 className="w-4 h-4 animate-spin" /> : "Apply"}
+                    </Button>
+                    <Button onClick={() => { setPromoOpen(false); setPromoCode(""); setPromoResult(null); }} variant="ghost" size="icon" className="shrink-0 text-muted-foreground">
+                      <X className="w-4 h-4" />
+                    </Button>
                   </div>
-                  <p className="text-xs text-muted-foreground pl-6">
-                    +3% Paystack fee
-                  </p>
-                </button>
+                )}
+                {promoResult && !promoResult.valid && <p className="text-xs text-destructive pl-1">{promoResult.error || "Invalid promo code"}</p>}
               </div>
-            </div>
+            )}
+
+            {/* Payment method */}
+            {!isFreePromo && (
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2 mt-2">Payment Method</p>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    onClick={() => setPayMethod("wallet")}
+                    className={`p-3 rounded-xl border-2 text-left transition-all ${
+                      payMethod === "wallet"
+                        ? "border-primary bg-primary/8"
+                        : "border-border hover:border-primary/40"
+                    }`}
+                  >
+                    <div className="flex items-center gap-2 mb-0.5">
+                      <Wallet className="w-4 h-4 text-primary shrink-0" />
+                      <span className="text-sm font-semibold">Wallet</span>
+                    </div>
+                    <p className="text-xs text-muted-foreground pl-6">
+                      Balance: GH₵ {(walletBalance || 0).toFixed(2)}
+                    </p>
+                  </button>
+
+                  <button
+                    onClick={() => setPayMethod("paystack")}
+                    className={`p-3 rounded-xl border-2 text-left transition-all ${
+                      payMethod === "paystack"
+                        ? "border-primary bg-primary/8"
+                        : "border-border hover:border-primary/40"
+                    }`}
+                  >
+                    <div className="flex items-center gap-2 mb-0.5">
+                      <CreditCard className="w-4 h-4 text-primary shrink-0" />
+                      <span className="text-sm font-semibold">Card / MoMo</span>
+                    </div>
+                    <p className="text-xs text-muted-foreground pl-6">
+                      +3% Paystack fee
+                    </p>
+                  </button>
+                </div>
+              </div>
+            )}
 
             {/* Price breakdown for Paystack */}
-            {payMethod === "paystack" && (
-              <div className="rounded-xl bg-secondary/60 border border-border divide-y divide-border text-sm overflow-hidden">
+            {payMethod === "paystack" && !isFreePromo && (
+              <div className="rounded-xl bg-secondary/60 border border-border divide-y divide-border text-sm overflow-hidden mt-2">
                 <div className="flex justify-between px-4 py-2.5">
                   <span className="text-muted-foreground">Bundle price</span>
-                  <span className="font-medium">GH₵ {selectedPackage.price.toFixed(2)}</span>
+                  <span className="font-medium">GH₵ {displayPrice.toFixed(2)}</span>
                 </div>
                 <div className="flex justify-between px-4 py-2.5">
                   <span className="text-muted-foreground">Paystack fee (3%)</span>
@@ -454,8 +594,8 @@ const DashboardBuyDataNetwork = ({ network }: DashboardBuyDataNetworkProps) => {
             )}
 
             {/* Wallet insufficient warning */}
-            {payMethod === "wallet" && walletBalance !== null && walletBalance < selectedPackage.price && (
-              <div className="rounded-xl border border-amber-500/30 bg-amber-500/8 px-4 py-3 text-xs text-amber-600 dark:text-amber-400 flex items-center gap-2">
+            {payMethod === "wallet" && !isFreePromo && walletBalance !== null && walletBalance < displayPrice && (
+              <div className="rounded-xl border border-amber-500/30 bg-amber-500/8 px-4 py-3 text-xs text-amber-600 dark:text-amber-400 flex items-center gap-2 mt-2">
                 <Wallet className="w-3.5 h-3.5 shrink-0" />
                 Insufficient wallet balance. Top up or pay with card instead.
                 <button
@@ -468,19 +608,33 @@ const DashboardBuyDataNetwork = ({ network }: DashboardBuyDataNetworkProps) => {
             )}
 
             {/* Action button */}
-            <Button
-              className="w-full gap-2 font-bold text-sm py-5"
-              onClick={payMethod === "wallet" ? handleWalletBuy : handlePaystackBuy}
-              disabled={buying || !selectedPackage}
-            >
-              {buying ? (
-                <><Loader2 className="w-4 h-4 animate-spin" /> Processing...</>
-              ) : payMethod === "wallet" ? (
-                <><Wallet className="w-4 h-4" /> Buy from Wallet — GH₵ {selectedPackage.price.toFixed(2)}</>
-              ) : (
-                <><CreditCard className="w-4 h-4" /> Pay GH₵ {paystackTotal.toFixed(2)} with Card</>
-              )}
-            </Button>
+            {isFreePromo ? (
+              <Button
+                className="w-full gap-2 font-bold text-sm py-5 mt-2 bg-green-500 hover:bg-green-600 text-white"
+                onClick={handleClaimFree}
+                disabled={claimingFree || !selectedPackage}
+              >
+                {claimingFree ? (
+                  <><Loader2 className="w-4 h-4 animate-spin" /> Claiming...</>
+                ) : (
+                  <><Gift className="w-4 h-4" /> Claim Free Data</>
+                )}
+              </Button>
+            ) : (
+              <Button
+                className="w-full gap-2 font-bold text-sm py-5 mt-2"
+                onClick={payMethod === "wallet" ? handleWalletBuy : handlePaystackBuy}
+                disabled={buying || !selectedPackage}
+              >
+                {buying ? (
+                  <><Loader2 className="w-4 h-4 animate-spin" /> Processing...</>
+                ) : payMethod === "wallet" ? (
+                  <><Wallet className="w-4 h-4" /> Buy from Wallet — GH₵ {displayPrice.toFixed(2)}</>
+                ) : (
+                  <><CreditCard className="w-4 h-4" /> Pay GH₵ {paystackTotal.toFixed(2)} with Card</>
+                )}
+              </Button>
+            )}
           </div>
         </div>
       )}
