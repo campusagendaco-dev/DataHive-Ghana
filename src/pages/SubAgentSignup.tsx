@@ -41,18 +41,21 @@ const SubAgentSignup = () => {
 
   useEffect(() => {
     const load = async () => {
-      const { data } = await supabase
-        .from("profiles")
-        .select("user_id, store_name, full_name, sub_agent_activation_markup, whatsapp_number")
-        .eq("slug", slug)
-        .eq("is_agent", true)
-        .eq("agent_approved", true)
-        .eq("is_sub_agent" as any, false)
-        .maybeSingle();
+      try {
+        const { data, error } = await supabase
+          .from("profiles")
+          .select("user_id, store_name, full_name, sub_agent_activation_markup, whatsapp_number")
+          .eq("slug", slug)
+          .eq("agent_approved", true)
+          .maybeSingle();
 
-      if (!data) { setNotFound(true); setLoading(false); return; }
-      setAgent(data as unknown as ParentAgent);
-      setLoading(false);
+        if (error || !data) { setNotFound(true); setLoading(false); return; }
+        setAgent(data as unknown as ParentAgent);
+      } catch {
+        setNotFound(true);
+      } finally {
+        setLoading(false);
+      }
     };
     load();
   }, [slug]);
