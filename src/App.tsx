@@ -55,6 +55,7 @@ import SubAgentPending from "./pages/SubAgentPending";
 import Maintenance from "./pages/Maintenance";
 import NotFound from "./pages/NotFound";
 import LoadingScreen from "@/components/LoadingScreen";
+import InstallPrompt from "@/components/InstallPrompt";
 
 const queryClient = new QueryClient();
 
@@ -318,6 +319,7 @@ const App = () => (
             <AppContent />
             <ThemeSelector />
             <WhatsAppButton />
+            <InstallPrompt />
           </AuthProvider>
         </BrowserRouter>
       </TooltipProvider>
