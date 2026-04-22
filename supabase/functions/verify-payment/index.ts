@@ -555,7 +555,11 @@ serve(async (req) => {
 
     const verifyData = await verifyRes.json();
     if (!verifyData.status || verifyData.data.status !== "success") {
-      return new Response(JSON.stringify({ status: order?.status || "pending" }), {
+      const paystackStatus = verifyData.data?.status || "abandoned";
+      return new Response(JSON.stringify({ 
+        status: order?.status || "pending",
+        failure_reason: `Payment not completed. Paystack status: ${paystackStatus}` 
+      }), {
         status: 200,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });

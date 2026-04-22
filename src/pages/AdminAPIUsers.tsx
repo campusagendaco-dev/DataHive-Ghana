@@ -88,7 +88,7 @@ const AdminAPIUsers = () => {
     if (error) {
       toast({ title: "Error loading API users", description: error.message, variant: "destructive" });
     } else {
-      const rows = (data ?? []) as APIUser[];
+      const rows = (data ?? []) as unknown as APIUser[];
       setUsers(rows);
       // Seed edit state from DB values
       const rl: Record<string, number> = {};
@@ -109,6 +109,7 @@ const AdminAPIUsers = () => {
     setLoading(false);
   };
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { fetchUsers(); }, []);
 
   const fetchUserOrders = async (userId: string) => {
@@ -133,14 +134,14 @@ const AdminAPIUsers = () => {
 
   const toggleAccess = async (user: APIUser) => {
     const newVal = !user.api_access_enabled;
-    const { error } = await supabase.from("profiles").update({ api_access_enabled: newVal }).eq("user_id", user.user_id);
+    const { error } = await supabase.from("profiles").update({ api_access_enabled: newVal } as any).eq("user_id", user.user_id);
     if (error) { toast({ title: "Failed", description: error.message, variant: "destructive" }); return; }
     toast({ title: newVal ? "API Access Enabled" : "API Access Revoked" });
     setUsers((prev) => prev.map((u) => u.user_id === user.user_id ? { ...u, api_access_enabled: newVal } : u));
   };
 
   const revokeKey = async (userId: string) => {
-    const { error } = await supabase.from("profiles").update({ api_key: null }).eq("user_id", userId);
+    const { error } = await supabase.from("profiles").update({ api_key: null } as any).eq("user_id", userId);
     if (error) { toast({ title: "Failed", description: error.message, variant: "destructive" }); return; }
     toast({ title: "API Key revoked" });
     setUsers((prev) => prev.map((u) => u.user_id === userId ? { ...u, api_key: null } : u));
@@ -162,7 +163,7 @@ const AdminAPIUsers = () => {
       api_allowed_actions: allowedActions,
       api_ip_whitelist: ipWhitelist.length > 0 ? ipWhitelist : null,
       api_webhook_url: webhookUrl,
-    }).eq("user_id", userId);
+    } as any).eq("user_id", userId);
     setSaving(null);
 
     if (error) { toast({ title: "Save failed", description: error.message, variant: "destructive" }); return; }
@@ -196,7 +197,8 @@ const AdminAPIUsers = () => {
   const toggleReveal = (userId: string) => {
     setRevealedKeys((prev) => {
       const next = new Set(prev);
-      next.has(userId) ? next.delete(userId) : next.add(userId);
+      if (next.has(userId)) next.delete(userId);
+      else next.add(userId);
       return next;
     });
   };

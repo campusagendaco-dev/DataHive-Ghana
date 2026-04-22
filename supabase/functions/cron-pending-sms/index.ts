@@ -44,7 +44,7 @@ async function sendSmsViaTxtConnect(apiKey: string, from: string, to: string, bo
   }
 }
 
-serve(async (req) => {
+serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
