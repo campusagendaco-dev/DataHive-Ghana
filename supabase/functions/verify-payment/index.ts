@@ -408,10 +408,12 @@ serve(async (req) => {
       });
     }
 
-    // For orders already paid/failed (e.g. wallet-paid orders retried by admin),
-    // only allow trusted callers to skip Paystack verification.
-    if (order && (order.status === "paid" || order.status === "fulfillment_failed")) {
-      let canRetryPaidOrder = false;
+    // Only block retries of already-failed orders for unauthenticated callers.
+    // "paid" orders must fall through to Paystack re-verification so the data
+    // provider call can be triggered — blocking them here is the root cause of
+    // orders staying permanently "paid" when the webhook fires before the frontend poll.
+    if (order && order.status === "fulfillment_failed") {
+      let canRetryFailedOrder = false;
       if (authHeader) {
         const supabaseUser = createClient(SUPABASE_URL, Deno.env.get("SUPABASE_ANON_KEY") || "", {
           global: { headers: { Authorization: authHeader } },
@@ -425,11 +427,11 @@ serve(async (req) => {
             .eq("user_id", user.id)
             .eq("role", "admin")
             .maybeSingle();
-          canRetryPaidOrder = isOrderOwner || !!adminRole;
+          canRetryFailedOrder = isOrderOwner || !!adminRole;
         }
       }
 
-      if (!canRetryPaidOrder) {
+      if (!canRetryFailedOrder) {
         return new Response(JSON.stringify({
           status: order.status,
           failure_reason: "Retry requires authenticated order owner or admin.",

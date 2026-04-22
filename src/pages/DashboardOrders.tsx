@@ -1,12 +1,10 @@
 import { useState, useEffect, useCallback } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ClipboardList, RefreshCw } from "lucide-react";
-import PhoneOrderTracker from "@/components/PhoneOrderTracker";
+import { ClipboardList, RefreshCw, CheckCircle2, XCircle, Clock, Loader2, Wallet } from "lucide-react";
 
 interface Order {
   id: string;
@@ -18,18 +16,75 @@ interface Order {
   profit: number;
   status: string;
   created_at: string;
+  updated_at: string | null;
 }
 
-const STATUS_CONFIG: Record<string, { label: string; colors: string }> = {
-  pending:             { label: "Pending",         colors: "bg-yellow-400/10 text-yellow-600 border-yellow-400/20" },
-  paid:                { label: "Processing",      colors: "bg-blue-500/10 text-blue-600 border-blue-500/20" },
-  processing:          { label: "Processing",      colors: "bg-blue-500/10 text-blue-600 border-blue-500/20" },
-  fulfilled:           { label: "Delivered ✓",     colors: "bg-green-500/10 text-green-600 border-green-500/20" },
-  fulfillment_failed:  { label: "Not Fulfilled",   colors: "bg-red-500/10 text-red-600 border-red-500/20" },
+const networkColors: Record<string, { bg: string; text: string }> = {
+  MTN:        { bg: "bg-amber-400",  text: "text-black" },
+  Telecel:    { bg: "bg-red-600",    text: "text-white" },
+  AirtelTigo: { bg: "bg-blue-600",   text: "text-white" },
 };
 
-const getStatusConfig = (status: string) =>
-  STATUS_CONFIG[status] ?? { label: status.replace(/_/g, " "), colors: "bg-secondary text-foreground border-border" };
+interface DisplayStatus {
+  label: string;
+  shortLabel: string;
+  icon: typeof CheckCircle2;
+  dot: string;
+  badge: string;
+  text: string;
+  spinning?: boolean;
+}
+
+function getDisplayStatus(status: string): DisplayStatus {
+  switch (status) {
+    case "fulfilled":
+      return {
+        label: "Delivered Successfully",
+        shortLabel: "Delivered ✓",
+        icon: CheckCircle2,
+        dot: "bg-green-500",
+        badge: "bg-green-500/12 border-green-500/25 text-green-600 dark:text-green-400",
+        text: "text-green-600 dark:text-green-400",
+      };
+    case "fulfillment_failed":
+      return {
+        label: "Delivery Failed",
+        shortLabel: "Not Fulfilled",
+        icon: XCircle,
+        dot: "bg-red-500",
+        badge: "bg-red-500/10 border-red-500/25 text-red-600 dark:text-red-400",
+        text: "text-red-600 dark:text-red-400",
+      };
+    case "paid":
+    case "processing":
+      return {
+        label: "Delivering Data",
+        shortLabel: "Processing",
+        icon: Loader2,
+        dot: "bg-blue-500",
+        badge: "bg-blue-500/10 border-blue-500/25 text-blue-600 dark:text-blue-400",
+        text: "text-blue-600 dark:text-blue-400",
+        spinning: true,
+      };
+    default:
+      return {
+        label: "Awaiting Payment",
+        shortLabel: "Pending",
+        icon: Clock,
+        dot: "bg-amber-400",
+        badge: "bg-amber-400/10 border-amber-400/25 text-amber-600 dark:text-amber-400",
+        text: "text-amber-600 dark:text-amber-400",
+      };
+  }
+}
+
+function fmt(dateStr: string) {
+  const d = new Date(dateStr);
+  return {
+    date: d.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }),
+    time: d.toLocaleTimeString("en-GH", { hour: "2-digit", minute: "2-digit", hour12: true }),
+  };
+}
 
 const DashboardOrders = () => {
   const { user, profile } = useAuth();
@@ -70,29 +125,51 @@ const DashboardOrders = () => {
     fetchOrders();
   }, [fetchOrders]);
 
-  const totals = orders.reduce(
-    (acc, o) => ({
-      amount: acc.amount + Number(o.amount),
-      profit: acc.profit + Number(o.profit),
-    }),
-    { amount: 0, profit: 0 }
+  // Live realtime updates for all current orders
+  useEffect(() => {
+    if (!user) return;
+    const ch = supabase
+      .channel("dashboard-orders-live")
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "orders" },
+        (payload: any) => {
+          const updated = payload.new;
+          if (!updated?.id) return;
+          setOrders((prev) =>
+            prev.map((o) => (o.id === updated.id ? { ...o, ...updated } : o))
+          );
+        }
+      )
+      .subscribe();
+    return () => { supabase.removeChannel(ch); };
+  }, [user]);
+
+  const stats = orders.reduce(
+    (acc, o) => {
+      if (o.status === "fulfilled") acc.delivered += 1;
+      else if (o.status === "fulfillment_failed") acc.failed += 1;
+      else if (o.status === "paid" || o.status === "processing") acc.processing += 1;
+      const isData = o.order_type === "data";
+      acc.totalSales += Number(o.amount);
+      acc.totalProfit += Number(o.profit);
+      if (isData) acc.dataOrders += 1;
+      return acc;
+    },
+    { delivered: 0, failed: 0, processing: 0, totalSales: 0, totalProfit: 0, dataOrders: 0 }
   );
 
   return (
-    <div className="p-6 md:p-8 max-w-5xl">
-      <div className="mb-6">
-        <PhoneOrderTracker
-          title="Order Status Tracker"
-          subtitle="Track delivery status by customer phone number before reviewing your transaction list."
-        />
-      </div>
-
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6 gap-4">
+    <div className="p-6 md:p-8 max-w-5xl space-y-6">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="font-display text-3xl font-bold flex items-center gap-2">
             <ClipboardList className="w-7 h-7 text-primary" /> Transactions
           </h1>
-          <p className="text-muted-foreground text-sm">View all wallet topups and data purchase transactions.</p>
+          <p className="text-muted-foreground text-sm mt-0.5">
+            Live delivery status for all your orders &mdash; updates instantly.
+          </p>
         </div>
         <div className="flex items-center gap-2">
           <Select value={filter} onValueChange={setFilter}>
@@ -102,9 +179,8 @@ const DashboardOrders = () => {
             <SelectContent>
               <SelectItem value="all">All Orders</SelectItem>
               <SelectItem value="data">Data Only</SelectItem>
-              <SelectItem value="paid">Paid</SelectItem>
               <SelectItem value="processing">Processing</SelectItem>
-              <SelectItem value="fulfilled">Fulfilled</SelectItem>
+              <SelectItem value="fulfilled">Delivered</SelectItem>
               <SelectItem value="fulfillment_failed">Failed</SelectItem>
             </SelectContent>
           </Select>
@@ -114,97 +190,118 @@ const DashboardOrders = () => {
         </div>
       </div>
 
-      {/* Summary */}
-      <div className="grid grid-cols-3 gap-4 mb-6">
-        <div className="bg-card border border-border rounded-xl p-4 text-center">
-          {loading ? <Skeleton className="h-8 w-12 mx-auto mb-1" /> : <p className="text-2xl font-bold font-display">{orders.length}</p>}
-          <p className="text-xs text-muted-foreground">Transactions</p>
+      {/* Summary stats */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <div className="rounded-xl bg-green-500/8 border border-green-500/20 px-4 py-3 text-center">
+          {loading ? <Skeleton className="h-7 w-10 mx-auto mb-1" /> : (
+            <p className="font-black text-2xl text-green-600 dark:text-green-400">{stats.delivered}</p>
+          )}
+          <p className="text-[11px] text-muted-foreground uppercase tracking-wide">Delivered</p>
         </div>
-        <div className="bg-card border border-border rounded-xl p-4 text-center">
-          {loading ? <Skeleton className="h-8 w-28 mx-auto mb-1" /> : <p className="text-2xl font-bold font-display text-primary">GH₵ {totals.amount.toFixed(2)}</p>}
-          <p className="text-xs text-muted-foreground">Total Sales</p>
+        <div className="rounded-xl bg-blue-500/8 border border-blue-500/20 px-4 py-3 text-center">
+          {loading ? <Skeleton className="h-7 w-10 mx-auto mb-1" /> : (
+            <p className="font-black text-2xl text-blue-600 dark:text-blue-400">{stats.processing}</p>
+          )}
+          <p className="text-[11px] text-muted-foreground uppercase tracking-wide">Processing</p>
         </div>
-        <div className="bg-card border border-border rounded-xl p-4 text-center">
-          {loading ? <Skeleton className="h-8 w-28 mx-auto mb-1" /> : <p className="text-2xl font-bold font-display text-primary">GH₵ {totals.profit.toFixed(2)}</p>}
-          <p className="text-xs text-muted-foreground">Total Profit</p>
+        <div className="rounded-xl bg-card border border-border px-4 py-3 text-center">
+          {loading ? <Skeleton className="h-7 w-24 mx-auto mb-1" /> : (
+            <p className="font-black text-xl text-primary">GH₵ {stats.totalSales.toFixed(2)}</p>
+          )}
+          <p className="text-[11px] text-muted-foreground uppercase tracking-wide">Total Sales</p>
+        </div>
+        <div className="rounded-xl bg-card border border-border px-4 py-3 text-center">
+          {loading ? <Skeleton className="h-7 w-24 mx-auto mb-1" /> : (
+            <p className="font-black text-xl text-primary">GH₵ {stats.totalProfit.toFixed(2)}</p>
+          )}
+          <p className="text-[11px] text-muted-foreground uppercase tracking-wide">Total Profit</p>
         </div>
       </div>
 
-      {/* Orders table */}
-      <div className="bg-card border border-border rounded-xl overflow-hidden">
+      {/* Order cards */}
+      <div className="rounded-2xl border border-border bg-card overflow-hidden">
+        <div className="px-5 py-4 border-b border-border flex items-center justify-between">
+          <p className="font-semibold text-sm">
+            {loading ? "Loading…" : `${orders.length} order${orders.length !== 1 ? "s" : ""}`}
+          </p>
+          <span className="flex items-center gap-1.5 text-xs text-green-600 dark:text-green-400 font-medium">
+            <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
+            Live updates
+          </span>
+        </div>
+
         {loading ? (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-border bg-secondary/50 text-muted-foreground">
-                  <th className="text-left py-3 px-4 font-medium">Date</th>
-                  <th className="text-left py-3 px-4 font-medium">Type</th>
-                  <th className="text-left py-3 px-4 font-medium">Customer</th>
-                  <th className="text-left py-3 px-4 font-medium">Details</th>
-                  <th className="text-right py-3 px-4 font-medium">Amount</th>
-                  <th className="text-right py-3 px-4 font-medium">Profit</th>
-                  <th className="text-center py-3 px-4 font-medium">Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {Array.from({ length: 6 }).map((_, i) => (
-                  <tr key={i} className="border-b border-border/50">
-                    <td className="py-3 px-4"><Skeleton className="h-4 w-20" /></td>
-                    <td className="py-3 px-4"><Skeleton className="h-5 w-14 rounded-full" /></td>
-                    <td className="py-3 px-4"><Skeleton className="h-4 w-24" /></td>
-                    <td className="py-3 px-4"><Skeleton className="h-4 w-32" /></td>
-                    <td className="py-3 px-4 text-right"><Skeleton className="h-4 w-20 ml-auto" /></td>
-                    <td className="py-3 px-4 text-right"><Skeleton className="h-4 w-16 ml-auto" /></td>
-                    <td className="py-3 px-4 text-center"><Skeleton className="h-5 w-20 rounded-full mx-auto" /></td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <div className="p-5 space-y-2.5">
+            {Array.from({ length: 5 }).map((_, i) => (
+              <div key={i} className="h-[72px] rounded-xl bg-secondary/50 animate-pulse" />
+            ))}
           </div>
         ) : orders.length === 0 ? (
-          <p className="text-sm text-muted-foreground text-center py-12">No orders found.</p>
+          <div className="py-16 text-center">
+            <ClipboardList className="w-10 h-10 mx-auto text-muted-foreground/30 mb-3" />
+            <p className="text-sm text-muted-foreground">No orders found.</p>
+          </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-border bg-secondary/50 text-muted-foreground">
-                  <th className="text-left py-3 px-4 font-medium">Date</th>
-                  <th className="text-left py-3 px-4 font-medium">Type</th>
-                  <th className="text-left py-3 px-4 font-medium">Customer</th>
-                  <th className="text-left py-3 px-4 font-medium">Details</th>
-                  <th className="text-right py-3 px-4 font-medium">Amount</th>
-                  <th className="text-right py-3 px-4 font-medium">Profit</th>
-                  <th className="text-center py-3 px-4 font-medium">Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {orders.map((o) => (
-                  <tr key={o.id} className="border-b border-border/50 hover:bg-secondary/30 transition-colors">
-                    <td className="py-3 px-4 text-muted-foreground whitespace-nowrap">
-                      {new Date(o.created_at).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "2-digit" })}
-                    </td>
-                    <td className="py-3 px-4">
-                      <Badge variant="outline" className="text-xs">
-                          {o.order_type === "wallet_topup" ? "Topup" : "Data"}
-                      </Badge>
-                    </td>
-                      <td className="py-3 px-4">{o.customer_phone || "Wallet"}</td>
-                    <td className="py-3 px-4 text-muted-foreground">
-                        {o.order_type === "data" ? `${o.network} — ${o.package_size}` : "Wallet topup"}
-                    </td>
-                    <td className="py-3 px-4 text-right font-medium">GH₵ {Number(o.amount).toFixed(2)}</td>
-                    <td className="py-3 px-4 text-right font-medium text-primary">+GH₵ {Number(o.profit).toFixed(2)}</td>
-                    <td className="py-3 px-4 text-center">
-                      {(() => { const cfg = getStatusConfig(o.status); return (
-                        <span className={`inline-block px-2.5 py-0.5 rounded-full text-xs font-semibold border ${cfg.colors}`}>
-                          {cfg.label}
+          <div className="p-5 space-y-2.5">
+            {orders.map((order) => {
+              const ds = getDisplayStatus(order.status);
+              const nc = networkColors[order.network || ""] || { bg: "bg-secondary", text: "text-foreground" };
+              const { date, time } = fmt(order.created_at);
+              const isWalletTopup = order.order_type === "wallet_topup";
+
+              return (
+                <div
+                  key={order.id}
+                  className="flex items-center gap-3 rounded-xl border border-border bg-secondary/30 p-3 hover:bg-secondary/60 transition-colors"
+                >
+                  {/* Network badge / Wallet icon */}
+                  {isWalletTopup ? (
+                    <div className="bg-primary/15 rounded-lg px-2.5 py-1.5 text-center shrink-0 w-[52px]">
+                      <Wallet className="w-5 h-5 text-primary mx-auto" />
+                      <p className="text-[10px] text-primary font-bold mt-0.5 leading-none">Topup</p>
+                    </div>
+                  ) : (
+                    <div className={`${nc.bg} ${nc.text} rounded-lg px-2.5 py-1.5 text-center shrink-0`}>
+                      <p className="font-black text-[10px] leading-none">{order.network || "—"}</p>
+                      <p className="font-black text-base leading-tight mt-0.5">{order.package_size || "—"}</p>
+                    </div>
+                  )}
+
+                  {/* Info */}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span className="font-bold text-sm">
+                        {isWalletTopup ? "Wallet Topup" : `${order.network} ${order.package_size}`}
+                      </span>
+                      {!isWalletTopup && (
+                        <span className={`inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full border ${ds.badge}`}>
+                          <ds.icon className={`w-3 h-3 shrink-0 ${ds.spinning ? "animate-spin" : ""}`} />
+                          {ds.shortLabel}
                         </span>
-                      ); })()}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                      )}
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      {order.customer_phone || "—"} &nbsp;·&nbsp; {date} &nbsp;·&nbsp; {time}
+                    </p>
+                  </div>
+
+                  {/* Amount + profit */}
+                  <div className="text-right shrink-0">
+                    <p className="font-bold text-sm">GH₵ {Number(order.amount).toFixed(2)}</p>
+                    {Number(order.profit) > 0 && (
+                      <div className="flex items-center justify-end gap-1 mt-0.5">
+                        <span className={`w-1.5 h-1.5 rounded-full ${ds.dot} ${ds.spinning ? "animate-pulse" : ""}`} />
+                        <span className="text-[11px] text-primary font-semibold">+GH₵ {Number(order.profit).toFixed(2)}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+
+            <p className="text-[10px] text-muted-foreground text-center pt-1">
+              Showing {orders.length} order{orders.length !== 1 ? "s" : ""} &middot; Updates live
+            </p>
           </div>
         )}
       </div>

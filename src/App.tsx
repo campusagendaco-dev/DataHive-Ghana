@@ -126,6 +126,12 @@ const AppContent = () => {
   });
   const [darkModeEnabled, setDarkModeEnabled] = useState(false);
   const [maintenanceLoading, setMaintenanceLoading] = useState(true);
+  // Minimum splash time — guarantees the loading animation is visible for at least 2 s
+  const [splashReady, setSplashReady] = useState(false);
+  useEffect(() => {
+    const t = setTimeout(() => setSplashReady(true), 2000);
+    return () => clearTimeout(t);
+  }, []);
 
   useEffect(() => {
     let mounted = true;
@@ -209,8 +215,8 @@ const AppContent = () => {
     location.pathname === "/reset-password" ||
     location.pathname === "/auth/callback" ||
     location.pathname === "/auth";
-  if (authLoading || maintenanceLoading) {
-    return <div className="min-h-screen flex items-center justify-center text-muted-foreground">Loading...</div>;
+  if (authLoading || maintenanceLoading || !splashReady) {
+    return <LoadingScreen />;
   }
 
   if (maintenance.is_enabled && !user && !isAdminUser && !isMaintenanceBypassRoute) {
