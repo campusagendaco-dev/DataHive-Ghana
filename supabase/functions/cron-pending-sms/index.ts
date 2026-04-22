@@ -1,0 +1,147 @@
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+};
+
+function normalizePhone(raw: string | null | undefined): string | null {
+  if (!raw) return null;
+  const clean = raw.trim().replace(/[^\d+]/g, "");
+  if (!clean) return null;
+
+  if (clean.startsWith("+")) {
+    const onlyDigits = `+${clean.slice(1).replace(/\D/g, "")}`;
+    return onlyDigits.length >= 11 ? onlyDigits : null;
+  }
+  const digits = clean.replace(/\D/g, "");
+  if (!digits) return null;
+
+  if (digits.startsWith("233") && digits.length >= 12) return `+${digits}`;
+  if (digits.startsWith("0") && digits.length >= 10) return `+233${digits.slice(1)}`;
+  if (digits.startsWith("00") && digits.length > 2) return `+${digits.slice(2)}`;
+  return digits.length >= 10 ? `+${digits}` : null;
+}
+
+async function sendSmsViaTxtConnect(apiKey: string, from: string, to: string, body: string) {
+  const endpoint = "https://api.txtconnect.net/v1/send";
+  const response = await fetch(endpoint, {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      API_key: apiKey,
+      TO: to,
+      FROM: from,
+      SMS: body,
+      RESPONSE: "json",
+    }),
+  });
+
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(`TxtConnect send failed (${response.status}): ${text}`);
+  }
+}
+
+serve(async (req) => {
+  if (req.method === "OPTIONS") {
+    return new Response(null, { headers: corsHeaders });
+  }
+
+  const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
+  const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+
+  if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
+    return new Response(JSON.stringify({ error: "Server misconfigured" }), {
+      status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+
+  const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+
+  try {
+    // 1. Check if auto SMS is enabled
+    const { data: settings, error: settingsError } = await supabaseAdmin
+      .from("system_settings")
+      .select("auto_pending_sms_enabled, auto_pending_sms_message, txtconnect_api_key, txtconnect_sender_id")
+      .eq("id", 1)
+      .maybeSingle();
+
+    if (settingsError || !settings || !settings.auto_pending_sms_enabled) {
+      return new Response(JSON.stringify({ message: "Auto SMS is disabled or not configured." }), {
+        status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const txtApiKey = settings.txtconnect_api_key || Deno.env.get("TXTCONNECT_API_KEY");
+    const txtSenderId = settings.txtconnect_sender_id || Deno.env.get("TXTCONNECT_SENDER_ID") || "SwiftDataGh";
+    const smsMessage = settings.auto_pending_sms_message || "Your SwiftData transaction is pending. Please try again or contact support.";
+
+    if (!txtApiKey) {
+      return new Response(JSON.stringify({ error: "TxtConnect API Key missing." }), {
+        status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // 2. Find pending orders from today where sms_reminder_sent is false
+    const startOfDay = new Date();
+    startOfDay.setHours(0, 0, 0, 0);
+
+    const { data: pendingOrders, error: ordersError } = await supabaseAdmin
+      .from("orders")
+      .select(`
+        id,
+        customer_phone,
+        profiles ( phone )
+      `)
+      .eq("status", "pending")
+      .eq("sms_reminder_sent", false)
+      .gte("created_at", startOfDay.toISOString());
+
+    if (ordersError || !pendingOrders || pendingOrders.length === 0) {
+      return new Response(JSON.stringify({ message: "No pending orders need reminders." }), {
+        status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    let sentCount = 0;
+    const orderIdsToUpdate: string[] = [];
+
+    // 3. Send SMS to each order
+    for (const order of pendingOrders) {
+      const cPhone = normalizePhone(order.customer_phone);
+      const aPhone = order.profiles ? normalizePhone((order.profiles as any).phone) : null;
+      const targetPhone = cPhone || aPhone;
+
+      if (targetPhone) {
+        try {
+          await sendSmsViaTxtConnect(txtApiKey, txtSenderId, targetPhone, smsMessage);
+          sentCount++;
+        } catch (error) {
+          console.error(`Failed to send reminder to ${targetPhone} for order ${order.id}:`, error);
+        }
+      }
+      // Always mark as sent so we don't keep retrying invalid numbers every 30 mins
+      orderIdsToUpdate.push(order.id);
+    }
+
+    // 4. Mark orders as reminded
+    if (orderIdsToUpdate.length > 0) {
+      await supabaseAdmin
+        .from("orders")
+        .update({ sms_reminder_sent: true })
+        .in("id", orderIdsToUpdate);
+    }
+
+    return new Response(JSON.stringify({ success: true, reminders_sent: sentCount, orders_processed: orderIdsToUpdate.length }), {
+      status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  } catch (error) {
+    console.error("Cron SMS error:", error);
+    return new Response(
+      JSON.stringify({ error: error instanceof Error ? error.message : "Internal error" }),
+      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
+  }
+});

@@ -28,6 +28,8 @@ interface SystemSettings {
   mtn_markup_percentage: string;
   telecel_markup_percentage: string;
   at_markup_percentage: string;
+  auto_pending_sms_enabled: boolean;
+  auto_pending_sms_message: string;
 }
 
 const AdminSettings = () => {
@@ -53,6 +55,8 @@ const AdminSettings = () => {
     mtn_markup_percentage: "0",
     telecel_markup_percentage: "0",
     at_markup_percentage: "0",
+    auto_pending_sms_enabled: false,
+    auto_pending_sms_message: "Your SwiftData transaction is pending. Please try again or contact support.",
   });
 
   useEffect(() => {
@@ -85,6 +89,8 @@ const AdminSettings = () => {
           mtn_markup_percentage: String(data.mtn_markup_percentage || "0"),
           telecel_markup_percentage: String(data.telecel_markup_percentage || "0"),
           at_markup_percentage: String(data.at_markup_percentage || "0"),
+          auto_pending_sms_enabled: data.auto_pending_sms_enabled || false,
+          auto_pending_sms_message: data.auto_pending_sms_message || "Your SwiftData transaction is pending. Please try again or contact support.",
         });
       }
       setLoading(false);
@@ -122,6 +128,8 @@ const AdminSettings = () => {
         mtn_markup_percentage: parseFloat(settings.mtn_markup_percentage) || 0,
         telecel_markup_percentage: parseFloat(settings.telecel_markup_percentage) || 0,
         at_markup_percentage: parseFloat(settings.at_markup_percentage) || 0,
+        auto_pending_sms_enabled: settings.auto_pending_sms_enabled,
+        auto_pending_sms_message: settings.auto_pending_sms_message,
       });
       dbError = error;
     } else {
@@ -146,6 +154,8 @@ const AdminSettings = () => {
           mtn_markup_percentage: parseFloat(settings.mtn_markup_percentage) || 0,
           telecel_markup_percentage: parseFloat(settings.telecel_markup_percentage) || 0,
           at_markup_percentage: parseFloat(settings.at_markup_percentage) || 0,
+          auto_pending_sms_enabled: settings.auto_pending_sms_enabled,
+          auto_pending_sms_message: settings.auto_pending_sms_message,
         })
         .eq("id", 1);
       dbError = error;
@@ -371,12 +381,37 @@ const AdminSettings = () => {
               </div>
 
               {settings.txtconnect_api_key && settings.txtconnect_sender_id && (
-                <Alert className="bg-green-50 text-green-900 border-green-200 mt-4 dark:bg-green-500/10 dark:text-green-400 dark:border-green-500/20">
-                  <AlertCircle className="h-4 w-4 text-green-600 dark:text-green-400" />
-                  <AlertDescription className="text-xs font-medium">
-                    TxtConnect credentials configured — SMS sending is enabled.
-                  </AlertDescription>
-                </Alert>
+                <>
+                  <Alert className="bg-green-50 text-green-900 border-green-200 mt-4 dark:bg-green-500/10 dark:text-green-400 dark:border-green-500/20">
+                    <AlertCircle className="h-4 w-4 text-green-600 dark:text-green-400" />
+                    <AlertDescription className="text-xs font-medium">
+                      TxtConnect credentials configured — SMS sending is enabled.
+                    </AlertDescription>
+                  </Alert>
+
+                  <div className="pt-4 border-t border-border mt-4 space-y-4">
+                    <div className="flex items-center justify-between">
+                      <div className="space-y-0.5">
+                        <Label>Auto-SMS for Pending Orders</Label>
+                        <p className="text-xs text-muted-foreground">Automatically send SMS every 30 mins to new pending orders.</p>
+                      </div>
+                      <Switch
+                        checked={settings.auto_pending_sms_enabled}
+                        onCheckedChange={(c) => setSettings({ ...settings, auto_pending_sms_enabled: c })}
+                      />
+                    </div>
+                    {settings.auto_pending_sms_enabled && (
+                      <div className="space-y-2">
+                        <Label>Auto-SMS Message</Label>
+                        <Input
+                          value={settings.auto_pending_sms_message}
+                          onChange={(e) => setSettings({ ...settings, auto_pending_sms_message: e.target.value })}
+                          placeholder="Your transaction is pending..."
+                        />
+                      </div>
+                    )}
+                  </div>
+                </>
               )}
             </CardContent>
           </Card>
