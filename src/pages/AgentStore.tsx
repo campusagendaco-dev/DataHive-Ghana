@@ -1,5 +1,5 @@
-import { useState, useEffect, useRef, useCallback, Fragment } from "react";
-import { useParams } from "react-router-dom";
+import { useState, useEffect, useRef, useCallback } from "react";
+import { useParams, Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { basePackages } from "@/lib/data";
 import { getNetworkCardColors } from "@/lib/utils";
@@ -9,30 +9,22 @@ import { getAppBaseUrl } from "@/lib/app-base-url";
 import { fetchApiPricingContext, applyPriceMultiplier } from "@/lib/api-source-pricing";
 import { invokePublicFunction } from "@/lib/public-function-client";
 import PhoneOrderTracker from "@/components/PhoneOrderTracker";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
-  Zap, ChevronDown, ChevronUp, Loader2, Users, TrendingUp,
-  ChevronRight, ShieldCheck, Phone,
+  Zap, Loader2, Users, TrendingUp, ChevronRight,
+  ShieldCheck, Phone, X, CreditCard, Star,
 } from "lucide-react";
 
 type NetworkName = "MTN" | "Telecel" | "AirtelTigo";
 const NETWORKS: NetworkName[] = ["MTN", "Telecel", "AirtelTigo"];
+const PAYSTACK_FEE_RATE = 0.03;
+const calcFee = (amount: number) => Math.min(amount * PAYSTACK_FEE_RATE, 100);
 
-const networkTabStyles: Record<NetworkName, { active: string; idle: string }> = {
-  MTN: { active: "bg-amber-400 text-black border-amber-400", idle: "border-border hover:border-amber-400/50" },
-  Telecel: { active: "bg-red-600 text-white border-red-600", idle: "border-border hover:border-red-400/50" },
-  AirtelTigo: { active: "bg-blue-600 text-white border-blue-600", idle: "border-border hover:border-blue-400/50" },
+const networkTabStyles: Record<NetworkName, { active: string; idle: string; accent: string }> = {
+  MTN:        { active: "bg-amber-400 text-black border-amber-400", idle: "border-white/15 text-white/60 hover:border-amber-400/50 hover:text-white", accent: "#f59e0b" },
+  Telecel:    { active: "bg-red-600 text-white border-red-600",     idle: "border-white/15 text-white/60 hover:border-red-400/50 hover:text-white",   accent: "#dc2626" },
+  AirtelTigo: { active: "bg-blue-600 text-white border-blue-600",   idle: "border-white/15 text-white/60 hover:border-blue-400/50 hover:text-white",  accent: "#2563eb" },
 };
-
-function useColsPerRow(): number {
-  const [cols, setCols] = useState(3);
-  useEffect(() => {
-    const update = () => setCols(window.innerWidth < 640 ? 2 : 3);
-    update();
-    window.addEventListener("resize", update, { passive: true });
-    return () => window.removeEventListener("resize", update);
-  }, []);
-  return cols;
-}
 
 interface AgentProfile {
   user_id: string;
@@ -71,15 +63,11 @@ const AgentStore = () => {
   const [buying, setBuying] = useState(false);
 
   const [globalSettings, setGlobalSettings] = useState<Record<string, GlobalPkgSetting>>({});
-  // Parent's sub_agent_prices — used as cost base for sub-agents
   const [parentAssignedPrices, setParentAssignedPrices] = useState<Record<string, Record<string, string | number>>>({});
   const [subAgentBaseFee, setSubAgentBaseFee] = useState<number | null>(null);
   const [priceMultiplier, setPriceMultiplier] = useState(1);
 
-  const colsPerRow = useColsPerRow();
-  const stripRef = useRef<HTMLDivElement>(null);
   const phoneInputRef = useRef<HTMLInputElement>(null);
-
   const phoneDigits = phone.replace(/\D+/g, "");
   const isPhoneValid = phoneDigits.length === 10 || phoneDigits.length === 12 || phoneDigits.length === 9;
 
@@ -94,9 +82,7 @@ const AgentStore = () => {
           .eq("onboarding_complete", true)
           .eq("agent_approved", true)
           .maybeSingle(),
-        supabase
-          .from("global_package_settings")
-          .select("network, package_size, agent_price, public_price, is_unavailable"),
+        supabase.from("global_package_settings").select("network, package_size, agent_price, public_price, is_unavailable"),
         fetchApiPricingContext(),
       ]);
 
@@ -105,57 +91,36 @@ const AgentStore = () => {
       setGlobalSettings(gsMap);
       setPriceMultiplier(pricingCtx.multiplier);
 
-      if (!agentRes.data) {
-        setNotFound(true);
-        setLoading(false);
-        return;
-      }
+      if (!agentRes.data) { setNotFound(true); setLoading(false); return; }
 
-      const profile = agentRes.data as AgentProfile;
+      const profile = agentRes.data as unknown as AgentProfile;
       setAgent(profile);
 
-      // If sub-agent, fetch parent's assigned prices for this sub-agent
       if (profile.is_sub_agent && profile.parent_agent_id) {
         const { data: parentProfile } = await supabase
-          .from("profiles")
-          .select("sub_agent_prices")
-          .eq("user_id", profile.parent_agent_id)
-          .maybeSingle();
-        if (parentProfile?.sub_agent_prices) {
-          setParentAssignedPrices(parentProfile.sub_agent_prices as Record<string, Record<string, string | number>>);
+          .from("profiles").select("sub_agent_prices").eq("user_id", profile.parent_agent_id).maybeSingle();
+        const pp = parentProfile as unknown as { sub_agent_prices?: Record<string, Record<string, string | number>> } | null;
+        if (pp?.sub_agent_prices) {
+          setParentAssignedPrices(pp.sub_agent_prices);
         }
       }
 
       const fee = Number(profile.sub_agent_activation_markup ?? 0);
       if (Number.isFinite(fee) && fee > 0) setSubAgentBaseFee(fee);
-
       setLoading(false);
     };
     fetchStore();
   }, [slug]);
 
-  /* Resolve the price to show customers for a given package */
   const resolveDisplayPrice = useCallback((network: string, size: string, fallbackPrice: number): number => {
     if (!agent) return fallbackPrice;
-
     const agentOwn = Number(agent.agent_prices?.[network]?.[size]);
-    if (Number.isFinite(agentOwn) && agentOwn > 0) {
-      return applyPriceMultiplier(agentOwn, priceMultiplier);
-    }
-
-    // Sub-agent with no custom price → show parent's assigned price
+    if (Number.isFinite(agentOwn) && agentOwn > 0) return applyPriceMultiplier(agentOwn, priceMultiplier);
     const parentAssigned = Number(parentAssignedPrices?.[network]?.[size]);
-    if (Number.isFinite(parentAssigned) && parentAssigned > 0) {
-      return applyPriceMultiplier(parentAssigned, priceMultiplier);
-    }
-
-    // Fallback to admin's agent_price or public_price
+    if (Number.isFinite(parentAssigned) && parentAssigned > 0) return applyPriceMultiplier(parentAssigned, priceMultiplier);
     const gs = globalSettings[`${network}-${size}`];
     const gsBase = Number(gs?.agent_price) > 0 ? Number(gs!.agent_price) : Number(gs?.public_price);
-    if (Number.isFinite(gsBase) && gsBase > 0) {
-      return applyPriceMultiplier(gsBase, priceMultiplier);
-    }
-
+    if (Number.isFinite(gsBase) && gsBase > 0) return applyPriceMultiplier(gsBase, priceMultiplier);
     return applyPriceMultiplier(fallbackPrice, priceMultiplier);
   }, [agent, globalSettings, parentAssignedPrices, priceMultiplier]);
 
@@ -163,30 +128,17 @@ const AgentStore = () => {
     .map((pkg) => {
       const gs = globalSettings[`${selectedNetwork}-${pkg.size}`];
       if (gs?.is_unavailable) return null;
-      const disabled = agent?.disabled_packages?.[selectedNetwork]?.includes(pkg.size) || false;
-      if (disabled) return null;
-      return {
-        ...pkg,
-        price: resolveDisplayPrice(selectedNetwork, pkg.size, pkg.price),
-      };
+      if (agent?.disabled_packages?.[selectedNetwork]?.includes(pkg.size)) return null;
+      return { ...pkg, price: resolveDisplayPrice(selectedNetwork, pkg.size, pkg.price) };
     })
     .filter(Boolean) as { size: string; price: number; validity: string; popular?: boolean }[];
 
-  const rows: typeof packages[] = [];
-  for (let i = 0; i < packages.length; i += colsPerRow) {
-    rows.push(packages.slice(i, i + colsPerRow));
-  }
-
-  const selectedIdx = selectedPkg ? packages.findIndex((p) => p.size === selectedPkg.size) : -1;
-  const selectedRow = selectedIdx >= 0 ? Math.floor(selectedIdx / colsPerRow) : -1;
-
-  const PAYSTACK_FEE_RATE = 0.03;
-  const fee = selectedPkg ? Math.min(selectedPkg.price * PAYSTACK_FEE_RATE, 100) : 0;
+  const fee = selectedPkg ? calcFee(selectedPkg.price) : 0;
   const total = selectedPkg ? parseFloat((selectedPkg.price + fee).toFixed(2)) : 0;
 
   const handleCardClick = useCallback((size: string, price: number) => {
     setSelectedPkg((prev) => (prev?.size === size ? null : { size, price }));
-    setTimeout(() => stripRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" }), 80);
+    setTimeout(() => phoneInputRef.current?.focus(), 140);
   }, []);
 
   const handlePay = async () => {
@@ -197,13 +149,9 @@ const AgentStore = () => {
       return;
     }
     setBuying(true);
-
     const orderId = crypto.randomUUID();
     const callbackParams = new URLSearchParams({
-      reference: orderId,
-      network: selectedNetwork,
-      package: selectedPkg.size,
-      phone: phoneDigits,
+      reference: orderId, network: selectedNetwork, package: selectedPkg.size, phone: phoneDigits,
     });
 
     const { data: paymentData, error: paymentError } = await invokePublicFunction("initialize-payment", {
@@ -221,7 +169,6 @@ const AgentStore = () => {
           fee,
           agent_id: agent.user_id,
           payment_source: "agent_store",
-          wallet_settlement_mode: "automatic",
         },
       },
     });
@@ -235,12 +182,25 @@ const AgentStore = () => {
     window.location.href = paymentData.authorization_url;
   };
 
+  /* ── Loading skeleton ── */
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="flex items-center gap-2 text-muted-foreground">
-          <Zap className="w-5 h-5 text-primary animate-pulse" />
-          Loading store...
+      <div className="min-h-screen flex flex-col" style={{ background: "#0d0d18" }}>
+        <div className="h-16 border-b border-white/10 flex items-center px-4">
+          <Skeleton className="h-9 w-9 rounded-full mr-2.5 bg-white/10" />
+          <Skeleton className="h-4 w-32 bg-white/10" />
+        </div>
+        <div className="py-10 px-4 text-center">
+          <Skeleton className="h-7 w-48 mx-auto mb-2 bg-white/10" />
+          <Skeleton className="h-4 w-64 mx-auto bg-white/10" />
+        </div>
+        <div className="px-4 max-w-3xl mx-auto w-full">
+          <div className="flex gap-2 mb-6">
+            {[1,2,3].map(i => <Skeleton key={i} className="flex-1 h-12 rounded-xl bg-white/10" />)}
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+            {Array.from({length:6}).map((_,i) => <Skeleton key={i} className="h-36 rounded-2xl bg-white/10" />)}
+          </div>
         </div>
       </div>
     );
@@ -248,48 +208,53 @@ const AgentStore = () => {
 
   if (notFound || !agent) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <h1 className="font-display text-3xl font-black mb-2">Store Not Found</h1>
-          <p className="text-muted-foreground">This store doesn't exist or isn't active.</p>
+      <div className="min-h-screen flex items-center justify-center" style={{ background: "#0d0d18" }}>
+        <div className="text-center text-white">
+          <div className="w-16 h-16 rounded-2xl bg-white/5 flex items-center justify-center mx-auto mb-4">
+            <Zap className="w-8 h-8 text-white/20" />
+          </div>
+          <h1 className="font-display text-2xl font-black mb-2">Store Not Found</h1>
+          <p className="text-white/40 text-sm mb-5">This store doesn't exist or isn't active yet.</p>
+          <Link to="/buy-data" className="inline-flex items-center gap-2 bg-amber-400 text-black font-bold px-5 py-2.5 rounded-xl text-sm">
+            Buy data directly <ChevronRight className="w-4 h-4" />
+          </Link>
         </div>
       </div>
     );
   }
 
   const colors = getNetworkCardColors(selectedNetwork);
+  const networkAccent = networkTabStyles[selectedNetwork].accent;
 
   return (
-    <div className="min-h-screen flex flex-col bg-background">
+    <div className="min-h-screen flex flex-col" style={{ background: "#0d0d18" }}>
 
-      {/* ── Header ─────────────────────────────────── */}
-      <header className="sticky top-0 z-50 border-b border-border/50" style={{ background: "#162316" }}>
+      {/* ── Sticky header ── */}
+      <header className="sticky top-0 z-40 border-b border-white/8 backdrop-blur-xl" style={{ background: "rgba(13,13,24,0.92)" }}>
         <div className="container mx-auto max-w-3xl flex items-center justify-between px-4 h-16">
           <div className="flex items-center gap-2.5">
-            <img src="/logo.png" alt="" className="w-9 h-9 shrink-0" />
+            <img src="/logo.png" alt="" className="w-9 h-9 rounded-full shrink-0 ring-1 ring-white/10" />
             <div className="leading-tight">
-              <p className="text-white font-bold text-sm leading-none">{agent.store_name}</p>
-              <p className="text-amber-400 text-[10px] leading-none mt-0.5">Data Reselling Store</p>
+              <p className="text-white font-bold text-sm leading-none truncate max-w-[140px] sm:max-w-none">{agent.store_name}</p>
+              <p className="text-[10px] mt-0.5 font-semibold" style={{ color: networkAccent }}>Data Reselling Store</p>
             </div>
           </div>
           <div className="flex items-center gap-2">
             {agent.whatsapp_number && (
               <a
                 href={`https://wa.me/${agent.whatsapp_number.replace(/\D+/g, "")}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-1.5 bg-[#25D366] hover:bg-[#1da851] text-white text-xs font-semibold px-3 py-1.5 rounded-full transition-colors"
+                target="_blank" rel="noopener noreferrer"
+                className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-full transition-colors text-white"
+                style={{ background: "#25D366" }}
               >
-                <svg viewBox="0 0 32 32" width="14" height="14" fill="white"><path d="M16.004 2.667C8.64 2.667 2.667 8.64 2.667 16c0 2.347.614 4.56 1.693 6.48L2.667 29.333l7.04-1.653A13.28 13.28 0 0016.004 29.333C23.36 29.333 29.333 23.36 29.333 16S23.36 2.667 16.004 2.667zm5.84 18.027c-.32-.16-1.893-.933-2.187-1.04-.293-.107-.507-.16-.72.16-.213.32-.827 1.04-.987 1.253-.16.213-.347.24-.667.08-.32-.16-1.36-.507-2.587-1.6-.96-.853-1.6-1.907-1.787-2.227-.187-.32 0-.48.147-.627.133-.133.32-.347.48-.52.16-.173.213-.32.32-.533.107-.213.053-.4-.027-.56-.08-.16-.72-1.733-.987-2.373-.253-.613-.52-.533-.72-.547h-.613c-.213 0-.56.08-.853.4-.293.32-1.12 1.093-1.12 2.667 0 1.573 1.147 3.093 1.307 3.307.16.213 2.267 3.467 5.493 4.853.773.333 1.373.533 1.84.68.773.24 1.48.213 2.027.133.627-.093 1.893-.773 2.16-1.52.267-.747.267-1.387.187-1.52-.08-.133-.293-.213-.613-.373z"/></svg>
-                <span className="hidden sm:inline">Contact</span>
+                <svg viewBox="0 0 32 32" width="13" height="13" fill="white"><path d="M16.004 2.667C8.64 2.667 2.667 8.64 2.667 16c0 2.347.614 4.56 1.693 6.48L2.667 29.333l7.04-1.653A13.28 13.28 0 0016.004 29.333C23.36 29.333 29.333 23.36 29.333 16S23.36 2.667 16.004 2.667zm5.84 18.027c-.32-.16-1.893-.933-2.187-1.04-.293-.107-.507-.16-.72.16-.213.32-.827 1.04-.987 1.253-.16.213-.347.24-.667.08-.32-.16-1.36-.507-2.587-1.6-.96-.853-1.6-1.907-1.787-2.227-.187-.32 0-.48.147-.627.133-.133.32-.347.48-.52.16-.173.213-.32.32-.533.107-.213.053-.4-.027-.56-.08-.16-.72-1.733-.987-2.373-.253-.613-.52-.533-.72-.547h-.613c-.213 0-.56.08-.853.4-.293.32-1.12 1.093-1.12 2.667 0 1.573 1.147 3.093 1.307 3.307.16.213 2.267 3.467 5.493 4.853.773.333 1.373.533 1.84.68.773.24 1.48.213 2.027.133.627-.093 1.893-.773 2.16-1.52.267-.747.267-1.387.187-1.52-.08-.133-.293-.213-.613-.373z"/></svg>
+                <span className="hidden sm:inline">WhatsApp</span>
               </a>
             )}
             {agent.whatsapp_group_link && (
               <a
-                href={agent.whatsapp_group_link}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-1.5 border border-white/20 text-white/80 hover:text-white hover:border-white/40 text-xs font-medium px-3 py-1.5 rounded-full transition-colors"
+                href={agent.whatsapp_group_link} target="_blank" rel="noopener noreferrer"
+                className="flex items-center gap-1.5 border border-white/15 text-white/70 hover:text-white hover:border-white/35 text-xs font-medium px-3 py-1.5 rounded-full transition-colors"
               >
                 <Users className="w-3.5 h-3.5" />
                 <span className="hidden sm:inline">Group</span>
@@ -299,191 +264,215 @@ const AgentStore = () => {
         </div>
       </header>
 
-      {/* ── Hero ───────────────────────────────────── */}
-      <div style={{ background: "#1a1a2e" }} className="text-white py-8 px-4">
-        <div className="container mx-auto max-w-3xl text-center">
-          <div className="inline-flex items-center gap-2 bg-amber-400/10 border border-amber-400/30 rounded-full px-4 py-1.5 mb-3">
-            <Zap className="w-3.5 h-3.5 text-amber-400" />
-            <span className="text-amber-400 text-xs font-semibold">Instant Data Delivery</span>
+      {/* ── Hero ── */}
+      <div className="relative overflow-hidden py-10 px-4 text-center" style={{ background: "linear-gradient(180deg, #111124 0%, #0d0d18 100%)" }}>
+        {/* Background glow */}
+        <div className="absolute inset-0 pointer-events-none" style={{
+          background: `radial-gradient(ellipse 60% 40% at 50% 0%, ${networkAccent}18 0%, transparent 70%)`,
+        }} />
+        <div className="relative container mx-auto max-w-3xl">
+          <div className="inline-flex items-center gap-2 rounded-full border px-4 py-1.5 mb-4 text-xs font-semibold"
+            style={{ borderColor: `${networkAccent}40`, color: networkAccent, background: `${networkAccent}10` }}>
+            <Zap className="w-3.5 h-3.5" /> Instant Non-Expiry Data
           </div>
-          <h2 className="font-display text-2xl md:text-3xl font-black mb-1">
-            {agent.store_name}
-          </h2>
-          <p className="text-white/55 text-sm">Choose a bundle below and pay securely via Paystack.</p>
-          <div className="flex flex-wrap items-center justify-center gap-x-5 gap-y-1.5 mt-4 text-xs text-white/40">
+          <h1 className="font-display text-2xl sm:text-3xl font-black text-white mb-2">{agent.store_name}</h1>
+          <p className="text-white/45 text-sm max-w-sm mx-auto">
+            Tap a bundle, enter your number, pay securely. Data arrives in seconds.
+          </p>
+          <div className="flex flex-wrap items-center justify-center gap-x-5 gap-y-1.5 mt-5 text-xs text-white/35">
             <span className="flex items-center gap-1.5"><ShieldCheck className="w-3.5 h-3.5 text-green-400" /> Secured by Paystack</span>
-            <span className="flex items-center gap-1.5"><Zap className="w-3.5 h-3.5 text-amber-400" /> Instant delivery</span>
-            <span>📦 Non-expiry bundles</span>
+            <span className="flex items-center gap-1.5"><Star className="w-3.5 h-3.5 text-amber-400" /> No Expiry bundles</span>
+            <span className="flex items-center gap-1.5"><Zap className="w-3.5 h-3.5 text-blue-400" /> Instant delivery</span>
           </div>
         </div>
       </div>
 
-      {/* ── Main ───────────────────────────────────── */}
-      <main className="flex-1 px-4 py-8">
-        <div className="container mx-auto max-w-3xl space-y-8">
+      {/* ── Main content ── */}
+      <main className={`flex-1 px-4 py-6 container mx-auto max-w-3xl space-y-8 ${selectedPkg ? "pb-44" : "pb-10"}`}>
 
-          {/* Network tabs */}
-          <div className="flex gap-2">
-            {NETWORKS.map((n) => (
-              <button
-                key={n}
-                onClick={() => { setSelectedNetwork(n); setSelectedPkg(null); }}
-                className={`flex-1 py-3 rounded-xl border-2 text-sm font-bold transition-all ${
-                  selectedNetwork === n ? networkTabStyles[n].active : networkTabStyles[n].idle
-                }`}
-              >
-                {n}
-              </button>
-            ))}
+        {/* Network tabs */}
+        <div className="flex gap-2">
+          {NETWORKS.map((n) => (
+            <button
+              key={n}
+              onClick={() => { setSelectedNetwork(n); setSelectedPkg(null); setPhone(""); }}
+              className={`flex-1 py-3 rounded-xl border-2 text-sm font-bold transition-all duration-200 ${
+                selectedNetwork === n ? networkTabStyles[n].active : networkTabStyles[n].idle
+              }`}
+            >
+              {n}
+            </button>
+          ))}
+        </div>
+
+        {/* Package grid */}
+        <div>
+          <p className="text-white/40 text-xs font-semibold uppercase tracking-widest mb-3">
+            {selectedNetwork} Bundles — tap to select
+          </p>
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+            {packages.map((pkg) => {
+              const isSelected = selectedPkg?.size === pkg.size;
+              return (
+                <button
+                  key={pkg.size}
+                  onClick={() => handleCardClick(pkg.size, pkg.price)}
+                  className={`${colors.card} rounded-2xl p-4 sm:p-5 flex flex-col gap-2.5 border-2 text-left transition-all duration-200 relative ${
+                    isSelected
+                      ? "border-white/80 shadow-2xl scale-[1.04]"
+                      : "border-transparent hover:border-white/25 hover:scale-[1.02]"
+                  }`}
+                >
+                  {isSelected && (
+                    <span className="absolute top-2.5 right-2.5 w-5 h-5 rounded-full bg-white flex items-center justify-center shadow">
+                      <span className="w-2.5 h-2.5 rounded-full bg-black" />
+                    </span>
+                  )}
+                  {pkg.popular && !isSelected && (
+                    <span className="absolute top-2 right-2 text-[9px] font-black bg-black/25 text-white px-1.5 py-0.5 rounded">HOT</span>
+                  )}
+                  <span className={`${colors.label} text-[11px] font-bold uppercase tracking-wide`}>{selectedNetwork}</span>
+                  <p className={`${colors.size} text-3xl sm:text-4xl font-black leading-none`}>{pkg.size}</p>
+                  <div className="flex items-end justify-between mt-auto pt-1">
+                    <p className={`${colors.size} text-sm sm:text-base font-black`}>₵{pkg.price.toFixed(2)}</p>
+                    <p className={`${colors.label} text-[10px] font-medium`}>No Expiry</p>
+                  </div>
+                </button>
+              );
+            })}
           </div>
+        </div>
 
-          {/* Package grid with inline buy strip */}
-          <div className="space-y-0">
-            {rows.map((row, rowIdx) => (
-              <Fragment key={rowIdx}>
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-3">
-                  {row.map((pkg) => {
-                    const isSelected = selectedPkg?.size === pkg.size;
-                    return (
-                      <button
-                        key={pkg.size}
-                        onClick={() => handleCardClick(pkg.size, pkg.price)}
-                        className={`${colors.card} rounded-2xl p-4 flex flex-col gap-2 border-2 text-left transition-all duration-200 ${
-                          isSelected ? "border-white/70 shadow-xl scale-[1.02]" : "border-transparent hover:border-white/25 hover:scale-[1.01]"
-                        }`}
-                      >
-                        <div className="flex justify-between items-start">
-                          <span className={`${colors.label} text-[11px] font-bold uppercase tracking-wide`}>{selectedNetwork}</span>
-                          {isSelected
-                            ? <ChevronUp className="w-4 h-4 text-white/70" />
-                            : <ChevronDown className={`w-4 h-4 ${colors.label}`} />}
-                        </div>
-                        <p className={`${colors.size} text-4xl font-black leading-none`}>{pkg.size}</p>
-                        <div className="flex items-end justify-between mt-auto">
-                          <p className={`${colors.size} text-base font-black`}>₵{pkg.price.toFixed(2)}</p>
-                          <p className={`${colors.label} text-[10px] font-medium`}>No Expiry</p>
-                        </div>
-                      </button>
-                    );
-                  })}
-                </div>
+        {/* Order tracker */}
+        <PhoneOrderTracker
+          title="Track Your Order"
+          subtitle="Enter the recipient number to get live delivery updates."
+        />
 
-                {/* Inline buy strip */}
-                {rowIdx === selectedRow && selectedPkg && (
-                  <div
-                    ref={stripRef}
-                    className="buy-strip-enter mb-3 rounded-xl overflow-hidden border border-white/10"
-                    style={{ background: "rgba(15,15,30,0.94)", backdropFilter: "blur(24px)", WebkitBackdropFilter: "blur(24px)" }}
-                  >
-                    <div className="flex flex-wrap sm:flex-nowrap items-center gap-2.5 p-3.5">
-                      <div className={`${colors.card} rounded-lg px-2.5 py-2 shrink-0`}>
-                        <span className={`${colors.size} text-xs font-black`}>{selectedNetwork}</span>
-                      </div>
-                      <div className="shrink-0 hidden sm:block">
-                        <span className="text-white font-bold text-sm">{selectedPkg.size}</span>
-                        <span className="text-white/40 mx-1.5">—</span>
-                        <span className="text-amber-400 font-bold text-sm">GH₵ {selectedPkg.price.toFixed(2)}</span>
-                      </div>
-                      <input
-                        ref={phoneInputRef}
-                        type="tel"
-                        inputMode="numeric"
-                        placeholder="0XXXXXXXXX"
-                        value={phone}
-                        onChange={(e) => setPhone(e.target.value)}
-                        maxLength={12}
-                        className="flex-1 min-w-0 rounded-xl px-4 py-2.5 text-white placeholder-white/35 text-sm focus:outline-none focus:border-amber-400/60 border border-white/15 transition-colors"
-                        style={{ background: "rgba(255,255,255,0.08)" }}
-                      />
-                      <button
-                        onClick={handlePay}
-                        disabled={buying}
-                        className="shrink-0 bg-amber-400 hover:bg-amber-300 text-black font-black px-5 py-2.5 rounded-xl text-sm transition-all hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 flex items-center gap-1.5 whitespace-nowrap"
-                      >
-                        {buying ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Processing...</> : <>Buy ₵{total.toFixed(2)}</>}
-                      </button>
+        {/* Sub-agent CTA */}
+        {!agent.is_sub_agent && (
+          <div className="rounded-2xl border border-amber-400/25 p-6" style={{ background: "rgba(251,191,36,0.04)" }}>
+            <div className="flex items-start gap-4">
+              <div className="w-11 h-11 rounded-xl flex items-center justify-center shrink-0" style={{ background: "rgba(251,191,36,0.12)" }}>
+                <TrendingUp className="w-5 h-5 text-amber-400" />
+              </div>
+              <div className="flex-1">
+                <h3 className="font-display text-lg font-bold text-white mb-1">Become a Sub Agent</h3>
+                <p className="text-sm text-white/50 mb-4">
+                  Get your own store under <strong className="text-white/80">{agent.store_name}</strong> and start earning by reselling data bundles.
+                </p>
+                <div className="grid grid-cols-3 gap-2 mb-4">
+                  {[
+                    { icon: "🏪", label: "Own Store" },
+                    { icon: "📊", label: "Dashboard" },
+                    { icon: "💰", label: "Earn Income" },
+                  ].map((b) => (
+                    <div key={b.label} className="rounded-xl border border-white/8 p-2.5 text-center" style={{ background: "rgba(255,255,255,0.03)" }}>
+                      <span className="text-lg">{b.icon}</span>
+                      <p className="text-white/70 text-xs font-semibold mt-1">{b.label}</p>
                     </div>
-                    {phone.length > 0 && !isPhoneValid && (
-                      <p className="text-xs text-red-400 px-4 pb-2.5">Enter a valid 10-digit Ghana number</p>
-                    )}
-                    {phone.length === 0 && (
-                      <p className="text-[11px] text-white/40 px-4 pb-2.5">Enter the recipient phone number to continue</p>
-                    )}
-                  </div>
-                )}
-              </Fragment>
-            ))}
-          </div>
-
-          {/* Order tracker */}
-          <PhoneOrderTracker
-            title="Track Your Order"
-            subtitle="Enter the recipient number to get live delivery updates."
-          />
-
-          {/* Sub-agent CTA */}
-          {!agent.is_sub_agent && (
-            <div className="rounded-2xl border border-amber-400/30 bg-amber-400/5 p-6 md:p-8">
-              <div className="flex items-start gap-4">
-                <div className="w-12 h-12 rounded-xl bg-amber-400/15 flex items-center justify-center shrink-0">
-                  <TrendingUp className="w-6 h-6 text-amber-500" />
+                  ))}
                 </div>
-                <div className="flex-1">
-                  <h3 className="font-display text-xl font-bold mb-1">Become a Sub Agent</h3>
-                  <p className="text-sm text-muted-foreground mb-4">
-                    Get your own data reselling store under <strong>{agent.store_name || agent.full_name}</strong>. Start earning by selling data bundles to your own customers.
-                  </p>
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-5">
-                    {[
-                      { icon: "🏪", label: "Your Own Store", desc: "Personalised store link" },
-                      { icon: "📊", label: "Full Dashboard", desc: "Orders, wallet & pricing" },
-                      { icon: "💰", label: "Earn Income", desc: "Set your own margins" },
-                    ].map((b) => (
-                      <div key={b.label} className="rounded-xl bg-card border border-border p-3">
-                        <span className="text-xl">{b.icon}</span>
-                        <p className="font-semibold text-sm mt-1">{b.label}</p>
-                        <p className="text-xs text-muted-foreground">{b.desc}</p>
-                      </div>
-                    ))}
-                  </div>
-                  <div className="flex flex-wrap items-center justify-between gap-3">
-                    {subAgentBaseFee !== null
-                      ? <p className="text-sm">Activation fee: <span className="font-bold">GH₵ {subAgentBaseFee.toFixed(2)}</span></p>
-                      : <p className="text-sm text-muted-foreground">Contact agent for activation fee.</p>}
-                    <a
-                      href={`/store/${slug}/sub-agent`}
-                      className="inline-flex items-center gap-2 bg-amber-400 hover:bg-amber-300 text-black font-bold px-5 py-2.5 rounded-xl text-sm transition-colors shrink-0"
-                    >
-                      Join Now <ChevronRight className="w-4 h-4" />
-                    </a>
-                  </div>
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  {subAgentBaseFee !== null
+                    ? <p className="text-sm text-white/60">Fee: <span className="font-bold text-amber-400">GH₵ {subAgentBaseFee.toFixed(2)}</span></p>
+                    : <p className="text-sm text-white/40">Contact agent for activation fee.</p>}
+                  <a
+                    href={`/store/${slug}/sub-agent`}
+                    className="inline-flex items-center gap-1.5 bg-amber-400 hover:bg-amber-300 text-black font-bold px-4 py-2 rounded-xl text-sm transition-colors"
+                  >
+                    Join Now <ChevronRight className="w-4 h-4" />
+                  </a>
                 </div>
               </div>
             </div>
-          )}
-        </div>
+          </div>
+        )}
       </main>
 
-      {/* ── Footer ─────────────────────────────────── */}
-      <footer className="border-t border-border bg-card/30 py-6">
-        <div className="container mx-auto max-w-3xl px-4 flex flex-col items-center gap-3 text-sm text-muted-foreground">
+      {/* ── Footer ── */}
+      <footer className="border-t border-white/8 py-5 px-4">
+        <div className="container mx-auto max-w-3xl flex flex-col items-center gap-3 text-sm text-white/35">
           <div className="flex flex-wrap items-center justify-center gap-4">
             {agent.support_number && (
-              <a href={`tel:${agent.support_number.replace(/\D+/g, "")}`} className="flex items-center gap-1.5 hover:text-foreground transition-colors">
+              <a href={`tel:${agent.support_number.replace(/\D+/g, "")}`} className="flex items-center gap-1.5 hover:text-white/70 transition-colors">
                 <Phone className="w-3.5 h-3.5" /> {agent.support_number}
               </a>
             )}
             {agent.email && (
-              <a href={`mailto:${agent.email}`} className="flex items-center gap-1.5 hover:text-foreground transition-colors">
+              <a href={`mailto:${agent.email}`} className="flex items-center gap-1.5 hover:text-white/70 transition-colors">
                 ✉️ {agent.email}
               </a>
             )}
           </div>
-          <div className="flex items-center gap-1.5 text-xs text-muted-foreground/60">
-            Powered by <Zap className="w-3 h-3 text-primary" /> SwiftData Ghana
+          <div className="flex items-center gap-1.5 text-xs text-white/20">
+            Powered by <Zap className="w-3 h-3 text-amber-400" /> SwiftData Ghana
           </div>
         </div>
       </footer>
+
+      {/* ── Sticky purchase bar (slides up when package selected) ── */}
+      {selectedPkg && (
+        <div
+          className="fixed bottom-0 left-0 right-0 z-50 border-t border-white/10"
+          style={{ background: "rgba(8,8,20,0.97)", backdropFilter: "blur(28px)", WebkitBackdropFilter: "blur(28px)" }}
+        >
+          <div className="container mx-auto max-w-3xl px-4 pt-3 pb-4 sm:pb-5">
+            {/* Summary row */}
+            <div className="flex items-center justify-between mb-2.5">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-white font-black text-base">{selectedNetwork} {selectedPkg.size}</span>
+                <span className="text-white/25">·</span>
+                <span className="text-white/45 text-xs">
+                  GH₵ {selectedPkg.price.toFixed(2)} + GH₵ {fee.toFixed(2)} fee
+                </span>
+                <span className="text-white/25">·</span>
+                <span className="font-bold text-sm" style={{ color: networkAccent }}>
+                  Total GH₵ {total.toFixed(2)}
+                </span>
+              </div>
+              <button
+                onClick={() => { setSelectedPkg(null); setPhone(""); }}
+                className="text-white/30 hover:text-white/70 transition-colors p-1.5 rounded-lg hover:bg-white/8 ml-2 shrink-0"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Phone + Pay */}
+            <div className="flex gap-2 sm:gap-3">
+              <input
+                ref={phoneInputRef}
+                type="tel"
+                inputMode="numeric"
+                placeholder="Recipient number (0XXXXXXXXX)"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                maxLength={12}
+                className="flex-1 min-w-0 border border-white/15 rounded-xl px-4 py-3 text-white placeholder-white/30 text-sm focus:outline-none focus:border-white/40 transition-colors"
+                style={{ background: "rgba(255,255,255,0.07)" }}
+              />
+              <button
+                onClick={handlePay}
+                disabled={buying}
+                className="shrink-0 font-black px-5 py-3 rounded-xl text-sm transition-all hover:scale-105 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 flex items-center gap-1.5 whitespace-nowrap text-black"
+                style={{ background: networkAccent }}
+              >
+                {buying
+                  ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Processing...</>
+                  : <><CreditCard className="w-3.5 h-3.5" /> Pay GH₵ {total.toFixed(2)}</>
+                }
+              </button>
+            </div>
+
+            {phone.length > 0 && !isPhoneValid
+              ? <p className="text-xs text-red-400 mt-1.5">Enter a valid 10-digit Ghana number</p>
+              : phone.length === 0
+              ? <p className="text-[11px] text-white/30 mt-1.5">Enter the recipient's number then tap Pay</p>
+              : null}
+          </div>
+        </div>
+      )}
     </div>
   );
 };
