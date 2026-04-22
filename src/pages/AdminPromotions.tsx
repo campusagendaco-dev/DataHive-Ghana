@@ -43,8 +43,8 @@ const AdminPromotions = () => {
   const [promoLoading, setPromoLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
   const [code, setCode] = useState("");
-  const [discount, setDiscount] = useState("10");
-  const [maxUses, setMaxUses] = useState("100");
+  const [discount, setDiscount] = useState("100");
+  const [maxUses, setMaxUses] = useState("1");
   const [bulkCount, setBulkCount] = useState("1");
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
 
@@ -221,7 +221,7 @@ const AdminPromotions = () => {
       toast({ title: "Failed to create code(s)", description: error.message, variant: "destructive" });
     } else {
       toast({ title: `${count} Promo code(s) created!` });
-      setCode(""); setDiscount("10"); setMaxUses("100"); setBulkCount("1");
+      setCode(""); setDiscount("100"); setMaxUses("1"); setBulkCount("1");
       fetchPromos();
     }
     setGenerating(false);
@@ -428,13 +428,17 @@ const AdminPromotions = () => {
                               <button onClick={() => handleCopy(promo.code)} className="text-white/30 hover:text-amber-400 transition-colors p-1" title="Copy Code">
                                 {copiedCode === promo.code ? <CheckCircle className="w-4 h-4 text-green-400" /> : <Copy className="w-4 h-4" />}
                               </button>
-                              <Badge variant={promo.is_active ? "default" : "secondary"}
-                                className={promo.is_active ? "bg-green-500/20 text-green-400 text-[10px]" : "text-[10px] text-white/30"}>
-                                {promo.is_active ? "Active" : "Disabled"}
+                              <Badge variant={!promo.is_active || promo.current_uses >= promo.max_uses ? "secondary" : "default"}
+                                className={
+                                  !promo.is_active ? "text-[10px] text-white/30 bg-white/5" 
+                                  : promo.current_uses >= promo.max_uses ? "bg-red-500/20 text-red-400 text-[10px]"
+                                  : "bg-green-500/20 text-green-400 text-[10px]"
+                                }>
+                                {!promo.is_active ? "Disabled" : promo.current_uses >= promo.max_uses ? "Fully Used" : "Active"}
                               </Badge>
                             </div>
                             <p className="text-xs text-white/40">
-                              {promo.discount_percentage}% off · {promo.current_uses}/{promo.max_uses} used
+                              {promo.discount_percentage}% off · {promo.current_uses}/{promo.max_uses} used {promo.max_uses === 1 && "(Single Use)"}
                             </p>
                           </div>
                           <div className="flex items-center gap-2">
