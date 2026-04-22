@@ -57,8 +57,7 @@ const Navbar = () => {
   /* ── Desktop nav links ── */
   const mainLinks = [
     { to: "/", label: "Home", icon: Home },
-    { to: "/buy-data", label: "Buy Data", icon: Wifi },
-    { to: "/order-status", label: "Track Order", icon: MapPin },
+    { to: "/order-status", label: "Track Order", icon: LayoutDashboard },
     ...(!user || !agentApproved ? [{ to: "/agent-program", label: "Become an Agent", icon: TrendingUp }] : []),
   ];
 

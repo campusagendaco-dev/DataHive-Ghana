@@ -257,8 +257,8 @@ const AppContent = () => {
         <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="/auth" element={<Navigate to="/login" replace />} />
 
-        {/* Public buy page — no login required */}
-        <Route path="/buy-data" element={<BuyData />} />
+        {/* Public buy page — disabled, now requires agent store */}
+        <Route path="/buy-data" element={<Navigate to="/agent-program" replace />} />
 
         {/* Sub agent routes */}
         <Route path="/store/:slug/sub-agent" element={<SubAgentSignup />} />

@@ -305,29 +305,12 @@ serve(async (req) => {
           parent_agent_id: resolvedParentAgentId,
         };
       } else {
-        const globalRow = await lookupGlobalRow(normalizedNetwork, normalizedPackage);
-        // For public (non-agent) purchases prefer public_price, fall back to agent_price
-        const publicBase = Number(globalRow?.public_price) > 0
-          ? Number(globalRow!.public_price)
-          : Number(globalRow?.agent_price);
-
-        if (!(Number.isFinite(publicBase) && publicBase > 0)) {
-          return new Response(JSON.stringify({ error: "Package price is not configured" }), {
-            status: 400,
-            headers: { ...corsHeaders, "Content-Type": "application/json" },
-          });
-        }
-
-        const adjustedBase = Number((publicBase * priceMultiplier).toFixed(2));
-        resolvedAmount = Number((adjustedBase + calculatePaystackFee(adjustedBase)).toFixed(2));
-        enrichedMetadata = {
-          ...metadata,
-          network,
-          package_size: packageSize,
-          base_price: adjustedBase,
-          profit: 0,
-          parent_profit: 0,
-        };
+        return new Response(JSON.stringify({ 
+          error: "Direct purchases are disabled. Please purchase through an official Agent's store link." 
+        }), {
+          status: 403,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
       }
     }
 

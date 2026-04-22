@@ -131,10 +131,10 @@ const Index = () => {
 
           <div className="mt-8 flex flex-col sm:flex-row gap-3 justify-center">
             <Link
-              to="/buy-data"
+              to="/agent-program"
               className="inline-flex items-center justify-center gap-2 rounded-xl bg-amber-400 hover:bg-amber-300 text-black font-bold text-base px-8 py-3.5 transition-colors shadow-lg"
             >
-              Buy Data Now <ArrowRight className="w-4 h-4" />
+              Start Selling Data <ArrowRight className="w-4 h-4" />
             </Link>
             <Link
               to="/login"
@@ -193,10 +193,10 @@ const Index = () => {
                   <p className={`${net.mutedColor} text-xs`}>+ more packages available</p>
                 </div>
                 <Link
-                  to="/buy-data"
+                  to="/agent-program"
                   className={`${net.btnColor} rounded-xl py-2.5 text-center text-sm font-bold transition-colors flex items-center justify-center gap-1.5`}
                 >
-                  Buy {net.name} Data <ArrowRight className="w-3.5 h-3.5" />
+                  Join Reseller Program <ArrowRight className="w-3.5 h-3.5" />
                 </Link>
               </div>
             ))}
@@ -204,10 +204,10 @@ const Index = () => {
 
           <div className="text-center mt-8">
             <Link
-              to="/buy-data"
+              to="/agent-program"
               className="inline-flex items-center gap-2 rounded-xl bg-primary hover:opacity-90 text-primary-foreground font-bold text-sm px-8 py-3 transition-all"
             >
-              View All Bundles &amp; Prices <ArrowRight className="w-4 h-4" />
+              View Agent Prices <ArrowRight className="w-4 h-4" />
             </Link>
           </div>
         </div>
