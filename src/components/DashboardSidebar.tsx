@@ -19,6 +19,7 @@ import {
   LogOut,
   X,
   User,
+  Key,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -42,6 +43,7 @@ const agentNavItems = [
   { to: "/dashboard/subagent-pricing", label: "Subagent Pricing", icon: SlidersHorizontal },
   { to: "/dashboard/flyer", label: "Flyer Generator", icon: FileText },
   { to: "/dashboard/result-checker", label: "Result Checker", icon: GraduationCap },
+  { to: "/dashboard/api", label: "Developer API", icon: Key },
 ];
 
 interface DashboardSidebarProps {

@@ -56,6 +56,8 @@ import AdminTickets from "./pages/AdminTickets";
 import AdminAuditLogs from "./pages/AdminAuditLogs";
 import SubAgentSignup from "./pages/SubAgentSignup";
 import SubAgentPending from "./pages/SubAgentPending";
+import DashboardDeveloperAPI from "./pages/DashboardDeveloperAPI";
+import APIDocumentation from "./pages/APIDocumentation";
 import Maintenance from "./pages/Maintenance";
 import NotFound from "./pages/NotFound";
 import LoadingScreen from "@/components/LoadingScreen";
@@ -239,6 +241,7 @@ const AppContent = () => {
         <Route path="/store/:slug" element={<AgentStore />} />
         <Route path="/order-status" element={<OrderStatus />} />
         <Route path="/purchase-success" element={<PurchaseSuccess />} />
+        <Route path="/api-docs" element={<APIDocumentation />} />
 
         {/* Auth pages */}
         <Route path="/login" element={<AuthPage />} />
@@ -279,6 +282,7 @@ const AppContent = () => {
           <Route path="subagents" element={<ParentAgentOnlyGuard><DashboardSubAgents /></ParentAgentOnlyGuard>} />
           <Route path="subagent-pricing" element={<ParentAgentOnlyGuard><DashboardSubAgentPricing /></ParentAgentOnlyGuard>} />
           <Route path="flyer" element={<AgentFeatureGuard><DashboardFlyer /></AgentFeatureGuard>} />
+          <Route path="/dashboard/api" element={<AgentFeatureGuard><DashboardDeveloperAPI /></AgentFeatureGuard>} />
           <Route path="result-checker" element={<AgentFeatureGuard><DashboardResultCheckers /></AgentFeatureGuard>} />
 
           {/* Legacy aliases */}
