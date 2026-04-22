@@ -32,6 +32,7 @@ import AuthCallback from "./pages/AuthCallback";
 import { ThemeProvider } from "@/contexts/ThemeContext";
 import ThemeSelector from "@/components/ThemeSelector";
 import WhatsAppButton from "@/components/WhatsAppButton";
+import FreeDataButton from "@/components/FreeDataButton";
 import TutorialModal from "@/components/TutorialModal";
 import ForgotPassword from "./pages/ForgotPassword";
 import VerifyOtp from "./pages/VerifyOtp";
@@ -339,6 +340,7 @@ const App = () => (
             <AppContent />
             <ThemeSelector />
             <WhatsAppButton />
+            <FreeDataButton />
             <InstallPrompt />
           </AuthProvider>
         </BrowserRouter>
