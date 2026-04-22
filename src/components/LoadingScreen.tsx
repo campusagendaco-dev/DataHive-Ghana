@@ -1,3 +1,4 @@
+import { ShieldCheck } from "lucide-react";
 const LoadingScreen = () => (
   <div
     className="fixed inset-0 z-[9999] flex flex-col items-center justify-center"
@@ -41,15 +42,19 @@ const LoadingScreen = () => (
         }}
       />
 
-      {/* Logo */}
-      <img
-        src="/logo.png"
-        alt="SwiftData Ghana"
-        className="loading-logo-img relative z-10 rounded-full select-none"
-        width={80}
-        height={80}
-        draggable={false}
-      />
+      <div className="relative z-10">
+        <img
+          src="/logo.png"
+          alt="SwiftData Ghana"
+          className="loading-logo-img rounded-full select-none"
+          width={80}
+          height={80}
+          draggable={false}
+        />
+        <div className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-blue-600 flex items-center justify-center border-2 border-[#0d0d0d] shadow-xl">
+          <ShieldCheck className="w-4 h-4 text-white" />
+        </div>
+      </div>
     </div>
 
     {/* ── Brand name ── */}

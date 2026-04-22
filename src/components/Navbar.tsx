@@ -86,7 +86,9 @@ const Navbar = () => {
               className="w-10 h-10 rounded-full shrink-0 ring-1 ring-amber-400/20"
               width={40} height={40}
             />
-            <span className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-green-500 border-2 border-[#0d0d18]" />
+            <div className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full bg-blue-600 flex items-center justify-center border-2 border-[#0d0d18] shadow-lg animate-pulse-subtle">
+              <ShieldCheck className="w-3 h-3 text-white" />
+            </div>
           </div>
           <div className="leading-tight hidden sm:block">
             <span className="text-white font-black text-sm block leading-none tracking-tight">SwiftData Ghana</span>

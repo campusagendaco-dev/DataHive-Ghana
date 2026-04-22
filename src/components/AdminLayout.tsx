@@ -43,8 +43,13 @@ const SidebarContent = ({ onNavigate }: { onNavigate?: () => void }) => {
 
       {/* Logo */}
       <div className="p-6 flex items-center gap-4 relative z-10">
-        <div className="bg-white/5 p-2 rounded-xl border border-white/10 shadow-lg backdrop-blur-sm">
-          <img src="/logo.png" alt="SwiftData Ghana" className="w-8 h-8 shrink-0" />
+        <div className="relative">
+          <div className="bg-white/5 p-2 rounded-xl border border-white/10 shadow-lg backdrop-blur-sm">
+            <img src="/logo.png" alt="SwiftData Ghana" className="w-8 h-8 shrink-0" />
+          </div>
+          <div className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full bg-blue-600 flex items-center justify-center border-2 border-[#0a0a0f] shadow-lg">
+            <ShieldCheck className="w-3 h-3 text-white" />
+          </div>
         </div>
         <div>
           <p className="text-white font-black tracking-tight leading-none text-lg">Admin<span className="text-amber-400">Pro</span></p>
@@ -123,8 +128,13 @@ const AdminLayout = () => {
             </SheetContent>
           </Sheet>
           <div className="flex items-center gap-3">
-            <div className="bg-white/5 p-1.5 rounded-lg border border-white/10">
-              <img src="/logo.png" alt="SwiftData Ghana" className="w-6 h-6 shrink-0" />
+            <div className="relative">
+              <div className="bg-white/5 p-1.5 rounded-lg border border-white/10">
+                <img src="/logo.png" alt="SwiftData Ghana" className="w-6 h-6 shrink-0" />
+              </div>
+              <div className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-blue-600 flex items-center justify-center border border-[#0a0a0f] shadow-lg">
+                <ShieldCheck className="w-2.5 h-2.5 text-white" />
+              </div>
             </div>
             <span className="font-display text-lg font-black tracking-tight">Admin<span className="text-amber-400">Pro</span></span>
           </div>

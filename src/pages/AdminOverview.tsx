@@ -84,7 +84,34 @@ const AdminOverview = () => {
     setLoading(false);
   };
 
-  useEffect(() => { fetchData(); }, []);
+  useEffect(() => {
+    fetchData();
+
+    // Subscribe to real-time order updates
+    const channel = supabase
+      .channel("admin-live-orders")
+      .on(
+        "postgres_changes",
+        { event: "*", table: "orders", schema: "public" },
+        (payload) => {
+          console.log("Real-time order update:", payload);
+          // Refresh all data when any order change occurs to keep stats accurate
+          fetchData();
+          
+          if (payload.eventType === "INSERT") {
+            toast({ 
+              title: "New Order Received!", 
+              description: `Amount: GHS ${payload.new.amount}. Customer: ${payload.new.customer_phone || 'Unknown'}`,
+            });
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
 
   const saveMaintenance = async () => {
     if (!maintenanceTableReady) {
