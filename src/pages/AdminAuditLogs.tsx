@@ -70,6 +70,40 @@ const AdminAuditLogs = () => {
 
   useEffect(() => {
     fetchLogs();
+
+    // Enable Realtime Subscription for Live Updates
+    const channel = supabase
+      .channel("audit-logs-live")
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "audit_logs" },
+        async (payload) => {
+          const newLog = payload.new as any;
+          
+          // Fetch the admin name for the new log
+          let adminName = "Unknown Admin";
+          if (newLog.admin_id) {
+            const { data: profile } = await supabase
+              .from("profiles")
+              .select("full_name")
+              .eq("user_id", newLog.admin_id)
+              .maybeSingle();
+            if (profile) adminName = profile.full_name;
+          }
+
+          const enrichedLog = {
+            ...newLog,
+            profiles: newLog.admin_id ? { full_name: adminName } : null
+          };
+
+          setLogs(prev => [enrichedLog, ...prev].slice(0, 100));
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, []);
 
   const formatAction = (action: string) => {
@@ -79,9 +113,18 @@ const AdminAuditLogs = () => {
   return (
     <div className="space-y-6 max-w-5xl pb-10">
       <div className="flex items-center justify-between">
-        <div>
-          <h1 className="font-display text-2xl font-bold">Audit Logs</h1>
-          <p className="text-sm text-muted-foreground mt-1">Track all administrative actions for security and compliance.</p>
+        <div className="flex items-center gap-4">
+          <div>
+            <h1 className="font-display text-2xl font-bold">Audit Logs</h1>
+            <p className="text-sm text-muted-foreground mt-1">Track all administrative actions for security and compliance.</p>
+          </div>
+          <div className="hidden sm:flex items-center gap-2 px-3 py-1 rounded-full bg-green-500/10 border border-green-500/20">
+            <span className="relative flex h-2 w-2">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
+            </span>
+            <span className="text-[10px] font-bold text-green-500 uppercase tracking-wider">Live Activity</span>
+          </div>
         </div>
         <button 
           onClick={fetchLogs} 
