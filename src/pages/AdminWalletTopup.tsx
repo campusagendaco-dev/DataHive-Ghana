@@ -76,35 +76,16 @@ const AdminWalletTopup = () => {
 
     setCrediting(true);
 
-    // Get current balance
-    const { data: wallet } = await supabase
-      .from("wallets")
-      .select("balance")
-      .eq("agent_id", agent.user_id)
-      .maybeSingle();
+    // Use the secure atomic RPC to credit the wallet
+    const { data: creditResult, error: creditError } = await supabase.rpc("credit_wallet", {
+      p_agent_id: agent.user_id,
+      p_amount: amount,
+    });
 
-    if (!wallet) {
-      // Create wallet with the credit amount
-      const { error } = await supabase.from("wallets").insert({
-        agent_id: agent.user_id,
-        balance: amount,
-      } as any);
-      if (error) {
-        toast({ title: "Failed to create wallet", description: error.message, variant: "destructive" });
-        setCrediting(false);
-        return;
-      }
-    } else {
-      const newBalance = parseFloat((wallet.balance + amount).toFixed(2));
-      const { error } = await supabase
-        .from("wallets")
-        .update({ balance: newBalance })
-        .eq("agent_id", agent.user_id);
-      if (error) {
-        toast({ title: "Failed to credit wallet", description: error.message, variant: "destructive" });
-        setCrediting(false);
-        return;
-      }
+    if (creditError) {
+      toast({ title: "Failed to credit wallet", description: creditError.message, variant: "destructive" });
+      setCrediting(false);
+      return;
     }
 
     // Create a wallet_topup order record
