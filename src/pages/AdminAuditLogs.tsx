@@ -16,21 +16,30 @@ interface AuditLog {
 const AdminAuditLogs = () => {
   const [logs, setLogs] = useState<AuditLog[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    const fetchLogs = async () => {
-      setLoading(true);
-      const { data, error } = await supabase
+  const fetchLogs = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const { data, error: fetchError } = await supabase
         .from("audit_logs")
-        .select("*, profiles:admin_id(full_name)")
+        .select("*, profiles!admin_id(full_name)")
         .order("created_at", { ascending: false });
       
-      if (!error && data) {
+      if (fetchError) throw fetchError;
+      if (data) {
         setLogs(data as any[]);
       }
+    } catch (err: any) {
+      console.error("Fetch logs error:", err);
+      setError(err.message || "Could not load audit logs.");
+    } finally {
       setLoading(false);
-    };
+    }
+  };
 
+  useEffect(() => {
     fetchLogs();
   }, []);
 
@@ -40,18 +49,37 @@ const AdminAuditLogs = () => {
 
   return (
     <div className="space-y-6 max-w-5xl pb-10">
-      <div>
-        <h1 className="font-display text-2xl font-bold">Audit Logs</h1>
-        <p className="text-sm text-muted-foreground mt-1">Track all administrative actions for security and compliance.</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="font-display text-2xl font-bold">Audit Logs</h1>
+          <p className="text-sm text-muted-foreground mt-1">Track all administrative actions for security and compliance.</p>
+        </div>
+        <button 
+          onClick={fetchLogs} 
+          disabled={loading}
+          className="flex items-center gap-2 text-xs font-semibold bg-white/5 hover:bg-white/10 px-4 py-2 rounded-lg transition-colors border border-white/10"
+        >
+          {loading ? <Loader2 className="w-3 h-3 animate-spin" /> : <FileSearch className="w-3 h-3" />}
+          Refresh Logs
+        </button>
       </div>
 
-      <Card className="border-red-500/20 bg-red-500/5">
+      {error && (
+        <Card className="border-red-500/50 bg-red-500/10">
+          <CardContent className="p-4 text-red-500 text-sm flex items-center gap-2">
+            <ShieldAlert className="w-4 h-4" />
+            Error: {error}
+          </CardContent>
+        </Card>
+      )}
+
+      <Card className="border-amber-500/20 bg-amber-500/5">
         <CardContent className="p-4 flex items-start gap-4">
-          <ShieldAlert className="w-5 h-5 text-red-500 shrink-0 mt-0.5" />
+          <ShieldAlert className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" />
           <div>
-            <p className="text-sm font-medium text-red-500">Security Notice</p>
-            <p className="text-xs text-muted-foreground mt-1">
-              Audit logs are immutable and cannot be deleted. All sensitive actions (manual wallet top-ups, price changes, role assignments) are recorded here.
+            <p className="text-sm font-medium text-amber-500">Security Notice</p>
+            <p className="text-xs text-muted-foreground mt-1 text-pretty">
+              Audit logs are **immutable and permanent**. They record every sensitive action taken by administrators to ensure accountability and platform integrity.
             </p>
           </div>
         </CardContent>
@@ -66,37 +94,47 @@ const AdminAuditLogs = () => {
           {loading ? (
             <div className="flex justify-center py-10"><Loader2 className="w-6 h-6 animate-spin text-muted-foreground" /></div>
           ) : logs.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-10 text-center">
-              <FileSearch className="w-12 h-12 text-muted-foreground opacity-20 mb-3" />
-              <p className="text-sm font-medium text-muted-foreground">No logs found</p>
-              <p className="text-xs text-muted-foreground mt-1">Admin actions will populate here once recorded.</p>
+            <div className="flex flex-col items-center justify-center py-20 text-center">
+              <div className="w-16 h-16 rounded-full bg-white/5 flex items-center justify-center mb-4">
+                <FileSearch className="w-8 h-8 text-muted-foreground opacity-30" />
+              </div>
+              <p className="text-base font-semibold text-white/80">Audit Log is Empty</p>
+              <p className="text-sm text-muted-foreground mt-2 max-w-xs mx-auto">
+                No administrative actions have been recorded yet. The system will automatically log actions like price updates, wallet top-ups, and user management.
+              </p>
+              <button 
+                onClick={fetchLogs}
+                className="mt-6 text-xs text-amber-400 hover:underline font-medium"
+              >
+                Check again
+              </button>
             </div>
           ) : (
-            <div className="rounded-md border border-white/5">
+            <div className="rounded-md border border-white/5 overflow-hidden">
               <Table>
                 <TableHeader>
-                  <TableRow className="bg-secondary/20 hover:bg-secondary/20">
-                    <TableHead className="w-[180px]">Timestamp</TableHead>
-                    <TableHead>Admin</TableHead>
-                    <TableHead>Action</TableHead>
-                    <TableHead>Details</TableHead>
+                  <TableRow className="bg-white/5 hover:bg-white/5 border-white/5">
+                    <TableHead className="w-[180px] text-white/50 uppercase text-[10px] font-black tracking-widest">Timestamp</TableHead>
+                    <TableHead className="text-white/50 uppercase text-[10px] font-black tracking-widest">Admin</TableHead>
+                    <TableHead className="text-white/50 uppercase text-[10px] font-black tracking-widest">Action</TableHead>
+                    <TableHead className="text-white/50 uppercase text-[10px] font-black tracking-widest">Details</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {logs.map((log) => (
-                    <TableRow key={log.id} className="border-white/5">
-                      <TableCell className="text-xs text-muted-foreground">
+                    <TableRow key={log.id} className="border-white/5 hover:bg-white/[0.02] transition-colors">
+                      <TableCell className="text-[11px] text-muted-foreground font-mono">
                         {new Date(log.created_at).toLocaleString()}
                       </TableCell>
-                      <TableCell className="font-medium text-sm">
+                      <TableCell className="font-semibold text-sm text-white/90">
                         {log.profiles?.full_name || "System"}
                       </TableCell>
                       <TableCell>
-                        <Badge variant="secondary" className="font-mono text-[10px]">
+                        <Badge variant="outline" className="font-mono text-[10px] bg-amber-400/5 text-amber-400 border-amber-400/20">
                           {formatAction(log.action)}
                         </Badge>
                       </TableCell>
-                      <TableCell className="text-xs text-muted-foreground max-w-[300px] truncate">
+                      <TableCell className="text-[11px] text-muted-foreground max-w-[300px] truncate group hover:text-white transition-colors cursor-help">
                         {JSON.stringify(log.details)}
                       </TableCell>
                     </TableRow>

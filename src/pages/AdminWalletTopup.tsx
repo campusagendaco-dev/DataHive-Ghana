@@ -103,8 +103,8 @@ const AdminWalletTopup = () => {
         target_agent_id: agent.user_id,
         target_agent_name: agent.full_name,
         amount: amount,
-        previous_balance: wallet?.balance || 0,
-        new_balance: wallet?.balance ? wallet.balance + amount : amount
+        previous_balance: walletBalance,
+        new_balance: parseFloat((walletBalance + amount).toFixed(2))
       });
     }
 

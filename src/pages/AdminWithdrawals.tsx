@@ -5,6 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Search, CheckCircle, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/useAuth";
+import { logAudit } from "@/utils/auditLogger";
 
 interface WithdrawalRow {
   id: string;
@@ -30,6 +32,7 @@ const statusColors: Record<string, string> = {
 
 const AdminWithdrawals = () => {
   const { toast } = useToast();
+  const { user: currentUser } = useAuth();
   const [withdrawals, setWithdrawals] = useState<WithdrawalRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -86,6 +89,10 @@ const AdminWithdrawals = () => {
 
   const handleConfirm = async (withdrawalId: string) => {
     setConfirming(withdrawalId);
+    
+    // Find withdrawal row for logging
+    const withdrawal = withdrawals.find(w => w.id === withdrawalId);
+
     const { error } = await supabase
       .from("withdrawals")
       .update({ status: "completed", completed_at: new Date().toISOString() })
@@ -94,6 +101,14 @@ const AdminWithdrawals = () => {
     if (error) {
       toast({ title: "Failed to confirm", description: error.message, variant: "destructive" });
     } else {
+      if (currentUser && withdrawal) {
+        await logAudit(currentUser.id, "confirm_withdrawal", {
+          withdrawal_id: withdrawalId,
+          agent_id: withdrawal.agent_id,
+          agent_name: withdrawal.agent_name,
+          amount: withdrawal.amount
+        });
+      }
       toast({ title: "Withdrawal confirmed as sent!" });
     }
     await fetchWithdrawals();
