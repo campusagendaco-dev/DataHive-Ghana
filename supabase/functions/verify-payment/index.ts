@@ -1,7 +1,7 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+﻿import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-const ALLOWED_ORIGIN = Deno.env.get("ALLOWED_ORIGIN") || "*";
+const ALLOWED_ORIGIN = Deno.env.get("ALLOWED_ORIGIN") || "https://swiftdatagh.com";
 const corsHeaders = {
   "Access-Control-Allow-Origin": ALLOWED_ORIGIN,
   "Access-Control-Allow-Headers": "authorization, x-user-access-token, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
@@ -172,7 +172,7 @@ function stripHtml(value: string): string {
 }
 
 async function sendPaymentSms(customerPhone: string) {
-  const smsApiKey = getFirstEnvValue(["TXTCONNECT_API_KEY"]) || "T5Ca1X9vjBnVexWoyLrfcpQSYdR02NhU46wm7IsE8gMZJOGqlF";
+  const smsApiKey = getFirstEnvValue(["TXTCONNECT_API_KEY"]);
   const senderId = getFirstEnvValue(["TXTCONNECT_SENDER_ID"]) || "SwiftDataGh";
   
   const digits = customerPhone.replace(/\D+/g, "");
@@ -614,13 +614,16 @@ serve(async (req) => {
       if (!order.package_size && metadata.package_size) patch.package_size = metadata.package_size;
       if (!order.customer_phone && metadata.customer_phone) patch.customer_phone = metadata.customer_phone;
       if ((!order.profit || Number(order.profit) === 0) && Number.isFinite(Number(metadata.profit))) {
-        patch.profit = parseFloat(Number(metadata.profit).toFixed(2));
+        const patchProfit = Number(metadata.profit);
+        patch.profit = parseFloat(Math.min(patchProfit, verifiedAmount).toFixed(2));
       }
       if (!order.parent_agent_id && typeof metadata.parent_agent_id === "string" && metadata.parent_agent_id) {
         patch.parent_agent_id = metadata.parent_agent_id;
       }
       if ((!order.parent_profit || Number(order.parent_profit) === 0) && Number.isFinite(Number(metadata.parent_profit))) {
-        patch.parent_profit = parseFloat(Number(metadata.parent_profit).toFixed(2));
+        const patchParentProfit = Number(metadata.parent_profit);
+        const usedProfit = Number(patch.profit ?? order.profit ?? 0);
+        patch.parent_profit = parseFloat(Math.min(patchParentProfit, verifiedAmount - usedProfit).toFixed(2));
       }
 
       if (Object.keys(patch).length > 0) {
@@ -692,11 +695,11 @@ serve(async (req) => {
         : verifiedAmount;
       const metadataProfit = Number(metadata.profit);
       const normalizedProfit = Number.isFinite(metadataProfit) && metadataProfit > 0
-        ? parseFloat(metadataProfit.toFixed(2))
+        ? parseFloat(Math.min(metadataProfit, verifiedAmount).toFixed(2))
         : 0;
       const metadataParentProfit = Number(metadata.parent_profit);
       const normalizedParentProfit = Number.isFinite(metadataParentProfit) && metadataParentProfit > 0
-        ? parseFloat(metadataParentProfit.toFixed(2))
+        ? parseFloat(Math.min(metadataParentProfit, verifiedAmount - normalizedProfit).toFixed(2))
         : 0;
       await supabase.from("orders").insert({
         id: reference,

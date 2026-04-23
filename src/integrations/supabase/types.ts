@@ -41,6 +41,7 @@ export type Database = {
       global_package_settings: {
         Row: {
           agent_price: number | null
+          api_price: number | null
           id: string
           is_unavailable: boolean
           network: string
@@ -50,6 +51,7 @@ export type Database = {
         }
         Insert: {
           agent_price?: number | null
+          api_price?: number | null
           id?: string
           is_unavailable?: boolean
           network: string
@@ -59,6 +61,7 @@ export type Database = {
         }
         Update: {
           agent_price?: number | null
+          api_price?: number | null
           id?: string
           is_unavailable?: boolean
           network?: string
@@ -248,6 +251,7 @@ export type Database = {
           topup_reference: string | null
           updated_at: string
           user_id: string
+          api_custom_prices: Json
           whatsapp_group_link: string | null
           whatsapp_number: string
         }
@@ -278,6 +282,7 @@ export type Database = {
           topup_reference?: string | null
           updated_at?: string
           user_id: string
+          api_custom_prices?: Json
           whatsapp_group_link?: string | null
           whatsapp_number?: string
         }
@@ -308,6 +313,7 @@ export type Database = {
           topup_reference?: string | null
           updated_at?: string
           user_id?: string
+          api_custom_prices?: Json
           whatsapp_group_link?: string | null
           whatsapp_number?: string
         }

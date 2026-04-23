@@ -1,7 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-const ALLOWED_ORIGIN = Deno.env.get("ALLOWED_ORIGIN") || "*";
+const ALLOWED_ORIGIN = Deno.env.get("ALLOWED_ORIGIN") || "https://swiftdatagh.com";
 const corsHeaders = {
   "Access-Control-Allow-Origin": ALLOWED_ORIGIN,
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
@@ -289,8 +289,8 @@ serve(async (req: Request) => {
             }
           }
 
-          // Fallback: parent hasn't assigned a price → use adminBase as sub-agent cost
-          if (!(Number.isFinite(parentAssignedBase) && parentAssignedBase > 0)) {
+          // Fallback: parent hasn't assigned a price or set it too low → use adminBase as sub-agent cost
+          if (!(Number.isFinite(parentAssignedBase) && parentAssignedBase >= adminBase)) {
             parentAssignedBase = adminBase;
           }
 

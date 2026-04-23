@@ -18,6 +18,7 @@ interface PackageSetting {
   package_size: string;
   agent_price: number | null;
   public_price: number | null;
+  api_price: number | null;
   is_unavailable: boolean;
 }
 
@@ -36,7 +37,7 @@ const AdminPackages = () => {
 
       const { data } = await supabase
         .from("global_package_settings")
-        .select("network, package_size, agent_price, public_price, is_unavailable");
+        .select("network, package_size, agent_price, public_price, api_price, is_unavailable");
 
       const map: Record<string, PackageSetting> = {};
       (data || []).forEach((r: any) => {
@@ -51,7 +52,7 @@ const AdminPackages = () => {
 
   const getSetting = (network: string, size: string): PackageSetting => {
     const key = `${network}-${size}`;
-    return settings[key] || { network, package_size: size, agent_price: null, public_price: null, is_unavailable: false };
+    return settings[key] || { network, package_size: size, agent_price: null, public_price: null, api_price: null, is_unavailable: false };
   };
 
   const updateSetting = (network: string, size: string, field: keyof PackageSetting, value: any) => {
@@ -70,6 +71,7 @@ const AdminPackages = () => {
           package_size: pkg.size,
           agent_price: pkg.price,
           public_price: parseFloat((pkg.price * 1.12).toFixed(2)),
+          api_price: pkg.price,
           is_unavailable: false,
         });
       }
@@ -119,6 +121,15 @@ const AdminPackages = () => {
           setSaving(false);
           return;
         }
+        if (s.api_price !== null && s.api_price < 0) {
+          toast({
+            title: "Invalid API price",
+            description: `${n.name} ${pkg.size} API price cannot be negative.`,
+            variant: "destructive",
+          });
+          setSaving(false);
+          return;
+        }
       }
     }
     // Collect all modified settings
@@ -127,6 +138,7 @@ const AdminPackages = () => {
       package_size: s.package_size,
       agent_price: s.agent_price,
       public_price: s.public_price,
+      api_price: s.api_price,
       is_unavailable: s.is_unavailable,
       updated_at: new Date().toISOString(),
     }));
@@ -250,10 +262,11 @@ const AdminPackages = () => {
                   {/* Header */}
                   <div className="grid grid-cols-12 gap-2 text-xs font-medium text-muted-foreground px-2">
                     <div className="col-span-2">Package</div>
-                    <div className="col-span-2">Base Price</div>
+                    <div className="col-span-1">Base</div>
                     <div className="col-span-3">Agent Price</div>
                     <div className="col-span-3">User Price</div>
-                    <div className="col-span-2 text-center">Available</div>
+                    <div className="col-span-2">API Price</div>
+                    <div className="col-span-1 text-center">On</div>
                   </div>
 
                   {basePackages[n.name]?.map((pkg) => {
@@ -263,8 +276,8 @@ const AdminPackages = () => {
                         <div className="col-span-2">
                           <span className="font-medium text-sm">{pkg.size}</span>
                         </div>
-                        <div className="col-span-2">
-                          <span className="text-sm text-muted-foreground">GH₵{pkg.price.toFixed(2)}</span>
+                        <div className="col-span-1">
+                          <span className="text-xs text-muted-foreground">₵{pkg.price.toFixed(0)}</span>
                         </div>
                         <div className="col-span-3">
                           <Input
@@ -273,7 +286,7 @@ const AdminPackages = () => {
                             placeholder={pkg.price.toFixed(2)}
                             value={s.agent_price ?? ""}
                             onChange={(e) => updateSetting(n.name, pkg.size, "agent_price", e.target.value ? parseFloat(e.target.value) : null)}
-                            className="h-8 text-sm bg-secondary"
+                            className="h-8 text-sm bg-secondary border-none"
                           />
                         </div>
                         <div className="col-span-3">
@@ -283,15 +296,25 @@ const AdminPackages = () => {
                             placeholder={(pkg.price * 1.12).toFixed(2)}
                             value={s.public_price ?? ""}
                             onChange={(e) => updateSetting(n.name, pkg.size, "public_price", e.target.value ? parseFloat(e.target.value) : null)}
-                            className="h-8 text-sm bg-secondary"
+                            className="h-8 text-sm bg-secondary border-none"
                           />
                         </div>
-                        <div className="col-span-2 flex justify-center items-center gap-2">
+                        <div className="col-span-2">
+                          <Input
+                            type="number"
+                            step="0.01"
+                            placeholder={pkg.price.toFixed(2)}
+                            value={s.api_price ?? ""}
+                            onChange={(e) => updateSetting(n.name, pkg.size, "api_price", e.target.value ? parseFloat(e.target.value) : null)}
+                            className="h-8 text-sm bg-amber-500/10 border-amber-500/20 text-amber-600 dark:text-amber-400"
+                          />
+                        </div>
+                        <div className="col-span-1 flex justify-center items-center">
                           <Switch
                             checked={!s.is_unavailable}
                             onCheckedChange={(checked) => updateSetting(n.name, pkg.size, "is_unavailable", !checked)}
+                            className="scale-75"
                           />
-                          {s.is_unavailable && <Badge variant="destructive" className="text-xs">Off</Badge>}
                         </div>
                       </div>
                     );

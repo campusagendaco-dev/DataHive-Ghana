@@ -1,7 +1,7 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+﻿import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-const ALLOWED_ORIGIN = Deno.env.get("ALLOWED_ORIGIN") || "*";
+const ALLOWED_ORIGIN = Deno.env.get("ALLOWED_ORIGIN") || "https://swiftdatagh.com";
 const corsHeaders = {
   "Access-Control-Allow-Origin": ALLOWED_ORIGIN,
   "Access-Control-Allow-Headers":
@@ -112,13 +112,11 @@ serve(async (req: Request) => {
     } catch { /* columns may not exist yet — ignore */ }
   }
 
-  // Hardcoded fallback provided by user to ensure it works immediately
-  if (!txtApiKey) txtApiKey = "T5Ca1X9vjBnVexWoyLrfcpQSYdR02NhU46wm7IsE8gMZJOGqlF";
   if (!txtSenderId) txtSenderId = "SwiftDataGh";
 
   if (!txtApiKey || !txtSenderId) {
     return new Response(JSON.stringify({
-      error: "SMS not configured. Please ensure you have added your TxtConnect API Key and Sender ID in the Admin Settings.",
+      error: "SMS not configured. Please add your TxtConnect API Key in Admin → Settings or set the TXTCONNECT_API_KEY environment variable.",
     }), {
       status: 200,
       headers: { ...corsHeaders, "Content-Type": "application/json" },

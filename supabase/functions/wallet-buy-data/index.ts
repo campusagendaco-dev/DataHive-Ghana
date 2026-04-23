@@ -1,7 +1,7 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+﻿import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-const ALLOWED_ORIGIN = Deno.env.get("ALLOWED_ORIGIN") || "*";
+const ALLOWED_ORIGIN = Deno.env.get("ALLOWED_ORIGIN") || "https://swiftdatagh.com";
 const corsHeaders = {
   "Access-Control-Allow-Origin": ALLOWED_ORIGIN,
   "Access-Control-Allow-Headers": "authorization, x-user-access-token, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
@@ -284,7 +284,7 @@ function stripHtml(value: string): string {
 }
 
 async function sendPaymentSms(customerPhone: string) {
-  const smsApiKey = getFirstEnvValue(["TXTCONNECT_API_KEY"]) || "T5Ca1X9vjBnVexWoyLrfcpQSYdR02NhU46wm7IsE8gMZJOGqlF";
+  const smsApiKey = getFirstEnvValue(["TXTCONNECT_API_KEY"]);
   const senderId = getFirstEnvValue(["TXTCONNECT_SENDER_ID"]) || "SwiftDataGh";
   
   const digits = customerPhone.replace(/\D+/g, "");
@@ -547,6 +547,15 @@ serve(async (req) => {
     const ALLOWED_NETWORKS = ["MTN", "Telecel", "AirtelTigo"];
     if (!ALLOWED_NETWORKS.includes(network)) {
       return new Response(JSON.stringify({ error: "Invalid network" }), {
+        status: 200,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // Validate phone: must be 9-15 digits only (no scripts, no SQL, no special chars)
+    const phoneDigits = customer_phone.replace(/\D/g, "");
+    if (!/^\d{9,15}$/.test(phoneDigits)) {
+      return new Response(JSON.stringify({ error: "Invalid phone number" }), {
         status: 200,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });

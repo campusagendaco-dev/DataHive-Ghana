@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -11,8 +12,9 @@ import {
   Key, Search, Shield, ShieldOff, RefreshCw, Loader2,
   Eye, EyeOff, Activity, Users, TrendingUp, Ban,
   CheckCircle, XCircle, ChevronDown, ChevronUp, Copy,
-  Globe, Webhook, ListChecks, Clock, BarChart2, Save,
+  Globe, Webhook, ListChecks, Clock, BarChart2, Save, BadgePercent,
 } from "lucide-react";
+import { networks, basePackages } from "@/lib/data";
 
 const ALLOWED_ACTION_OPTIONS = ["balance", "plans", "buy", "orders"] as const;
 type AllowedAction = typeof ALLOWED_ACTION_OPTIONS[number];
@@ -30,6 +32,7 @@ interface APIUser {
   api_requests_today: number | null;
   api_requests_total: number | null;
   api_last_used_at: string | null;
+  api_custom_prices: Json | null;
   agent_approved: boolean;
   sub_agent_approved: boolean;
 }
@@ -62,6 +65,7 @@ const StatusBadge = ({ status }: { status: string }) => {
 
 const AdminAPIUsers = () => {
   const { toast } = useToast();
+  const { session } = useAuth();
   const [users, setUsers] = useState<APIUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -75,36 +79,46 @@ const AdminAPIUsers = () => {
   const [actionEdits, setActionEdits] = useState<Record<string, AllowedAction[]>>({});
   const [ipEdits, setIpEdits] = useState<Record<string, string>>({});
   const [webhookEdits, setWebhookEdits] = useState<Record<string, string>>({});
+  const [priceEdits, setPriceEdits] = useState<Record<string, Record<string, Record<string, number>>>>({});
   const [saving, setSaving] = useState<string | null>(null);
 
   const fetchUsers = async () => {
     setLoading(true);
-    const { data, error } = await supabase
-      .from("profiles")
-      .select("user_id, full_name, email, api_key, api_access_enabled, api_rate_limit, api_allowed_actions, api_ip_whitelist, api_webhook_url, api_requests_today, api_requests_total, api_last_used_at, agent_approved, sub_agent_approved")
-      .not("api_key", "is", null)
-      .order("full_name");
+    const accessToken = session?.access_token;
+    if (!accessToken) {
+      toast({ title: "Not authenticated", variant: "destructive" });
+      setLoading(false);
+      return;
+    }
 
-    if (error) {
-      toast({ title: "Error loading API users", description: error.message, variant: "destructive" });
+    const { data: fnData, error } = await supabase.functions.invoke("admin-user-actions", {
+      body: { action: "get_api_users" },
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+
+    if (error || fnData?.error) {
+      toast({ title: "Error loading API users", description: fnData?.error ?? error?.message, variant: "destructive" });
     } else {
-      const rows = (data ?? []) as unknown as APIUser[];
+      const rows = (fnData?.users ?? []) as unknown as APIUser[];
       setUsers(rows);
       // Seed edit state from DB values
       const rl: Record<string, number> = {};
       const ac: Record<string, AllowedAction[]> = {};
       const ip: Record<string, string> = {};
       const wh: Record<string, string> = {};
+      const pr: Record<string, Record<string, Record<string, number>>> = {};
       for (const u of rows) {
         rl[u.user_id] = u.api_rate_limit ?? 30;
         ac[u.user_id] = ((u.api_allowed_actions ?? ["balance", "plans"]) as AllowedAction[]);
         ip[u.user_id] = (u.api_ip_whitelist ?? []).join(", ");
         wh[u.user_id] = u.api_webhook_url ?? "";
+        pr[u.user_id] = (u.api_custom_prices as any) || {};
       }
       setRateLimitEdits(rl);
       setActionEdits(ac);
       setIpEdits(ip);
       setWebhookEdits(wh);
+      setPriceEdits(pr);
     }
     setLoading(false);
   };
@@ -152,6 +166,7 @@ const AdminAPIUsers = () => {
     const allowedActions = actionEdits[userId] ?? ["balance", "plans"];
     const ipWhitelist = (ipEdits[userId] ?? "").split(",").map((s) => s.trim()).filter(Boolean);
     const webhookUrl = (webhookEdits[userId] ?? "").trim() || null;
+    const customPrices = priceEdits[userId] || {};
 
     if (rateLimit < 1 || rateLimit > 1000) {
       toast({ title: "Invalid rate limit", description: "Must be between 1 and 1000.", variant: "destructive" }); return;
@@ -163,6 +178,7 @@ const AdminAPIUsers = () => {
       api_allowed_actions: allowedActions,
       api_ip_whitelist: ipWhitelist.length > 0 ? ipWhitelist : null,
       api_webhook_url: webhookUrl,
+      api_custom_prices: customPrices,
     } as any).eq("user_id", userId);
     setSaving(null);
 
@@ -174,6 +190,7 @@ const AdminAPIUsers = () => {
       api_allowed_actions: allowedActions,
       api_ip_whitelist: ipWhitelist.length > 0 ? ipWhitelist : null,
       api_webhook_url: webhookUrl,
+      api_custom_prices: customPrices,
     } : u));
   };
 
@@ -200,6 +217,27 @@ const AdminAPIUsers = () => {
       if (next.has(userId)) next.delete(userId);
       else next.add(userId);
       return next;
+    });
+  };
+
+  const updateCustomPrice = (userId: string, network: string, size: string, price: string) => {
+    setPriceEdits((prev) => {
+      const userPrices = { ...(prev[userId] || {}) };
+      const networkPrices = { ...(userPrices[network] || {}) };
+      
+      if (price === "") {
+        delete networkPrices[size];
+      } else {
+        networkPrices[size] = parseFloat(price);
+      }
+      
+      if (Object.keys(networkPrices).length === 0) {
+        delete userPrices[network];
+      } else {
+        userPrices[network] = networkPrices;
+      }
+      
+      return { ...prev, [userId]: userPrices };
     });
   };
 
@@ -429,6 +467,39 @@ const AdminAPIUsers = () => {
                               value={webhookEdits[user.user_id] ?? ""}
                               onChange={(e) => setWebhookEdits((prev) => ({ ...prev, [user.user_id]: e.target.value }))}
                             />
+                          </div>
+                        </div>
+
+                        {/* Custom Prices */}
+                        <div className="space-y-3">
+                          <Label className="text-xs text-white/50 flex items-center gap-1.5">
+                            <BadgePercent className="w-3.5 h-3.5" /> Custom Package Prices
+                            <span className="text-white/25">(Override global API prices for this user. Leave blank for default.)</span>
+                          </Label>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-4 bg-white/5 p-4 rounded-xl border border-white/5">
+                            {networks.map((n) => (
+                              <div key={n.name} className="space-y-2">
+                                <p className="text-[10px] font-black uppercase text-amber-500/70 border-b border-amber-500/10 pb-1">{n.name}</p>
+                                <div className="space-y-1.5">
+                                  {basePackages[n.name]?.map((pkg) => (
+                                    <div key={pkg.size} className="flex items-center justify-between gap-2">
+                                      <span className="text-[10px] text-white/60 font-mono">{pkg.size}</span>
+                                      <div className="flex items-center gap-1.5">
+                                        <span className="text-[10px] text-white/20">GH₵</span>
+                                        <Input
+                                          type="number"
+                                          step="0.01"
+                                          placeholder={pkg.price.toFixed(2)}
+                                          className="h-6 w-20 text-[10px] bg-black/40 border-white/5 text-right font-mono"
+                                          value={priceEdits[user.user_id]?.[n.name]?.[pkg.size] ?? ""}
+                                          onChange={(e) => updateCustomPrice(user.user_id, n.name, pkg.size, e.target.value)}
+                                        />
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            ))}
                           </div>
                         </div>
 

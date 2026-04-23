@@ -1,7 +1,7 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+﻿import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-const ALLOWED_ORIGIN = Deno.env.get("ALLOWED_ORIGIN") || "*";
+const ALLOWED_ORIGIN = Deno.env.get("ALLOWED_ORIGIN") || "https://swiftdatagh.com";
 const corsHeaders = {
   "Access-Control-Allow-Origin": ALLOWED_ORIGIN,
   "Access-Control-Allow-Headers": "authorization, content-type, x-api-key",
@@ -124,14 +124,21 @@ serve(async (req: Request) => {
   const prefix = rawApiKey.slice(0, 12); // "sdg_live_xxxx"
   const { data: candidates } = await supabase
     .from("profiles")
-    .select("user_id, full_name, api_key, api_access_enabled, api_rate_limit, api_allowed_actions, api_ip_whitelist, api_webhook_url, agent_approved, sub_agent_approved")
+    .select("user_id, full_name, api_key, api_access_enabled, api_rate_limit, api_allowed_actions, api_ip_whitelist, api_webhook_url, agent_approved, sub_agent_approved, api_custom_prices")
     .like("api_key", `${prefix}%`);
 
   type ProfileRow = {
-    user_id: string; full_name: string; api_key: string | null;
-    api_access_enabled: boolean; api_rate_limit: number | null;
-    api_allowed_actions: string[] | null; api_ip_whitelist: string[] | null;
-    api_webhook_url: string | null; agent_approved: boolean; sub_agent_approved: boolean;
+    user_id: string;
+    full_name: string;
+    api_key: string | null;
+    api_access_enabled: boolean;
+    api_rate_limit: number | null;
+    api_allowed_actions: string[] | null;
+    api_ip_whitelist: string[] | null;
+    api_webhook_url: string | null;
+    agent_approved: boolean;
+    sub_agent_approved: boolean;
+    api_custom_prices: Record<string, Record<string, number>> | null;
   };
   const profile = (candidates as ProfileRow[] ?? []).find((p) => p.api_key && safeEqual(p.api_key, rawApiKey));
   if (!profile) return json({ error: "Invalid API key" }, 401);
@@ -199,10 +206,21 @@ serve(async (req: Request) => {
     if (action === "plans") {
       const { data: plans } = await supabase
         .from("global_package_settings")
-        .select("network, package_size, agent_price, public_price, is_unavailable")
+        .select("network, package_size, agent_price, public_price, api_price, is_unavailable")
         .eq("is_unavailable", false)
         .order("network").order("package_size");
-      return json({ success: true, plans: plans ?? [] });
+
+      // Apply custom overrides for this user
+      const customPrices = profile.api_custom_prices || {};
+      const customizedPlans = (plans || []).map(p => {
+        const override = customPrices[p.network]?.[p.package_size];
+        if (override && override > 0) {
+          return { ...p, api_price: override, is_custom: true };
+        }
+        return p;
+      });
+
+      return json({ success: true, plans: customizedPlans });
     }
 
     // ── buy ──────────────────────────────────────────────────────────────────
@@ -236,16 +254,26 @@ serve(async (req: Request) => {
       const normalizedPkg = package_size.replace(/\s+/g, "").toUpperCase();
       const { data: pkgRow } = await supabase
         .from("global_package_settings")
-        .select("agent_price, public_price, is_unavailable")
+        .select("agent_price, public_price, api_price, is_unavailable")
         .eq("network", network)
         .eq("package_size", normalizedPkg)
         .maybeSingle();
 
       if (pkgRow?.is_unavailable) return json({ error: "Package is unavailable" }, 400);
 
-      const expectedPrice = Number(pkgRow?.agent_price) > 0
-        ? Number(pkgRow!.agent_price)
-        : Number(pkgRow?.public_price);
+      // Priority: user_custom_price > global_api_price > global_agent_price > global_public_price
+      let expectedPrice = 0;
+      const customOverride = profile.api_custom_prices?.[network]?.[package_size];
+      
+      if (Number(customOverride) > 0) {
+        expectedPrice = Number(customOverride);
+      } else if (Number(pkgRow?.api_price) > 0) {
+        expectedPrice = Number(pkgRow!.api_price);
+      } else if (Number(pkgRow?.agent_price) > 0) {
+        expectedPrice = Number(pkgRow!.agent_price);
+      } else {
+        expectedPrice = Number(pkgRow?.public_price);
+      }
 
       if (!(Number.isFinite(expectedPrice) && expectedPrice > 0))
         return json({ error: "Package price not configured" }, 400);

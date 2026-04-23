@@ -8,7 +8,7 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-type AdminUserAction = "send_reset_link" | "reset_password" | "delete_user";
+type AdminUserAction = "get_api_users" | "send_reset_link" | "reset_password" | "delete_user";
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -62,8 +62,37 @@ serve(async (req) => {
       });
     }
 
-    const { action, user_id, email, redirect_path, new_password } = await req.json();
-    if (!action || !user_id) {
+    const body = await req.json();
+    const { action, user_id, email, redirect_path, new_password } = body;
+
+    if (!action) {
+      return new Response(JSON.stringify({ error: "Missing required fields" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // ── get_api_users: returns all profiles that have an API key ──────────────
+    if (action === "get_api_users") {
+      const { data, error } = await supabaseAdmin
+        .from("profiles")
+        .select("user_id, full_name, email, api_key, api_access_enabled, api_rate_limit, api_allowed_actions, api_ip_whitelist, api_webhook_url, api_requests_today, api_requests_total, api_last_used_at, agent_approved, sub_agent_approved, api_custom_prices")
+        .not("api_key", "is", null)
+        .order("full_name");
+      if (error) {
+        return new Response(JSON.stringify({ error: error.message }), {
+          status: 500,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      return new Response(JSON.stringify({ users: data ?? [] }), {
+        status: 200,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // All other actions require a valid user_id
+    if (!user_id) {
       return new Response(JSON.stringify({ error: "Missing required fields" }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
