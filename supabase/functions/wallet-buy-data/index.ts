@@ -636,36 +636,11 @@ serve(async (req) => {
     let parentProfit = 0;
 
     if (isSubAgent && parentAgentId) {
-      // Resolve global agent base price (what the parent agent normally pays per unit)
-      const globalBasePrice = await resolveExpectedAmount(
-        supabaseAdmin,
-        network,
-        package_size,
-        pricingContext.multiplier,
-      );
-
+      const globalBasePrice = await resolveExpectedAmount(supabaseAdmin, network, package_size, pricingContext.multiplier);
       if (globalBasePrice && globalBasePrice > 0 && expectedAmount > globalBasePrice) {
         parentProfit = parseFloat((expectedAmount - globalBasePrice).toFixed(2));
       }
-
-      // Credit the parent agent's wallet with their profit margin
-      if (parentProfit > 0) {
-        // Ensure parent wallet is credited atomically
-        const { error: creditError } = await supabaseAdmin.rpc("credit_wallet", {
-          p_agent_id: parentAgentId,
-          p_amount: parentProfit,
-        });
-
-        if (creditError) {
-          console.error("Failed to credit parent profit:", creditError);
-        } else {
-          console.log(`Parent profit credited atomically: GHS ${parentProfit} to agent ${parentAgentId}`);
-        }
-
-        console.log(`Parent profit credited: GHS ${parentProfit} to agent ${parentAgentId}`);
-      }
     }
-    // ─────────────────────────────────────────────────────────────────────────
 
     const orderId = crypto.randomUUID();
     await supabaseAdmin.from("orders").insert({
@@ -704,6 +679,12 @@ serve(async (req) => {
 
     if (fulfillmentResult.ok) {
       await supabaseAdmin.from("orders").update({ status: "fulfilled", failure_reason: null }).eq("id", orderId);
+      
+      // Credit parent profit after successful fulfillment
+      if (parentProfit > 0 && parentAgentId) {
+        await supabaseAdmin.rpc("credit_wallet", { p_agent_id: parentAgentId, p_amount: parentProfit });
+      }
+
       return new Response(JSON.stringify({ success: true, order_id: orderId, status: "fulfilled" }), {
         status: 200,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -714,6 +695,17 @@ serve(async (req) => {
       status: "fulfillment_failed",
       failure_reason: fulfillmentResult.reason,
     }).eq("id", orderId);
+
+    // ── REFUND SUB-AGENT ON FAILURE ──────────────────────────────────────────
+    // Since this was a wallet order, we must return the funds if delivery failed.
+    const { error: refundError } = await supabaseAdmin.rpc("credit_wallet", {
+      p_agent_id: user.id,
+      p_amount: expectedAmount,
+    });
+    if (!refundError) {
+      console.log(`Refunded GHS ${expectedAmount} to ${user.id} due to fulfillment failure.`);
+    }
+    // ─────────────────────────────────────────────────────────────────────────
 
     return new Response(JSON.stringify({
       success: true,

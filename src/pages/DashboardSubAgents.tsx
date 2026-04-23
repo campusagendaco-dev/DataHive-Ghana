@@ -444,18 +444,6 @@ const DashboardSubAgents = () => {
               {savingPrices ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
               {savingPrices ? "Saving..." : "Save Prices"}
             </button>
-            {subAgents.filter((s) => s.sub_agent_approved).length > 0 && (
-              <button
-                onClick={handlePushPrices}
-                disabled={pushingPrices}
-                className="border border-border hover:bg-accent disabled:opacity-50 text-foreground font-semibold px-4 py-2 rounded-lg text-sm transition-colors flex items-center gap-2"
-              >
-                {pushingPrices ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
-                {pushingPrices
-                  ? "Pushing..."
-                  : `Push to ${subAgents.filter((s) => s.sub_agent_approved).length} Active Sub Agent(s)`}
-              </button>
-            )}
           </div>
         </div>
       )}

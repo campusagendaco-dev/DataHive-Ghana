@@ -645,13 +645,7 @@ serve(async (req) => {
     if (orderType === "wallet_topup") {
       const { data: order } = await supabase.from("orders").select("amount, agent_id").eq("id", orderId).maybeSingle();
       if (order) {
-        const { data: wallet } = await supabase.from("wallets").select("balance").eq("agent_id", order.agent_id).maybeSingle();
-        if (wallet) {
-          const newBalance = parseFloat(((wallet.balance || 0) + order.amount).toFixed(2));
-          await supabase.from("wallets").update({ balance: newBalance }).eq("agent_id", order.agent_id);
-        } else {
-          await supabase.from("wallets").insert({ agent_id: order.agent_id, balance: order.amount });
-        }
+        await supabase.rpc("credit_wallet", { p_agent_id: order.agent_id, p_amount: order.amount });
         await supabase.from("orders").update({ status: "fulfilled", failure_reason: null }).eq("id", orderId);
       }
       return new Response(JSON.stringify({ received: true, fulfilled: true }), {
