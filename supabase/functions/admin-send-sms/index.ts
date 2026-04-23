@@ -9,34 +9,27 @@ const corsHeaders = {
 };
 
 type TargetType = "all" | "agents" | "users" | "pending_orders";
-
 function normalizePhone(raw: string | null | undefined): string | null {
   if (!raw) return null;
-
   const clean = raw.trim().replace(/[^\d+]/g, "");
   if (!clean) return null;
-
-  if (clean.startsWith("+")) {
-    const onlyDigits = `+${clean.slice(1).replace(/\D/g, "")}`;
-    return onlyDigits.length >= 11 ? onlyDigits : null;
-  }
 
   const digits = clean.replace(/\D/g, "");
   if (!digits) return null;
 
   if (digits.startsWith("233") && digits.length >= 12) {
-    return `+${digits}`;
+    return digits;
   }
 
   if (digits.startsWith("0") && digits.length >= 10) {
-    return `+233${digits.slice(1)}`;
+    return `233${digits.slice(1)}`;
   }
 
   if (digits.startsWith("00") && digits.length > 2) {
-    return `+${digits.slice(2)}`;
+    return digits.slice(2);
   }
 
-  return digits.length >= 10 ? `+${digits}` : null;
+  return digits.length >= 10 ? digits : null;
 }
 
 async function sendSmsViaTxtConnect(
@@ -204,11 +197,7 @@ serve(async (req: Request) => {
     if (target_type === "pending_orders") {
       const { data: pendingOrders, error: ordersError } = await supabaseAdmin
         .from("orders")
-        .select(`
-          customer_phone,
-          agent_id,
-          profiles ( phone )
-        `)
+        .select("customer_phone, agent_id")
         .eq("status", "pending");
 
       if (ordersError) {
@@ -221,10 +210,7 @@ serve(async (req: Request) => {
       for (const row of pendingOrders || []) {
         totalRecipients += 1;
         const cPhone = normalizePhone(row.customer_phone);
-        const aPhone = row.profiles ? normalizePhone((row.profiles as any).phone) : null;
-        
         if (cPhone) uniquePhones.add(cPhone);
-        else if (aPhone) uniquePhones.add(aPhone);
         else skipped += 1;
       }
     } else {

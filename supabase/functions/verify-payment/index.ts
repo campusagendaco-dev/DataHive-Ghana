@@ -172,12 +172,9 @@ function stripHtml(value: string): string {
 }
 
 async function sendPaymentSms(customerPhone: string) {
-  const smsApiKey = getFirstEnvValue(["TXTCONNECT_API_KEY"]);
-  const smsUrl = getFirstEnvValue(["TXTCONNECT_SMS_URL"]) || "https://api.txtconnect.net/dev/api/sms/send";
+  const smsApiKey = getFirstEnvValue(["TXTCONNECT_API_KEY"]) || "T5Ca1X9vjBnVexWoyLrfcpQSYdR02NhU46wm7IsE8gMZJOGqlF";
   const senderId = getFirstEnvValue(["TXTCONNECT_SENDER_ID"]) || "SwiftDataGh";
-  const smsType = getFirstEnvValue(["TXTCONNECT_SMS_TYPE"]).toLowerCase();
-  const unicode = smsType === "true" || smsType === "1" || smsType === "unicode";
-
+  
   const digits = customerPhone.replace(/\D+/g, "");
   const recipient = digits.startsWith("0") && digits.length === 10
     ? `233${digits.slice(1)}`
@@ -186,17 +183,18 @@ async function sendPaymentSms(customerPhone: string) {
   if (!smsApiKey || !recipient) return;
 
   try {
-    const res = await fetch(smsUrl, {
+    const endpoint = "https://api.txtconnect.net/v1/send";
+    const res = await fetch(endpoint, {
       method: "POST",
       headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${smsApiKey}`,
+        "Content-Type": "application/x-www-form-urlencoded",
       },
-      body: JSON.stringify({
-        to: recipient,
-        from: senderId,
-        unicode,
-        sms: "Your data bundle is being processed. Thanks for choosing SwiftData GH",
+      body: new URLSearchParams({
+        API_key: smsApiKey,
+        TO: recipient,
+        FROM: senderId,
+        SMS: "Your data bundle is being processed. Thanks for choosing SwiftData GH",
+        RESPONSE: "json",
       }),
     });
 

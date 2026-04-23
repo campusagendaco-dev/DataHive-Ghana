@@ -11,17 +11,13 @@ function normalizePhone(raw: string | null | undefined): string | null {
   const clean = raw.trim().replace(/[^\d+]/g, "");
   if (!clean) return null;
 
-  if (clean.startsWith("+")) {
-    const onlyDigits = `+${clean.slice(1).replace(/\D/g, "")}`;
-    return onlyDigits.length >= 11 ? onlyDigits : null;
-  }
   const digits = clean.replace(/\D/g, "");
   if (!digits) return null;
 
-  if (digits.startsWith("233") && digits.length >= 12) return `+${digits}`;
-  if (digits.startsWith("0") && digits.length >= 10) return `+233${digits.slice(1)}`;
-  if (digits.startsWith("00") && digits.length > 2) return `+${digits.slice(2)}`;
-  return digits.length >= 10 ? `+${digits}` : null;
+  if (digits.startsWith("233") && digits.length >= 12) return digits;
+  if (digits.startsWith("0") && digits.length >= 10) return `233${digits.slice(1)}`;
+  if (digits.startsWith("00") && digits.length > 2) return digits.slice(2);
+  return digits.length >= 10 ? digits : null;
 }
 
 async function sendSmsViaTxtConnect(apiKey: string, from: string, to: string, body: string) {

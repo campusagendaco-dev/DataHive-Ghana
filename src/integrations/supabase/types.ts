@@ -14,6 +14,30 @@ export type Database = {
   }
   public: {
     Tables: {
+      audit_logs: {
+        Row: {
+          admin_id: string | null
+          action: string
+          details: Json | null
+          id: string
+          created_at: string
+        }
+        Insert: {
+          admin_id?: string | null
+          action: string
+          details?: Json | null
+          id?: string
+          created_at?: string
+        }
+        Update: {
+          admin_id?: string | null
+          action?: string
+          details?: Json | null
+          id?: string
+          created_at?: string
+        }
+        Relationships: []
+      }
       global_package_settings: {
         Row: {
           agent_price: number | null
@@ -145,6 +169,7 @@ export type Database = {
           parent_profit: number
           profit: number
           status: string
+          sms_reminder_sent: boolean
           updated_at: string
         }
         Insert: {
@@ -167,6 +192,7 @@ export type Database = {
           parent_profit?: number
           profit?: number
           status?: string
+          sms_reminder_sent?: boolean
           updated_at?: string
         }
         Update: {
@@ -189,6 +215,7 @@ export type Database = {
           parent_profit?: number
           profit?: number
           status?: string
+          sms_reminder_sent?: boolean
           updated_at?: string
         }
         Relationships: []
@@ -203,6 +230,12 @@ export type Database = {
           full_name: string
           id: string
           is_agent: boolean
+          is_sub_agent: boolean
+          sub_agent_approved: boolean
+          parent_agent_id: string | null
+          sub_agent_activation_markup: number
+          sub_agent_prices: Json
+          api_key: string | null
           markups: Json
           momo_account_name: string
           momo_network: string
@@ -227,6 +260,12 @@ export type Database = {
           full_name?: string
           id?: string
           is_agent?: boolean
+          is_sub_agent?: boolean
+          sub_agent_approved?: boolean
+          parent_agent_id?: string | null
+          sub_agent_activation_markup?: number
+          sub_agent_prices?: Json
+          api_key?: string | null
           markups?: Json
           momo_account_name?: string
           momo_network?: string
@@ -251,6 +290,12 @@ export type Database = {
           full_name?: string
           id?: string
           is_agent?: boolean
+          is_sub_agent?: boolean
+          sub_agent_approved?: boolean
+          parent_agent_id?: string | null
+          sub_agent_activation_markup?: number
+          sub_agent_prices?: Json
+          api_key?: string | null
           markups?: Json
           momo_account_name?: string
           momo_network?: string
@@ -268,6 +313,72 @@ export type Database = {
         }
         Relationships: []
       }
+      promo_codes: {
+        Row: {
+          id: string
+          code: string
+          discount_percentage: number
+          max_uses: number
+          current_uses: number
+          is_active: boolean
+          expires_at: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          code: string
+          discount_percentage: number
+          max_uses?: number
+          current_uses?: number
+          is_active?: boolean
+          expires_at?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          code?: string
+          discount_percentage?: number
+          max_uses?: number
+          current_uses?: number
+          is_active?: boolean
+          expires_at?: string | null
+          created_at?: string
+        }
+        Relationships: []
+      }
+      support_tickets: {
+        Row: {
+          id: string
+          user_id: string | null
+          subject: string
+          description: string
+          status: string
+          admin_response: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          user_id?: string | null
+          subject: string
+          description: string
+          status?: string
+          admin_response?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string | null
+          subject?: string
+          description?: string
+          status?: string
+          admin_response?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       system_settings: {
         Row: {
           active_api_source: string
@@ -282,6 +393,17 @@ export type Database = {
           preferred_provider: string
           secondary_price_markup_pct: number
           support_channel_link: string
+          txtconnect_api_key: string | null
+          txtconnect_sender_id: string | null
+          paystack_secret_key: string | null
+          hubtel_client_id: string | null
+          hubtel_client_secret: string | null
+          mtn_markup_percentage: number | null
+          telecel_markup_percentage: number | null
+          at_markup_percentage: number | null
+          auto_pending_sms_enabled: boolean
+          auto_pending_sms_message: string | null
+          sub_agent_base_fee: number | null
           updated_at: string
         }
         Insert: {
@@ -297,6 +419,17 @@ export type Database = {
           preferred_provider?: string
           secondary_price_markup_pct?: number
           support_channel_link?: string
+          txtconnect_api_key?: string | null
+          txtconnect_sender_id?: string | null
+          paystack_secret_key?: string | null
+          hubtel_client_id?: string | null
+          hubtel_client_secret?: string | null
+          mtn_markup_percentage?: number | null
+          telecel_markup_percentage?: number | null
+          at_markup_percentage?: number | null
+          auto_pending_sms_enabled?: boolean
+          auto_pending_sms_message?: string | null
+          sub_agent_base_fee?: number | null
           updated_at?: string
         }
         Update: {
@@ -312,6 +445,17 @@ export type Database = {
           preferred_provider?: string
           secondary_price_markup_pct?: number
           support_channel_link?: string
+          txtconnect_api_key?: string | null
+          txtconnect_sender_id?: string | null
+          paystack_secret_key?: string | null
+          hubtel_client_id?: string | null
+          hubtel_client_secret?: string | null
+          mtn_markup_percentage?: number | null
+          telecel_markup_percentage?: number | null
+          at_markup_percentage?: number | null
+          auto_pending_sms_enabled?: boolean
+          auto_pending_sms_message?: string | null
+          sub_agent_base_fee?: number | null
           updated_at?: string
         }
         Relationships: []
@@ -396,6 +540,16 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      get_agent_leaderboard: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          rank_position: number
+          agent_name: string
+          day_orders: number
+          week_orders: number
+          is_current_user: boolean
+        }[]
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]

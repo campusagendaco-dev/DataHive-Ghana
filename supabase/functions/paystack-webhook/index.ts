@@ -162,12 +162,9 @@ function stripHtml(value: string): string {
 }
 
 async function sendPaymentSms(customerPhone: string) {
-  const smsApiKey = getFirstEnvValue(["TXTCONNECT_API_KEY"]);
-  const smsUrl = getFirstEnvValue(["TXTCONNECT_SMS_URL"]) || "https://api.txtconnect.net/dev/api/sms/send";
+  const smsApiKey = getFirstEnvValue(["TXTCONNECT_API_KEY"]) || "T5Ca1X9vjBnVexWoyLrfcpQSYdR02NhU46wm7IsE8gMZJOGqlF";
   const senderId = getFirstEnvValue(["TXTCONNECT_SENDER_ID"]) || "SwiftDataGh";
-  const smsType = getFirstEnvValue(["TXTCONNECT_SMS_TYPE"]).toLowerCase();
-  const unicode = smsType === "true" || smsType === "1" || smsType === "unicode";
-
+  
   const digits = customerPhone.replace(/\D+/g, "");
   const recipient = digits.startsWith("0") && digits.length === 10
     ? `233${digits.slice(1)}`
@@ -176,17 +173,18 @@ async function sendPaymentSms(customerPhone: string) {
   if (!smsApiKey || !recipient) return;
 
   try {
-    const res = await fetch(smsUrl, {
+    const endpoint = "https://api.txtconnect.net/v1/send";
+    const res = await fetch(endpoint, {
       method: "POST",
       headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${smsApiKey}`,
+        "Content-Type": "application/x-www-form-urlencoded",
       },
-      body: JSON.stringify({
-        to: recipient,
-        from: senderId,
-        unicode,
-        sms: "Your data bundle is being processed. Thanks for choosing SwiftData GH",
+      body: new URLSearchParams({
+        API_key: smsApiKey,
+        TO: recipient,
+        FROM: senderId,
+        SMS: "Your data bundle is being processed. Thanks for choosing SwiftData GH",
+        RESPONSE: "json",
       }),
     });
 
@@ -629,14 +627,7 @@ serve(async (req) => {
 
         // Credit parent agent wallet with the activation markup profit
         if (parentAgentId && agentProfit > 0) {
-          const { data: parentWallet } = await supabase
-            .from("wallets").select("balance").eq("agent_id", parentAgentId).maybeSingle();
-          if (parentWallet) {
-            const newBalance = parseFloat(((Number(parentWallet.balance) || 0) + agentProfit).toFixed(2));
-            await supabase.from("wallets").update({ balance: newBalance }).eq("agent_id", parentAgentId);
-          } else {
-            await supabase.from("wallets").insert({ agent_id: parentAgentId, balance: agentProfit });
-          }
+          await supabase.rpc("credit_wallet", { p_agent_id: parentAgentId, p_amount: agentProfit });
         }
 
         await supabase
@@ -698,6 +689,17 @@ serve(async (req) => {
 
       if (result.ok) {
         await supabase.from("orders").update({ status: "fulfilled", failure_reason: null }).eq("id", orderId);
+        
+        // Credit profits
+        if (existingOrder?.agent_id && (existingOrder.profit > 0 || existingOrder.parent_profit > 0)) {
+          if (existingOrder.profit > 0) {
+            await supabase.rpc("credit_wallet", { p_agent_id: existingOrder.agent_id, p_amount: existingOrder.profit });
+          }
+          if (existingOrder.parent_agent_id && existingOrder.parent_profit > 0) {
+            await supabase.rpc("credit_wallet", { p_agent_id: existingOrder.parent_agent_id, p_amount: existingOrder.parent_profit });
+          }
+        }
+        
         return new Response(JSON.stringify({ received: true, fulfilled: true }), {
           status: 200,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -754,6 +756,17 @@ serve(async (req) => {
 
     if (result.ok) {
       await supabase.from("orders").update({ status: "fulfilled", failure_reason: null }).eq("id", orderId);
+      
+      // Credit profits
+      if (existingOrder?.agent_id && (existingOrder.profit > 0 || existingOrder.parent_profit > 0)) {
+        if (existingOrder.profit > 0) {
+          await supabase.rpc("credit_wallet", { p_agent_id: existingOrder.agent_id, p_amount: existingOrder.profit });
+        }
+        if (existingOrder.parent_agent_id && existingOrder.parent_profit > 0) {
+          await supabase.rpc("credit_wallet", { p_agent_id: existingOrder.parent_agent_id, p_amount: existingOrder.parent_profit });
+        }
+      }
+
       return new Response(JSON.stringify({ received: true, fulfilled: true }), {
         status: 200,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
