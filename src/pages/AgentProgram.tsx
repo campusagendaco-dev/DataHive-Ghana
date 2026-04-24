@@ -5,6 +5,8 @@ import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { getAppBaseUrl } from "@/lib/app-base-url";
+import { invokePublicFunction } from "@/lib/public-function-client";
 
 const benefits = [
   { icon: TrendingUp, title: "Set Your Own Profit", desc: "Set your reseller prices above our wholesale base and keep the margin." },
@@ -69,7 +71,7 @@ const AgentProgram = () => {
         };
 
   const handleRequestApproval = async () => {
-    if (!user) {
+    if (!user || !profile) {
       navigate("/login");
       return;
     }
@@ -87,8 +89,41 @@ const AgentProgram = () => {
     }
 
     await refreshProfile();
-    toast({ title: "Request submitted", description: "Proceed to pay GHS 80 for instant activation." });
-    navigate("/agent/pending");
+    
+    // Initialize payment immediately
+    const ACTIVATION_FEE = 80;
+    const PAYSTACK_FEE_RATE = 0.03;
+    const PAYSTACK_FEE_CAP = 100;
+    const paystackFee = Math.min(ACTIVATION_FEE * PAYSTACK_FEE_RATE, PAYSTACK_FEE_CAP);
+    const ACTIVATION_TOTAL = parseFloat((ACTIVATION_FEE + paystackFee).toFixed(2));
+    const orderId = crypto.randomUUID();
+
+    const { data: paymentData, error: paymentError } = await invokePublicFunction("initialize-payment", {
+      body: {
+        email: profile.email || `${user.id}@agent.swiftdata.gh`,
+        amount: ACTIVATION_TOTAL,
+        reference: orderId,
+        callback_url: `${getAppBaseUrl()}/agent/pending?reference=${orderId}`,
+        metadata: {
+          order_id: orderId,
+          order_type: "agent_activation",
+          agent_id: user.id,
+          base_amount: ACTIVATION_FEE,
+          paystack_fee: paystackFee,
+        },
+      },
+    });
+
+    if (paymentError || !paymentData?.authorization_url) {
+      toast({ 
+        title: "Payment initialization failed", 
+        description: "Your request was saved, but we couldn't start the payment. Please go to the pending page to pay.", 
+        variant: "destructive" 
+      });
+      navigate("/agent/pending");
+    } else {
+      window.location.href = paymentData.authorization_url;
+    }
     setSubmitting(false);
   };
 

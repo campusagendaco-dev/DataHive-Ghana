@@ -9,6 +9,8 @@ import {
   X, ArrowLeft, BadgeCheck, Zap
 } from "lucide-react";
 import StoreNavbar from "@/components/StoreNavbar";
+import { getAppBaseUrl } from "@/lib/app-base-url";
+import { invokePublicFunction } from "@/lib/public-function-client";
 
 interface ParentAgent {
   user_id: string;
@@ -98,8 +100,49 @@ const SubAgentSignup = () => {
       parent_agent_id: agent!.user_id,
     } as any).eq("user_id", userId);
 
-    toast({ title: "Account created!", description: "Complete your activation below." });
-    navigate("/sub-agent/pending");
+    toast({ title: "Account created!", description: "Initializing activation payment..." });
+    
+    // Initialize payment immediately
+    const totalFee = Math.max(0, Number(agent!.sub_agent_activation_markup || 0));
+    const orderId = crypto.randomUUID();
+    const agentProfitShare = parseFloat((totalFee * 0.5).toFixed(2));
+    const swiftDataShare = parseFloat((totalFee - agentProfitShare).toFixed(2));
+
+    if (totalFee > 0) {
+      const { data: paymentData, error: paymentError } = await invokePublicFunction("initialize-payment", {
+        body: {
+          email: email.trim(),
+          amount: totalFee,
+          reference: orderId,
+          callback_url: `${getAppBaseUrl()}/sub-agent/pending?reference=${orderId}`,
+          metadata: {
+            order_id: orderId,
+            order_type: "sub_agent_activation",
+            sub_agent_id: userId,
+            agent_id: agent!.user_id,
+            parent_agent_id: agent!.user_id,
+            activation_fee: totalFee,
+            paystack_fee: 0,
+            agent_profit: agentProfitShare,
+            swiftdata_share: swiftDataShare,
+          },
+        },
+      });
+
+      if (paymentError || !paymentData?.authorization_url) {
+        toast({ 
+          title: "Payment initialization failed", 
+          description: "Your account was created, but we couldn't start the payment. Please go to the pending page to pay.", 
+          variant: "destructive" 
+        });
+        navigate("/sub-agent/pending");
+      } else {
+        window.location.href = paymentData.authorization_url;
+      }
+    } else {
+      // If fee is 0, just go to pending/dashboard
+      navigate("/sub-agent/pending");
+    }
     setSubmitting(false);
   };
 
