@@ -81,9 +81,12 @@ const AdminUsers = () => {
 
   const handleApproveAgent = async (row: UserRow) => {
     setRowAction(row.user_id, "approve-agent");
-    const { error } = await supabase.from("profiles").update({ agent_approved: true }).eq("user_id", row.user_id);
-    if (error) {
-      toast({ title: "Failed to approve agent", description: error.message, variant: "destructive" });
+    const { data, error } = await supabase.functions.invoke("admin-user-actions", {
+      body: { action: "approve_agent", user_id: row.user_id },
+    });
+
+    if (error || data?.error) {
+      toast({ title: "Failed to approve agent", description: data?.error || error?.message, variant: "destructive" });
     } else {
       toast({ title: "Agent approved" });
       setUsers(prev => prev.map(u => u.user_id === row.user_id ? { ...u, agent_approved: true } : u));
@@ -98,25 +101,12 @@ const AdminUsers = () => {
     }
     setRowAction(row.user_id, "approve-sub");
 
-    const { data: parent } = await supabase
-      .from("profiles")
-      .select("sub_agent_prices")
-      .eq("user_id", row.parent_agent_id)
-      .maybeSingle();
+    const { data, error } = await supabase.functions.invoke("admin-user-actions", {
+      body: { action: "approve_sub_agent", user_id: row.user_id },
+    });
 
-    const parentSubAgentPrices = (parent?.sub_agent_prices && typeof parent.sub_agent_prices === "object")
-      ? parent.sub_agent_prices : {};
-
-    const { error } = await supabase.from("profiles").update({
-      is_agent: true,
-      agent_approved: true,
-      onboarding_complete: true,
-      sub_agent_approved: true,
-      agent_prices: parentSubAgentPrices,
-    }).eq("user_id", row.user_id);
-
-    if (error) {
-      toast({ title: "Failed to approve sub-agent", description: error.message, variant: "destructive" });
+    if (error || data?.error) {
+      toast({ title: "Failed to approve sub-agent", description: data?.error || error?.message, variant: "destructive" });
     } else {
       toast({ title: "Sub-agent approved", description: "User can now access dashboard." });
       setUsers(prev => prev.map(u => u.user_id === row.user_id

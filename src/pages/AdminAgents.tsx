@@ -87,12 +87,12 @@ const AdminAgents = () => {
 
   const handleApprove = async (userId: string) => {
     setApprovingId(userId);
-    const { error } = await supabase
-      .from("profiles")
-      .update({ agent_approved: true })
-      .eq("user_id", userId);
-    if (error) {
-      toast({ title: "Failed to approve", description: error.message, variant: "destructive" });
+    const { data, error } = await supabase.functions.invoke("admin-user-actions", {
+      body: { action: "approve_agent", user_id: userId },
+    });
+
+    if (error || data?.error) {
+      toast({ title: "Failed to approve", description: data?.error || error?.message, variant: "destructive" });
     } else {
       toast({ title: "Agent approved" });
       setAgents(prev => prev.map(a => a.user_id === userId ? { ...a, agent_approved: true } : a));
@@ -103,12 +103,12 @@ const AdminAgents = () => {
 
   const handleRevoke = async (userId: string) => {
     setApprovingId(userId);
-    const { error } = await supabase
-      .from("profiles")
-      .update({ agent_approved: false })
-      .eq("user_id", userId);
-    if (error) {
-      toast({ title: "Failed to revoke", description: error.message, variant: "destructive" });
+    const { data, error } = await supabase.functions.invoke("admin-user-actions", {
+      body: { action: "revoke_agent", user_id: userId },
+    });
+
+    if (error || data?.error) {
+      toast({ title: "Failed to revoke", description: data?.error || error?.message, variant: "destructive" });
     } else {
       toast({ title: "Agent access revoked" });
       setAgents(prev => prev.map(a => a.user_id === userId ? { ...a, agent_approved: false } : a));
@@ -124,31 +124,26 @@ const AdminAgents = () => {
     }
     setToppingUp(agent.user_id);
 
-    const { data: wallet } = await supabase.from("wallets").select("balance").eq("agent_id", agent.user_id).maybeSingle();
-
-    if (!wallet) {
-      await supabase.from("wallets").insert({ agent_id: agent.user_id, balance: amount } as any);
-    } else {
-      const newBal = parseFloat((wallet.balance + amount).toFixed(2));
-      await supabase.from("wallets").update({ balance: newBal }).eq("agent_id", agent.user_id);
-    }
-
-    await supabase.from("orders").insert({
-      agent_id: agent.user_id, order_type: "wallet_topup", amount, profit: 0, status: "fulfilled",
+    const { data, error } = await supabase.functions.invoke("admin-user-actions", {
+      body: { action: "manual_topup", user_id: agent.user_id, amount },
     });
 
-    if (currentUser) {
-      await logAudit(currentUser.id, "manual_wallet_topup", {
-        target_agent_id: agent.user_id,
-        target_agent_name: agent.full_name,
-        amount,
-        previous_balance: wallet?.balance ?? 0,
-      });
-    }
+    if (error || data?.error) {
+      toast({ title: "Failed to top up", description: data?.error || error?.message, variant: "destructive" });
+    } else {
+      if (currentUser) {
+        await logAudit(currentUser.id, "manual_wallet_topup", {
+          target_agent_id: agent.user_id,
+          target_agent_name: agent.full_name,
+          amount,
+          new_balance: data.new_balance,
+        });
+      }
 
-    toast({ title: `GH₵${amount.toFixed(2)} credited to ${agent.full_name}` });
-    setTopupAmount(prev => ({ ...prev, [agent.user_id]: "" }));
-    setAgents(prev => prev.map(a => a.user_id === agent.user_id ? { ...a, wallet_balance: (a.wallet_balance || 0) + amount } : a));
+      toast({ title: `GH₵${amount.toFixed(2)} credited to ${agent.full_name}` });
+      setTopupAmount(prev => ({ ...prev, [agent.user_id]: "" }));
+      setAgents(prev => prev.map(a => a.user_id === agent.user_id ? { ...a, wallet_balance: data.new_balance } : a));
+    }
     setToppingUp(null);
   };
 

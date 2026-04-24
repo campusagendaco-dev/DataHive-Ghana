@@ -3,7 +3,23 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 import { corsHeaders } from "../_shared/cors.ts";
 
-type AdminUserAction = "get_api_users" | "send_reset_link" | "reset_password" | "delete_user" | "toggle_api_access" | "revoke_api_key" | "update_api_settings";
+type AdminUserAction = 
+  | "get_api_users" 
+  | "send_reset_link" 
+  | "reset_password" 
+  | "delete_user" 
+  | "toggle_api_access" 
+  | "revoke_api_key" 
+  | "update_api_settings"
+  | "approve_agent"
+  | "revoke_agent" 
+  | "approve_sub_agent" 
+  | "manual_topup"
+  | "update_system_settings"
+  | "confirm_withdrawal";
+
+
+
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -183,8 +199,176 @@ serve(async (req) => {
       });
     }
 
-    if (!["send_reset_link", "reset_password", "delete_user", "toggle_api_access", "revoke_api_key", "update_api_settings"].includes(action as AdminUserAction)) {
+    // ── approve_agent ──────────────────────────────────────────────────────
+    if (action === "approve_agent") {
+      const { error: updateError } = await supabaseAdmin
+        .from("profiles")
+        .update({ agent_approved: true })
+        .eq("user_id", user_id);
+
+      if (updateError) throw updateError;
+      return new Response(JSON.stringify({ success: true }), {
+        status: 200,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // ── revoke_agent ───────────────────────────────────────────────────────
+    if (action === "revoke_agent") {
+      const { error: updateError } = await supabaseAdmin
+        .from("profiles")
+        .update({ agent_approved: false })
+        .eq("user_id", user_id);
+
+      if (updateError) throw updateError;
+      return new Response(JSON.stringify({ success: true }), {
+        status: 200,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // ── approve_sub_agent ──────────────────────────────────────────────────
+    if (action === "approve_sub_agent") {
+      // Fetch user's profile to get parent_agent_id
+      const { data: profile } = await supabaseAdmin
+        .from("profiles")
+        .select("parent_agent_id")
+        .eq("user_id", user_id)
+        .single();
+
+      if (!profile?.parent_agent_id) {
+        return new Response(JSON.stringify({ error: "User is not a sub-agent or missing parent" }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      const { data: parent } = await supabaseAdmin
+        .from("profiles")
+        .select("sub_agent_prices")
+        .eq("user_id", profile.parent_agent_id)
+        .single();
+
+      const { error: updateError } = await supabaseAdmin
+        .from("profiles")
+        .update({
+          is_agent: true,
+          agent_approved: true,
+          onboarding_complete: true,
+          sub_agent_approved: true,
+          agent_prices: parent?.sub_agent_prices || {},
+        })
+        .eq("user_id", user_id);
+
+      if (updateError) throw updateError;
+      return new Response(JSON.stringify({ success: true }), {
+        status: 200,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // ── manual_topup ───────────────────────────────────────────────────────
+    if (action === "manual_topup") {
+      const { amount } = body;
+      if (typeof amount !== "number" || amount <= 0) {
+        return new Response(JSON.stringify({ error: "Invalid amount" }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      // Get current balance
+      const { data: wallet } = await supabaseAdmin
+        .from("wallets")
+        .select("balance")
+        .eq("agent_id", user_id)
+        .maybeSingle();
+
+      const currentBalance = wallet?.balance || 0;
+      const newBalance = parseFloat((currentBalance + amount).toFixed(2));
+
+      if (!wallet) {
+        const { error: insertError } = await supabaseAdmin
+          .from("wallets")
+          .insert({ agent_id: user_id, balance: amount });
+        if (insertError) throw insertError;
+      } else {
+        const { error: updateError } = await supabaseAdmin
+          .from("wallets")
+          .update({ balance: newBalance })
+          .eq("agent_id", user_id);
+        if (updateError) throw updateError;
+      }
+
+      // Log the topup order
+      const { error: orderError } = await supabaseAdmin
+        .from("orders")
+        .insert({
+          agent_id: user_id,
+          order_type: "wallet_topup",
+          amount,
+          profit: 0,
+          status: "fulfilled",
+        });
+
+      if (orderError) throw orderError;
+
+      return new Response(JSON.stringify({ success: true, new_balance: newBalance }), {
+        status: 200,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // ── update_system_settings ────────────────────────────────────────────
+    if (action === "update_system_settings") {
+      const { settings } = body;
+      if (!settings || typeof settings !== "object") {
+        return new Response(JSON.stringify({ error: "Invalid settings object" }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      // We only allow one row in system_settings with id 1
+      const { error: updateError } = await supabaseAdmin
+        .from("system_settings")
+        .upsert({ id: 1, ...settings, updated_at: new Date().toISOString(), updated_by: actor.id });
+
+      if (updateError) throw updateError;
+      return new Response(JSON.stringify({ success: true }), {
+        status: 200,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // ── confirm_withdrawal ────────────────────────────────────────────────
+    if (action === "confirm_withdrawal") {
+      const { withdrawal_id } = body;
+      if (!withdrawal_id) {
+        return new Response(JSON.stringify({ error: "Missing withdrawal_id" }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      const { error: updateError } = await supabaseAdmin
+        .from("withdrawals")
+        .update({ status: "completed", completed_at: new Date().toISOString() })
+        .eq("id", withdrawal_id);
+
+      if (updateError) throw updateError;
+      return new Response(JSON.stringify({ success: true }), {
+        status: 200,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+
+    if (!["send_reset_link", "reset_password", "delete_user", "toggle_api_access", "revoke_api_key", "update_api_settings", "approve_agent", "revoke_agent", "approve_sub_agent", "manual_topup", "update_system_settings", "confirm_withdrawal"].includes(action as AdminUserAction)) {
+
+
       return new Response(JSON.stringify({ error: "Invalid action" }), {
+
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });

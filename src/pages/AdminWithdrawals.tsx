@@ -93,13 +93,12 @@ const AdminWithdrawals = () => {
     // Find withdrawal row for logging
     const withdrawal = withdrawals.find(w => w.id === withdrawalId);
 
-    const { error } = await supabase
-      .from("withdrawals")
-      .update({ status: "completed", completed_at: new Date().toISOString() })
-      .eq("id", withdrawalId);
+    const { data, error } = await supabase.functions.invoke("admin-user-actions", {
+      body: { action: "confirm_withdrawal", withdrawal_id: withdrawalId },
+    });
 
-    if (error) {
-      toast({ title: "Failed to confirm", description: error.message, variant: "destructive" });
+    if (error || data?.error) {
+      toast({ title: "Failed to confirm", description: data?.error || error?.message, variant: "destructive" });
     } else {
       if (currentUser && withdrawal) {
         await logAudit(currentUser.id, "confirm_withdrawal", {
@@ -110,8 +109,8 @@ const AdminWithdrawals = () => {
         });
       }
       toast({ title: "Withdrawal confirmed as sent!" });
+      await fetchWithdrawals();
     }
-    await fetchWithdrawals();
     setConfirming(null);
   };
 

@@ -104,67 +104,35 @@ const AdminSettings = () => {
   const handleSave = async () => {
     setSaving(true);
     
-    // Auto-create row if it doesn't exist to ensure robust setting saving
-    const { data: existing } = await supabase.from("system_settings").select("id").eq("id", 1).maybeSingle();
-    
-    let dbError = null;
-    
-    if (!existing) {
-      const { error } = await supabase.from("system_settings").insert({
-        id: 1,
-        auto_api_switch: settings.auto_api_switch,
-        preferred_provider: settings.preferred_provider,
-        backup_provider: settings.backup_provider,
-        holiday_mode_enabled: settings.holiday_mode_enabled,
-        holiday_message: settings.holiday_message,
-        disable_ordering: settings.disable_ordering,
-        dark_mode_enabled: settings.dark_mode_enabled,
-        customer_service_number: settings.customer_service_number.trim(),
-        support_channel_link: settings.support_channel_link.trim(),
-        sub_agent_base_fee: parseFloat(settings.sub_agent_base_fee) || 5.0,
-        txtconnect_api_key: settings.txtconnect_api_key.trim(),
-        txtconnect_sender_id: settings.txtconnect_sender_id.trim(),
-        paystack_secret_key: settings.paystack_secret_key.trim(),
-        hubtel_client_id: settings.hubtel_client_id.trim(),
-        hubtel_client_secret: settings.hubtel_client_secret.trim(),
-        mtn_markup_percentage: parseFloat(settings.mtn_markup_percentage) || 0,
-        telecel_markup_percentage: parseFloat(settings.telecel_markup_percentage) || 0,
-        at_markup_percentage: parseFloat(settings.at_markup_percentage) || 0,
-        auto_pending_sms_enabled: settings.auto_pending_sms_enabled,
-        auto_pending_sms_message: settings.auto_pending_sms_message,
-      });
-      dbError = error;
-    } else {
-      const { error } = await supabase
-        .from("system_settings")
-        .update({
-          auto_api_switch: settings.auto_api_switch,
-          preferred_provider: settings.preferred_provider,
-          backup_provider: settings.backup_provider,
-          holiday_mode_enabled: settings.holiday_mode_enabled,
-          holiday_message: settings.holiday_message,
-          disable_ordering: settings.disable_ordering,
-          dark_mode_enabled: settings.dark_mode_enabled,
-          customer_service_number: settings.customer_service_number.trim(),
-          support_channel_link: settings.support_channel_link.trim(),
-          sub_agent_base_fee: parseFloat(settings.sub_agent_base_fee) || 5.0,
-          txtconnect_api_key: settings.txtconnect_api_key.trim(),
-          txtconnect_sender_id: settings.txtconnect_sender_id.trim(),
-          paystack_secret_key: settings.paystack_secret_key.trim(),
-          hubtel_client_id: settings.hubtel_client_id.trim(),
-          hubtel_client_secret: settings.hubtel_client_secret.trim(),
-          mtn_markup_percentage: parseFloat(settings.mtn_markup_percentage) || 0,
-          telecel_markup_percentage: parseFloat(settings.telecel_markup_percentage) || 0,
-          at_markup_percentage: parseFloat(settings.at_markup_percentage) || 0,
-          auto_pending_sms_enabled: settings.auto_pending_sms_enabled,
-          auto_pending_sms_message: settings.auto_pending_sms_message,
-        })
-        .eq("id", 1);
-      dbError = error;
-    }
+    const payload = {
+      auto_api_switch: settings.auto_api_switch,
+      preferred_provider: settings.preferred_provider,
+      backup_provider: settings.backup_provider,
+      holiday_mode_enabled: settings.holiday_mode_enabled,
+      holiday_message: settings.holiday_message,
+      disable_ordering: settings.disable_ordering,
+      dark_mode_enabled: settings.dark_mode_enabled,
+      customer_service_number: settings.customer_service_number.trim(),
+      support_channel_link: settings.support_channel_link.trim(),
+      sub_agent_base_fee: parseFloat(settings.sub_agent_base_fee) || 5.0,
+      txtconnect_api_key: settings.txtconnect_api_key.trim(),
+      txtconnect_sender_id: settings.txtconnect_sender_id.trim(),
+      paystack_secret_key: settings.paystack_secret_key.trim(),
+      hubtel_client_id: settings.hubtel_client_id.trim(),
+      hubtel_client_secret: settings.hubtel_client_secret.trim(),
+      mtn_markup_percentage: parseFloat(settings.mtn_markup_percentage) || 0,
+      telecel_markup_percentage: parseFloat(settings.telecel_markup_percentage) || 0,
+      at_markup_percentage: parseFloat(settings.at_markup_percentage) || 0,
+      auto_pending_sms_enabled: settings.auto_pending_sms_enabled,
+      auto_pending_sms_message: settings.auto_pending_sms_message,
+    };
 
-    if (dbError) {
-      toast({ title: "Failed to save settings", description: dbError.message, variant: "destructive" });
+    const { data, error } = await supabase.functions.invoke("admin-user-actions", {
+      body: { action: "update_system_settings", settings: payload },
+    });
+
+    if (error || data?.error) {
+      toast({ title: "Failed to save settings", description: data?.error || error?.message, variant: "destructive" });
     } else {
       // Log the audit action
       const { data: { user: currentUser } } = await supabase.auth.getUser();

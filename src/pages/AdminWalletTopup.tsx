@@ -76,41 +76,27 @@ const AdminWalletTopup = () => {
 
     setCrediting(true);
 
-    // Use the secure atomic RPC to credit the wallet
-    const { data: creditResult, error: creditError } = await supabase.rpc("credit_wallet", {
-      p_agent_id: agent.user_id,
-      p_amount: amount,
+    const { data, error } = await supabase.functions.invoke("admin-user-actions", {
+      body: { action: "manual_topup", user_id: agent.user_id, amount },
     });
 
-    if (creditError) {
-      toast({ title: "Failed to credit wallet", description: creditError.message, variant: "destructive" });
-      setCrediting(false);
-      return;
+    if (error || data?.error) {
+      toast({ title: "Failed to credit wallet", description: data?.error || error?.message, variant: "destructive" });
+    } else {
+      // Log the audit action
+      if (currentUser) {
+        await logAudit(currentUser.id, "manual_wallet_topup", {
+          target_agent_id: agent.user_id,
+          target_agent_name: agent.full_name,
+          amount: amount,
+          new_balance: data.new_balance
+        });
+      }
+
+      toast({ title: `Successfully credited GH₵${amount.toFixed(2)} to ${agent.full_name}'s wallet!` });
+      setWalletBalance(data.new_balance);
+      setCreditAmount("");
     }
-
-    // Create a wallet_topup order record
-    await supabase.from("orders").insert({
-      agent_id: agent.user_id,
-      order_type: "wallet_topup",
-      amount: amount,
-      profit: 0,
-      status: "fulfilled",
-    });
-
-    // Log the audit action
-    if (currentUser) {
-      await logAudit(currentUser.id, "manual_wallet_topup", {
-        target_agent_id: agent.user_id,
-        target_agent_name: agent.full_name,
-        amount: amount,
-        previous_balance: walletBalance,
-        new_balance: parseFloat((walletBalance + amount).toFixed(2))
-      });
-    }
-
-    toast({ title: `Successfully credited GH₵${amount.toFixed(2)} to ${agent.full_name}'s wallet!` });
-    setWalletBalance((prev) => parseFloat((prev + amount).toFixed(2)));
-    setCreditAmount("");
     setCrediting(false);
   };
 
