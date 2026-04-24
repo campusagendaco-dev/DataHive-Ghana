@@ -25,6 +25,7 @@ import DashboardBuyDataNetwork from "./pages/DashboardBuyDataNetwork";
 import DashboardMyStore from "./pages/DashboardMyStore";
 import DashboardReportIssue from "./pages/DashboardReportIssue";
 import DashboardAccountSettings from "./pages/DashboardAccountSettings";
+import DashboardProfile from "./pages/DashboardProfile";
 import DashboardSubAgentPricing from "./pages/DashboardSubAgentPricing";
 import AuthPage from "./pages/AuthPage";
 import BuyData from "./pages/BuyData";
@@ -280,6 +281,7 @@ const AppContent = () => {
           <Route path="my-store" element={<DashboardMyStore />} />
           <Route path="report-issue" element={<DashboardReportIssue />} />
           <Route path="account-settings" element={<DashboardAccountSettings />} />
+          <Route path="profile" element={<DashboardProfile />} />
 
           {/* Paid agent-only pages */}
           <Route path="cheaper-prices" element={<AgentFeatureGuard><DashboardPricing /></AgentFeatureGuard>} />

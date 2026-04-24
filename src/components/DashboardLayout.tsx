@@ -2,11 +2,14 @@ import { useState, useEffect } from "react";
 import { Outlet } from "react-router-dom";
 import DashboardSidebar from "@/components/DashboardSidebar";
 import NotificationPopup from "@/components/NotificationPopup";
-import { Menu, User, Wallet } from "lucide-react";
+import { Menu, User, Wallet, Bell, Search, PlusCircle } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
 import { useAppTheme } from "@/contexts/ThemeContext";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
 
 const DashboardLayout = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -46,47 +49,77 @@ const DashboardLayout = () => {
   }, [user]);
 
   return (
-    <div className="flex min-h-screen w-full bg-background">
+    <div className="flex min-h-screen w-full bg-[#030703]">
       <DashboardSidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
-      <div className="flex-1 flex flex-col overflow-auto min-w-0">
-        {/* Top header bar */}
-        <header
-          className="text-white h-14 flex items-center px-3 sm:px-4 gap-2 sm:gap-3 shrink-0 sticky top-0 z-30"
-          style={{ background: theme.heroHex }}
-        >
-          <button onClick={() => setSidebarOpen(true)} className="md:hidden text-white/70 hover:text-white mr-1 p-1">
+      
+      <div className="flex-1 flex flex-col min-w-0 h-screen overflow-hidden">
+        {/* ── Premium Glass Header ── */}
+        <header className="h-16 flex items-center px-4 sm:px-6 gap-4 shrink-0 sticky top-0 z-40 bg-black/40 backdrop-blur-xl border-b border-white/5">
+          <button 
+            onClick={() => setSidebarOpen(true)} 
+            className="md:hidden p-2 rounded-xl bg-white/5 text-white/70 hover:text-white transition-all"
+          >
             <Menu className="w-5 h-5" />
           </button>
 
-          {/* Greeting pill */}
-          <div className="bg-white/10 rounded-full px-3 py-1 text-sm hidden sm:block truncate max-w-[200px]">
-            {getGreeting()}, {firstName} 👋
+          {/* Search/Command Bar (Mockup for Pro feel) */}
+          <div className="hidden lg:flex items-center gap-3 bg-white/5 border border-white/10 rounded-xl px-4 py-2 w-72 focus-within:border-primary/50 transition-all cursor-text text-white/40">
+            <Search className="w-4 h-4" />
+            <span className="text-xs font-medium">Quick Search...</span>
+            <div className="flex-1" />
+            <kbd className="text-[10px] bg-white/10 px-1.5 py-0.5 rounded border border-white/10">⌘K</kbd>
           </div>
-          {/* Mobile: just name */}
-          <div className="sm:hidden text-sm font-semibold truncate">{firstName}</div>
 
           <div className="flex-1" />
 
-          {/* Balance chip */}
-          <div className="flex items-center gap-1.5 sm:gap-2 bg-white/10 rounded-full pl-2.5 sm:pl-3 pr-1 py-1">
-            <Wallet className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-amber-400 shrink-0" />
-            <span className="text-xs sm:text-sm font-semibold">₵{walletBalance.toFixed(2)}</span>
-            <button
-              onClick={() => navigate("/dashboard/wallet")}
-              className="bg-amber-400 text-black text-[11px] sm:text-xs font-bold px-2 py-0.5 rounded-full hover:bg-amber-300 transition-colors whitespace-nowrap"
-            >
-              Top Up
-            </button>
-          </div>
+          {/* Action Chips */}
+          <div className="flex items-center gap-2 sm:gap-4">
+            {/* Balance Card */}
+            <div className="flex items-center gap-2 bg-white/5 border border-white/10 rounded-2xl pl-3 pr-1 py-1 group hover:border-primary/30 transition-all">
+              <div className="w-7 h-7 rounded-full bg-amber-400/10 flex items-center justify-center">
+                <Wallet className="w-3.5 h-3.5 text-amber-400" />
+              </div>
+              <div className="flex flex-col mr-1">
+                <span className="text-[9px] font-black uppercase tracking-widest text-white/30 leading-none mb-0.5">Wallet</span>
+                <span className="text-sm font-black text-white leading-none">₵{walletBalance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+              </div>
+              <button
+                onClick={() => navigate("/dashboard/wallet")}
+                className="bg-amber-400 text-black p-1.5 rounded-xl hover:bg-amber-300 transition-all shadow-lg shadow-amber-400/20 active:scale-95"
+              >
+                <PlusCircle className="w-4 h-4" />
+              </button>
+            </div>
 
-          {/* User avatar */}
-          <div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center shrink-0">
-            <User className="w-4 h-4 text-white/70" />
+            {/* Notification Bell */}
+            <button className="relative p-2.5 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 hover:border-white/20 transition-all group">
+              <Bell className="w-5 h-5 text-white/70 group-hover:text-white transition-colors" />
+              <span className="absolute top-2 right-2.5 w-2 h-2 bg-red-500 rounded-full border-2 border-[#0d140d]"></span>
+            </button>
+
+            <div className="w-px h-8 bg-white/10 mx-1 hidden sm:block" />
+
+            {/* User Profile Trigger */}
+            <button 
+              onClick={() => navigate("/dashboard/profile")}
+              className="flex items-center gap-3 pl-1 pr-1 sm:pr-2 py-1 rounded-2xl hover:bg-white/5 transition-all group"
+            >
+              <Avatar className="w-9 h-9 border-2 border-white/10 group-hover:border-primary/50 transition-all">
+                <AvatarImage src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${user?.id}`} />
+                <AvatarFallback className="bg-primary/10 text-xs">{firstName.charAt(0)}</AvatarFallback>
+              </Avatar>
+              <div className="hidden sm:flex flex-col items-start text-left leading-tight">
+                <span className="text-[10px] font-bold text-white/40 uppercase tracking-widest">{getGreeting()}</span>
+                <span className="text-sm font-black text-white">{firstName}</span>
+              </div>
+            </button>
           </div>
         </header>
 
-        <main className="flex-1 overflow-auto">
-          <Outlet />
+        <main className="flex-1 overflow-y-auto overflow-x-hidden bg-gradient-to-br from-[#030703] to-[#0d140d]">
+          <div className="max-w-7xl mx-auto w-full">
+            <Outlet />
+          </div>
         </main>
       </div>
 
@@ -96,3 +129,4 @@ const DashboardLayout = () => {
 };
 
 export default DashboardLayout;
+

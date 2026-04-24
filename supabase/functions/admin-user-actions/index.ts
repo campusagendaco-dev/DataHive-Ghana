@@ -3,7 +3,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 import { corsHeaders } from "../_shared/cors.ts";
 
-type AdminUserAction = "get_api_users" | "send_reset_link" | "reset_password" | "delete_user";
+type AdminUserAction = "get_api_users" | "send_reset_link" | "reset_password" | "delete_user" | "toggle_api_access" | "revoke_api_key" | "update_api_settings";
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -109,10 +109,10 @@ serve(async (req) => {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
-
+    
     // All other actions require a valid user_id
     if (!user_id) {
-      return new Response(JSON.stringify({ error: "Missing required fields" }), {
+      return new Response(JSON.stringify({ error: "Missing required fields: user_id" }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -126,7 +126,64 @@ serve(async (req) => {
       });
     }
 
-    if (!["send_reset_link", "reset_password", "delete_user"].includes(action as AdminUserAction)) {
+    // ── toggle_api_access ──────────────────────────────────────────────────
+    if (action === "toggle_api_access") {
+      const { enabled } = body;
+      const { error: updateError } = await supabaseAdmin
+        .from("profiles")
+        .update({ api_access_enabled: !!enabled })
+        .eq("user_id", user_id);
+
+      if (updateError) throw updateError;
+      return new Response(JSON.stringify({ success: true }), {
+        status: 200,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // ── revoke_api_key ─────────────────────────────────────────────────────
+    if (action === "revoke_api_key") {
+      const { error: updateError } = await supabaseAdmin
+        .from("profiles")
+        .update({ api_key: null })
+        .eq("user_id", user_id);
+
+      if (updateError) throw updateError;
+      return new Response(JSON.stringify({ success: true }), {
+        status: 200,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // ── update_api_settings ────────────────────────────────────────────────
+    if (action === "update_api_settings") {
+      const { 
+        api_rate_limit, 
+        api_allowed_actions, 
+        api_ip_whitelist, 
+        api_webhook_url, 
+        api_custom_prices 
+      } = body;
+
+      const { error: updateError } = await supabaseAdmin
+        .from("profiles")
+        .update({
+          api_rate_limit,
+          api_allowed_actions,
+          api_ip_whitelist,
+          api_webhook_url,
+          api_custom_prices,
+        })
+        .eq("user_id", user_id);
+
+      if (updateError) throw updateError;
+      return new Response(JSON.stringify({ success: true }), {
+        status: 200,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    if (!["send_reset_link", "reset_password", "delete_user", "toggle_api_access", "revoke_api_key", "update_api_settings"].includes(action as AdminUserAction)) {
       return new Response(JSON.stringify({ error: "Invalid action" }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },

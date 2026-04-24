@@ -102,11 +102,10 @@ const Navbar = () => {
             <Link
               key={to}
               to={to}
-              className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-medium transition-all duration-150 ${
-                isActive(to)
-                  ? "bg-white/10 text-white"
-                  : "text-white/60 hover:text-white hover:bg-white/8"
-              }`}
+              className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-medium transition-all duration-150 ${isActive(to)
+                ? "bg-white/10 text-white"
+                : "text-white/60 hover:text-white hover:bg-white/8"
+                }`}
             >
               <NavIcon icon={icon} className={isActive(to) ? "text-amber-400" : ""} />
               {label}
@@ -129,11 +128,10 @@ const Navbar = () => {
           {user && (
             <Link
               to={isAdmin ? "/admin" : "/dashboard"}
-              className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-medium transition-all duration-150 ${
-                isActive("/dashboard") || isActive("/admin")
-                  ? "bg-white/10 text-white"
-                  : "text-white/60 hover:text-white hover:bg-white/8"
-              }`}
+              className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-medium transition-all duration-150 ${isActive("/dashboard") || isActive("/admin")
+                ? "bg-white/10 text-white"
+                : "text-white/60 hover:text-white hover:bg-white/8"
+                }`}
             >
               <NavIcon icon={isAdmin ? ShieldCheck : LayoutDashboard}
                 className={isActive("/dashboard") || isActive("/admin") ? "text-amber-400" : ""} />
@@ -181,9 +179,8 @@ const Navbar = () => {
 
       {/* ── Mobile menu ── */}
       <div
-        className={`md:hidden overflow-hidden transition-all duration-300 ease-in-out ${
-          menuOpen ? "max-h-[600px] opacity-100" : "max-h-0 opacity-0"
-        }`}
+        className={`md:hidden overflow-hidden transition-all duration-300 ease-in-out ${menuOpen ? "max-h-[600px] opacity-100" : "max-h-0 opacity-0"
+          }`}
         style={{ borderTop: menuOpen ? "1px solid rgba(255,255,255,0.07)" : "none" }}
       >
         <div className="px-4 py-4 space-y-1" style={{ background: "rgba(10,10,20,0.98)" }}>
@@ -208,15 +205,13 @@ const Navbar = () => {
             <Link
               key={to}
               to={to}
-              className={`flex items-center gap-3 px-3 py-3 rounded-xl text-sm font-medium transition-colors ${
-                isActive(to)
-                  ? "bg-white/10 text-white"
-                  : "text-white/65 hover:text-white hover:bg-white/8"
-              }`}
+              className={`flex items-center gap-3 px-3 py-3 rounded-xl text-sm font-medium transition-colors ${isActive(to)
+                ? "bg-white/10 text-white"
+                : "text-white/65 hover:text-white hover:bg-white/8"
+                }`}
             >
-              <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${
-                isActive(to) ? "bg-amber-400/15" : "bg-white/5"
-              }`}>
+              <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${isActive(to) ? "bg-amber-400/15" : "bg-white/5"
+                }`}>
                 <NavIcon icon={icon} className={isActive(to) ? "text-amber-400" : "text-white/50"} />
               </div>
               {label}

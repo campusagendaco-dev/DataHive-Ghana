@@ -1,11 +1,11 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { CheckCircle2, XCircle, Loader2, ShieldCheck, Zap } from "lucide-react";
+import { CheckCircle2, XCircle, Loader2, ShieldCheck, Zap, ArrowRight, Package, Clock, Activity } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { invokePublicFunction } from "@/lib/public-function-client";
 import PhoneOrderTracker from "@/components/PhoneOrderTracker";
 
-type OrderStatus = "pending" | "paid" | "processing" | "fulfilled" | "fulfillment_failed";
+type OrderStatusType = "pending" | "paid" | "processing" | "fulfilled" | "fulfillment_failed";
 
 const STEPS = [
   {
@@ -13,22 +13,28 @@ const STEPS = [
     label: "Payment Confirmed",
     sub: "Paystack verified your payment",
     icon: ShieldCheck,
+    color: "text-emerald-400",
+    bg: "bg-emerald-500/10",
   },
   {
     key: "delivering",
     label: "Delivering Data",
     sub: "Sending bundle to your number",
     icon: Zap,
+    color: "text-amber-400",
+    bg: "bg-amber-500/10",
   },
   {
     key: "done",
     label: "Data Delivered",
     sub: "Bundle successfully activated",
     icon: CheckCircle2,
+    color: "text-blue-400",
+    bg: "bg-blue-500/10",
   },
 ] as const;
 
-function statusToStep(status: OrderStatus): number {
+function statusToStep(status: OrderStatusType): number {
   if (status === "fulfilled") return 3;
   if (status === "paid" || status === "processing") return 1;
   return 0;
@@ -42,14 +48,14 @@ const OrderStatus = () => {
   const packageSize = searchParams.get("package") || "";
   const phone = searchParams.get("phone") || "";
 
-  const [orderStatus, setOrderStatus] = useState<OrderStatus>("pending");
+  const [orderStatus, setOrderStatus] = useState<OrderStatusType>("pending");
   const [step, setStep] = useState(0);
   const [failed, setFailed] = useState(false);
   const [initialCheckDone, setInitialCheckDone] = useState(!reference);
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   const redirectedRef = useRef(false);
 
-  const handleStatusUpdate = (status: OrderStatus) => {
+  const handleStatusUpdate = (status: OrderStatusType) => {
     setOrderStatus(status);
     const s = statusToStep(status);
     setStep(s);
@@ -62,28 +68,26 @@ const OrderStatus = () => {
     if (status === "fulfilled" && !redirectedRef.current) {
       redirectedRef.current = true;
       const params = new URLSearchParams({ reference, network, package: packageSize, phone, source: "checkout" });
-      setTimeout(() => navigate(`/purchase-success?${params.toString()}`, { replace: true }), 900);
+      setTimeout(() => navigate(`/purchase-success?${params.toString()}`, { replace: true }), 1200);
     }
   };
 
   useEffect(() => {
     if (!reference) return;
 
-    // Realtime subscription — fires the moment the webhook updates the order
     const ch = supabase
       .channel(`order-status-${reference}`)
       .on(
         "postgres_changes",
         { event: "UPDATE", schema: "public", table: "orders", filter: `id=eq.${reference}` },
         (payload: any) => {
-          if (payload.new?.status) handleStatusUpdate(payload.new.status as OrderStatus);
+          if (payload.new?.status) handleStatusUpdate(payload.new.status as OrderStatusType);
         }
       )
       .subscribe();
 
     channelRef.current = ch;
 
-    // Also poll verify-payment as a fallback (in case realtime misses the event)
     let cancelled = false;
     let attempts = 0;
 
@@ -93,7 +97,7 @@ const OrderStatus = () => {
       if (cancelled) return;
 
       if (data?.status) {
-        handleStatusUpdate(data.status as OrderStatus);
+        handleStatusUpdate(data.status as OrderStatusType);
         setInitialCheckDone(true);
         if (data.status === "fulfilled" || data.status === "fulfillment_failed") {
           clearInterval(timer);
@@ -113,154 +117,165 @@ const OrderStatus = () => {
       clearInterval(timer);
       if (channelRef.current) supabase.removeChannel(channelRef.current);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [reference]);
 
   const hasOrder = Boolean(reference);
 
   return (
-    <div className="min-h-screen pt-24 pb-20 px-4">
-      <div className="container mx-auto max-w-2xl space-y-6">
+    <div className="min-h-screen bg-[#030305] pt-28 pb-20 px-4">
+      <div className="container mx-auto max-w-2xl space-y-8">
 
-        {/* ── Live order status (only when coming from checkout) ── */}
+        {/* ── Live Tracking Card ── */}
         {hasOrder && (
-          <div className="rounded-2xl border border-border bg-card overflow-hidden">
-            {/* Card header */}
-            <div
-              className="px-5 pt-5 pb-4 flex items-center gap-3"
-              style={{ background: "linear-gradient(135deg,#1a1a2e,#0f0f1e)" }}
-            >
-              <div className="relative shrink-0">
-                <img
-                  src="/logo.png"
-                  alt="SwiftData Ghana"
-                  className="w-11 h-11 rounded-full"
-                  style={{ animation: step < 3 ? "logo-breathe 2.4s ease-in-out infinite" : "none" }}
-                />
-                {step < 3 && !failed && (
-                  <span className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full bg-blue-500 border-2 border-[#1a1a2e] flex items-center justify-center">
-                    <Loader2 className="w-2 h-2 text-white animate-spin" />
-                  </span>
-                )}
-                {step >= 3 && (
-                  <span className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full bg-green-500 border-2 border-[#1a1a2e]" />
-                )}
-              </div>
-              <div>
-                <p className="text-white font-bold text-sm">
-                  {network && packageSize ? `${network} ${packageSize}` : "Your Order"}
-                </p>
-                <p className="text-white/50 text-xs">{phone || "Processing your purchase"}</p>
-              </div>
-              <div className="ml-auto text-right">
-                {failed ? (
-                  <span className="text-xs font-semibold text-red-400">Failed</span>
-                ) : step >= 3 ? (
-                  <span className="text-xs font-semibold text-green-400">Complete ✓</span>
-                ) : (
-                  <span className="text-xs font-semibold text-blue-400 animate-pulse">Live</span>
-                )}
-              </div>
-            </div>
-
-            {/* Steps */}
-            <div className="px-5 py-5">
-              {failed ? (
-                <div className="flex items-start gap-3 rounded-xl border border-red-500/25 bg-red-500/8 p-4 text-sm text-red-600 dark:text-red-400">
-                  <XCircle className="w-5 h-5 shrink-0 mt-0.5" />
-                  <div>
-                    <p className="font-bold">Delivery Failed</p>
-                    <p className="text-xs mt-0.5 text-muted-foreground">
-                      Payment was received but data delivery failed. Contact support with reference:{" "}
-                      <span className="font-mono">{reference.slice(0, 8)}</span>
+          <div className="relative group animate-in fade-in slide-in-from-top-4 duration-700">
+             {/* Card Ambient Glow */}
+            <div className="absolute -inset-0.5 bg-gradient-to-r from-blue-500/10 via-amber-500/5 to-emerald-500/10 rounded-3xl blur opacity-100 transition-opacity" />
+            
+            <div className="relative rounded-3xl border border-white/10 bg-[#0A0A0C]/90 backdrop-blur-xl overflow-hidden shadow-2xl">
+              {/* Header section with gradient */}
+              <div className="p-6 border-b border-white/5 bg-gradient-to-br from-white/[0.03] to-transparent">
+                <div className="flex items-center gap-4">
+                  <div className="relative">
+                    <div className={`w-14 h-14 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center overflow-hidden shadow-inner ${step < 3 && !failed ? "animate-pulse" : ""}`}>
+                      <img
+                        src="/logo.png"
+                        alt="SwiftData Ghana"
+                        className={`w-10 h-10 rounded-full transition-all duration-1000 ${step < 3 && !failed ? "scale-110 blur-[0.5px]" : ""}`}
+                      />
+                    </div>
+                    {step < 3 && !failed && (
+                      <div className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full bg-blue-500 border-[3px] border-[#0A0A0C] flex items-center justify-center shadow-lg">
+                        <Loader2 className="w-2.5 h-2.5 text-white animate-spin" />
+                      </div>
+                    )}
+                    {step >= 3 && (
+                      <div className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full bg-emerald-500 border-[3px] border-[#0A0A0C] flex items-center justify-center shadow-lg">
+                        <CheckCircle2 className="w-2.5 h-2.5 text-white" />
+                      </div>
+                    )}
+                  </div>
+                  
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <h1 className="text-lg font-black text-white tracking-tight">
+                        {network && packageSize ? `${network} ${packageSize}` : "Order Status"}
+                      </h1>
+                      {failed ? (
+                        <span className="text-[10px] font-black uppercase tracking-widest text-red-500 bg-red-500/10 px-2 py-0.5 rounded-full border border-red-500/20">Failed</span>
+                      ) : (
+                        <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-blue-500/10 border border-blue-500/20">
+                          <span className="w-1 h-1 rounded-full bg-blue-500 animate-ping" />
+                          <span className="text-[10px] font-black uppercase tracking-widest text-blue-400">Live</span>
+                        </div>
+                      )}
+                    </div>
+                    <p className="text-xs font-medium text-white/40 truncate mt-0.5">
+                      {phone ? `Recipient: ${phone}` : `Ref: ${reference.slice(0, 12)}...`}
                     </p>
                   </div>
                 </div>
-              ) : (
-                <div className="space-y-0">
-                  {STEPS.map((s, i) => {
-                    const done = step > i;
-                    const active = step === i && initialCheckDone;
-                    const upcoming = step < i;
+              </div>
 
-                    return (
-                      <div key={s.key} className="flex gap-4">
-                        {/* Icon + connector line */}
-                        <div className="flex flex-col items-center">
+              {/* Progress Stepper */}
+              <div className="p-8">
+                {failed ? (
+                  <div className="space-y-4 rounded-2xl border border-red-500/20 bg-red-500/5 p-5 animate-in zoom-in-95 duration-300">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-red-500/20 flex items-center justify-center shrink-0">
+                        <XCircle className="w-5 h-5 text-red-500" />
+                      </div>
+                      <div>
+                        <p className="font-black text-sm text-red-400">Delivery Interrupted</p>
+                        <p className="text-[11px] text-white/40">We encountered an issue with the carrier.</p>
+                      </div>
+                    </div>
+                    <div className="pt-4 border-t border-red-500/10">
+                      <p className="text-xs text-white/60 leading-relaxed">
+                        Don't worry — your payment is safe. Our team has been notified. Please contact support with this reference:
+                        <code className="block mt-2 font-mono text-amber-500 bg-black/40 p-2 rounded-lg border border-white/5">{reference}</code>
+                      </p>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-0">
+                    {STEPS.map((s, i) => {
+                      const done = step > i;
+                      const active = step === i && initialCheckDone;
+                      const upcoming = step < i;
+
+                      return (
+                        <div key={s.key} className="relative flex gap-6 pb-8 last:pb-0">
+                          {/* Connector line */}
+                          {i < STEPS.length - 1 && (
+                            <div className="absolute left-6 top-10 bottom-0 w-[2px] bg-white/5">
+                              <div 
+                                className="w-full bg-emerald-500 transition-all duration-1000 ease-out"
+                                style={{ height: done ? "100%" : "0%" }}
+                              />
+                            </div>
+                          )}
+
+                          {/* Icon Container */}
                           <div
-                            className={`w-9 h-9 rounded-full border-2 flex items-center justify-center shrink-0 transition-all duration-500 ${
+                            className={`relative w-12 h-12 rounded-2xl border-2 flex items-center justify-center shrink-0 transition-all duration-700 ${
                               done
-                                ? "border-green-500 bg-green-500"
+                                ? "border-emerald-500/50 bg-emerald-500 shadow-lg shadow-emerald-500/20"
                                 : active
-                                ? "border-primary bg-primary/15 animate-pulse"
-                                : "border-border bg-secondary/50"
+                                ? "border-amber-400/50 bg-amber-400/10 shadow-lg shadow-amber-400/10"
+                                : "border-white/5 bg-white/[0.02]"
                             }`}
                           >
                             {done ? (
-                              <CheckCircle2 className="w-4 h-4 text-white" />
+                              <CheckCircle2 className="w-5 h-5 text-white" />
                             ) : active ? (
-                              <Loader2 className="w-4 h-4 text-primary animate-spin" />
+                              <Loader2 className="w-5 h-5 text-amber-400 animate-spin" />
                             ) : (
-                              <s.icon className="w-4 h-4 text-muted-foreground/40" />
+                              <s.icon className="w-5 h-5 text-white/10" />
                             )}
                           </div>
-                          {i < STEPS.length - 1 && (
-                            <div
-                              className={`w-0.5 flex-1 my-1 min-h-[24px] transition-all duration-700 ${
-                                done ? "bg-green-500" : "bg-border"
+
+                          {/* Label + Description */}
+                          <div className="pt-1.5 flex-1">
+                            <p
+                              className={`text-sm font-black tracking-tight transition-colors duration-500 ${
+                                done ? "text-emerald-400" : active ? "text-white" : "text-white/20"
                               }`}
-                            />
-                          )}
+                            >
+                              {s.label}
+                            </p>
+                            <p className={`text-xs mt-1 transition-colors duration-500 ${upcoming ? "text-white/10" : "text-white/40"}`}>
+                              {s.sub}
+                            </p>
+                          </div>
                         </div>
+                      );
+                    })}
+                  </div>
+                )}
 
-                        {/* Text */}
-                        <div className={`pb-4 pt-1 ${i === STEPS.length - 1 ? "pb-0" : ""}`}>
-                          <p
-                            className={`text-sm font-bold leading-tight transition-colors ${
-                              done
-                                ? "text-green-600 dark:text-green-400"
-                                : active
-                                ? "text-foreground"
-                                : "text-muted-foreground/50"
-                            }`}
-                          >
-                            {s.label}
-                          </p>
-                          <p
-                            className={`text-xs mt-0.5 ${
-                              upcoming ? "text-muted-foreground/35" : "text-muted-foreground"
-                            }`}
-                          >
-                            {s.sub}
-                          </p>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-
-              {/* Loading initial state */}
-              {!initialCheckDone && (
-                <div className="mt-3 flex items-center gap-2 text-xs text-muted-foreground">
-                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                  Confirming payment with Paystack...
-                </div>
-              )}
+                {!initialCheckDone && !failed && (
+                  <div className="mt-8 pt-6 border-t border-white/5 flex items-center gap-3 text-[10px] font-bold text-white/30 uppercase tracking-[0.2em] animate-pulse">
+                    <Activity className="w-3.5 h-3.5" />
+                    Connecting to Payment Gateway...
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         )}
 
-        {/* ── Phone tracker — all orders ── */}
-        <PhoneOrderTracker
-          title={hasOrder ? "All Orders for This Number" : "Track Order by Phone"}
-          subtitle={
-            hasOrder
-              ? "View the full delivery history for the recipient's number."
-              : "Enter the recipient phone number to see all delivery statuses."
-          }
-          defaultPhone={phone || undefined}
-        />
+        {/* ── Global Phone Tracker Section ── */}
+        <div className="relative">
+          <PhoneOrderTracker
+            title={hasOrder ? "Related History" : "Find Your Order"}
+            subtitle={
+              hasOrder
+                ? "Full delivery history for this number."
+                : "Enter your phone number to check all recent data bundles."
+            }
+            defaultPhone={phone || undefined}
+          />
+        </div>
       </div>
     </div>
   );

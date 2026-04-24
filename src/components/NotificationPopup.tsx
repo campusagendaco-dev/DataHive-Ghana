@@ -25,6 +25,15 @@ const NotificationPopup = () => {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
 
+  // Play sound effect when notifications are loaded
+  useEffect(() => {
+    if (notifications.length > 0 && currentIndex === 0) {
+      const audio = new Audio("https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3");
+      audio.volume = 0.5;
+      audio.play().catch(err => console.log("Audio playback delayed until user interaction:", err));
+    }
+  }, [notifications]);
+
   useEffect(() => {
     if (!user) return;
 
@@ -46,7 +55,9 @@ const NotificationPopup = () => {
       if (!notifs) return;
 
       // Filter by target type and not dismissed
-      const isAgent = profile?.is_agent || false;
+      // A user is considered an agent if they are either an agent or a sub-agent
+      const isAgent = Boolean(profile?.agent_approved || profile?.sub_agent_approved || profile?.is_agent || profile?.is_sub_agent);
+      
       const filtered = notifs.filter((n: any) => {
         if (dismissedIds.includes(n.id)) return false;
         if (n.target_type === "all") return true;
@@ -62,6 +73,7 @@ const NotificationPopup = () => {
 
     fetchNotifications();
   }, [user, profile]);
+
 
   const handleDismiss = async () => {
     const current = notifications[currentIndex];

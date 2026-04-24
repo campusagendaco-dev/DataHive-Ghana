@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, useRef } from "react";
-import { Loader2, Search, CheckCircle2, Clock, XCircle, ShieldCheck, AlertTriangle, RefreshCw, Package } from "lucide-react";
+import { Loader2, Search, CheckCircle2, Clock, XCircle, ShieldCheck, AlertTriangle, RefreshCw, Activity, Zap } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -43,9 +43,10 @@ interface DisplayStatus {
   label: string;
   shortLabel: string;
   icon: typeof CheckCircle2;
-  dot: string;
-  badge: string;
-  text: string;
+  color: string;
+  bg: string;
+  border: string;
+  glow: string;
 }
 
 function getDisplayStatus(order: TrackedOrder): DisplayStatus {
@@ -55,54 +56,58 @@ function getDisplayStatus(order: TrackedOrder): DisplayStatus {
       label: "Delivered Successfully",
       shortLabel: "Delivered",
       icon: CheckCircle2,
-      dot: "bg-green-500",
-      badge: "bg-green-500/12 border-green-500/25 text-green-600 dark:text-green-400",
-      text: "text-green-600 dark:text-green-400",
+      color: "text-emerald-400",
+      bg: "bg-emerald-500/10",
+      border: "border-emerald-500/20",
+      glow: "shadow-emerald-500/20",
     };
   }
   if (order.status === "fulfillment_failed") {
     return {
       key: "failed",
       label: "Delivery Failed",
-      shortLabel: "Not Fulfilled",
+      shortLabel: "Failed",
       icon: XCircle,
-      dot: "bg-red-500",
-      badge: "bg-red-500/10 border-red-500/25 text-red-600 dark:text-red-400",
-      text: "text-red-600 dark:text-red-400",
+      color: "text-red-400",
+      bg: "bg-red-500/10",
+      border: "border-red-500/20",
+      glow: "shadow-red-500/20",
     };
   }
   if (order.status === "paid" || order.status === "processing") {
     return {
       key: "processing",
-      label: "Processing — Delivering Data",
+      label: "Processing Delivery",
       shortLabel: "Processing",
       icon: Loader2,
-      dot: "bg-blue-500",
-      badge: "bg-blue-500/10 border-blue-500/25 text-blue-600 dark:text-blue-400",
-      text: "text-blue-600 dark:text-blue-400",
+      color: "text-sky-400",
+      bg: "bg-sky-500/10",
+      border: "border-sky-500/20",
+      glow: "shadow-sky-500/20",
     };
   }
   return {
     key: "pending",
-    label: "Payment Pending",
+    label: "Awaiting Payment",
     shortLabel: "Pending",
     icon: Clock,
-    dot: "bg-amber-400",
-    badge: "bg-amber-400/10 border-amber-400/25 text-amber-600 dark:text-amber-400",
-    text: "text-amber-600 dark:text-amber-400",
+    color: "text-amber-400",
+    bg: "bg-amber-500/10",
+    border: "border-amber-500/20",
+    glow: "shadow-amber-500/20",
   };
 }
 
-const networkColors: Record<string, { bg: string; text: string }> = {
-  MTN:        { bg: "bg-amber-400",  text: "text-black" },
-  Telecel:    { bg: "bg-red-600",    text: "text-white" },
-  AirtelTigo: { bg: "bg-blue-600",   text: "text-white" },
+const networkColors: Record<string, { bg: string; text: string; accent: string }> = {
+  MTN:        { bg: "bg-amber-400",  text: "text-black", accent: "border-amber-400/30" },
+  Telecel:    { bg: "bg-red-600",    text: "text-white", accent: "border-red-600/30" },
+  AirtelTigo: { bg: "bg-blue-600",   text: "text-white", accent: "border-blue-600/30" },
 };
 
 function fmt(dateStr: string) {
   const d = new Date(dateStr);
   return {
-    date: d.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }),
+    date: d.toLocaleDateString("en-GB", { day: "2-digit", month: "short" }),
     time: d.toLocaleTimeString("en-GH", { hour: "2-digit", minute: "2-digit", hour12: true }),
   };
 }
@@ -116,7 +121,7 @@ interface PhoneOrderTrackerProps {
 
 const PhoneOrderTracker = ({
   title = "Track Your Order",
-  subtitle = "Enter the phone number used for purchase to see all recent deliveries.",
+  subtitle = "Instant real-time tracking for your data bundles.",
   className = "",
   defaultPhone,
 }: PhoneOrderTrackerProps) => {
@@ -130,10 +135,10 @@ const PhoneOrderTracker = ({
 
   const isPhoneValid = useMemo(() => {
     const d = phone.replace(/\D+/g, "");
-    return d.length === 9 || d.length === 10 || d.length === 12;
+    return d.length >= 9 && d.length <= 15;
   }, [phone]);
 
-  const fetchOrders = async (phoneValue: string, silent = false): Promise<TrackedOrder[]> => {
+  const fetchOrders = async (phoneValue: string): Promise<TrackedOrder[]> => {
     const variants = normalizePhoneForQuery(phoneValue);
     if (!variants.length) return [];
 
@@ -158,7 +163,7 @@ const PhoneOrderTracker = ({
     if (!orderIds.length) return;
 
     const ch = supabase
-      .channel(`tracker-orders-${orderIds[0]}`)
+      .channel(`tracker-orders-${Date.now()}`)
       .on(
         "postgres_changes",
         { event: "UPDATE", schema: "public", table: "orders" },
@@ -177,30 +182,15 @@ const PhoneOrderTracker = ({
 
   useEffect(() => () => { if (channelRef.current) supabase.removeChannel(channelRef.current); }, []);
 
-  // Auto-search when defaultPhone is provided (e.g. from OrderStatus page)
   useEffect(() => {
-    if (defaultPhone && normalizePhoneForQuery(defaultPhone).length > 0) {
-      void (async () => {
-        setLoading(true);
-        setSearched(true);
-        try {
-          const found = await fetchOrders(defaultPhone);
-          setOrders(found);
-          subscribeToOrders(found.map((o) => o.id));
-          if (!found.length) setError(`No data orders found in the last ${LOOKBACK_DAYS} days for this number.`);
-        } catch {
-          setError("Could not load orders. Please try again.");
-        } finally {
-          setLoading(false);
-        }
-      })();
+    if (defaultPhone && isPhoneValid) {
+      handleTrack();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [defaultPhone]);
 
   const handleTrack = async () => {
+    if (!isPhoneValid) return;
     setError("");
-    setOrders([]);
     setLoading(true);
     setSearched(true);
 
@@ -208,9 +198,9 @@ const PhoneOrderTracker = ({
       const found = await fetchOrders(phone);
       setOrders(found);
       subscribeToOrders(found.map((o) => o.id));
-      if (!found.length) setError(`No data orders found in the last ${LOOKBACK_DAYS} days for this number.`);
+      if (!found.length) setError(`No recent orders found for this number.`);
     } catch {
-      setError("Could not load orders. Please try again.");
+      setError("Unable to sync with network. Try again.");
     } finally {
       setLoading(false);
     }
@@ -220,7 +210,7 @@ const PhoneOrderTracker = ({
     if (!searched || !phone) return;
     setRefreshing(true);
     try {
-      const found = await fetchOrders(phone, true);
+      const found = await fetchOrders(phone);
       setOrders(found);
     } catch { /* ignore */ }
     finally { setRefreshing(false); }
@@ -228,145 +218,146 @@ const PhoneOrderTracker = ({
 
   const handleKey = (e: React.KeyboardEvent) => { if (e.key === "Enter" && isPhoneValid) handleTrack(); };
 
-  const stats = orders.reduce(
-    (acc, o) => {
-      if (o.status === "fulfilled") acc.delivered += 1;
-      else if (o.status === "fulfillment_failed") acc.failed += 1;
-      else acc.processing += 1;
-      return acc;
-    },
-    { delivered: 0, failed: 0, processing: 0 }
-  );
-
   return (
-    <div className={`rounded-2xl border border-border bg-card overflow-hidden ${className}`}>
-      {/* Header */}
-      <div className="px-5 pt-5 pb-4 border-b border-border">
-        <div className="flex items-start gap-3 mb-4">
-          <div className="w-10 h-10 rounded-xl bg-primary/15 flex items-center justify-center shrink-0">
-            <Package className="w-5 h-5 text-primary" />
+    <div className={`relative group ${className}`}>
+      {/* Premium Glow Effect */}
+      <div className="absolute -inset-1 bg-gradient-to-r from-amber-500/10 via-orange-500/5 to-amber-500/10 rounded-3xl blur-xl opacity-0 group-hover:opacity-100 transition-opacity duration-700 pointer-events-none" />
+      
+      <div className="relative rounded-3xl border border-white/8 bg-[#0A0A0C]/80 backdrop-blur-xl overflow-hidden shadow-2xl">
+        {/* Header Strip */}
+        <div className="p-6 border-b border-white/5 bg-white/[0.02]">
+          <div className="flex items-center justify-between gap-4 mb-6">
+            <div className="flex items-center gap-3.5">
+              <div className="w-11 h-11 rounded-2xl bg-amber-400/10 border border-amber-400/20 flex items-center justify-center shrink-0 shadow-lg shadow-amber-400/5">
+                <Activity className="w-5 h-5 text-amber-400" />
+              </div>
+              <div>
+                <h3 className="font-black text-lg tracking-tight text-white">{title}</h3>
+                <p className="text-xs font-medium text-white/40">{subtitle}</p>
+              </div>
+            </div>
+            {searched && orders.length > 0 && (
+              <button
+                onClick={handleRefresh}
+                disabled={refreshing}
+                className="p-2.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 transition-all text-white/40 hover:text-white"
+              >
+                <RefreshCw className={`w-4 h-4 ${refreshing ? "animate-spin" : ""}`} />
+              </button>
+            )}
           </div>
-          <div className="flex-1 min-w-0">
-            <h3 className="font-display text-lg font-bold leading-tight">{title}</h3>
-            <p className="text-xs text-muted-foreground mt-0.5">{subtitle}</p>
-          </div>
-          {searched && orders.length > 0 && (
-            <button
-              onClick={handleRefresh}
-              disabled={refreshing}
-              className="shrink-0 p-2 rounded-lg hover:bg-secondary transition-colors text-muted-foreground hover:text-foreground"
-              title="Refresh"
+
+          <div className="flex flex-col sm:flex-row gap-2">
+            <div className="relative flex-1">
+              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-white/20" />
+              <Input
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                onKeyDown={handleKey}
+                placeholder="Recipient Phone Number"
+                className="h-12 pl-10 bg-white/[0.03] border-white/10 text-white placeholder:text-white/20 rounded-2xl focus-visible:ring-amber-400/30 transition-all"
+                type="tel"
+              />
+            </div>
+            <Button 
+              onClick={handleTrack} 
+              disabled={!isPhoneValid || loading} 
+              className="h-12 px-8 rounded-2xl bg-amber-400 hover:bg-amber-300 text-black font-black transition-all hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50"
             >
-              <RefreshCw className={`w-4 h-4 ${refreshing ? "animate-spin" : ""}`} />
-            </button>
+              {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Zap className="w-5 h-5" />}
+              <span className="ml-2">Track Now</span>
+            </Button>
+          </div>
+        </div>
+
+        {/* Error State */}
+        {error && (
+          <div className="mx-6 mt-6 flex items-center gap-3 rounded-2xl border border-red-500/20 bg-red-500/5 p-4 text-sm text-red-400 animate-in fade-in slide-in-from-top-2">
+            <AlertTriangle className="w-4 h-4 shrink-0" />
+            <span className="font-semibold">{error}</span>
+          </div>
+        )}
+
+        {/* Results */}
+        <div className="p-6">
+          {loading ? (
+            <div className="space-y-3">
+              {[1, 2, 3].map((i) => (
+                <div key={i} className="h-20 rounded-2xl bg-white/[0.02] border border-white/5 animate-pulse" />
+              ))}
+            </div>
+          ) : orders.length > 0 ? (
+            <div className="space-y-3">
+              {orders.map((order) => {
+                const ds = getDisplayStatus(order);
+                const nc = networkColors[order.network || ""] || { bg: "bg-white/5", text: "text-white", accent: "border-white/10" };
+                const { date, time } = fmt(order.created_at);
+                const isSpinning = ds.key === "processing";
+
+                return (
+                  <div
+                    key={order.id}
+                    className="group/card flex items-center gap-4 rounded-2xl border border-white/5 bg-white/[0.02] p-4 transition-all hover:bg-white/[0.04] hover:border-white/10"
+                  >
+                    {/* Network Badge */}
+                    <div className={`w-14 h-14 rounded-2xl ${nc.bg} ${nc.text} flex flex-col items-center justify-center shrink-0 shadow-xl shadow-black/20`}>
+                      <span className="text-[10px] font-black uppercase opacity-60 leading-none">{order.network}</span>
+                      <span className="text-sm font-black mt-0.5 leading-none">{order.package_size}</span>
+                    </div>
+
+                    {/* Order Details */}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="font-bold text-sm text-white/90">{order.network} Bundle</span>
+                        <div className={`flex items-center gap-1.5 px-2 py-0.5 rounded-full border ${ds.bg} ${ds.border} ${ds.color} text-[10px] font-bold`}>
+                          <ds.icon className={`w-3 h-3 ${isSpinning ? "animate-spin" : ""}`} />
+                          {ds.shortLabel}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 text-[11px] text-white/30 font-medium">
+                        <span>{date}</span>
+                        <span className="w-1 h-1 rounded-full bg-white/10" />
+                        <span>{time}</span>
+                      </div>
+                    </div>
+
+                    {/* Pricing & Final Status */}
+                    <div className="text-right shrink-0">
+                      <p className="text-base font-black text-white leading-none mb-2">
+                        <span className="text-[10px] text-white/40 font-bold mr-1">GHS</span>
+                        {Number(order.amount).toFixed(2)}
+                      </p>
+                      <div className="flex items-center justify-end gap-1.5 opacity-60 group-hover/card:opacity-100 transition-opacity">
+                        <span className={`w-1.5 h-1.5 rounded-full bg-current ${ds.color} ${isSpinning ? "animate-pulse" : ""}`} />
+                        <span className={`text-[9px] font-black uppercase tracking-wider ${ds.color}`}>{ds.key}</span>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+              
+              <div className="pt-4 flex items-center justify-center gap-2 text-[10px] font-bold text-white/10 uppercase tracking-[0.2em]">
+                <ShieldCheck className="w-3 h-3" />
+                Live Real-time Feed
+              </div>
+            </div>
+          ) : searched ? (
+            <div className="py-12 text-center text-white/20">
+              <Zap className="w-12 h-12 mx-auto mb-4 opacity-10" />
+              <p className="font-bold text-white/40">No Records Found</p>
+              <p className="text-xs">No orders detected for this number in the last 30 days.</p>
+            </div>
+          ) : (
+            <div className="py-16 text-center">
+              <div className="w-16 h-16 rounded-3xl bg-amber-400/5 border border-amber-400/10 flex items-center justify-center mx-auto mb-6">
+                <Search className="w-6 h-6 text-amber-400/30" />
+              </div>
+              <p className="text-sm font-black text-white/40">Enter number to begin tracking</p>
+              <p className="text-[11px] text-white/20 mt-1 max-w-[200px] mx-auto uppercase tracking-tighter">Instant history retrieval</p>
+            </div>
           )}
         </div>
-
-        {/* Search */}
-        <div className="flex gap-2">
-          <Input
-            value={phone}
-            onChange={(e) => setPhone(e.target.value)}
-            onKeyDown={handleKey}
-            placeholder="Recipient phone (e.g. 0241234567)"
-            className="bg-background"
-            type="tel"
-            inputMode="numeric"
-          />
-          <Button onClick={handleTrack} disabled={!isPhoneValid || loading} className="shrink-0 gap-1.5">
-            {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
-            Track
-          </Button>
-        </div>
       </div>
-
-      {/* Error */}
-      {error && (
-        <div className="mx-5 mt-4 flex items-start gap-2 rounded-xl border border-red-500/25 bg-red-500/8 p-3 text-sm text-red-600 dark:text-red-400">
-          <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
-          {error}
-        </div>
-      )}
-
-      {/* Results */}
-      {orders.length > 0 && (
-        <div className="p-5 space-y-4">
-          {/* Summary row */}
-          <div className="grid grid-cols-3 gap-2 text-center">
-            <div className="rounded-xl bg-green-500/8 border border-green-500/20 px-3 py-2.5">
-              <p className="font-black text-lg text-green-600 dark:text-green-400">{stats.delivered}</p>
-              <p className="text-[10px] text-muted-foreground uppercase tracking-wide">Delivered</p>
-            </div>
-            <div className="rounded-xl bg-blue-500/8 border border-blue-500/20 px-3 py-2.5">
-              <p className="font-black text-lg text-blue-600 dark:text-blue-400">{stats.processing}</p>
-              <p className="text-[10px] text-muted-foreground uppercase tracking-wide">Processing</p>
-            </div>
-            <div className="rounded-xl bg-red-500/8 border border-red-500/20 px-3 py-2.5">
-              <p className="font-black text-lg text-red-600 dark:text-red-400">{stats.failed}</p>
-              <p className="text-[10px] text-muted-foreground uppercase tracking-wide">Failed</p>
-            </div>
-          </div>
-
-          {/* Order cards */}
-          <div className="space-y-2.5">
-            {orders.map((order) => {
-              const ds = getDisplayStatus(order);
-              const nc = networkColors[order.network || ""] || { bg: "bg-secondary", text: "text-foreground" };
-              const { date, time } = fmt(order.created_at);
-              const isSpinning = ds.key === "processing";
-
-              return (
-                <div
-                  key={order.id}
-                  className="flex items-center gap-3 rounded-xl border border-border bg-secondary/30 p-3 hover:bg-secondary/60 transition-colors"
-                >
-                  {/* Network badge */}
-                  <div className={`${nc.bg} ${nc.text} rounded-lg px-2.5 py-1.5 text-center shrink-0`}>
-                    <p className="font-black text-xs leading-none">{order.network || "—"}</p>
-                    <p className="font-black text-base leading-tight mt-0.5">{order.package_size || "—"}</p>
-                  </div>
-
-                  {/* Info */}
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-1.5 flex-wrap">
-                      <span className="font-bold text-sm">{order.network} {order.package_size}</span>
-                      <span className={`inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full border ${ds.badge}`}>
-                        <ds.icon className={`w-3 h-3 shrink-0 ${isSpinning ? "animate-spin" : ""}`} />
-                        {ds.shortLabel}
-                      </span>
-                    </div>
-                    <p className="text-xs text-muted-foreground mt-0.5">
-                      {date} &nbsp;·&nbsp; {time}
-                    </p>
-                  </div>
-
-                  {/* Amount + status dot */}
-                  <div className="text-right shrink-0">
-                    <p className="font-bold text-sm">GH₵ {Number(order.amount).toFixed(2)}</p>
-                    <div className="flex items-center justify-end gap-1 mt-1">
-                      <span className={`w-1.5 h-1.5 rounded-full ${ds.dot} ${ds.key === "processing" ? "animate-pulse" : ""}`} />
-                      <span className={`text-[10px] font-medium ${ds.text}`}>{ds.label}</span>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-
-          <p className="text-[10px] text-muted-foreground text-center">
-            Showing last {orders.length} order{orders.length !== 1 ? "s" : ""} · Updates live · {LOOKBACK_DAYS}-day history
-          </p>
-        </div>
-      )}
-
-      {/* Loading skeleton */}
-      {loading && (
-        <div className="p-5 space-y-2.5">
-          {[1, 2, 3].map((i) => (
-            <div key={i} className="h-16 rounded-xl bg-secondary/50 animate-pulse" />
-          ))}
-        </div>
-      )}
     </div>
   );
 };

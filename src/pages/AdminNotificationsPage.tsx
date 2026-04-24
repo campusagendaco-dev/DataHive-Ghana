@@ -33,7 +33,7 @@ const SMS_LIMIT = 160;
 
 const targetLabels: Record<string, string> = {
   all: "Everyone",
-  agents: "Agents Only",
+  agents: "Agents & Subagents Only",
   users: "Users Only",
   pending_orders: "Pending Orders Only",
 };

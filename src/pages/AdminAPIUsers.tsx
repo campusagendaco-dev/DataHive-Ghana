@@ -149,17 +149,37 @@ const AdminAPIUsers = () => {
 
   const toggleAccess = async (user: APIUser) => {
     const newVal = !user.api_access_enabled;
-    const { error } = await supabase.from("profiles").update({ api_access_enabled: newVal } as any).eq("user_id", user.user_id);
-    if (error) { toast({ title: "Failed", description: error.message, variant: "destructive" }); return; }
-    toast({ title: newVal ? "API Access Enabled" : "API Access Revoked" });
-    setUsers((prev) => prev.map((u) => u.user_id === user.user_id ? { ...u, api_access_enabled: newVal } : u));
+    const accessToken = session?.access_token;
+    if (!accessToken) return;
+
+    const { data: fnData, error } = await supabase.functions.invoke("admin-user-actions", {
+      body: { action: "toggle_api_access", user_id: user.user_id, enabled: newVal },
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+
+    if (error || fnData?.error) {
+      toast({ title: "Failed", description: fnData?.error ?? error?.message, variant: "destructive" });
+    } else {
+      toast({ title: newVal ? "API Access Enabled" : "API Access Revoked" });
+      setUsers((prev) => prev.map((u) => u.user_id === user.user_id ? { ...u, api_access_enabled: newVal } : u));
+    }
   };
 
   const revokeKey = async (userId: string) => {
-    const { error } = await supabase.from("profiles").update({ api_key: null } as any).eq("user_id", userId);
-    if (error) { toast({ title: "Failed", description: error.message, variant: "destructive" }); return; }
-    toast({ title: "API Key revoked" });
-    setUsers((prev) => prev.map((u) => u.user_id === userId ? { ...u, api_key: null } : u));
+    const accessToken = session?.access_token;
+    if (!accessToken) return;
+
+    const { data: fnData, error } = await supabase.functions.invoke("admin-user-actions", {
+      body: { action: "revoke_api_key", user_id: userId },
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+
+    if (error || fnData?.error) {
+      toast({ title: "Failed", description: fnData?.error ?? error?.message, variant: "destructive" });
+    } else {
+      toast({ title: "API Key revoked" });
+      setUsers((prev) => prev.map((u) => u.user_id === userId ? { ...u, api_key: null } : u));
+    }
   };
 
   const saveSettings = async (userId: string) => {
@@ -168,31 +188,45 @@ const AdminAPIUsers = () => {
     const ipWhitelist = (ipEdits[userId] ?? "").split(",").map((s) => s.trim()).filter(Boolean);
     const webhookUrl = (webhookEdits[userId] ?? "").trim() || null;
     const customPrices = priceEdits[userId] || {};
+    const accessToken = session?.access_token;
+
+    if (!accessToken) {
+      toast({ title: "Session expired", variant: "destructive" });
+      return;
+    }
 
     if (rateLimit < 1 || rateLimit > 1000) {
       toast({ title: "Invalid rate limit", description: "Must be between 1 and 1000.", variant: "destructive" }); return;
     }
 
     setSaving(userId);
-    const { error } = await supabase.from("profiles").update({
-      api_rate_limit: rateLimit,
-      api_allowed_actions: allowedActions,
-      api_ip_whitelist: ipWhitelist.length > 0 ? ipWhitelist : null,
-      api_webhook_url: webhookUrl,
-      api_custom_prices: customPrices,
-    } as any).eq("user_id", userId);
+    const { data: fnData, error } = await supabase.functions.invoke("admin-user-actions", {
+      body: { 
+        action: "update_api_settings", 
+        user_id: userId,
+        api_rate_limit: rateLimit,
+        api_allowed_actions: allowedActions,
+        api_ip_whitelist: ipWhitelist.length > 0 ? ipWhitelist : null,
+        api_webhook_url: webhookUrl,
+        api_custom_prices: customPrices,
+      },
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
     setSaving(null);
 
-    if (error) { toast({ title: "Save failed", description: error.message, variant: "destructive" }); return; }
-    toast({ title: "API settings saved" });
-    setUsers((prev) => prev.map((u) => u.user_id === userId ? {
-      ...u,
-      api_rate_limit: rateLimit,
-      api_allowed_actions: allowedActions,
-      api_ip_whitelist: ipWhitelist.length > 0 ? ipWhitelist : null,
-      api_webhook_url: webhookUrl,
-      api_custom_prices: customPrices,
-    } : u));
+    if (error || fnData?.error) {
+      toast({ title: "Save failed", description: fnData?.error ?? error?.message, variant: "destructive" });
+    } else {
+      toast({ title: "API settings saved" });
+      setUsers((prev) => prev.map((u) => u.user_id === userId ? {
+        ...u,
+        api_rate_limit: rateLimit,
+        api_allowed_actions: allowedActions,
+        api_ip_whitelist: ipWhitelist.length > 0 ? ipWhitelist : null,
+        api_webhook_url: webhookUrl,
+        api_custom_prices: customPrices,
+      } : u));
+    }
   };
 
   const toggleAction = (userId: string, action: AllowedAction) => {

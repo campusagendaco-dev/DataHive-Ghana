@@ -208,12 +208,17 @@ serve(async (req: Request) => {
     } else {
       let profilesQuery = supabaseAdmin
         .from("profiles")
-        .select("user_id, phone, is_agent");
+        .select("user_id, phone, is_agent, is_sub_agent, agent_approved, sub_agent_approved");
 
       if (target_type === "agents") {
-        profilesQuery = profilesQuery.eq("is_agent", true);
+        profilesQuery = profilesQuery.or('is_agent.eq.true,is_sub_agent.eq.true,agent_approved.eq.true,sub_agent_approved.eq.true');
       } else if (target_type === "users") {
-        profilesQuery = profilesQuery.eq("is_agent", false);
+        // Users are those who are NOT agents/sub-agents
+        profilesQuery = profilesQuery
+          .eq('is_agent', false)
+          .eq('is_sub_agent', false)
+          .eq('agent_approved', false)
+          .eq('sub_agent_approved', false);
       }
 
       const { data: recipients, error: recipientsError } = await profilesQuery;
@@ -235,24 +240,27 @@ serve(async (req: Request) => {
       }
     }
 
+    // --- Parallel Sending with Concurrency Limit ---
+    const phoneList = Array.from(uniquePhones);
     let sent = 0;
     const failures: Array<{ phone: string; reason: string }> = [];
+    const CONCURRENCY_LIMIT = 5; // Send 5 messages at a time
 
-    for (const phone of uniquePhones) {
-      try {
-        await sendSmsViaTxtConnect(
-          txtApiKey,
-          txtSenderId,
-          phone,
-          smsBody,
-        );
-        sent += 1;
-      } catch (error) {
-        failures.push({
-          phone,
-          reason: error instanceof Error ? error.message : "Unknown error",
-        });
-      }
+    for (let i = 0; i < phoneList.length; i += CONCURRENCY_LIMIT) {
+      const chunk = phoneList.slice(i, i + CONCURRENCY_LIMIT);
+      await Promise.all(
+        chunk.map(async (phone) => {
+          try {
+            await sendSmsViaTxtConnect(txtApiKey, txtSenderId, phone, smsBody);
+            sent += 1;
+          } catch (error) {
+            failures.push({
+              phone,
+              reason: error instanceof Error ? error.message : "Unknown error",
+            });
+          }
+        })
+      );
     }
 
     return new Response(JSON.stringify({
@@ -263,7 +271,7 @@ serve(async (req: Request) => {
       sent,
       failed: failures.length,
       skipped_invalid_or_empty: skipped,
-      failures: failures.slice(0, 15),
+      failures: failures.slice(0, 20),
     }), {
       status: 200,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
