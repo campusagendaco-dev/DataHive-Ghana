@@ -806,7 +806,7 @@ serve(async (req) => {
           onboarding_complete: true, agent_prices: subAgentPrices,
         }).eq("user_id", subAgentId);
         if (parentAgentId && agentProfit > 0) {
-          await supabase.rpc("credit_wallet", { p_agent_id: parentAgentId, p_amount: agentProfit });
+          await supabase.rpc("credit_order_profits", { p_order_id: reference });
         }
         await supabase
           .from("orders")
@@ -870,12 +870,7 @@ serve(async (req) => {
         
         // Credit profits
         if (order?.agent_id && (order.profit > 0 || order.parent_profit > 0)) {
-          if (order.profit > 0) {
-            await supabase.rpc("credit_wallet", { p_agent_id: order.agent_id, p_amount: order.profit });
-          }
-          if (order.parent_agent_id && order.parent_profit > 0) {
-            await supabase.rpc("credit_wallet", { p_agent_id: order.parent_agent_id, p_amount: order.parent_profit });
-          }
+          await supabase.rpc("credit_order_profits", { p_order_id: reference });
         }
       } else {
         await supabase.from("orders").update({
@@ -917,12 +912,7 @@ serve(async (req) => {
           
           // Credit profits
           if (order?.agent_id && (order.profit > 0 || order.parent_profit > 0)) {
-            if (order.profit > 0) {
-              await supabase.rpc("credit_wallet", { p_agent_id: order.agent_id, p_amount: order.profit });
-            }
-            if (order.parent_agent_id && order.parent_profit > 0) {
-              await supabase.rpc("credit_wallet", { p_agent_id: order.parent_agent_id, p_amount: order.parent_profit });
-            }
+            await supabase.rpc("credit_order_profits", { p_order_id: reference });
           }
         } else {
           await supabase.from("orders").update({

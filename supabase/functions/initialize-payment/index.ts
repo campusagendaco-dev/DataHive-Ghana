@@ -291,16 +291,11 @@ serve(async (req: Request) => {
           }
 
           // Sub-agent's customer price:
-          // 1. Strictly use parent-assigned price if set (Parent controls sub-agent retail)
-          // 2. Fallback to sub-agent's own listed price
-          // 3. Last fallback to parentAssignedBase (break-even)
-          if (Number.isFinite(parentAssignedBase) && parentAssignedBase > adminBase) {
-            chargeBase = parentAssignedBase;
-          } else {
-            chargeBase = Number.isFinite(sellerListed) && sellerListed > parentAssignedBase
-              ? sellerListed
-              : parentAssignedBase;
-          }
+          // 1. Must be at least the parent-assigned price (Parent sets the floor)
+          // 2. Can be higher if the sub-agent has set their own retail price
+          chargeBase = Number.isFinite(sellerListed) && sellerListed > parentAssignedBase
+            ? sellerListed
+            : parentAssignedBase;
 
           // Important: In this model, if the parent sets the price, the parent keeps the margin
           // between parentAssignedBase and adminBase.

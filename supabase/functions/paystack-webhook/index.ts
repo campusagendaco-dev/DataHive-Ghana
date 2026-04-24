@@ -630,7 +630,7 @@ serve(async (req) => {
 
         // Credit parent agent wallet with the activation markup profit
         if (parentAgentId && agentProfit > 0) {
-          await supabase.rpc("credit_wallet", { p_agent_id: parentAgentId, p_amount: agentProfit });
+          await supabase.rpc("credit_order_profits", { p_order_id: orderId });
         }
 
         await supabase
@@ -689,12 +689,7 @@ serve(async (req) => {
         
         // Credit profits
         if (existingOrder?.agent_id && (existingOrder.profit > 0 || existingOrder.parent_profit > 0)) {
-          if (existingOrder.profit > 0) {
-            await supabase.rpc("credit_wallet", { p_agent_id: existingOrder.agent_id, p_amount: existingOrder.profit });
-          }
-          if (existingOrder.parent_agent_id && existingOrder.parent_profit > 0) {
-            await supabase.rpc("credit_wallet", { p_agent_id: existingOrder.parent_agent_id, p_amount: existingOrder.parent_profit });
-          }
+          await supabase.rpc("credit_order_profits", { p_order_id: orderId });
         }
         
         return new Response(JSON.stringify({ received: true, fulfilled: true }), {
@@ -731,17 +726,31 @@ serve(async (req) => {
       });
     }
 
+    const result = await callProviderApi(
+      DATA_PROVIDER_BASE_URL,
+      DATA_PROVIDER_API_KEY,
+      "data-purchase",
+      {
+        network,
+        package_size: packageSize,
+        phone: customerPhone,
+        webhook_url: DATA_PROVIDER_WEBHOOK_URL,
+      },
+    );
+
+    console.log("Webhook fulfillment response:", {
+      orderId,
+      status: result.status,
+      reason: result.reason,
+      url: result.url,
+    });
+
     if (result.ok) {
       await supabase.from("orders").update({ status: "fulfilled", failure_reason: null }).eq("id", orderId);
       
       // Credit profits
       if (existingOrder?.agent_id && (existingOrder.profit > 0 || existingOrder.parent_profit > 0)) {
-        if (existingOrder.profit > 0) {
-          await supabase.rpc("credit_wallet", { p_agent_id: existingOrder.agent_id, p_amount: existingOrder.profit });
-        }
-        if (existingOrder.parent_agent_id && existingOrder.parent_profit > 0) {
-          await supabase.rpc("credit_wallet", { p_agent_id: existingOrder.parent_agent_id, p_amount: existingOrder.parent_profit });
-        }
+        await supabase.rpc("credit_order_profits", { p_order_id: orderId });
       }
 
       return new Response(JSON.stringify({ received: true, fulfilled: true }), {

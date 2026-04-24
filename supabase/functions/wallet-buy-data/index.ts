@@ -91,13 +91,13 @@ async function resolveExpectedAmount(supabaseAdmin: any, network: string, packag
 }
 
 // deno-lint-ignore no-explicit-any
-async function resolveExpectedAmountForUser(
+async function resolveOrderDetails(
   supabaseAdmin: any,
   userId: string,
   network: string,
   packageSize: string,
   multiplier: number,
-): Promise<number | null> {
+): Promise<{ cost: number; parentAgentId?: string; parentProfit?: number; profit?: number } | null> {
   const normalizedNetwork = normalizeNetworkForPricing(network);
   const normalizedPackage = packageSize.replace(/\s+/g, "").toUpperCase();
 
@@ -107,19 +107,20 @@ async function resolveExpectedAmountForUser(
     .eq("user_id", userId)
     .maybeSingle();
 
-  if (profile?.is_sub_agent) {
-    const ownPriceMap = (profile?.agent_prices || {}) as Record<string, Record<string, string | number>>;
-    const ownAssigned = resolvePriceFromMap(
-      ownPriceMap,
-      normalizedNetwork,
-      network,
-      normalizedPackage,
-      packageSize,
-    );
-    if (Number.isFinite(ownAssigned) && ownAssigned > 0) {
-      return Number((ownAssigned * multiplier).toFixed(2));
-    }
+  // Get admin cost as base floor
+  const { data: globalRow } = await supabaseAdmin
+    .from("global_package_settings")
+    .select("agent_price")
+    .eq("network", normalizedNetwork)
+    .eq("package_size", normalizedPackage)
+    .maybeSingle();
+  
+  const adminBase = Number(globalRow?.agent_price || 0);
+  if (!(adminBase > 0)) return null;
+  const adminCost = Number((adminBase * multiplier).toFixed(2));
 
+  if (profile?.is_sub_agent) {
+    let parentAssignedBase = 0;
     if (profile?.parent_agent_id) {
       const { data: parentProfile } = await supabaseAdmin
         .from("profiles")
@@ -128,23 +129,35 @@ async function resolveExpectedAmountForUser(
         .maybeSingle();
 
       const parentMap = (parentProfile?.sub_agent_prices || {}) as Record<string, Record<string, string | number>>;
-      const parentAssigned = resolvePriceFromMap(
+      parentAssignedBase = resolvePriceFromMap(
         parentMap,
         normalizedNetwork,
         network,
         normalizedPackage,
         packageSize,
       );
-      if (Number.isFinite(parentAssigned) && parentAssigned > 0) {
-        return Number((parentAssigned * multiplier).toFixed(2));
-      }
     }
 
-    // Parent-assigned price is required for sub-agent dashboard wallet purchases.
-    return null;
+    // If no parent price is assigned, we can't process sub-agent wallet orders
+    if (!(parentAssignedBase > 0)) return null;
+    
+    const parentCost = Number((parentAssignedBase * multiplier).toFixed(2));
+    const parentProfit = Math.max(0, Number((parentCost - adminCost).toFixed(2)));
+
+    // For wallet orders, the agent pays their cost (parentCost)
+    return { 
+      cost: parentCost, 
+      parentAgentId: profile.parent_agent_id, 
+      parentProfit: parentProfit,
+      profit: 0 // In wallet orders, agent markup is cash in hand, not wallet credit
+    };
   }
 
-  return await resolveExpectedAmount(supabaseAdmin, network, packageSize, multiplier);
+  // Regular agent: they pay the admin cost
+  return { 
+    cost: adminCost, 
+    profit: 0 // Regular agent markup is cash in hand
+  };
 }
 
 // deno-lint-ignore no-explicit-any
@@ -556,14 +569,14 @@ serve(async (req) => {
       });
     }
 
-    const expectedAmount = await resolveExpectedAmountForUser(
+    const orderDetails = await resolveOrderDetails(
       supabaseAdmin,
       user.id,
       network,
       package_size,
       pricingContext.multiplier,
     );
-    if (!expectedAmount) {
+    if (!orderDetails) {
       const { data: priceProfile } = await supabaseAdmin
         .from("profiles")
         .select("is_sub_agent")
@@ -579,6 +592,8 @@ serve(async (req) => {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
+
+    const { cost: expectedAmount, parentAgentId, parentProfit } = orderDetails;
 
     // Ensure wallet row exists before attempting atomic debit
     const { data: existingWallet } = await supabaseAdmin.from("wallets").select("id").eq("agent_id", user.id).maybeSingle();
@@ -605,28 +620,6 @@ serve(async (req) => {
       });
     }
 
-    // ── PROFIT LOGIC ──────────────────────────────────────────────────────────
-    // Fetch the buyer's profile to check if they are a sub-agent
-    const { data: buyerProfile } = await supabaseAdmin
-      .from("profiles")
-      .select("is_sub_agent, parent_agent_id")
-      .eq("user_id", user.id)
-      .maybeSingle();
-
-    const isSubAgent = buyerProfile?.is_sub_agent === true;
-    const parentAgentId: string | null = buyerProfile?.parent_agent_id ?? null;
-
-    // Profit for the sub-agent's own order is 0 (they pay a fixed price set by parent)
-    // Profit for the parent agent = what sub-agent paid minus the global base price (agent_price)
-    let parentProfit = 0;
-
-    if (isSubAgent && parentAgentId) {
-      const globalBasePrice = await resolveExpectedAmount(supabaseAdmin, network, package_size, pricingContext.multiplier);
-      if (globalBasePrice && globalBasePrice > 0 && expectedAmount > globalBasePrice) {
-        parentProfit = parseFloat((expectedAmount - globalBasePrice).toFixed(2));
-      }
-    }
-
     const orderId = crypto.randomUUID();
     await supabaseAdmin.from("orders").insert({
       id: orderId,
@@ -636,9 +629,9 @@ serve(async (req) => {
       package_size,
       customer_phone,
       amount: expectedAmount,
-      profit: 0, // Sub-agent's own profit is 0 (they buy at fixed price)
-      parent_agent_id: parentAgentId,
-      parent_profit: parentProfit,
+      profit: 0,
+      parent_agent_id: parentAgentId || null,
+      parent_profit: parentProfit || 0,
       status: "paid",
       failure_reason: null,
     });
@@ -665,9 +658,9 @@ serve(async (req) => {
     if (fulfillmentResult.ok) {
       await supabaseAdmin.from("orders").update({ status: "fulfilled", failure_reason: null }).eq("id", orderId);
       
-      // Credit parent profit after successful fulfillment
+      // Credit profits after successful fulfillment
       if (parentProfit > 0 && parentAgentId) {
-        await supabaseAdmin.rpc("credit_wallet", { p_agent_id: parentAgentId, p_amount: parentProfit });
+        await supabaseAdmin.rpc("credit_order_profits", { p_order_id: orderId });
       }
 
       return new Response(JSON.stringify({ success: true, order_id: orderId, status: "fulfilled" }), {

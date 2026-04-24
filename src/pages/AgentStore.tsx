@@ -163,8 +163,12 @@ const AgentStore = () => {
     const agentOwn = Number(agent.agent_prices?.[network]?.[size]);
     
     if (agent.is_sub_agent) {
-      if (Number.isFinite(parentAssigned) && parentAssigned > 0) return applyPriceMultiplier(parentAssigned, priceMultiplier);
-      if (Number.isFinite(agentOwn) && agentOwn > 0) return applyPriceMultiplier(agentOwn, priceMultiplier);
+      // Use the higher of the parent-assigned price or the sub-agent's own price
+      const base = Math.max(
+        Number.isFinite(parentAssigned) ? parentAssigned : 0,
+        Number.isFinite(agentOwn) ? agentOwn : 0
+      );
+      if (base > 0) return applyPriceMultiplier(base, priceMultiplier);
     } else {
       if (Number.isFinite(agentOwn) && agentOwn > 0) return applyPriceMultiplier(agentOwn, priceMultiplier);
     }
