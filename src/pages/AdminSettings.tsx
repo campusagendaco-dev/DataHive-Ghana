@@ -20,6 +20,7 @@ interface SystemSettings {
   holiday_message: string;
   disable_ordering: boolean;
   dark_mode_enabled: boolean;
+  store_visitor_popup_enabled: boolean;
   customer_service_number: string;
   support_channel_link: string;
   sub_agent_base_fee: string;
@@ -48,6 +49,7 @@ const AdminSettings = () => {
     holiday_message: "",
     disable_ordering: false,
     dark_mode_enabled: false,
+    store_visitor_popup_enabled: false,
     customer_service_number: "",
     support_channel_link: "https://whatsapp.com/channel/0029VbCx0q4KLaHfJaiHLN40",
     sub_agent_base_fee: "5.00",
@@ -82,6 +84,7 @@ const AdminSettings = () => {
           holiday_message: data.holiday_message || "",
           disable_ordering: data.disable_ordering || false,
           dark_mode_enabled: data.dark_mode_enabled || false,
+          store_visitor_popup_enabled: data.store_visitor_popup_enabled || false,
           customer_service_number: data.customer_service_number || "",
           support_channel_link: data.support_channel_link || "https://whatsapp.com/channel/0029VbCx0q4KLaHfJaiHLN40",
           sub_agent_base_fee: String(data.sub_agent_base_fee || "5.00"),
@@ -127,6 +130,7 @@ const AdminSettings = () => {
       at_markup_percentage: parseFloat(settings.at_markup_percentage) || 0,
       auto_pending_sms_enabled: settings.auto_pending_sms_enabled,
       auto_pending_sms_message: settings.auto_pending_sms_message,
+      store_visitor_popup_enabled: settings.store_visitor_popup_enabled,
     };
 
     const { data, error } = await supabase.functions.invoke("admin-user-actions", {
@@ -184,6 +188,17 @@ const AdminSettings = () => {
                 <Switch
                   checked={settings.dark_mode_enabled}
                   onCheckedChange={(c) => setSettings({ ...settings, dark_mode_enabled: c })}
+                />
+              </div>
+
+              <div className="flex items-start justify-between">
+                <div className="space-y-0.5">
+                  <Label>Agent Store Visitor Popup</Label>
+                  <p className="text-xs text-muted-foreground">Show a "Get your own store" popup to first-time store visitors.</p>
+                </div>
+                <Switch
+                  checked={settings.store_visitor_popup_enabled}
+                  onCheckedChange={(c) => setSettings({ ...settings, store_visitor_popup_enabled: c })}
                 />
               </div>
 

@@ -10,11 +10,12 @@ import { fetchApiPricingContext, applyPriceMultiplier } from "@/lib/api-source-p
 import { invokePublicFunction } from "@/lib/public-function-client";
 import PhoneOrderTracker from "@/components/PhoneOrderTracker";
 import StoreNavbar from "@/components/StoreNavbar";
+import StoreVisitorPopup from "@/components/StoreVisitorPopup";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Zap, Loader2, TrendingUp, ChevronRight, Store, MessageCircle, ShoppingBag,
-  ShieldCheck, Phone, X, CreditCard, Star, Gift, Tag, CheckCircle2,
-  Smartphone, Package, Clock, ArrowLeft, ArrowRight, Check, Share2, History, Sparkles, Users, PhoneCall, Send, Mail
+  ShieldCheck, Phone, X, CreditCard, Gift, Tag, CheckCircle2,
+  Smartphone, Package, Clock, ArrowRight,
 } from "lucide-react";
 
 interface PromoResult {
@@ -88,23 +89,6 @@ const AgentStore = () => {
   const [promoResult, setPromoResult] = useState<PromoResult | null>(null);
   const [claiming, setClaiming] = useState(false);
 
-  // Simulated live orders for trust
-  const [liveOrders, setLiveOrders] = useState<{name: string, size: string, time: string}[]>([]);
-  useEffect(() => {
-    const names = ["Kofi", "Ama", "Kwame", "Abena", "Yaw", "Esi", "Papa", "Akosua"];
-    const sizes = ["5GB", "10GB", "2GB", "1GB", "20GB"];
-    const generateOrder = () => ({
-      name: names[Math.floor(Math.random() * names.length)],
-      size: sizes[Math.floor(Math.random() * sizes.length)],
-      time: "Just now"
-    });
-    setLiveOrders([generateOrder(), generateOrder()]);
-    const interval = setInterval(() => {
-      setLiveOrders(prev => [generateOrder(), ...prev.slice(0, 2)]);
-    }, 15000);
-    return () => clearInterval(interval);
-  }, []);
-
   const phoneDigits = phone.replace(/\D+/g, "");
   const isPhoneValid = phoneDigits.length === 10 || phoneDigits.length === 12 || phoneDigits.length === 9;
 
@@ -125,7 +109,6 @@ const AgentStore = () => {
         ]);
 
         if (agentRes.error) {
-          console.error("Agent fetch error:", agentRes.error);
           setNotFound(true);
           setLoading(false);
           return;
@@ -137,16 +120,13 @@ const AgentStore = () => {
         setPriceMultiplier(pricingCtx.multiplier);
 
         if (!agentRes.data) {
-          console.warn("No agent found for slug:", slug);
           setNotFound(true);
           setLoading(false);
           return;
         }
 
-        // Final verification of approval status
         const rawAgent = agentRes.data as any;
         if (!rawAgent.agent_approved && !rawAgent.sub_agent_approved) {
-          console.warn("Agent found but not approved:", slug);
           setNotFound(true);
           setLoading(false);
           return;
@@ -156,10 +136,8 @@ const AgentStore = () => {
         setAgent(profile);
 
         if (profile.is_sub_agent && profile.parent_agent_id) {
-          const { data: parentProfile, error: parentErr } = await supabase
+          const { data: parentProfile } = await supabase
             .from("profiles").select("sub_agent_prices").eq("user_id", profile.parent_agent_id).maybeSingle();
-          
-          if (parentErr) console.error("Parent profile fetch error:", parentErr);
           
           const pp = parentProfile as unknown as { sub_agent_prices?: Record<string, Record<string, string | number>> } | null;
           if (pp?.sub_agent_prices) {
@@ -169,8 +147,7 @@ const AgentStore = () => {
 
         const fee = Number(profile.sub_agent_activation_markup ?? 0);
         if (Number.isFinite(fee) && fee > 0) setSubAgentBaseFee(fee);
-      } catch (err) {
-        console.error("Critical error in fetchStore:", err);
+      } catch {
         setNotFound(true);
       } finally {
         setLoading(false);
@@ -380,7 +357,8 @@ const AgentStore = () => {
 
   return (
     <div className="min-h-screen flex flex-col bg-[#030305] text-white selection:bg-amber-400/30">
-      
+      <StoreVisitorPopup agentSlug={slug} showSubAgentLink={!agent.is_sub_agent} />
+
       {/* ── Background Mesh ── */}
       <div className="fixed inset-0 pointer-events-none overflow-hidden z-0 transition-all duration-700">
         <div className={`absolute top-0 left-1/2 -translate-x-1/2 w-[1000px] h-[600px] rounded-full blur-[140px] transition-all duration-1000 ${
@@ -764,19 +742,18 @@ const AgentStore = () => {
               </div>
             </div>
 
-            {/* Live Feed (Desktop Only) */}
+            {/* Secure checkout callout */}
             <div className="space-y-6">
-              <p className="text-xs font-black uppercase tracking-[0.2em] text-white/20 text-center md:text-left">Live Activity</p>
-              <div className="space-y-3">
-                {liveOrders.map((order, i) => (
-                  <div key={i} className="flex items-center gap-4 p-4 rounded-2xl bg-white/[0.02] border border-white/[0.05] animate-in fade-in slide-in-from-right-4 duration-500">
-                    <div className="w-10 h-10 rounded-full bg-emerald-500/10 flex items-center justify-center">
-                      <ShoppingBag className="w-5 h-5 text-emerald-500" />
-                    </div>
-                    <div className="text-left">
-                      <p className="text-[12px] font-bold text-white/70">{order.name} bought {order.size}</p>
-                      <p className="text-[10px] text-white/20 uppercase font-black tracking-widest">{order.time}</p>
-                    </div>
+              <p className="text-xs font-black uppercase tracking-[0.2em] text-white/20 text-center md:text-left">Secure Checkout</p>
+              <div className="p-6 rounded-[2.5rem] bg-white/[0.02] border border-white/10 space-y-4">
+                {[
+                  { icon: ShieldCheck, text: "Paystack-secured payments",  color: "text-emerald-400" },
+                  { icon: Zap,         text: "Data delivered in seconds",   color: "text-amber-400" },
+                  { icon: Clock,       text: "24/7 support available",      color: "text-sky-400" },
+                ].map(({ icon: Icon, text, color }) => (
+                  <div key={text} className="flex items-center gap-3">
+                    <Icon className={`w-4 h-4 shrink-0 ${color}`} />
+                    <span className="text-white/30 text-xs font-semibold">{text}</span>
                   </div>
                 ))}
               </div>
