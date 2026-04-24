@@ -2,7 +2,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { corsHeaders } from "../_shared/cors.ts";
-import { normalizePhone, getSmsConfig, sendSmsViaTxtConnect, formatTemplate } from "../_shared/sms.ts";
+import { normalizePhone, getSmsConfig, sendSmsViaTxtConnect, formatTemplate, sendPaymentSms } from "../_shared/sms.ts";
 
 function getFirstEnvValue(keys: string[]): string {
   for (const key of keys) {
@@ -751,6 +751,10 @@ serve(async (req) => {
       // Credit profits
       if (existingOrder?.agent_id && (existingOrder.profit > 0 || existingOrder.parent_profit > 0)) {
         await supabase.rpc("credit_order_profits", { p_order_id: orderId });
+      }
+
+      if (customerPhone) {
+        await sendPaymentSms(supabase, customerPhone, "payment_success");
       }
 
       return new Response(JSON.stringify({ received: true, fulfilled: true }), {

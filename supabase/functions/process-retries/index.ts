@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { corsHeaders } from "../_shared/cors.ts";
+import { sendPaymentSms } from "../_shared/sms.ts";
 
 const supabaseAdmin = createClient(
   Deno.env.get("SUPABASE_URL") ?? "",
@@ -142,6 +143,11 @@ serve(async (req) => {
         // Atomic Profit Credit (since it might have failed before)
         await supabaseAdmin.rpc("credit_order_profits", { p_order_id: order.id });
         
+        // Send success SMS
+        if (order.customer_phone) {
+          await sendPaymentSms(supabaseAdmin, order.customer_phone, "payment_success");
+        }
+
         results.push({ id: order.id, status: "fulfilled" });
       } else {
         await supabaseAdmin.from("orders").update({ 

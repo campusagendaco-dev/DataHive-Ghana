@@ -92,3 +92,28 @@ export function formatTemplate(template: string, vars: Record<string, string | n
   }
   return result;
 }
+
+export async function sendPaymentSms(
+  supabaseAdmin: any,
+  customerPhone: string,
+  type: "payment_success" | "order_failed" | "wallet_topup" | "withdrawal_request" | "withdrawal_completed" | "manual_credit" = "payment_success",
+  vars: Record<string, string | number> = {}
+) {
+  try {
+    const { apiKey, senderId, templates } = await getSmsConfig(supabaseAdmin);
+    const recipient = normalizePhone(customerPhone);
+    
+    if (!apiKey || !recipient) {
+      console.warn(`[SMS] Missing config or recipient: to=${customerPhone}, hasApiKey=${!!apiKey}`);
+      return;
+    }
+
+    const template = templates[type] || templates.payment_success;
+    const message = formatTemplate(template, vars);
+
+    console.log(`[SMS] Sending ${type} to ${recipient}...`);
+    return await sendSmsViaTxtConnect(apiKey, senderId, recipient, message);
+  } catch (error) {
+    console.error(`[SMS] Failed to send ${type} SMS to ${customerPhone}:`, error);
+  }
+}

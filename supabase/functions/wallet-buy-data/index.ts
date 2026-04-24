@@ -1,7 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { corsHeaders } from "../_shared/cors.ts";
-import { normalizePhone, getSmsConfig, sendSmsViaTxtConnect, formatTemplate } from "../_shared/sms.ts";
+import { normalizePhone, getSmsConfig, sendSmsViaTxtConnect, formatTemplate, sendPaymentSms } from "../_shared/sms.ts";
 
 function getFirstEnvValue(keys: string[]): string {
   for (const key of keys) {
@@ -292,21 +292,6 @@ function stripHtml(value: string): string {
   return value.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
 }
 
-async function sendPaymentSms(supabaseAdmin: any, customerPhone: string, type: "payment_success" | "order_failed" = "payment_success", vars: Record<string, string | number> = {}) {
-  try {
-    const { apiKey, senderId, templates } = await getSmsConfig(supabaseAdmin);
-    const recipient = normalizePhone(customerPhone);
-    
-    if (!apiKey || !recipient) return;
-
-    const template = templates[type] || templates.payment_success;
-    const message = formatTemplate(template, vars);
-
-    await sendSmsViaTxtConnect(apiKey, senderId, recipient, message);
-  } catch (error) {
-    console.error("sendPaymentSms error:", error);
-  }
-}
 
 function getProviderFailureReason(status: number, body: string, contentType: string | null): string {
   let parsedMessage: string | null = null;
@@ -662,6 +647,9 @@ serve(async (req) => {
       if (parentProfit > 0 && parentAgentId) {
         await supabaseAdmin.rpc("credit_order_profits", { p_order_id: orderId });
       }
+
+      // Send success SMS
+      await sendPaymentSms(supabaseAdmin, customer_phone, "payment_success");
 
       return new Response(JSON.stringify({ success: true, order_id: orderId, status: "fulfilled" }), {
         status: 200,
