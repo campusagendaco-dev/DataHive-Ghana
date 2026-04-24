@@ -185,82 +185,96 @@ serve(async (req: Request) => {
     const uniquePhones = new Set<string>();
     let skipped = 0;
     let totalRecipients = 0;
+    let sent = 0;
+    const failures: Array<{ phone: string; reason: string }> = [];
+    const CONCURRENCY_LIMIT = 5;
+    const FETCH_BATCH_SIZE = 1000;
 
     if (target_type === "pending_orders") {
       const { data: pendingOrders, error: ordersError } = await supabaseAdmin
         .from("orders")
-        .select("customer_phone, agent_id")
+        .select("customer_phone")
         .eq("status", "pending");
 
-      if (ordersError) {
-        return new Response(JSON.stringify({ error: ordersError.message }), {
-          status: 200,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
+      if (ordersError) throw ordersError;
 
-      for (const row of pendingOrders || []) {
-        totalRecipients += 1;
-        const cPhone = normalizePhone(row.customer_phone);
-        if (cPhone) uniquePhones.add(cPhone);
-        else skipped += 1;
-      }
-    } else {
-      let profilesQuery = supabaseAdmin
-        .from("profiles")
-        .select("user_id, phone, is_agent, is_sub_agent, agent_approved, sub_agent_approved");
+      const phonesToProcess = (pendingOrders || [])
+        .map(r => normalizePhone(r.customer_phone))
+        .filter((p): p is string => !!p);
+      
+      totalRecipients = (pendingOrders || []).length;
+      skipped = totalRecipients - phonesToProcess.length;
 
-      if (target_type === "agents") {
-        profilesQuery = profilesQuery.or('is_agent.eq.true,is_sub_agent.eq.true,agent_approved.eq.true,sub_agent_approved.eq.true');
-      } else if (target_type === "users") {
-        // Users are those who are NOT agents/sub-agents
-        profilesQuery = profilesQuery
-          .eq('is_agent', false)
-          .eq('is_sub_agent', false)
-          .eq('agent_approved', false)
-          .eq('sub_agent_approved', false);
-      }
-
-      const { data: recipients, error: recipientsError } = await profilesQuery;
-      if (recipientsError) {
-        return new Response(JSON.stringify({ error: recipientsError.message }), {
-          status: 200,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-
-      totalRecipients = (recipients || []).length;
-      for (const row of recipients || []) {
-        const normalized = normalizePhone(row.phone);
-        if (!normalized) {
-          skipped += 1;
-          continue;
-        }
-        uniquePhones.add(normalized);
-      }
-    }
-
-    // --- Parallel Sending with Concurrency Limit ---
-    const phoneList = Array.from(uniquePhones);
-    let sent = 0;
-    const failures: Array<{ phone: string; reason: string }> = [];
-    const CONCURRENCY_LIMIT = 5; // Send 5 messages at a time
-
-    for (let i = 0; i < phoneList.length; i += CONCURRENCY_LIMIT) {
-      const chunk = phoneList.slice(i, i + CONCURRENCY_LIMIT);
-      await Promise.all(
-        chunk.map(async (phone) => {
+      // Process in parallel chunks
+      for (let i = 0; i < phonesToProcess.length; i += CONCURRENCY_LIMIT) {
+        const chunk = phonesToProcess.slice(i, i + CONCURRENCY_LIMIT);
+        await Promise.all(chunk.map(async (phone) => {
           try {
             await sendSmsViaTxtConnect(txtApiKey, txtSenderId, phone, smsBody);
             sent += 1;
           } catch (error) {
-            failures.push({
-              phone,
-              reason: error instanceof Error ? error.message : "Unknown error",
-            });
+            failures.push({ phone, reason: error instanceof Error ? error.message : "Unknown error" });
           }
-        })
-      );
+        }));
+      }
+    } else {
+      // --- Paginated Fetching for Large User Bases ---
+      let hasMore = true;
+      let offset = 0;
+
+      while (hasMore) {
+        let profilesQuery = supabaseAdmin
+          .from("profiles")
+          .select("phone, is_agent, is_sub_agent, agent_approved, sub_agent_approved")
+          .range(offset, offset + FETCH_BATCH_SIZE - 1);
+
+        if (target_type === "agents") {
+          profilesQuery = profilesQuery.or('is_agent.eq.true,is_sub_agent.eq.true,agent_approved.eq.true,sub_agent_approved.eq.true');
+        } else if (target_type === "users") {
+          profilesQuery = profilesQuery
+            .eq('is_agent', false)
+            .eq('is_sub_agent', false)
+            .eq('agent_approved', false)
+            .eq('sub_agent_approved', false);
+        }
+
+        const { data: recipients, error: recipientsError } = await profilesQuery;
+        if (recipientsError) throw recipientsError;
+
+        if (!recipients || recipients.length === 0) {
+          hasMore = false;
+          break;
+        }
+
+        const phonesToProcess = recipients
+          .map(r => normalizePhone(r.phone))
+          .filter((p): p is string => !!p && !uniquePhones.has(p));
+        
+        // Add unique phones to our set to prevent duplicates across batches
+        phonesToProcess.forEach(p => uniquePhones.add(p));
+        
+        totalRecipients += recipients.length;
+        skipped += (recipients.length - phonesToProcess.length);
+
+        // Process this batch
+        for (let i = 0; i < phonesToProcess.length; i += CONCURRENCY_LIMIT) {
+          const chunk = phonesToProcess.slice(i, i + CONCURRENCY_LIMIT);
+          await Promise.all(chunk.map(async (phone) => {
+            try {
+              await sendSmsViaTxtConnect(txtApiKey, txtSenderId, phone, smsBody);
+              sent += 1;
+            } catch (error) {
+              failures.push({ phone, reason: error instanceof Error ? error.message : "Unknown error" });
+            }
+          }));
+        }
+
+        if (recipients.length < FETCH_BATCH_SIZE) {
+          hasMore = false;
+        } else {
+          offset += FETCH_BATCH_SIZE;
+        }
+      }
     }
 
     return new Response(JSON.stringify({
