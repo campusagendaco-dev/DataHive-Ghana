@@ -4,6 +4,29 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ── Dark mode CSS class overrides (Tailwind dark: variants) ─────────────── */
+.dark {
+  --background:           240 15% 4%;
+  --foreground:           0 0% 95%;
+  --card:                 240 12% 8%;
+  --card-foreground:      0 0% 95%;
+  --popover:              240 12% 8%;
+  --popover-foreground:   0 0% 95%;
+  --primary:              48 96% 53%;
+  --primary-foreground:   0 0% 5%;
+  --secondary:            240 10% 13%;
+  --secondary-foreground: 0 0% 90%;
+  --muted:                240 10% 12%;
+  --muted-foreground:     240 5% 60%;
+  --accent:               48 96% 53%;
+  --accent-foreground:    0 0% 5%;
+  --destructive:          0 72% 51%;
+  --destructive-foreground: 0 0% 100%;
+  --border:               240 10% 18%;
+  --input:                240 10% 18%;
+  --ring:                 48 96% 53%;
+}
+
 @layer base {
   :root {
     --background: 0 0% 100%;
@@ -102,6 +125,12 @@
   backdrop-filter: blur(24px);
   -webkit-backdrop-filter: blur(24px);
   border: 1px solid rgba(var(--glass-border-rgb), 0.2) !important;
+}
+
+/* ── Hero fade-in animation (used inline in Index.tsx) ── */
+@keyframes fade-in {
+  from { opacity: 0; transform: translateY(16px); }
+  to   { opacity: 1; transform: translateY(0); }
 }
 
 /* ── Buy strip slide-in animation ─────────────────────── */

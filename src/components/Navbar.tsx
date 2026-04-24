@@ -1,11 +1,12 @@
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
-  Menu, X, LogOut, LayoutDashboard, ShieldCheck, Wifi,
-  TrendingUp, Home, MapPin, HelpCircle, ChevronRight,
-  User, Settings, Wallet, ClipboardList, Store,
+  Menu, X, LogOut, LayoutDashboard, ShieldCheck,
+  TrendingUp, Home, HelpCircle, ChevronRight,
+  User, Settings, Wallet, ClipboardList, Store, Sun, Moon,
 } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 import { useAuth } from "@/hooks/useAuth";
+import { useAppTheme } from "@/contexts/ThemeContext";
 
 
 const openTutorial = () => window.dispatchEvent(new CustomEvent("open-tutorial"));
@@ -21,6 +22,7 @@ const Navbar = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const { user, profile, isAdmin, signOut } = useAuth();
+  const { isDark, toggleDark } = useAppTheme();
   const menuRef = useRef<HTMLDivElement>(null);
 
   /* close on route change */
@@ -61,18 +63,33 @@ const Navbar = () => {
     ...(!user || !agentApproved ? [{ to: "/agent-program", label: "Become an Agent", icon: TrendingUp }] : []),
   ];
 
+  const navBg   = isDark
+    ? (scrolled ? "rgba(13,13,24,0.97)"    : "rgba(13,13,24,0.92)")
+    : (scrolled ? "rgba(255,255,255,0.97)" : "rgba(255,255,255,0.90)");
+  const navBorder = scrolled
+    ? `1px solid ${isDark ? "rgba(255,255,255,0.07)" : "rgba(0,0,0,0.08)"}`
+    : "1px solid transparent";
+  const navShadow = scrolled
+    ? (isDark ? "0 4px 32px rgba(0,0,0,0.4)" : "0 4px 24px rgba(0,0,0,0.08)")
+    : "none";
+  const linkIdle    = isDark ? "text-white/60 hover:text-white hover:bg-white/8"   : "text-gray-600 hover:text-gray-900 hover:bg-black/5";
+  const linkActive  = isDark ? "bg-white/10 text-white"                            : "bg-black/6 text-gray-900";
+  const logoText    = isDark ? "text-white"   : "text-gray-900";
+  const dividerBg   = isDark ? "bg-white/10"  : "bg-black/10";
+  const mobileMenuBg= isDark ? "rgba(10,10,20,0.98)" : "rgba(255,255,255,0.99)";
+  const mobileItemIdle   = isDark ? "text-white/65 hover:text-white hover:bg-white/8" : "text-gray-600 hover:text-gray-900 hover:bg-black/5";
+  const mobileItemActive = isDark ? "bg-white/10 text-white" : "bg-black/6 text-gray-900";
+
   return (
     <nav
       ref={menuRef}
       className="fixed top-0 left-0 right-0 z-50 transition-all duration-300"
       style={{
-        background: scrolled
-          ? "rgba(13,13,24,0.97)"
-          : "rgba(13,13,24,0.92)",
+        background: navBg,
         backdropFilter: "blur(20px)",
         WebkitBackdropFilter: "blur(20px)",
-        borderBottom: scrolled ? "1px solid rgba(255,255,255,0.07)" : "1px solid transparent",
-        boxShadow: scrolled ? "0 4px 32px rgba(0,0,0,0.4)" : "none",
+        borderBottom: navBorder,
+        boxShadow: navShadow,
       }}
     >
       <div className="container mx-auto flex items-center justify-between h-16 px-4">
@@ -91,7 +108,7 @@ const Navbar = () => {
             </div>
           </div>
           <div className="leading-tight hidden sm:block">
-            <span className="text-white font-black text-sm block leading-none tracking-tight">SwiftData Ghana</span>
+            <span className={`${logoText} font-black text-sm block leading-none tracking-tight`}>SwiftData Ghana</span>
             <span className="text-amber-400 text-[10px] leading-none font-semibold">#1 Cheapest Data Bundles</span>
           </div>
         </Link>
@@ -102,10 +119,7 @@ const Navbar = () => {
             <Link
               key={to}
               to={to}
-              className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-medium transition-all duration-150 ${isActive(to)
-                ? "bg-white/10 text-white"
-                : "text-white/60 hover:text-white hover:bg-white/8"
-                }`}
+              className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-medium transition-all duration-150 ${isActive(to) ? linkActive : linkIdle}`}
             >
               <NavIcon icon={icon} className={isActive(to) ? "text-amber-400" : ""} />
               {label}
@@ -115,23 +129,31 @@ const Navbar = () => {
           {/* Tutorial */}
           <button
             onClick={openTutorial}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-medium text-white/60 hover:text-white hover:bg-white/8 transition-all duration-150"
+            className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-medium transition-all duration-150 ${linkIdle}`}
           >
             <NavIcon icon={HelpCircle} />
             How It Works
           </button>
 
           {/* Divider */}
-          <div className="w-px h-5 bg-white/10 mx-1" />
+          <div className={`w-px h-5 ${dividerBg} mx-1`} />
+
+          {/* Dark / Light toggle */}
+          <button
+            onClick={toggleDark}
+            className={`w-9 h-9 rounded-xl flex items-center justify-center transition-all duration-200 ${linkIdle}`}
+            title={isDark ? "Switch to Light Mode" : "Switch to Dark Mode"}
+          >
+            {isDark
+              ? <Sun  className="w-4 h-4 text-amber-400" />
+              : <Moon className="w-4 h-4" />}
+          </button>
 
           {/* Dashboard / Admin shortcut */}
           {user && (
             <Link
               to={isAdmin ? "/admin" : "/dashboard"}
-              className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-medium transition-all duration-150 ${isActive("/dashboard") || isActive("/admin")
-                ? "bg-white/10 text-white"
-                : "text-white/60 hover:text-white hover:bg-white/8"
-                }`}
+              className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-medium transition-all duration-150 ${isActive("/dashboard") || isActive("/admin") ? linkActive : linkIdle}`}
             >
               <NavIcon icon={isAdmin ? ShieldCheck : LayoutDashboard}
                 className={isActive("/dashboard") || isActive("/admin") ? "text-amber-400" : ""} />
@@ -143,7 +165,7 @@ const Navbar = () => {
           {user ? (
             <button
               onClick={handleSignOut}
-              className="ml-1 flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-medium text-white/50 hover:text-white hover:bg-white/8 transition-all duration-150"
+              className={`ml-1 flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-medium transition-all duration-150 ${linkIdle}`}
             >
               <LogOut className="w-4 h-4" /> Sign Out
             </button>
@@ -159,6 +181,14 @@ const Navbar = () => {
 
         {/* ── Mobile right side ── */}
         <div className="md:hidden flex items-center gap-2">
+          {/* Dark / Light toggle (mobile) */}
+          <button
+            onClick={toggleDark}
+            className={`w-8 h-8 rounded-xl flex items-center justify-center transition-all duration-200 ${linkIdle}`}
+            title={isDark ? "Light Mode" : "Dark Mode"}
+          >
+            {isDark ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4" />}
+          </button>
           {!user && (
             <Link
               to="/login"
@@ -169,7 +199,7 @@ const Navbar = () => {
           )}
           <button
             onClick={() => setMenuOpen(!menuOpen)}
-            className="w-9 h-9 rounded-xl flex items-center justify-center transition-colors text-white/70 hover:text-white hover:bg-white/8"
+            className={`w-9 h-9 rounded-xl flex items-center justify-center transition-colors ${isDark ? "text-white/70 hover:text-white hover:bg-white/8" : "text-gray-600 hover:text-gray-900 hover:bg-black/5"}`}
             aria-label="Menu"
           >
             {menuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
@@ -179,53 +209,47 @@ const Navbar = () => {
 
       {/* ── Mobile menu ── */}
       <div
-        className={`md:hidden overflow-hidden transition-all duration-300 ease-in-out ${menuOpen ? "max-h-[600px] opacity-100" : "max-h-0 opacity-0"
-          }`}
-        style={{ borderTop: menuOpen ? "1px solid rgba(255,255,255,0.07)" : "none" }}
+        className={`md:hidden overflow-hidden transition-all duration-300 ease-in-out ${menuOpen ? "max-h-[640px] opacity-100" : "max-h-0 opacity-0"}`}
+        style={{ borderTop: menuOpen ? `1px solid ${isDark ? "rgba(255,255,255,0.07)" : "rgba(0,0,0,0.08)"}` : "none" }}
       >
-        <div className="px-4 py-4 space-y-1" style={{ background: "rgba(10,10,20,0.98)" }}>
+        <div className="px-4 py-4 space-y-1" style={{ background: mobileMenuBg }}>
 
           {/* User greeting */}
           {user && (
-            <div className="flex items-center gap-3 px-3 py-3 mb-2 rounded-xl border border-white/8"
-              style={{ background: "rgba(255,255,255,0.03)" }}>
+            <div className={`flex items-center gap-3 px-3 py-3 mb-2 rounded-xl border ${isDark ? "border-white/8 bg-white/[0.03]" : "border-black/8 bg-black/[0.02]"}`}>
               <div className="w-9 h-9 rounded-full flex items-center justify-center bg-amber-400/15 border border-amber-400/20 shrink-0">
                 <User className="w-4 h-4 text-amber-400" />
               </div>
               <div className="min-w-0">
-                <p className="text-white text-sm font-bold truncate">{profile?.full_name || "My Account"}</p>
-                <p className="text-white/40 text-xs truncate">{profile?.store_name || (isAdmin ? "Administrator" : "Customer")}</p>
+                <p className={`${logoText} text-sm font-bold truncate`}>{profile?.full_name || "My Account"}</p>
+                <p className={`${isDark ? "text-white/40" : "text-gray-400"} text-xs truncate`}>{profile?.store_name || (isAdmin ? "Administrator" : "Customer")}</p>
               </div>
             </div>
           )}
 
           {/* Main links */}
-          <p className="text-white/25 text-[10px] font-bold uppercase tracking-widest px-3 pb-1">Explore</p>
+          <p className={`${isDark ? "text-white/25" : "text-gray-400"} text-[10px] font-bold uppercase tracking-widest px-3 pb-1`}>Explore</p>
           {mainLinks.map(({ to, label, icon }) => (
             <Link
               key={to}
               to={to}
-              className={`flex items-center gap-3 px-3 py-3 rounded-xl text-sm font-medium transition-colors ${isActive(to)
-                ? "bg-white/10 text-white"
-                : "text-white/65 hover:text-white hover:bg-white/8"
-                }`}
+              className={`flex items-center gap-3 px-3 py-3 rounded-xl text-sm font-medium transition-colors ${isActive(to) ? mobileItemActive : mobileItemIdle}`}
             >
-              <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${isActive(to) ? "bg-amber-400/15" : "bg-white/5"
-                }`}>
-                <NavIcon icon={icon} className={isActive(to) ? "text-amber-400" : "text-white/50"} />
+              <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${isActive(to) ? "bg-amber-400/15" : (isDark ? "bg-white/5" : "bg-black/5")}`}>
+                <NavIcon icon={icon} className={isActive(to) ? "text-amber-400" : (isDark ? "text-white/50" : "text-gray-400")} />
               </div>
               {label}
-              {isActive(to) && <ChevronRight className="w-4 h-4 text-white/30 ml-auto" />}
+              {isActive(to) && <ChevronRight className={`w-4 h-4 ml-auto ${isDark ? "text-white/30" : "text-gray-300"}`} />}
             </Link>
           ))}
 
           {/* Help */}
           <button
             onClick={() => { setMenuOpen(false); openTutorial(); }}
-            className="w-full flex items-center gap-3 px-3 py-3 rounded-xl text-sm font-medium text-white/65 hover:text-white hover:bg-white/8 transition-colors"
+            className={`w-full flex items-center gap-3 px-3 py-3 rounded-xl text-sm font-medium transition-colors ${mobileItemIdle}`}
           >
-            <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 bg-white/5">
-              <HelpCircle className="w-4 h-4 text-white/50" />
+            <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${isDark ? "bg-white/5" : "bg-black/5"}`}>
+              <HelpCircle className={`w-4 h-4 ${isDark ? "text-white/50" : "text-gray-400"}`} />
             </div>
             How It Works
             <span className="ml-auto text-[10px] font-bold text-amber-400/70 bg-amber-400/10 px-1.5 py-0.5 rounded">Tutorial</span>
@@ -234,66 +258,26 @@ const Navbar = () => {
           {/* Account links (logged in) */}
           {user && (
             <>
-              <div className="h-px bg-white/8 my-2" />
-              <p className="text-white/25 text-[10px] font-bold uppercase tracking-widest px-3 pb-1">Account</p>
+              <div className={`h-px ${isDark ? "bg-white/8" : "bg-black/8"} my-2`} />
+              <p className={`${isDark ? "text-white/25" : "text-gray-400"} text-[10px] font-bold uppercase tracking-widest px-3 pb-1`}>Account</p>
 
-              <Link
-                to={isAdmin ? "/admin" : "/dashboard"}
-                className="flex items-center gap-3 px-3 py-3 rounded-xl text-sm font-medium text-white/65 hover:text-white hover:bg-white/8 transition-colors"
-              >
-                <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 bg-white/5">
-                  <LayoutDashboard className="w-4 h-4 text-white/50" />
-                </div>
-                Dashboard
-              </Link>
-
-              <Link
-                to="/dashboard/wallet"
-                className="flex items-center gap-3 px-3 py-3 rounded-xl text-sm font-medium text-white/65 hover:text-white hover:bg-white/8 transition-colors"
-              >
-                <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 bg-white/5">
-                  <Wallet className="w-4 h-4 text-white/50" />
-                </div>
-                My Wallet
-              </Link>
-
-              <Link
-                to="/dashboard/transactions"
-                className="flex items-center gap-3 px-3 py-3 rounded-xl text-sm font-medium text-white/65 hover:text-white hover:bg-white/8 transition-colors"
-              >
-                <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 bg-white/5">
-                  <ClipboardList className="w-4 h-4 text-white/50" />
-                </div>
-                My Transactions
-              </Link>
-
-              {agentApproved && (
-                <Link
-                  to="/dashboard/my-store"
-                  className="flex items-center gap-3 px-3 py-3 rounded-xl text-sm font-medium text-white/65 hover:text-white hover:bg-white/8 transition-colors"
-                >
-                  <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 bg-white/5">
-                    <Store className="w-4 h-4 text-white/50" />
+              {[
+                { to: isAdmin ? "/admin" : "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+                { to: "/dashboard/wallet", label: "My Wallet", icon: Wallet },
+                { to: "/dashboard/transactions", label: "My Transactions", icon: ClipboardList },
+                ...(agentApproved ? [{ to: "/dashboard/my-store", label: "My Store", icon: Store }] : []),
+                { to: "/dashboard/account-settings", label: "Account Settings", icon: Settings },
+              ].map(({ to, label, icon: Icon }) => (
+                <Link key={to} to={to} className={`flex items-center gap-3 px-3 py-3 rounded-xl text-sm font-medium transition-colors ${mobileItemIdle}`}>
+                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${isDark ? "bg-white/5" : "bg-black/5"}`}>
+                    <Icon className={`w-4 h-4 ${isDark ? "text-white/50" : "text-gray-400"}`} />
                   </div>
-                  My Store
+                  {label}
                 </Link>
-              )}
-
-              <Link
-                to="/dashboard/account-settings"
-                className="flex items-center gap-3 px-3 py-3 rounded-xl text-sm font-medium text-white/65 hover:text-white hover:bg-white/8 transition-colors"
-              >
-                <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 bg-white/5">
-                  <Settings className="w-4 h-4 text-white/50" />
-                </div>
-                Account Settings
-              </Link>
+              ))}
 
               {isAdmin && (
-                <Link
-                  to="/admin"
-                  className="flex items-center gap-3 px-3 py-3 rounded-xl text-sm font-medium text-white/65 hover:text-white hover:bg-white/8 transition-colors"
-                >
+                <Link to="/admin" className={`flex items-center gap-3 px-3 py-3 rounded-xl text-sm font-medium transition-colors ${mobileItemIdle}`}>
                   <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 bg-amber-400/10">
                     <ShieldCheck className="w-4 h-4 text-amber-400" />
                   </div>
@@ -305,7 +289,7 @@ const Navbar = () => {
           )}
 
           {/* Auth footer */}
-          <div className="h-px bg-white/8 my-2" />
+          <div className={`h-px ${isDark ? "bg-white/8" : "bg-black/8"} my-2`} />
           {user ? (
             <button
               onClick={handleSignOut}

@@ -23,7 +23,7 @@ function loadSavedPos(): { x: number; y: number } | null {
 }
 
 const ThemeSelector = () => {
-  const { theme, setThemeId } = useAppTheme();
+  const { theme, setThemeId, isDark } = useAppTheme();
   const [open, setOpen] = useState(false);
   const [pos, setPos] = useState<{ x: number; y: number } | null>(loadSavedPos);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -107,25 +107,27 @@ const ThemeSelector = () => {
     <div ref={containerRef} className="fixed z-50 select-none" style={posStyle}>
       {open && (
         <div
-          className="absolute rounded-2xl border border-white/10 shadow-2xl p-3 w-[230px]"
+          className={`absolute rounded-2xl shadow-2xl p-3 w-[230px] border ${isDark ? "border-white/10" : "border-gray-200"}`}
           style={{
             ...popupStyle,
-            background: "rgba(var(--glass-rgb, 20,20,40), 0.95)",
+            background: isDark ? "rgba(var(--glass-rgb, 20,20,40), 0.95)" : "rgba(255,255,255,0.98)",
             backdropFilter: "blur(24px)",
           }}
         >
-          <p className="text-xs font-semibold text-white/60 mb-2.5 px-1">Choose Theme</p>
+          <p className={`text-xs font-semibold mb-2.5 px-1 ${isDark ? "text-white/60" : "text-gray-500"}`}>Choose Theme</p>
           <div className="grid grid-cols-3 gap-2">
             {THEMES.map((t) => (
               <button
                 key={t.id}
                 onClick={() => { setThemeId(t.id); setOpen(false); }}
                 className={`flex flex-col items-center gap-1.5 rounded-xl p-2 transition-all ${
-                  theme.id === t.id ? "bg-white/15 ring-1 ring-white/30" : "hover:bg-white/10"
+                  theme.id === t.id
+                    ? isDark ? "bg-white/15 ring-1 ring-white/30" : "bg-gray-100 ring-1 ring-gray-300"
+                    : isDark ? "hover:bg-white/10" : "hover:bg-gray-100"
                 }`}
               >
                 <span className="w-7 h-7 rounded-full border-2 border-white/20" style={{ background: t.dot }} />
-                <span className="text-[10px] text-white/80 font-medium leading-none">{t.label}</span>
+                <span className={`text-[10px] font-medium leading-none ${isDark ? "text-white/80" : "text-gray-700"}`}>{t.label}</span>
               </button>
             ))}
           </div>

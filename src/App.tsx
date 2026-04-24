@@ -138,7 +138,6 @@ const AppContent = () => {
     is_enabled: false,
     message: "",
   });
-  const [darkModeEnabled, setDarkModeEnabled] = useState(false);
   const [maintenanceLoading, setMaintenanceLoading] = useState(true);
   // Minimum splash time — guarantees the loading animation is visible for at least 2 s
   const [splashReady, setSplashReady] = useState(false);
@@ -195,29 +194,6 @@ const AppContent = () => {
       window.clearInterval(interval);
     };
   }, []);
-
-  useEffect(() => {
-    let active = true;
-
-    const loadSystemSettings = async () => {
-      const { data } = await supabase.functions.invoke("system-settings", {
-        body: { action: "get" },
-      });
-      if (!active || !data) return;
-      setDarkModeEnabled(Boolean((data as any).dark_mode_enabled));
-    };
-
-    loadSystemSettings();
-    const interval = window.setInterval(loadSystemSettings, 30000);
-    return () => {
-      active = false;
-      window.clearInterval(interval);
-    };
-  }, []);
-
-  useEffect(() => {
-    document.documentElement.classList.toggle("dark", darkModeEnabled);
-  }, [darkModeEnabled]);
 
   const isDashboard = location.pathname.startsWith("/dashboard");
   const isAdmin = location.pathname.startsWith("/admin");

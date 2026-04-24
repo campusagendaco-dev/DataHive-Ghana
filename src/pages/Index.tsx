@@ -3,7 +3,7 @@ import {
   ChevronDown, Clock, Wifi, Users, BarChart3,
 } from "lucide-react";
 import { Link } from "react-router-dom";
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import PhoneOrderTracker from "@/components/PhoneOrderTracker";
 
 // ─── Data ─────────────────────────────────────────────────────────────────────
@@ -18,7 +18,7 @@ const NETWORK_CARDS = [
       { size: "10 GB", price: "GH₵ 42.50" },
       { size: "50 GB", price: "GH₵ 199.30" },
     ],
-    glow: "group-hover:shadow-amber-400/10",
+    glow: "group-hover:shadow-amber-400/10 dark:group-hover:shadow-amber-400/10",
     top: "bg-amber-400",
   },
   {
@@ -54,7 +54,7 @@ const STEPS = [
     step: "01",
     title: "Choose a Bundle",
     desc: "Select your network (MTN, Telecel or AirtelTigo) and pick a data bundle size that fits your needs.",
-    color: "text-amber-400",
+    color: "text-amber-500",
     border: "border-amber-400/25",
     bg: "bg-amber-400/8",
   },
@@ -62,7 +62,7 @@ const STEPS = [
     step: "02",
     title: "Enter & Pay",
     desc: "Type in the recipient's phone number and pay securely with card or Mobile Money via Paystack.",
-    color: "text-emerald-400",
+    color: "text-emerald-500",
     border: "border-emerald-400/25",
     bg: "bg-emerald-400/8",
   },
@@ -70,7 +70,7 @@ const STEPS = [
     step: "03",
     title: "Receive Instantly",
     desc: "Data lands on the recipient's line in under 5 seconds. No app, no account, no delays.",
-    color: "text-sky-400",
+    color: "text-sky-500",
     border: "border-sky-400/25",
     bg: "bg-sky-400/8",
   },
@@ -81,33 +81,33 @@ const FEATURES = [
     icon: Zap,
     title: "No Account Needed",
     desc: "Pick a bundle and pay directly with card or MoMo. No sign-up, no waiting.",
-    color: "text-amber-400",
-    bg: "bg-amber-400/8",
-    border: "border-amber-400/15",
+    color: "text-amber-500",
+    bg: "bg-amber-400/8 dark:bg-amber-400/8",
+    border: "border-amber-400/20",
   },
   {
     icon: ShieldCheck,
     title: "Instant & Secure Delivery",
     desc: "Data lands in seconds after payment. Every transaction is secured by Paystack.",
-    color: "text-emerald-400",
-    bg: "bg-emerald-400/8",
-    border: "border-emerald-400/15",
+    color: "text-emerald-500",
+    bg: "bg-emerald-400/8 dark:bg-emerald-400/8",
+    border: "border-emerald-400/20",
   },
   {
     icon: TrendingUp,
     title: "Non-Expiry Bundles",
     desc: "All data bundles are non-expiry — use them at your own pace, anytime.",
-    color: "text-sky-400",
-    bg: "bg-sky-400/8",
-    border: "border-sky-400/15",
+    color: "text-sky-500",
+    bg: "bg-sky-400/8 dark:bg-sky-400/8",
+    border: "border-sky-400/20",
   },
   {
     icon: Store,
     title: "Agent & Reseller Program",
     desc: "Unlock wholesale rates and launch your own Paystack-powered data store.",
-    color: "text-purple-400",
-    bg: "bg-purple-400/8",
-    border: "border-purple-400/15",
+    color: "text-purple-500",
+    bg: "bg-purple-400/8 dark:bg-purple-400/8",
+    border: "border-purple-400/20",
   },
 ];
 
@@ -149,25 +149,42 @@ const FAQS = [
   },
 ];
 
+// ─── Scroll-reveal hook ───────────────────────────────────────────────────────
+const useReveal = () => {
+  const ref = useRef<HTMLDivElement>(null);
+  const [visible, setVisible] = useState(false);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const obs = new IntersectionObserver(
+      ([entry]) => { if (entry.isIntersecting) { setVisible(true); obs.disconnect(); } },
+      { threshold: 0.12 },
+    );
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, []);
+  return { ref, visible };
+};
+
 // ─── FAQ Accordion ────────────────────────────────────────────────────────────
 const FaqItem = ({ q, a }: { q: string; a: string }) => {
   const [open, setOpen] = useState(false);
   return (
-    <div className="border-b border-white/6 last:border-0">
+    <div className="border-b border-gray-100 dark:border-white/6 last:border-0">
       <button
         className="w-full flex items-center justify-between gap-4 px-6 py-5 text-left group"
         onClick={() => setOpen(!open)}
         aria-expanded={open}
       >
-        <span className="font-semibold text-sm text-white/80 group-hover:text-white transition-colors leading-relaxed">
+        <span className="font-semibold text-sm text-gray-700 dark:text-white/80 group-hover:text-gray-900 dark:group-hover:text-white transition-colors leading-relaxed">
           {q}
         </span>
         <ChevronDown
-          className={`w-4 h-4 shrink-0 text-white/30 transition-transform duration-200 ${open ? "rotate-180 text-amber-400" : ""}`}
+          className={`w-4 h-4 shrink-0 text-gray-300 dark:text-white/30 transition-transform duration-200 ${open ? "rotate-180 !text-amber-500" : ""}`}
         />
       </button>
       {open && (
-        <p className="px-6 pb-5 text-sm text-white/40 leading-relaxed">{a}</p>
+        <p className="px-6 pb-5 text-sm text-gray-500 dark:text-white/40 leading-relaxed">{a}</p>
       )}
     </div>
   );
@@ -175,20 +192,26 @@ const FaqItem = ({ q, a }: { q: string; a: string }) => {
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 const Index = () => {
+  const networks = useReveal();
+  const steps    = useReveal();
+  const features = useReveal();
+  const tracker  = useReveal();
+  const agent    = useReveal();
+  const faq      = useReveal();
+
   return (
-    <div className="min-h-screen bg-[#030305] text-white">
+    <div className="min-h-screen bg-gray-50 dark:bg-[#030305] text-gray-900 dark:text-white">
 
       {/* ── Hero ──────────────────────────────────────────────────────────── */}
       <section className="relative overflow-hidden pt-36 pb-28 px-4">
-        {/* Background glow mesh */}
+        {/* Background glow mesh — visible in dark mode, subtle in light */}
         <div className="absolute inset-0 pointer-events-none select-none">
-          <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[1000px] h-[700px] bg-amber-400/7 rounded-full blur-[140px]" />
-          <div className="absolute top-24 left-1/4 w-[500px] h-[400px] bg-blue-600/5 rounded-full blur-[100px]" />
-          <div className="absolute top-32 right-1/4 w-[400px] h-[350px] bg-red-600/4 rounded-full blur-[90px]" />
-          {/* subtle grid */}
+          <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[1000px] h-[700px] bg-amber-400/5 dark:bg-amber-400/7 rounded-full blur-[140px]" />
+          <div className="absolute top-24 left-1/4 w-[500px] h-[400px] bg-blue-600/3 dark:bg-blue-600/5 rounded-full blur-[100px]" />
+          <div className="absolute top-32 right-1/4 w-[400px] h-[350px] bg-red-600/3 dark:bg-red-600/4 rounded-full blur-[90px]" />
           <div className="absolute inset-0 opacity-[0.015]"
             style={{
-              backgroundImage: "linear-gradient(rgba(255,255,255,0.5) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.5) 1px, transparent 1px)",
+              backgroundImage: "linear-gradient(rgba(0,0,0,0.4) 1px, transparent 1px), linear-gradient(90deg, rgba(0,0,0,0.4) 1px, transparent 1px)",
               backgroundSize: "60px 60px",
             }}
           />
@@ -196,18 +219,24 @@ const Index = () => {
 
         <div className="relative container mx-auto max-w-5xl text-center">
           {/* Status badge */}
-          <div className="inline-flex items-center gap-2.5 bg-white/5 border border-white/10 rounded-full px-4 py-2 mb-10">
+          <div
+            className="inline-flex items-center gap-2.5 bg-white dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-full px-4 py-2 mb-10 shadow-sm"
+            style={{ animation: "fade-in 0.5s cubic-bezier(0.22,1,0.36,1) both" }}
+          >
             <span className="flex items-center gap-1.5">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-              <span className="text-emerald-400 text-xs font-bold">Live</span>
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+              <span className="text-emerald-600 dark:text-emerald-400 text-xs font-bold">Live</span>
             </span>
-            <span className="w-px h-3 bg-white/15" />
+            <span className="w-px h-3 bg-gray-200 dark:bg-white/15" />
             <img src="/logo.png" alt="SwiftData Ghana" className="w-4 h-4 rounded-full" />
-            <span className="text-white/50 text-xs font-medium">Ghana's #1 Data Bundle Store</span>
+            <span className="text-gray-500 dark:text-white/50 text-xs font-medium">Ghana's #1 Data Bundle Store</span>
           </div>
 
           {/* Headline */}
-          <h1 className="text-5xl sm:text-6xl md:text-7xl font-black leading-[1.04] tracking-tight mb-6">
+          <h1
+            className="text-5xl sm:text-6xl md:text-7xl font-black leading-[1.04] tracking-tight mb-6"
+            style={{ animation: "fade-in 0.6s cubic-bezier(0.22,1,0.36,1) 0.1s both" }}
+          >
             Cheapest Non-Expiry
             <br />
             <span className="bg-gradient-to-r from-amber-400 via-orange-400 to-amber-500 bg-clip-text text-transparent">
@@ -215,15 +244,21 @@ const Index = () => {
             </span>
           </h1>
 
-          <p className="text-white/45 text-base md:text-lg max-w-2xl mx-auto leading-relaxed mb-10">
-            Buy <strong className="text-white/75 font-bold">MTN</strong>,{" "}
-            <strong className="text-white/75 font-bold">Telecel</strong> and{" "}
-            <strong className="text-white/75 font-bold">AirtelTigo</strong> data online.
+          <p
+            className="text-gray-500 dark:text-white/45 text-base md:text-lg max-w-2xl mx-auto leading-relaxed mb-10"
+            style={{ animation: "fade-in 0.6s cubic-bezier(0.22,1,0.36,1) 0.2s both" }}
+          >
+            Buy <strong className="text-gray-700 dark:text-white/75 font-bold">MTN</strong>,{" "}
+            <strong className="text-gray-700 dark:text-white/75 font-bold">Telecel</strong> and{" "}
+            <strong className="text-gray-700 dark:text-white/75 font-bold">AirtelTigo</strong> data online.
             Instant delivery in under 5 seconds — secured by Paystack. No account needed.
           </p>
 
           {/* CTA buttons */}
-          <div className="flex flex-col sm:flex-row gap-3 justify-center mb-12">
+          <div
+            className="flex flex-col sm:flex-row gap-3 justify-center mb-12"
+            style={{ animation: "fade-in 0.6s cubic-bezier(0.22,1,0.36,1) 0.3s both" }}
+          >
             <Link
               to="/buy-data"
               className="inline-flex items-center justify-center gap-2.5 rounded-2xl bg-amber-400 hover:bg-amber-300 text-black font-black text-base px-10 py-4 transition-all duration-200 hover:scale-[1.02] active:scale-[0.98] shadow-xl shadow-amber-400/20"
@@ -232,23 +267,26 @@ const Index = () => {
             </Link>
             <Link
               to="/agent-program"
-              className="inline-flex items-center justify-center gap-2 rounded-2xl border border-white/10 hover:border-white/20 hover:bg-white/5 text-white/60 hover:text-white font-semibold text-base px-8 py-4 transition-all duration-200"
+              className="inline-flex items-center justify-center gap-2 rounded-2xl border border-gray-200 dark:border-white/10 hover:border-gray-300 dark:hover:border-white/20 hover:bg-gray-100 dark:hover:bg-white/5 text-gray-600 dark:text-white/60 hover:text-gray-900 dark:hover:text-white font-semibold text-base px-8 py-4 transition-all duration-200"
             >
               Start Selling Data
             </Link>
           </div>
 
           {/* Trust pills */}
-          <div className="flex flex-wrap items-center justify-center gap-2">
+          <div
+            className="flex flex-wrap items-center justify-center gap-2"
+            style={{ animation: "fade-in 0.6s cubic-bezier(0.22,1,0.36,1) 0.4s both" }}
+          >
             {[
-              { icon: ShieldCheck, text: "Paystack secured", color: "text-emerald-400" },
-              { icon: Zap,         text: "Delivery under 5 s", color: "text-amber-400" },
-              { icon: CheckCircle2,text: "Non-expiry bundles", color: "text-sky-400" },
-              { icon: Clock,       text: "Available 24/7",     color: "text-purple-400" },
+              { icon: ShieldCheck, text: "Paystack secured", color: "text-emerald-500" },
+              { icon: Zap,         text: "Delivery under 5 s", color: "text-amber-500" },
+              { icon: CheckCircle2,text: "Non-expiry bundles", color: "text-sky-500" },
+              { icon: Clock,       text: "Available 24/7",     color: "text-purple-500" },
             ].map(({ icon: Icon, text, color }) => (
               <span
                 key={text}
-                className="inline-flex items-center gap-1.5 bg-white/[0.04] border border-white/8 rounded-full px-3.5 py-2 text-xs text-white/45"
+                className="inline-flex items-center gap-1.5 bg-white dark:bg-white/[0.04] border border-gray-200 dark:border-white/8 rounded-full px-3.5 py-2 text-xs text-gray-500 dark:text-white/45 shadow-sm"
               >
                 <Icon className={`w-3.5 h-3.5 shrink-0 ${color}`} /> {text}
               </span>
@@ -258,13 +296,13 @@ const Index = () => {
       </section>
 
       {/* ── Stats strip ────────────────────────────────────────────────────── */}
-      <div className="border-y border-white/6 bg-white/[0.018]">
+      <div className="border-y border-gray-200 dark:border-white/6 bg-white dark:bg-white/[0.018]">
         <div className="container mx-auto max-w-5xl px-4 py-6">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-6 text-center">
             {TRUST_STATS.map((s) => (
               <div key={s.label}>
-                <p className="font-black text-2xl md:text-3xl text-amber-400">{s.value}</p>
-                <p className="text-white/30 text-xs mt-1">{s.label}</p>
+                <p className="font-black text-2xl md:text-3xl text-amber-500">{s.value}</p>
+                <p className="text-gray-400 dark:text-white/30 text-xs mt-1">{s.label}</p>
               </div>
             ))}
           </div>
@@ -275,18 +313,27 @@ const Index = () => {
       <section className="py-24 px-4">
         <div className="container mx-auto max-w-5xl">
           <div className="text-center mb-14">
-            <p className="text-amber-400 text-[11px] font-bold uppercase tracking-[0.2em] mb-3">All networks covered</p>
+            <p className="text-amber-500 text-[11px] font-bold uppercase tracking-[0.2em] mb-3">All networks covered</p>
             <h2 className="text-3xl md:text-4xl font-black mb-3">Pick Your Network</h2>
-            <p className="text-white/35 text-sm max-w-md mx-auto">
+            <p className="text-gray-500 dark:text-white/35 text-sm max-w-md mx-auto">
               Non-expiry bundles for every major network. Instant delivery, best prices in Ghana.
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-            {NETWORK_CARDS.map((net) => (
+          <div
+            ref={networks.ref}
+            className="grid grid-cols-1 md:grid-cols-3 gap-5"
+            style={{
+              opacity: networks.visible ? 1 : 0,
+              transform: networks.visible ? "translateY(0)" : "translateY(24px)",
+              transition: "opacity 0.55s cubic-bezier(0.22,1,0.36,1), transform 0.55s cubic-bezier(0.22,1,0.36,1)",
+            }}
+          >
+            {NETWORK_CARDS.map((net, i) => (
               <div
                 key={net.name}
-                className={`group relative rounded-2xl border border-white/8 bg-white/[0.025] overflow-hidden transition-all duration-300 hover:border-white/14 hover:bg-white/[0.04] hover:shadow-2xl ${net.glow}`}
+                className={`group relative rounded-2xl border border-gray-200 dark:border-white/8 bg-white dark:bg-white/[0.025] overflow-hidden transition-all duration-300 hover:border-gray-300 dark:hover:border-white/14 hover:bg-gray-50 dark:hover:bg-white/[0.04] hover:shadow-2xl ${net.glow} shadow-sm`}
+                style={{ transitionDelay: `${i * 80}ms` }}
               >
                 {/* Colored top accent bar */}
                 <div className={`h-[3px] ${net.top}`} />
@@ -299,29 +346,29 @@ const Index = () => {
                     </div>
                     <div>
                       <p className="font-black text-lg leading-tight">{net.name} Ghana</p>
-                      <p className="text-white/30 text-[11px]">Non-expiry · Instant</p>
+                      <p className="text-gray-400 dark:text-white/30 text-[11px]">Non-expiry · Instant</p>
                     </div>
                   </div>
 
                   {/* Price list */}
-                  <div className="space-y-0 mb-6 rounded-xl border border-white/6 overflow-hidden">
-                    {net.samples.map(({ size, price }, i) => (
+                  <div className="space-y-0 mb-6 rounded-xl border border-gray-100 dark:border-white/6 overflow-hidden">
+                    {net.samples.map(({ size, price }, j) => (
                       <div
                         key={size}
                         className={`flex items-center justify-between px-4 py-2.5 text-sm ${
-                          i % 2 === 0 ? "bg-white/[0.02]" : ""
-                        } border-b border-white/5 last:border-0`}
+                          j % 2 === 0 ? "bg-gray-50 dark:bg-white/[0.02]" : ""
+                        } border-b border-gray-100 dark:border-white/5 last:border-0`}
                       >
-                        <span className="font-semibold text-white/70">{size}</span>
-                        <span className="font-black text-amber-400">{price}</span>
+                        <span className="font-semibold text-gray-700 dark:text-white/70">{size}</span>
+                        <span className="font-black text-amber-500">{price}</span>
                       </div>
                     ))}
-                    <div className="px-4 py-2 text-[10px] text-white/20">+ many more packages available</div>
+                    <div className="px-4 py-2 text-[10px] text-gray-400 dark:text-white/20">+ many more packages available</div>
                   </div>
 
                   <Link
                     to="/buy-data"
-                    className="w-full flex items-center justify-center gap-2 rounded-xl bg-white/6 hover:bg-amber-400 text-white/60 hover:text-black font-bold text-sm py-3 transition-all duration-200"
+                    className="w-full flex items-center justify-center gap-2 rounded-xl bg-gray-100 dark:bg-white/6 hover:bg-amber-400 text-gray-600 dark:text-white/60 hover:text-black font-bold text-sm py-3 transition-all duration-200"
                   >
                     Buy {net.name} Data <ArrowRight className="w-4 h-4" />
                   </Link>
@@ -333,7 +380,7 @@ const Index = () => {
           <div className="text-center mt-10">
             <Link
               to="/buy-data"
-              className="inline-flex items-center gap-2 text-sm text-white/40 hover:text-amber-400 transition-colors font-medium"
+              className="inline-flex items-center gap-2 text-sm text-gray-400 dark:text-white/40 hover:text-amber-500 transition-colors font-medium"
             >
               View all packages and prices <ArrowRight className="w-4 h-4" />
             </Link>
@@ -342,25 +389,33 @@ const Index = () => {
       </section>
 
       {/* ── How it works ───────────────────────────────────────────────────── */}
-      <section className="py-24 px-4 border-t border-white/6">
+      <section className="py-24 px-4 border-t border-gray-200 dark:border-white/6">
         <div className="container mx-auto max-w-4xl">
           <div className="text-center mb-14">
-            <p className="text-amber-400 text-[11px] font-bold uppercase tracking-[0.2em] mb-3">Simple process</p>
+            <p className="text-amber-500 text-[11px] font-bold uppercase tracking-[0.2em] mb-3">Simple process</p>
             <h2 className="text-3xl md:text-4xl font-black mb-3">Buy Data in 3 Steps</h2>
-            <p className="text-white/35 text-sm">No account, no waiting. Just pick, pay, and receive.</p>
+            <p className="text-gray-500 dark:text-white/35 text-sm">No account, no waiting. Just pick, pay, and receive.</p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-5 relative">
+          <div
+            ref={steps.ref}
+            className="grid grid-cols-1 md:grid-cols-3 gap-5 relative"
+            style={{
+              opacity: steps.visible ? 1 : 0,
+              transform: steps.visible ? "translateY(0)" : "translateY(24px)",
+              transition: "opacity 0.55s cubic-bezier(0.22,1,0.36,1), transform 0.55s cubic-bezier(0.22,1,0.36,1)",
+            }}
+          >
             {/* Connector line (desktop only) */}
-            <div className="hidden md:block absolute top-10 left-[calc(16.67%+1.25rem)] right-[calc(16.67%+1.25rem)] h-px border-t border-dashed border-white/10" />
+            <div className="hidden md:block absolute top-10 left-[calc(16.67%+1.25rem)] right-[calc(16.67%+1.25rem)] h-px border-t border-dashed border-gray-200 dark:border-white/10" />
 
             {STEPS.map(({ step, title, desc, color, border, bg }) => (
-              <div key={step} className="relative rounded-2xl border border-white/8 bg-white/[0.025] p-7 text-center">
+              <div key={step} className="relative rounded-2xl border border-gray-200 dark:border-white/8 bg-white dark:bg-white/[0.025] p-7 text-center shadow-sm">
                 <div className={`w-14 h-14 rounded-2xl border ${border} ${bg} flex items-center justify-center mx-auto mb-5`}>
                   <span className={`text-xl font-black ${color}`}>{step}</span>
                 </div>
                 <h3 className="font-black text-base mb-2">{title}</h3>
-                <p className="text-sm text-white/35 leading-relaxed">{desc}</p>
+                <p className="text-sm text-gray-500 dark:text-white/35 leading-relaxed">{desc}</p>
               </div>
             ))}
           </div>
@@ -368,28 +423,36 @@ const Index = () => {
       </section>
 
       {/* ── Features ───────────────────────────────────────────────────────── */}
-      <section className="py-24 px-4 border-t border-white/6">
+      <section className="py-24 px-4 border-t border-gray-200 dark:border-white/6">
         <div className="container mx-auto max-w-5xl">
           <div className="text-center mb-14">
-            <p className="text-amber-400 text-[11px] font-bold uppercase tracking-[0.2em] mb-3">Why SwiftData Ghana</p>
+            <p className="text-amber-500 text-[11px] font-bold uppercase tracking-[0.2em] mb-3">Why SwiftData Ghana</p>
             <h2 className="text-3xl md:text-4xl font-black mb-3">Ghana's #1 Data Bundle Store</h2>
-            <p className="text-white/35 text-sm max-w-xl mx-auto">
+            <p className="text-gray-500 dark:text-white/35 text-sm max-w-xl mx-auto">
               Fast, secure, and built for Ghana. Everything you need from a modern data vending service.
             </p>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div
+            ref={features.ref}
+            className="grid grid-cols-1 sm:grid-cols-2 gap-4"
+            style={{
+              opacity: features.visible ? 1 : 0,
+              transform: features.visible ? "translateY(0)" : "translateY(24px)",
+              transition: "opacity 0.55s cubic-bezier(0.22,1,0.36,1), transform 0.55s cubic-bezier(0.22,1,0.36,1)",
+            }}
+          >
             {FEATURES.map(({ icon: Icon, title, desc, color, bg, border }) => (
               <div
                 key={title}
-                className={`flex gap-5 rounded-2xl border ${border} ${bg} p-6 transition-all duration-200 hover:scale-[1.01]`}
+                className={`flex gap-5 rounded-2xl border ${border} ${bg} p-6 transition-all duration-200 hover:scale-[1.01] shadow-sm`}
               >
-                <div className={`w-11 h-11 rounded-xl border ${border} flex items-center justify-center shrink-0`}>
+                <div className={`w-11 h-11 rounded-xl border ${border} ${bg} flex items-center justify-center shrink-0`}>
                   <Icon className={`w-5 h-5 ${color}`} />
                 </div>
                 <div>
-                  <h3 className="font-black text-sm mb-1.5 text-white/90">{title}</h3>
-                  <p className="text-sm text-white/38 leading-relaxed">{desc}</p>
+                  <h3 className="font-black text-sm mb-1.5 text-gray-800 dark:text-white/90">{title}</h3>
+                  <p className="text-sm text-gray-500 dark:text-white/38 leading-relaxed">{desc}</p>
                 </div>
               </div>
             ))}
@@ -398,40 +461,57 @@ const Index = () => {
       </section>
 
       {/* ── Order tracker ──────────────────────────────────────────────────── */}
-      <section className="py-24 px-4 border-t border-white/6">
+      <section className="py-24 px-4 border-t border-gray-200 dark:border-white/6">
         <div className="container mx-auto max-w-3xl">
           <div className="text-center mb-10">
-            <p className="text-amber-400 text-[11px] font-bold uppercase tracking-[0.2em] mb-3">Real-time tracking</p>
+            <p className="text-amber-500 text-[11px] font-bold uppercase tracking-[0.2em] mb-3">Real-time tracking</p>
             <h2 className="text-3xl font-black mb-3">Track Your Order</h2>
-            <p className="text-white/35 text-sm">
+            <p className="text-gray-500 dark:text-white/35 text-sm">
               Enter the recipient phone number to check delivery status instantly.
             </p>
           </div>
-          <PhoneOrderTracker
-            title="Track Your Data Delivery"
-            subtitle="Enter the recipient phone number to check payment and delivery status instantly."
-          />
+          <div
+            ref={tracker.ref}
+            style={{
+              opacity: tracker.visible ? 1 : 0,
+              transform: tracker.visible ? "translateY(0)" : "translateY(24px)",
+              transition: "opacity 0.55s cubic-bezier(0.22,1,0.36,1), transform 0.55s cubic-bezier(0.22,1,0.36,1)",
+            }}
+          >
+            <PhoneOrderTracker
+              title="Track Your Data Delivery"
+              subtitle="Enter the recipient phone number to check payment and delivery status instantly."
+            />
+          </div>
         </div>
       </section>
 
       {/* ── Agent CTA ──────────────────────────────────────────────────────── */}
-      <section className="py-24 px-4 border-t border-white/6">
+      <section className="py-24 px-4 border-t border-gray-200 dark:border-white/6">
         <div className="container mx-auto max-w-5xl">
-          <div className="relative rounded-3xl overflow-hidden border border-amber-400/18 p-10 md:p-14">
+          <div
+            ref={agent.ref}
+            className="relative rounded-3xl overflow-hidden border border-amber-400/25 p-10 md:p-14 bg-white dark:bg-transparent shadow-sm"
+            style={{
+              opacity: agent.visible ? 1 : 0,
+              transform: agent.visible ? "translateY(0)" : "translateY(24px)",
+              transition: "opacity 0.55s cubic-bezier(0.22,1,0.36,1), transform 0.55s cubic-bezier(0.22,1,0.36,1)",
+            }}
+          >
             {/* Background gradients */}
-            <div className="absolute inset-0 bg-gradient-to-br from-amber-400/6 via-transparent to-transparent pointer-events-none" />
-            <div className="absolute -top-24 -right-24 w-[500px] h-[400px] bg-amber-400/5 rounded-full blur-[120px] pointer-events-none" />
+            <div className="absolute inset-0 bg-gradient-to-br from-amber-400/5 via-transparent to-transparent pointer-events-none" />
+            <div className="absolute -top-24 -right-24 w-[500px] h-[400px] bg-amber-400/4 dark:bg-amber-400/5 rounded-full blur-[120px] pointer-events-none" />
 
             <div className="relative flex flex-col md:flex-row md:items-center gap-10">
               <div className="flex-1">
                 <div className="inline-flex items-center gap-2 bg-amber-400/10 border border-amber-400/20 rounded-full px-3.5 py-1.5 mb-5">
-                  <Store className="w-3.5 h-3.5 text-amber-400" />
-                  <span className="text-amber-400 text-[11px] font-bold uppercase tracking-widest">Agent & Reseller Program</span>
+                  <Store className="w-3.5 h-3.5 text-amber-500" />
+                  <span className="text-amber-600 dark:text-amber-400 text-[11px] font-bold uppercase tracking-widest">Agent & Reseller Program</span>
                 </div>
                 <h2 className="text-3xl md:text-4xl font-black mb-4 leading-tight">
                   Start Your Data<br />Reselling Business
                 </h2>
-                <p className="text-white/40 text-sm max-w-md leading-relaxed mb-6">
+                <p className="text-gray-500 dark:text-white/40 text-sm max-w-md leading-relaxed mb-6">
                   Activate agent access to unlock wholesale MTN, Telecel &amp; AirtelTigo prices, profit tracking,
                   and your own Paystack-powered public store — all in one platform.
                 </p>
@@ -444,9 +524,9 @@ const Index = () => {
                   ].map(({ icon: Icon, text }) => (
                     <span
                       key={text}
-                      className="inline-flex items-center gap-1.5 text-xs text-white/45 bg-white/5 border border-white/8 rounded-full px-3 py-1.5"
+                      className="inline-flex items-center gap-1.5 text-xs text-gray-500 dark:text-white/45 bg-gray-100 dark:bg-white/5 border border-gray-200 dark:border-white/8 rounded-full px-3 py-1.5"
                     >
-                      <Icon className="w-3 h-3 text-emerald-400" /> {text}
+                      <Icon className="w-3 h-3 text-emerald-500" /> {text}
                     </span>
                   ))}
                 </div>
@@ -461,7 +541,7 @@ const Index = () => {
                 </Link>
                 <Link
                   to="/login"
-                  className="inline-flex items-center justify-center gap-2 rounded-2xl border border-white/10 hover:border-white/20 hover:bg-white/5 text-white/55 hover:text-white font-semibold text-sm px-8 py-4 transition-all whitespace-nowrap"
+                  className="inline-flex items-center justify-center gap-2 rounded-2xl border border-gray-200 dark:border-white/10 hover:border-gray-300 dark:hover:border-white/20 hover:bg-gray-100 dark:hover:bg-white/5 text-gray-600 dark:text-white/55 hover:text-gray-900 dark:hover:text-white font-semibold text-sm px-8 py-4 transition-all whitespace-nowrap"
                 >
                   Sign In to Dashboard
                 </Link>
@@ -472,36 +552,44 @@ const Index = () => {
       </section>
 
       {/* ── FAQ ────────────────────────────────────────────────────────────── */}
-      <section className="py-24 px-4 border-t border-white/6">
+      <section className="py-24 px-4 border-t border-gray-200 dark:border-white/6">
         <div className="container mx-auto max-w-3xl">
           <div className="text-center mb-12">
-            <p className="text-amber-400 text-[11px] font-bold uppercase tracking-[0.2em] mb-3">FAQ</p>
+            <p className="text-amber-500 text-[11px] font-bold uppercase tracking-[0.2em] mb-3">FAQ</p>
             <h2 className="text-3xl font-black mb-3">Frequently Asked Questions</h2>
-            <p className="text-white/35 text-sm">
+            <p className="text-gray-500 dark:text-white/35 text-sm">
               Everything you need to know about buying data bundles in Ghana.
             </p>
           </div>
-          <div className="rounded-2xl border border-white/8 bg-white/[0.02] overflow-hidden divide-y divide-white/6">
-            {FAQS.map((faq) => (
-              <FaqItem key={faq.q} q={faq.q} a={faq.a} />
+          <div
+            ref={faq.ref}
+            className="rounded-2xl border border-gray-200 dark:border-white/8 bg-white dark:bg-white/[0.02] overflow-hidden divide-y divide-gray-100 dark:divide-white/6 shadow-sm"
+            style={{
+              opacity: faq.visible ? 1 : 0,
+              transform: faq.visible ? "translateY(0)" : "translateY(24px)",
+              transition: "opacity 0.55s cubic-bezier(0.22,1,0.36,1), transform 0.55s cubic-bezier(0.22,1,0.36,1)",
+            }}
+          >
+            {FAQS.map((item) => (
+              <FaqItem key={item.q} q={item.q} a={item.a} />
             ))}
           </div>
         </div>
       </section>
 
       {/* ── SEO footer text ────────────────────────────────────────────────── */}
-      <section className="py-14 px-4 border-t border-white/6">
+      <section className="py-14 px-4 border-t border-gray-200 dark:border-white/6">
         <div className="container mx-auto max-w-3xl text-center">
           <div className="w-14 h-14 rounded-2xl border border-amber-400/20 bg-amber-400/8 flex items-center justify-center mx-auto mb-5">
             <img src="/logo.png" alt="SwiftData Ghana" className="w-9 h-9 rounded-full" />
           </div>
           <p className="font-black text-lg mb-2">SwiftData Ghana</p>
-          <p className="text-white/25 text-xs max-w-2xl mx-auto leading-relaxed">
+          <p className="text-gray-400 dark:text-white/25 text-xs max-w-2xl mx-auto leading-relaxed">
             Ghana's #1 cheapest data bundle store — buy non-expiry MTN data bundles, Telecel data bundles
             and AirtelTigo data bundles online. Instant delivery secured by Paystack.
             Serving all regions of Ghana 24/7.
           </p>
-          <p className="text-white/12 text-[10px] mt-5">
+          <p className="text-gray-300 dark:text-white/12 text-[10px] mt-5">
             © {new Date().getFullYear()} SwiftData Ghana · swiftdatagh.com · All rights reserved.
           </p>
         </div>

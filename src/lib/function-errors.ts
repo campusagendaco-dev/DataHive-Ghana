@@ -4,11 +4,26 @@ const isFunctionsHttpError = (error: unknown): error is FunctionsHttpError => {
   return !!error && typeof error === "object" && "context" in error;
 };
 
+const isRelayError = (error: unknown): boolean => {
+  if (!(error instanceof Error)) return false;
+  return (
+    error.message.includes("Failed to send a request to the Edge Function") ||
+    error.message.includes("FunctionsRelayError") ||
+    error.message.includes("NetworkError") ||
+    error.message.includes("Failed to fetch")
+  );
+};
+
 export const getFunctionErrorMessage = async (
   error: unknown,
   fallback: string,
 ): Promise<string> => {
   if (!error) return fallback;
+
+  // Relay/network error — the function is unreachable (not deployed, or network issue)
+  if (isRelayError(error)) {
+    return "Service temporarily unavailable. Please check your connection and try again.";
+  }
 
   if (isFunctionsHttpError(error) && error.context) {
     try {
