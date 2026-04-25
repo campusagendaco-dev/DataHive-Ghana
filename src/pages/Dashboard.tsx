@@ -52,7 +52,9 @@ const Dashboard = () => {
           .in("status", ["paid", "processing", "fulfilled", "fulfillment_failed"]),
       ]);
 
-      if (walletRes.error || ordersRes.error) throw new Error("Fetch failed");
+      // PGRST116 = "no rows returned" — user may not have a wallet row yet, treat as 0
+      if (walletRes.error && walletRes.error.code !== "PGRST116") throw new Error("Fetch failed");
+      if (ordersRes.error) throw new Error("Fetch failed");
 
       const balance = walletRes.data ? Number(walletRes.data.balance) : 0;
       const allOrders = ordersRes.data ?? [];
