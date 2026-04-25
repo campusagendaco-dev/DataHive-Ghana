@@ -8,7 +8,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import {
   Search, RotateCcw, Loader2, RefreshCw,
   TrendingUp, ShoppingCart, AlertTriangle, Clock,
-  ChevronDown, Filter,
+  ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { getFunctionErrorMessage } from "@/lib/function-errors";
@@ -52,12 +52,15 @@ const STATUS_COLORS: Record<string, string> = {
 
 type FilterType = "all" | "agents" | "sub_agents";
 
+const PAGE_SIZE = 50;
+
 const AdminOrders = () => {
   const { toast } = useToast();
   const { user: currentUser } = useAuth();
-  const [orders, setOrders] = useState<OrderRow[]>([]);
+  const [allOrders, setAllOrders] = useState<OrderRow[]>([]);
   const [profiles, setProfiles] = useState<Record<string, AgentProfile>>({});
   const [loading, setLoading] = useState(true);
+  const [fetchProgress, setFetchProgress] = useState(0);
   const [searchParams] = useSearchParams();
   const initialSearch = searchParams.get("agent") || "";
   const [search, setSearch] = useState(initialSearch);
@@ -65,40 +68,60 @@ const AdminOrders = () => {
   const [typeFilter, setTypeFilter] = useState<FilterType>("all");
   const [statusFilter, setStatusFilter] = useState("all");
   const [networkFilter, setNetworkFilter] = useState("all");
+  const [page, setPage] = useState(1);
+
+  // Reset to page 1 when any filter changes
+  useEffect(() => { setPage(1); }, [search, typeFilter, statusFilter, networkFilter]);
 
   const fetchOrders = useCallback(async () => {
     setLoading(true);
+    setFetchProgress(0);
 
-    // Fetch orders and profiles in parallel
-    const [ordersRes, profilesRes] = await Promise.all([
-      supabase
-        .from("orders")
-        .select("*")
-        .order("created_at", { ascending: false })
-        .limit(2000),
-      supabase
-        .from("profiles")
-        .select("user_id, full_name, email, is_sub_agent")
-        .or("agent_approved.eq.true,sub_agent_approved.eq.true"),
-    ]);
+    // Fetch profiles first
+    const profilesRes = await supabase
+      .from("profiles")
+      .select("user_id, full_name, email, is_sub_agent")
+      .or("agent_approved.eq.true,sub_agent_approved.eq.true");
 
-    // Build profile lookup map
     const profileMap: Record<string, AgentProfile> = {};
     for (const p of (profilesRes.data ?? [])) {
       profileMap[p.user_id] = p as AgentProfile;
     }
     setProfiles(profileMap);
 
-    // Enrich orders with agent names
-    const enriched = (ordersRes.data ?? []).map((o: any) => ({
+    // Batch-fetch ALL orders — 1000 rows per request until exhausted
+    let fetched: any[] = [];
+    let from = 0;
+    let hasMore = true;
+
+    while (hasMore) {
+      const { data, error } = await supabase
+        .from("orders")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .range(from, from + 999);
+
+      if (error || !data || data.length === 0) {
+        hasMore = false;
+      } else {
+        fetched = [...fetched, ...data];
+        setFetchProgress(fetched.length);
+        from += 1000;
+        if (data.length < 1000) hasMore = false;
+      }
+    }
+
+    // Enrich with agent info
+    const enriched: OrderRow[] = fetched.map((o: any) => ({
       ...o,
       agent_name: profileMap[o.agent_id]?.full_name || "Unknown",
       agent_email: profileMap[o.agent_id]?.email || "",
       is_sub_agent: profileMap[o.agent_id]?.is_sub_agent ?? false,
     }));
 
-    setOrders(enriched as OrderRow[]);
+    setAllOrders(enriched);
     setLoading(false);
+    setFetchProgress(0);
   }, []);
 
   useEffect(() => { fetchOrders(); }, [fetchOrders]);
@@ -131,8 +154,8 @@ const AdminOrders = () => {
     setRetrying(null);
   };
 
-  // Apply filters
-  const filtered = orders.filter((o) => {
+  // Client-side filtering
+  const filtered = allOrders.filter((o) => {
     if (typeFilter === "agents" && o.is_sub_agent) return false;
     if (typeFilter === "sub_agents" && !o.is_sub_agent) return false;
     if (statusFilter !== "all" && o.status !== statusFilter) return false;
@@ -146,18 +169,28 @@ const AdminOrders = () => {
     return true;
   });
 
-  // Stats
-  const totalRevenue = orders.reduce((s, o) => s + Number(o.amount || 0), 0);
-  const totalParentProfit = orders.reduce((s, o) => s + Number(o.parent_profit || 0), 0);
-  const failed = orders.filter((o) => o.status === "fulfillment_failed").length;
-  const pending = orders.filter((o) => o.status === "pending" || o.status === "paid").length;
-  const subAgentOrders = orders.filter((o) => o.is_sub_agent).length;
+  // Pagination
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const safePage = Math.min(page, totalPages);
+  const paginated = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
 
-  const uniqueNetworks = [...new Set(orders.map((o) => o.network).filter(Boolean))] as string[];
+  // Stats from ALL loaded orders (not just current page)
+  const totalRevenue = allOrders.reduce((s, o) => s + Number(o.amount || 0), 0);
+  const totalParentProfit = allOrders.reduce((s, o) => s + Number(o.parent_profit || 0), 0);
+  const failed = allOrders.filter((o) => o.status === "fulfillment_failed").length;
+  const pending = allOrders.filter((o) => o.status === "pending" || o.status === "paid").length;
+  const subAgentOrders = allOrders.filter((o) => o.is_sub_agent).length;
+  const uniqueNetworks = [...new Set(allOrders.map((o) => o.network).filter(Boolean))] as string[];
 
   if (loading) return (
-    <div className="flex items-center justify-center py-20">
-      <Loader2 className="w-6 h-6 animate-spin text-amber-400" />
+    <div className="flex flex-col items-center justify-center py-24 gap-4">
+      <Loader2 className="w-7 h-7 animate-spin text-amber-400" />
+      <div className="text-center">
+        <p className="text-white/60 text-sm font-medium">Loading all orders…</p>
+        {fetchProgress > 0 && (
+          <p className="text-white/35 text-xs mt-1">{fetchProgress.toLocaleString()} fetched so far</p>
+        )}
+      </div>
     </div>
   );
 
@@ -173,7 +206,9 @@ const AdminOrders = () => {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="font-display text-2xl font-bold">All Orders</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">Full transaction history — agents and sub-agents</p>
+          <p className="text-sm text-muted-foreground mt-0.5">
+            Full transaction history — {allOrders.length.toLocaleString()} total orders
+          </p>
         </div>
         <Button variant="outline" size="sm" className="gap-2 self-start" onClick={fetchOrders}>
           <RefreshCw className="w-4 h-4" /> Refresh
@@ -183,10 +218,10 @@ const AdminOrders = () => {
       {/* Stats */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
         {[
-          { label: "Total Orders", value: orders.length, icon: ShoppingCart, color: "text-blue-400" },
+          { label: "Total Orders", value: allOrders.length.toLocaleString(), icon: ShoppingCart, color: "text-blue-400" },
           { label: "Revenue", value: `GH₵${totalRevenue.toFixed(2)}`, icon: TrendingUp, color: "text-emerald-400" },
           { label: "Agent Profits", value: `GH₵${totalParentProfit.toFixed(2)}`, icon: TrendingUp, color: "text-amber-400" },
-          { label: "Sub-Agent Orders", value: subAgentOrders, icon: ShoppingCart, color: "text-purple-400" },
+          { label: "Sub-Agent Orders", value: subAgentOrders.toLocaleString(), icon: ShoppingCart, color: "text-purple-400" },
           { label: "Pending / Failed", value: `${pending} / ${failed}`, icon: failed > 0 ? AlertTriangle : Clock, color: failed > 0 ? "text-red-400" : "text-yellow-400" },
         ].map(({ label, value, icon: Icon, color }) => (
           <Card key={label} className="bg-white/3 border-white/8">
@@ -203,18 +238,16 @@ const AdminOrders = () => {
 
       {/* Filters */}
       <div className="flex flex-wrap gap-3 items-center">
-        {/* Search */}
         <div className="relative flex-1 min-w-[200px] max-w-xs">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/30" />
           <Input
-            placeholder="Search orders, agents, phones..."
+            placeholder="Search orders, agents, phones…"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="pl-9 bg-white/5 border-white/10 text-sm"
           />
         </div>
 
-        {/* Type filter */}
         <div className="flex items-center gap-1 bg-white/5 border border-white/10 rounded-lg p-1">
           {(["all", "agents", "sub_agents"] as FilterType[]).map((f) => (
             <button
@@ -227,7 +260,6 @@ const AdminOrders = () => {
           ))}
         </div>
 
-        {/* Status filter */}
         <select
           value={statusFilter}
           onChange={(e) => setStatusFilter(e.target.value)}
@@ -240,7 +272,6 @@ const AdminOrders = () => {
           <option value="pending">Pending</option>
         </select>
 
-        {/* Network filter */}
         <select
           value={networkFilter}
           onChange={(e) => setNetworkFilter(e.target.value)}
@@ -250,10 +281,12 @@ const AdminOrders = () => {
           {uniqueNetworks.map((n) => <option key={n} value={n}>{n}</option>)}
         </select>
 
-        <span className="text-xs text-white/30 ml-auto">{filtered.length} results</span>
+        <span className="text-xs text-white/30 ml-auto">
+          {filtered.length.toLocaleString()} result{filtered.length !== 1 ? "s" : ""}
+        </span>
       </div>
 
-      {/* Desktop Table View */}
+      {/* Desktop Table */}
       <div className="hidden md:block rounded-xl border border-white/8 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
@@ -272,8 +305,8 @@ const AdminOrders = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-white/5">
-              {filtered.map((order) => (
-                <tr key={order.id} className="hover:bg-white/3 transition-colors group">
+              {paginated.map((order) => (
+                <tr key={order.id} className="hover:bg-white/3 transition-colors">
                   <td className="px-4 py-3 text-white/40 text-xs whitespace-nowrap">
                     {new Date(order.created_at).toLocaleDateString("en-GH", { day: "2-digit", month: "short" })}
                     <span className="block text-white/25 text-[10px]">
@@ -345,7 +378,7 @@ const AdminOrders = () => {
 
       {/* Mobile Card View */}
       <div className="md:hidden space-y-4">
-        {filtered.map((order) => (
+        {paginated.map((order) => (
           <div key={order.id} className="rounded-2xl bg-white/[0.03] border border-white/5 p-4 space-y-4">
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
@@ -358,14 +391,13 @@ const AdminOrders = () => {
                 <p className="font-bold text-white text-sm">{order.agent_name}</p>
                 <p className="text-[10px] text-white/30 truncate">{order.agent_email}</p>
               </div>
-              <div className="text-right">
+              <div className="text-right shrink-0">
                 <p className="font-black text-white">GH₵{Number(order.amount).toFixed(2)}</p>
                 <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded border ${order.is_sub_agent ? "border-purple-500/30 text-purple-400 bg-purple-500/10" : "border-amber-500/30 text-amber-400 bg-amber-500/10"}`}>
                   {order.is_sub_agent ? "Sub-Agent" : "Agent"}
                 </span>
               </div>
             </div>
-
             <div className="grid grid-cols-2 gap-y-3 gap-x-4 py-3 border-y border-white/5">
               <div>
                 <p className="text-[10px] uppercase tracking-wider text-white/30 mb-0.5">Type</p>
@@ -386,7 +418,6 @@ const AdminOrders = () => {
                 <p className="text-xs text-white/80 font-mono">{order.customer_phone || "—"}</p>
               </div>
             </div>
-
             <div className="flex items-center gap-2 pt-1">
               {(order.status === "pending" || order.status === "fulfillment_failed" || order.status === "paid") && (
                 <Button
@@ -413,6 +444,82 @@ const AdminOrders = () => {
         <div className="py-16 text-center">
           <ShoppingCart className="w-10 h-10 text-white/10 mx-auto mb-3" />
           <p className="text-white/40 text-sm">No orders match your filters.</p>
+        </div>
+      )}
+
+      {/* ── Pagination controls ── */}
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between gap-4 pt-2">
+          <p className="text-xs text-white/35">
+            Showing {((safePage - 1) * PAGE_SIZE) + 1}–{Math.min(safePage * PAGE_SIZE, filtered.length)} of {filtered.length.toLocaleString()}
+          </p>
+
+          <div className="flex items-center gap-1">
+            {/* First */}
+            <button
+              onClick={() => setPage(1)}
+              disabled={safePage === 1}
+              className="w-8 h-8 rounded-lg flex items-center justify-center text-white/40 hover:text-white hover:bg-white/8 disabled:opacity-25 disabled:cursor-not-allowed transition-all"
+            >
+              <ChevronsLeft className="w-4 h-4" />
+            </button>
+            {/* Prev */}
+            <button
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+              disabled={safePage === 1}
+              className="w-8 h-8 rounded-lg flex items-center justify-center text-white/40 hover:text-white hover:bg-white/8 disabled:opacity-25 disabled:cursor-not-allowed transition-all"
+            >
+              <ChevronLeft className="w-4 h-4" />
+            </button>
+
+            {/* Page numbers */}
+            {Array.from({ length: Math.min(7, totalPages) }, (_, i) => {
+              let p: number;
+              if (totalPages <= 7) {
+                p = i + 1;
+              } else if (safePage <= 4) {
+                p = i + 1;
+              } else if (safePage >= totalPages - 3) {
+                p = totalPages - 6 + i;
+              } else {
+                p = safePage - 3 + i;
+              }
+              return (
+                <button
+                  key={p}
+                  onClick={() => setPage(p)}
+                  className={`w-8 h-8 rounded-lg text-xs font-bold transition-all ${
+                    p === safePage
+                      ? "bg-amber-400 text-black"
+                      : "text-white/40 hover:text-white hover:bg-white/8"
+                  }`}
+                >
+                  {p}
+                </button>
+              );
+            })}
+
+            {/* Next */}
+            <button
+              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+              disabled={safePage === totalPages}
+              className="w-8 h-8 rounded-lg flex items-center justify-center text-white/40 hover:text-white hover:bg-white/8 disabled:opacity-25 disabled:cursor-not-allowed transition-all"
+            >
+              <ChevronRight className="w-4 h-4" />
+            </button>
+            {/* Last */}
+            <button
+              onClick={() => setPage(totalPages)}
+              disabled={safePage === totalPages}
+              className="w-8 h-8 rounded-lg flex items-center justify-center text-white/40 hover:text-white hover:bg-white/8 disabled:opacity-25 disabled:cursor-not-allowed transition-all"
+            >
+              <ChevronsRight className="w-4 h-4" />
+            </button>
+          </div>
+
+          <p className="text-xs text-white/35 hidden sm:block">
+            Page {safePage} of {totalPages}
+          </p>
         </div>
       )}
     </div>

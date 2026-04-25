@@ -118,22 +118,37 @@ const DashboardOrders = () => {
       profile?.id,
     ].filter(Boolean) as string[]));
 
-    let query = supabase
-      .from("orders")
-      .select("*")
-      .in("agent_id", candidateAgentIds)
-      .in("status", ["pending", "paid", "processing", "fulfilled", "fulfillment_failed"])
-      .order("created_at", { ascending: false })
-      .limit(200);
+    // Batch-fetch all orders — no arbitrary limit
+    let fetched: any[] = [];
+    let from = 0;
+    let hasMore = true;
 
-    if (filter !== "all") {
-      query = filter === "data"
-        ? query.eq("order_type", filter)
-        : query.eq("status", filter);
+    while (hasMore) {
+      let q = supabase
+        .from("orders")
+        .select("*")
+        .in("agent_id", candidateAgentIds)
+        .in("status", ["pending", "paid", "processing", "fulfilled", "fulfillment_failed"])
+        .order("created_at", { ascending: false })
+        .range(from, from + 999);
+
+      if (filter !== "all") {
+        q = filter === "data"
+          ? q.eq("order_type", filter)
+          : q.eq("status", filter);
+      }
+
+      const { data } = await q;
+      if (!data || data.length === 0) {
+        hasMore = false;
+      } else {
+        fetched = [...fetched, ...data];
+        from += 1000;
+        if (data.length < 1000) hasMore = false;
+      }
     }
 
-    const { data } = await query;
-    setOrders(data || []);
+    setOrders(fetched);
     setLoading(false);
   }, [filter, profile?.id, profile?.user_id, user]);
 
