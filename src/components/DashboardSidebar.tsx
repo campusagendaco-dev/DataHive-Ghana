@@ -25,7 +25,8 @@ import {
   ChevronRight,
   Zap,
   Activity,
-  Star
+  Star,
+  MessageCircle
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
