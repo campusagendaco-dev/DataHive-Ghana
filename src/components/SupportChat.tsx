@@ -17,6 +17,8 @@ interface Message {
   created_at: string;
 }
 
+import { motion } from "framer-motion";
+
 const SupportChat = () => {
   const { user, profile } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
@@ -117,8 +119,7 @@ const SupportChat = () => {
         .from("support_conversations")
         .update({ 
           last_message: content, 
-          last_message_at: new Date().toISOString(),
-          unread_count_admin: supabase.rpc('increment', { row_id: conversationId }) // This needs a function or manual increment
+          last_message_at: new Date().toISOString()
         })
         .eq("id", conversationId);
     }
@@ -131,10 +132,14 @@ const SupportChat = () => {
     <div className="fixed bottom-6 right-6 z-[100] flex flex-col items-end gap-4 pointer-events-none">
       {/* Chat Window */}
       {isOpen && (
-        <div className={cn(
-          "w-[380px] max-w-[calc(100vw-48px)] bg-[#0d140d] border border-white/10 rounded-[2.5rem] shadow-[0_20px_50px_rgba(0,0,0,0.5)] overflow-hidden flex flex-col pointer-events-auto transition-all duration-300 origin-bottom-right",
-          isMinimized ? "h-16" : "h-[500px]"
-        )}>
+        <motion.div 
+          initial={{ opacity: 0, scale: 0.9, y: 20 }}
+          animate={{ opacity: 1, scale: 1, y: 0 }}
+          className={cn(
+            "w-[380px] max-w-[calc(100vw-48px)] bg-[#0d140d] border border-white/10 rounded-[2.5rem] shadow-[0_20px_50px_rgba(0,0,0,0.5)] overflow-hidden flex flex-col pointer-events-auto transition-all duration-300 origin-bottom-right",
+            isMinimized ? "h-16" : "h-[500px]"
+          )}
+        >
           {/* Header */}
           <div className="h-16 px-6 bg-white/5 border-b border-white/5 flex items-center justify-between shrink-0">
             <div className="flex items-center gap-3">
@@ -216,12 +221,15 @@ const SupportChat = () => {
               </form>
             </>
           )}
-        </div>
+        </motion.div>
       )}
 
-      {/* Floating Trigger Button */}
+      {/* Floating Trigger Button - NOW DRAGGABLE */}
       {!isOpen && (
-        <button
+        <motion.button
+          drag
+          dragConstraints={{ left: -window.innerWidth + 80, right: 0, top: -window.innerHeight + 80, bottom: 0 }}
+          whileDrag={{ scale: 1.1, cursor: "grabbing" }}
           onClick={() => setIsOpen(true)}
           className="group relative w-16 h-16 rounded-[2rem] bg-primary text-black flex items-center justify-center shadow-[0_15px_35px_rgba(251,191,36,0.4)] transition-all duration-500 hover:scale-110 active:scale-95 pointer-events-auto"
         >
@@ -229,7 +237,7 @@ const SupportChat = () => {
           <MessageCircle className="w-7 h-7 relative z-10" />
           {/* Notification dot */}
           <span className="absolute top-0 right-0 w-4 h-4 bg-red-500 rounded-full border-2 border-[#030703] animate-bounce" />
-        </button>
+        </motion.button>
       )}
     </div>
   );
