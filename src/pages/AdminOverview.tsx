@@ -105,7 +105,7 @@ const AdminOverview = () => {
     
     startDate.setHours(0, 0, 0, 0);
 
-    const [ordersRes, profilesRes, maintenanceRes, recentRes, rangeOrdersRes, providerRes, withdrawalsRes, ticketsRes] = await Promise.all([
+    const [ordersRes, profilesRes, maintenanceRes, recentRes, rangeOrdersRes, providerRes, withdrawalsRes, ticketsRes, walletsRes, salesStatsRes] = await Promise.all([
       supabase.from("orders").select("id, amount, status, order_type, profit, parent_profit"),
       supabase.from("profiles").select("user_id, is_agent, is_sub_agent, agent_approved, sub_agent_approved, onboarding_complete, created_at"),
       supabase.functions.invoke("maintenance-mode", { body: { action: "get" } }),
@@ -114,11 +114,19 @@ const AdminOverview = () => {
       supabase.functions.invoke("admin-user-actions", { body: { action: "get_provider_balance" } }).catch(e => ({ data: { success: false, error: e.message }, error: e })),
       supabase.from("withdrawals").select("id", { count: "exact", head: true }).eq("status", "pending"),
       supabase.from("support_tickets").select("id", { count: "exact", head: true }).eq("status", "open"),
+      supabase.from("wallets").select("balance"),
+      supabase.from("user_sales_stats").select("total_sales_volume, total_own_profit, total_commissions_paid"),
     ]);
 
     const orders = ordersRes.data || [];
     const profiles = profilesRes.data || [];
     const rangeOrders = rangeOrdersRes.data || [];
+    const wallets = walletsRes.data || [];
+    const salesStats = salesStatsRes.data || [];
+
+    const totalSystemBalance = wallets.reduce((s, w) => s + (w.balance || 0), 0);
+    const totalVolumeAllTime = salesStats.reduce((s, st) => s + (st.total_sales_volume || 0), 0);
+    const totalAgentProfitsAllTime = salesStats.reduce((s, st) => s + (st.total_own_profit || 0) + (st.total_commissions_paid || 0), 0);
     const maintenanceRow = maintenanceRes.data as { is_enabled?: boolean; message?: string; table_ready?: boolean; error?: string } | null;
     const maintenanceError = maintenanceRes.error || maintenanceRow?.error;
     const isMonthly = timeRange === "1y" || timeRange === "all";
@@ -195,14 +203,16 @@ const AdminOverview = () => {
     });
     setStats({
       totalOrders: orders.length,
-      totalRevenue: orders.filter((o: any) => o.status === "fulfilled").reduce((s: number, o: any) => s + (o.amount || 0), 0),
+      totalRevenue: totalVolumeAllTime, // Use aggregated volume instead of client-side sum
       totalUsers: profiles.length,
       pendingAgents: profiles.filter((p: any) => p.is_agent && p.onboarding_complete && !p.agent_approved).length,
       swiftDataSubAgentShare: orders.filter((o: any) => o.status === "fulfilled" && o.order_type === "sub_agent_activation").reduce((s: number, o: any) => s + (Number(o.amount || 0) * 0.5), 0),
-      totalAgentProfit: orders.filter((o: any) => o.status === "fulfilled").reduce((s: number, o: any) => s + Number(o.profit || 0), 0),
-      totalSubAgentProfit: orders.filter((o: any) => o.status === "fulfilled").reduce((s: number, o: any) => s + Number(o.parent_profit || 0), 0),
+      totalAgentProfit: totalAgentProfitsAllTime,
+      totalSubAgentProfit: 0, // already included in totalAgentProfitsAllTime
       pendingWithdrawals: withdrawalsRes.count || 0,
       unreadTickets: ticketsRes.count || 0,
+      totalSystemBalance,
+      todaySignups: todayUsers,
     });
     setRecentOrders((recentRes.data || []) as RecentOrder[]);
     if (providerRes.data?.success) {
@@ -308,7 +318,8 @@ const AdminOverview = () => {
 
   const statCards = [
     { title: "Total Revenue",   value: `GH₵ ${stats.totalRevenue.toFixed(2)}`,                                icon: DollarSign, color: "text-green-500",  bg: "bg-green-500/10",  border: "border-green-500/20"  },
-    { title: "Agent Profits",   value: `GH₵ ${(stats.totalAgentProfit + stats.totalSubAgentProfit).toFixed(2)}`, icon: DollarSign, color: "text-amber-500",  bg: "bg-amber-400/10",  border: "border-amber-400/20"  },
+    { title: "Agent Profits",   value: `GH₵ ${stats.totalAgentProfit.toFixed(2)}`, icon: DollarSign, color: "text-amber-500",  bg: "bg-amber-400/10",  border: "border-amber-400/20"  },
+    { title: "User Balances",   value: `GH₵ ${stats.totalSystemBalance.toFixed(2)}`,                        icon: Wallet,     color: "text-red-400",    bg: "bg-red-400/10",    border: "border-red-400/20"    },
     { title: "Platform Share",  value: `GH₵ ${stats.swiftDataSubAgentShare.toFixed(2)}`,                      icon: Activity,   color: "text-blue-500",   bg: "bg-blue-400/10",   border: "border-blue-400/20"   },
     { title: "Active Users",    value: stats.totalUsers.toLocaleString(),                                      icon: Users,      color: "text-purple-500", bg: "bg-purple-500/10", border: "border-purple-500/20" },
     {
@@ -332,6 +343,7 @@ const AdminOverview = () => {
     { title: "Today's New Users", value: todaySales.newUsers,     icon: Users,        color: "text-indigo-500",  bg: "bg-indigo-500/10",  border: "border-indigo-500/20"  },
     { title: "Pending Withdrawals", value: stats.pendingWithdrawals, icon: Wallet,   color: stats.pendingWithdrawals > 0 ? "text-red-500" : "text-emerald-500", bg: stats.pendingWithdrawals > 0 ? "bg-red-500/10" : "bg-emerald-500/10", border: stats.pendingWithdrawals > 0 ? "border-red-500/20" : "border-emerald-500/20" },
     { title: "Open Tickets",      value: stats.unreadTickets,      icon: MessageCircle, color: stats.unreadTickets > 0 ? "text-amber-500" : "text-emerald-500", bg: stats.unreadTickets > 0 ? "bg-amber-500/10" : "bg-emerald-500/10", border: stats.unreadTickets > 0 ? "border-amber-500/20" : "border-emerald-500/20" },
+    { title: "Total Purchase", value: `GH₵ ${rangeOrders.reduce((s, o) => s + (o.amount || 0), 0).toFixed(2)}`, icon: ShoppingCart, color: "text-purple-500", bg: "bg-purple-500/10", border: "border-purple-500/20" },
   ];
 
   // Chart axis/grid colors
@@ -410,6 +422,46 @@ const AdminOverview = () => {
             </div>
           );
         })}
+      </div>
+
+      {/* Reconciliation Alert */}
+      <div className={`p-6 rounded-[2rem] border ${isDark ? "bg-[#0d0d12] border-amber-500/20 shadow-[0_20px_50px_rgba(0,0,0,0.3)]" : "bg-amber-50/50 border-amber-200"}`}>
+        <div className="flex flex-col md:flex-row gap-6 items-start">
+          <div className="w-12 h-12 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center shrink-0">
+            <ShieldCheck className="w-6 h-6 text-amber-500" />
+          </div>
+          <div className="space-y-4 flex-1">
+            <div>
+              <h2 className={`text-xl font-black tracking-tight ${head}`}>Financial Reconciliation</h2>
+              <p className={`text-sm mt-1 leading-relaxed ${sub}`}>
+                Understanding the discrepancy between Paystack inflows and dashboard purchases.
+              </p>
+            </div>
+            
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div className={`p-4 rounded-2xl border ${isDark ? "bg-black/40 border-white/5" : "bg-white border-gray-100"}`}>
+                <p className={`text-[10px] uppercase font-black tracking-widest mb-1 ${muted}`}>Gross Received</p>
+                <p className={`text-lg font-black text-emerald-500`}>GH₵ {stats.totalRevenue.toFixed(2)}</p>
+                <p className="text-[9px] text-white/20 mt-1">Total money users sent via Paystack.</p>
+              </div>
+              <div className={`p-4 rounded-2xl border ${isDark ? "bg-black/40 border-white/5" : "bg-white border-gray-100"}`}>
+                <p className={`text-[10px] uppercase font-black tracking-widest mb-1 ${muted}`}>Held in Wallets</p>
+                <p className={`text-lg font-black text-red-400`}>GH₵ {stats.totalSystemBalance.toFixed(2)}</p>
+                <p className="text-[9px] text-white/20 mt-1">Liability: Funds users haven't spent yet.</p>
+              </div>
+              <div className={`p-4 rounded-2xl border ${isDark ? "bg-black/40 border-white/5" : "bg-white border-gray-100"}`}>
+                <p className={`text-[10px] uppercase font-black tracking-widest mb-1 ${muted}`}>Platform Activity</p>
+                <p className={`text-lg font-black text-blue-400`}>GH₵ {(stats.totalRevenue - stats.totalSystemBalance).toFixed(2)}</p>
+                <p className="text-[9px] text-white/20 mt-1">Actual value converted into orders.</p>
+              </div>
+            </div>
+
+            <div className={`text-xs p-4 rounded-xl border italic ${isDark ? "bg-white/5 border-white/10 text-white/60" : "bg-amber-50 border-amber-200 text-amber-800"}`}>
+              💡 <strong>Note:</strong> If your Paystack total is higher than "Total Purchase", it means users have topped up their wallets but 
+              <strong> haven't spent the money yet</strong>. That money is sitting safely in their account balances (Liability) and will show up in revenue once they buy data.
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* Provider Diagnostics Alert */}
