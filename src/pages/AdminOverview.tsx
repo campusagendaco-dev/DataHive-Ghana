@@ -12,6 +12,7 @@ import {
   Users, ShoppingCart, DollarSign, ShieldCheck,
   Package, Wallet, ArrowUpRight, RefreshCw,
   CheckCircle2, Clock, XCircle, Activity, ChevronRight, TrendingUp,
+  MessageCircle,
 } from "lucide-react";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
@@ -41,6 +42,10 @@ interface TodaySales {
   customers: number;
   agents: number;
   subAgents: number;
+  successCount: number;
+  failedCount: number;
+  pendingCount: number;
+  newUsers: number;
 }
 
 const DailySalesTooltip = ({ active, payload, label, isDark }: any) => {
@@ -74,10 +79,10 @@ const AdminOverview = () => {
   const navigate = useNavigate();
   const { isDark } = useAppTheme();
 
-  const [stats, setStats] = useState({ totalOrders: 0, totalRevenue: 0, totalUsers: 0, pendingAgents: 0, swiftDataSubAgentShare: 0, totalAgentProfit: 0, totalSubAgentProfit: 0 });
+  const [stats, setStats] = useState({ totalOrders: 0, totalRevenue: 0, totalUsers: 0, pendingAgents: 0, swiftDataSubAgentShare: 0, totalAgentProfit: 0, totalSubAgentProfit: 0, todaySignups: 0, pendingWithdrawals: 0, unreadTickets: 0 });
   const [recentOrders, setRecentOrders] = useState<RecentOrder[]>([]);
   const [dailySales, setDailySales] = useState<DailySalesPoint[]>([]);
-  const [todaySales, setTodaySales] = useState<TodaySales>({ total: 0, customers: 0, agents: 0, subAgents: 0 });
+  const [todaySales, setTodaySales] = useState<TodaySales>({ total: 0, customers: 0, agents: 0, subAgents: 0, successCount: 0, failedCount: 0, pendingCount: 0, newUsers: 0 });
   const [providerBalance, setProviderBalance] = useState<number | null>(null);
   const [providerDiagnostics, setProviderDiagnostics] = useState<any>(null);
   const [timeRange, setTimeRange] = useState<"7d" | "30d" | "1y" | "all">("7d");
@@ -100,13 +105,15 @@ const AdminOverview = () => {
     
     startDate.setHours(0, 0, 0, 0);
 
-    const [ordersRes, profilesRes, maintenanceRes, recentRes, rangeOrdersRes, providerRes] = await Promise.all([
+    const [ordersRes, profilesRes, maintenanceRes, recentRes, rangeOrdersRes, providerRes, withdrawalsRes, ticketsRes] = await Promise.all([
       supabase.from("orders").select("id, amount, status, order_type, profit, parent_profit"),
-      supabase.from("profiles").select("user_id, is_agent, is_sub_agent, agent_approved, sub_agent_approved, onboarding_complete"),
+      supabase.from("profiles").select("user_id, is_agent, is_sub_agent, agent_approved, sub_agent_approved, onboarding_complete, created_at"),
       supabase.functions.invoke("maintenance-mode", { body: { action: "get" } }),
       supabase.from("orders").select("id, network, package_size, customer_phone, amount, status, created_at").order("created_at", { ascending: false }).limit(8),
       supabase.from("orders").select("id, amount, agent_id, created_at").gte("created_at", startDate.toISOString()).eq("status", "fulfilled"),
       supabase.functions.invoke("admin-user-actions", { body: { action: "get_provider_balance" } }).catch(e => ({ data: { success: false, error: e.message }, error: e })),
+      supabase.from("withdrawals").select("id", { count: "exact", head: true }).eq("status", "pending"),
+      supabase.from("support_tickets").select("id", { count: "exact", head: true }).eq("status", "open"),
     ]);
 
     const orders = ordersRes.data || [];
@@ -140,7 +147,19 @@ const AdminOverview = () => {
     }
 
     let todayCustomers = 0, todayAgents = 0, todaySubAgents = 0;
+    let todaySuccess = 0, todayFailed = 0, todayPending = 0;
     const todayStr = now.toISOString().slice(0, 10);
+
+    const todayUsers = profiles.filter((p: any) => (p.created_at as string)?.slice(0, 10) === todayStr).length;
+
+    orders.forEach((o: any) => {
+      const fullKey = (o.created_at as string)?.slice(0, 10);
+      if (fullKey === todayStr) {
+        if (o.status === "fulfilled") todaySuccess++;
+        else if (o.status === "fulfillment_failed") todayFailed++;
+        else todayPending++;
+      }
+    });
 
     rangeOrders.forEach((o: any) => {
       const fullKey = (o.created_at as string).slice(0, 10);
@@ -164,7 +183,16 @@ const AdminOverview = () => {
     });
 
     setDailySales(Object.values(chartMap));
-    setTodaySales({ total: todayCustomers + todayAgents + todaySubAgents, customers: todayCustomers, agents: todayAgents, subAgents: todaySubAgents });
+    setTodaySales({ 
+      total: todayCustomers + todayAgents + todaySubAgents, 
+      customers: todayCustomers, 
+      agents: todayAgents, 
+      subAgents: todaySubAgents,
+      successCount: todaySuccess,
+      failedCount: todayFailed,
+      pendingCount: todayPending,
+      newUsers: todayUsers
+    });
     setStats({
       totalOrders: orders.length,
       totalRevenue: orders.filter((o: any) => o.status === "fulfilled").reduce((s: number, o: any) => s + (o.amount || 0), 0),
@@ -173,6 +201,8 @@ const AdminOverview = () => {
       swiftDataSubAgentShare: orders.filter((o: any) => o.status === "fulfilled" && o.order_type === "sub_agent_activation").reduce((s: number, o: any) => s + (Number(o.amount || 0) * 0.5), 0),
       totalAgentProfit: orders.filter((o: any) => o.status === "fulfilled").reduce((s: number, o: any) => s + Number(o.profit || 0), 0),
       totalSubAgentProfit: orders.filter((o: any) => o.status === "fulfilled").reduce((s: number, o: any) => s + Number(o.parent_profit || 0), 0),
+      pendingWithdrawals: withdrawalsRes.count || 0,
+      unreadTickets: ticketsRes.count || 0,
     });
     setRecentOrders((recentRes.data || []) as RecentOrder[]);
     if (providerRes.data?.success) {
@@ -296,7 +326,12 @@ const AdminOverview = () => {
       color: "text-sky-500",
       bg: "bg-sky-500/10",
       border: "border-sky-500/20"
-    }
+    },
+    { title: "Today's Success", value: todaySales.successCount, icon: CheckCircle2, color: "text-emerald-500", bg: "bg-emerald-500/10", border: "border-emerald-500/20" },
+    { title: "Today's Failed",  value: todaySales.failedCount,  icon: XCircle,      color: "text-red-500",     bg: "bg-red-500/10",     border: "border-red-500/20"     },
+    { title: "Today's New Users", value: todaySales.newUsers,     icon: Users,        color: "text-indigo-500",  bg: "bg-indigo-500/10",  border: "border-indigo-500/20"  },
+    { title: "Pending Withdrawals", value: stats.pendingWithdrawals, icon: Wallet,   color: stats.pendingWithdrawals > 0 ? "text-red-500" : "text-emerald-500", bg: stats.pendingWithdrawals > 0 ? "bg-red-500/10" : "bg-emerald-500/10", border: stats.pendingWithdrawals > 0 ? "border-red-500/20" : "border-emerald-500/20" },
+    { title: "Open Tickets",      value: stats.unreadTickets,      icon: MessageCircle, color: stats.unreadTickets > 0 ? "text-amber-500" : "text-emerald-500", bg: stats.unreadTickets > 0 ? "bg-amber-500/10" : "bg-emerald-500/10", border: stats.unreadTickets > 0 ? "border-amber-500/20" : "border-emerald-500/20" },
   ];
 
   // Chart axis/grid colors
@@ -352,7 +387,7 @@ const AdminOverview = () => {
       </div>
 
       {/* Stats grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
         {statCards.map((c) => {
           const isFlashing = updatedKeys.has(c.title) || updatedKeys.has("totalRevenue" ) && c.title === "Total Revenue";
           return (
