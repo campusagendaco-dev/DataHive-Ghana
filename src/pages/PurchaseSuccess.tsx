@@ -40,6 +40,13 @@ const PurchaseSuccess = () => {
   const slug = searchParams.get("slug") || "";
   const [copied, setCopied] = useState(false);
 
+  // Play success sound on mount
+  useState(() => {
+    const audio = new Audio("https://assets.mixkit.co/active_storage/sfx/2358/2358-preview.mp3");
+    audio.volume = 0.5;
+    audio.play().catch(() => console.log("[PurchaseSuccess] Audio blocked"));
+  });
+
   const fromStore = Boolean(slug);
   const storeUrl = fromStore ? `/store/${slug}` : null;
 
