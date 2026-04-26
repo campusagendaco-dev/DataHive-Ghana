@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import { useNavigate, Link, useSearchParams } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -20,6 +20,8 @@ const AuthPage = () => {
   const { signUp, signIn, signInWithOAuth } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const [searchParams] = useSearchParams();
+  const referralCode = searchParams.get("ref") || "";
 
   const getPostLoginRoute = async () => {
     const {
@@ -76,7 +78,7 @@ const AuthPage = () => {
         return;
       }
 
-      const { error } = await signUp(email, password, fullName);
+      const { error } = await signUp(email, password, fullName, referralCode);
       if (error) {
         toast({ title: "Sign up failed", description: error.message, variant: "destructive" });
       } else {

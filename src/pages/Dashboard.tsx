@@ -11,6 +11,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useAppTheme } from "@/contexts/ThemeContext";
 import FreeDataClaimBanner from "@/components/FreeDataClaimBanner";
 import WelcomeAnnouncement from "@/components/WelcomeAnnouncement";
+import ReferAndEarn from "@/components/ReferAndEarn";
 
 interface DashboardStats {
   walletBalance: number;
@@ -181,6 +182,7 @@ const Dashboard = () => {
           )}
         </div>
       </div>
+      <ReferAndEarn />
 
       {/* ── Error State ── */}
       {error && (

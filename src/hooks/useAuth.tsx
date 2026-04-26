@@ -160,14 +160,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     };
   }, []);
 
-  const signUp = async (email: string, password: string, fullName: string) => {
+  const signUp = async (email: string, password: string, fullName: string, referralCode?: string) => {
     const normalizedEmail = normalizeEmailInput(email);
     const { error } = await supabase.auth.signUp({
       email: normalizedEmail,
       password,
       options: {
         emailRedirectTo: appBaseUrl,
-        data: { full_name: fullName },
+        data: { 
+          full_name: fullName,
+          referral_code: referralCode
+        },
       },
     });
     return { error };
