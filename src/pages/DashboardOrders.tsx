@@ -5,7 +5,7 @@ import { invokePublicFunctionAsUser } from "@/lib/public-function-client";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ClipboardList, RefreshCw, CheckCircle2, XCircle, Clock, Loader2, Wallet, ChevronDown, Phone, Package, Calendar, Receipt } from "lucide-react";
+import { ClipboardList, RefreshCw, CheckCircle2, XCircle, Clock, Loader2, Wallet, ChevronDown, Phone, Package, Calendar, Receipt, Copy, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface Order {
@@ -106,6 +106,7 @@ const DashboardOrders = () => {
   const [filter, setFilter] = useState("all");
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [retryingIds, setRetryingIds] = useState<Set<string>>(new Set());
+  const [copiedId, setCopiedId] = useState<string | null>(null);
   const retryCountRef = useRef<Record<string, number>>({});
 
   const fetchOrders = useCallback(async () => {
@@ -214,6 +215,42 @@ const DashboardOrders = () => {
     }, 30_000);
     return () => clearInterval(interval);
   }, [user]);
+
+  const copyReceipt = useCallback((order: Order) => {
+    const { date, time } = fmt(order.created_at);
+    const isWalletTopup = order.order_type === "wallet_topup";
+    const statusLabel =
+      order.status === "fulfilled" ? "✅ Delivered" :
+      order.status === "fulfillment_failed" ? "❌ Failed" :
+      order.status === "paid" || order.status === "processing" ? "⏳ Processing" :
+      "🕐 Pending";
+
+    const lines = [
+      "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
+      "    SwiftData Ghana — Receipt",
+      "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
+      `Order ID  : ${order.id.slice(0, 8).toUpperCase()}`,
+      `Date      : ${date} at ${time}`,
+      "─────────────────────────────────",
+      isWalletTopup
+        ? `Type      : Wallet Top-up`
+        : `Network   : ${order.network || "—"}`,
+      isWalletTopup
+        ? `Amount    : GH₵ ${Number(order.amount).toFixed(2)}`
+        : `Package   : ${order.package_size || "—"}`,
+      ...(!isWalletTopup ? [`Recipient : ${order.customer_phone || "—"}`] : []),
+      `Amount    : GH₵ ${Number(order.amount).toFixed(2)}`,
+      `Status    : ${statusLabel}`,
+      "─────────────────────────────────",
+      "  swiftdataghana.com",
+      "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
+    ];
+
+    navigator.clipboard.writeText(lines.join("\n")).then(() => {
+      setCopiedId(order.id);
+      setTimeout(() => setCopiedId(null), 2000);
+    });
+  }, []);
 
   const stats = orders.reduce(
     (acc, o) => {
@@ -430,6 +467,21 @@ const DashboardOrders = () => {
                           </div>
                         ))}
                       </div>
+
+                      {/* Copy Receipt button */}
+                      <button
+                        onClick={() => copyReceipt(order)}
+                        className="w-full flex items-center justify-center gap-2 py-2 mb-3 rounded-xl text-xs font-bold border transition-all duration-150"
+                        style={
+                          copiedId === order.id
+                            ? { background: "rgba(34,197,94,0.12)", borderColor: "rgba(34,197,94,0.30)", color: "rgb(74,222,128)" }
+                            : { background: "rgba(255,255,255,0.04)", borderColor: "rgba(255,255,255,0.09)", color: "rgba(255,255,255,0.55)" }
+                        }
+                      >
+                        {copiedId === order.id
+                          ? <><Check className="w-3.5 h-3.5" /> Receipt Copied!</>
+                          : <><Copy className="w-3.5 h-3.5" /> Copy Receipt</>}
+                      </button>
 
                       {/* Timeline */}
                       {!isWalletTopup && (

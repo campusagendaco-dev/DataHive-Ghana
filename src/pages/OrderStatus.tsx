@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { CheckCircle2, XCircle, Loader2, ShieldCheck, Zap, ArrowRight, Package, Clock, Activity } from "lucide-react";
+import { CheckCircle2, XCircle, Loader2, ShieldCheck, Zap, ArrowRight, Package, Clock, Activity, Copy, Check } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { invokePublicFunction } from "@/lib/public-function-client";
 import PhoneOrderTracker from "@/components/PhoneOrderTracker";
@@ -52,8 +52,33 @@ const OrderStatus = () => {
   const [step, setStep] = useState(0);
   const [failed, setFailed] = useState(false);
   const [initialCheckDone, setInitialCheckDone] = useState(!reference);
+  const [copied, setCopied] = useState(false);
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   const redirectedRef = useRef(false);
+
+  const copyReceipt = () => {
+    const now = new Date().toLocaleString("en-GH", { dateStyle: "medium", timeStyle: "short" });
+    const statusLabel = failed ? "❌ Failed" : step >= 3 ? "✅ Delivered" : "⏳ Processing";
+    const lines = [
+      "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
+      "    SwiftData Ghana — Receipt",
+      "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
+      `Ref       : ${reference.slice(0, 12).toUpperCase()}`,
+      `Date      : ${now}`,
+      "─────────────────────────────────",
+      ...(network ? [`Network   : ${network}`] : []),
+      ...(packageSize ? [`Package   : ${packageSize}`] : []),
+      ...(phone ? [`Recipient : ${phone}`] : []),
+      `Status    : ${statusLabel}`,
+      "─────────────────────────────────",
+      "  swiftdataghana.com",
+      "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
+    ];
+    navigator.clipboard.writeText(lines.join("\n")).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  };
 
   const handleStatusUpdate = (status: OrderStatusType) => {
     setOrderStatus(status);
@@ -189,11 +214,20 @@ const OrderStatus = () => {
                         <p className="text-[11px] text-white/40">We encountered an issue with the carrier.</p>
                       </div>
                     </div>
-                    <div className="pt-4 border-t border-red-500/10">
+                    <div className="pt-4 border-t border-red-500/10 space-y-3">
                       <p className="text-xs text-white/60 leading-relaxed">
                         Don't worry — your payment is safe. Our team has been notified. Please contact support with this reference:
                         <code className="block mt-2 font-mono text-amber-500 bg-black/40 p-2 rounded-lg border border-white/5">{reference}</code>
                       </p>
+                      <button
+                        onClick={copyReceipt}
+                        className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-bold border transition-all duration-150"
+                        style={copied
+                          ? { background: "rgba(34,197,94,0.12)", borderColor: "rgba(34,197,94,0.30)", color: "rgb(74,222,128)" }
+                          : { background: "rgba(255,255,255,0.05)", borderColor: "rgba(255,255,255,0.10)", color: "rgba(255,255,255,0.55)" }}
+                      >
+                        {copied ? <><Check className="w-3.5 h-3.5" /> Receipt Copied!</> : <><Copy className="w-3.5 h-3.5" /> Copy Receipt</>}
+                      </button>
                     </div>
                   </div>
                 ) : (

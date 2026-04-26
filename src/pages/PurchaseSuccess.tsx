@@ -1,6 +1,6 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { CheckCircle2, Home, ReceiptText, Wallet, ShoppingBag } from "lucide-react";
+import { CheckCircle2, Home, ReceiptText, Wallet, ShoppingBag, Copy, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 
@@ -38,9 +38,33 @@ const PurchaseSuccess = () => {
   const customerPhone = formatPhone(searchParams.get("phone") || "");
   const source = searchParams.get("source") || "";
   const slug = searchParams.get("slug") || "";
+  const [copied, setCopied] = useState(false);
 
   const fromStore = Boolean(slug);
   const storeUrl = fromStore ? `/store/${slug}` : null;
+
+  const copyReceipt = () => {
+    const now = new Date().toLocaleString("en-GH", { dateStyle: "medium", timeStyle: "short" });
+    const lines = [
+      "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
+      "    SwiftData Ghana — Receipt",
+      "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
+      `Ref       : ${reference.slice(0, 12).toUpperCase()}`,
+      `Date      : ${now}`,
+      "─────────────────────────────────",
+      ...(network ? [`Network   : ${network}`] : []),
+      ...(packageSize ? [`Package   : ${packageSize}`] : []),
+      ...(customerPhone ? [`Recipient : ${customerPhone}`] : []),
+      `Status    : ✅ Delivered`,
+      "─────────────────────────────────",
+      "  swiftdataghana.com",
+      "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
+    ];
+    navigator.clipboard.writeText(lines.join("\n")).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  };
 
   const confetti = useMemo<ConfettiPiece[]>(
     () =>
@@ -137,6 +161,13 @@ const PurchaseSuccess = () => {
             )}
 
             <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
+              <Button
+                onClick={copyReceipt}
+                variant="outline"
+                className={copied ? "border-green-500/40 text-green-500" : ""}
+              >
+                {copied ? <><Check className="h-4 w-4 mr-2" /> Copied!</> : <><Copy className="h-4 w-4 mr-2" /> Copy Receipt</>}
+              </Button>
               <Button asChild>
                 <Link to="/order-status">
                   <ReceiptText className="h-4 w-4 mr-2" />
