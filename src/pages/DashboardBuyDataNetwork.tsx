@@ -13,7 +13,7 @@ import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Wallet, Loader2, CreditCard, X, RefreshCw, ArrowRight, Tag, CheckCircle2, Gift, Users2 } from "lucide-react";
 import { basePackages, getPublicPrice } from "@/lib/data";
-import { getNetworkCardColors } from "@/lib/utils";
+import { getNetworkCardColors, detectNetwork } from "@/lib/utils";
 import OrderStatusBanner from "@/components/OrderStatusBanner";
 
 type NetworkName = "MTN" | "Telecel" | "AirtelTigo";
@@ -108,6 +108,31 @@ const DashboardBuyDataNetwork = ({ network }: DashboardBuyDataNetworkProps) => {
   const [showCustomers, setShowCustomers] = useState(false);
 
   const isPaidAgent = Boolean(profile?.agent_approved || profile?.sub_agent_approved);
+
+  // Restore phone from navigation state if it exists (for auto-network switching)
+  useEffect(() => {
+    const navState = window.history.state?.usr;
+    if (navState?.phone && !phone) {
+      setPhone(navState.phone);
+    }
+  }, [phone]);
+
+  // Auto-detect network and switch tabs
+  useEffect(() => {
+    const detected = detectNetwork(phone);
+    if (detected && detected !== network) {
+      const route = networkRouteMap[detected];
+      navigate(`/dashboard/buy-data/${route}`, { 
+        replace: true, 
+        state: { phone } 
+      });
+      toast({ 
+        title: `Switched to ${detected}`, 
+        description: `We detected an ${detected} number and updated the bundles for you.`,
+        duration: 2000
+      });
+    }
+  }, [phone, network, navigate, toast]);
 
   useEffect(() => {
     const loadPricing = async () => {

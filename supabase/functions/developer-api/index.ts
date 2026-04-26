@@ -153,36 +153,18 @@ serve(async (req: Request) => {
   };
   
   let profile = (candidates as ProfileRow[] ?? []).find((p) => p.api_key && safeEqual(p.api_key, rawApiKey));
-  const isTestKey = safeEqual(rawApiKey, "jbg_live_g436mah07m37rqruejreeedd");
-
-  // SPECIAL CASE: Allow the test key if it's the one provided by the user
-  if (!profile && isTestKey) {
-    const { data: firstAgent } = await supabase
-      .from("profiles")
-      .select("*")
-      .eq("agent_approved", true)
-      .limit(1)
-      .maybeSingle();
-    
-    if (firstAgent) {
-      console.log("Using fallback profile for test key:", firstAgent.email);
-      profile = firstAgent as ProfileRow;
-    }
-  }
-
   if (!profile) return json({ success: false, error: "Invalid API key" }, 401);
 
   // ── 3. Access checks ──────────────────────────────────────────────────────
-  if (!profile.api_access_enabled && !isTestKey)
+  if (!profile.api_access_enabled)
     return json({ success: false, error: "API access has been revoked for this account. Contact support." }, 403);
 
   const isApproved = profile.agent_approved || profile.sub_agent_approved;
   if (!isApproved)
     return json({ success: false, error: "Account is not an approved agent. API access requires agent approval." }, 403);
 
-  // ── 4. IP whitelist (Skip for test key) ──────────────────────────────────
   const whitelist: string[] = Array.isArray(profile.api_ip_whitelist) ? profile.api_ip_whitelist : [];
-  if (whitelist.length > 0 && !isTestKey) {
+  if (whitelist.length > 0) {
     const clientIp =
       req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
       req.headers.get("cf-connecting-ip") || "";
@@ -200,7 +182,7 @@ serve(async (req: Request) => {
     .eq("agent_id", profile.user_id)
     .gte("created_at", oneMinuteAgo);
 
-  if ((recentCount ?? 0) >= rateLimit && !isTestKey) {
+  if ((recentCount ?? 0) >= rateLimit) {
     return json({ success: false, error: `Rate limit exceeded: max ${rateLimit} requests/minute.` }, 429);
   }
 
@@ -282,8 +264,9 @@ serve(async (req: Request) => {
 
       const phone = payload.customerNumber || payload.phone;
       const network = payload.networkCode || payload.network;
-      const amount = payload.amount; 
-      const package_size = payload.package_size;
+      const amount = payload.amount;
+      // plan_id (original format) accepted as alias for package_size
+      const package_size = payload.package_size || payload.plan_id;
       const request_id = payload.request_id;
 
       if (!network || !phone || (!amount && !package_size))
@@ -320,9 +303,9 @@ serve(async (req: Request) => {
       const DATA_PROVIDER_BASE_URL = getEnv("PRIMARY_DATA_PROVIDER_BASE_URL", "DATA_PROVIDER_BASE_URL");
       const WEBHOOK_URL = profile.api_webhook_url || getEnv("DATA_PROVIDER_WEBHOOK_URL");
 
-      // FORCED MOCK FOR TEST KEY
-      if (isTestKey || !DATA_PROVIDER_API_KEY || !DATA_PROVIDER_BASE_URL) {
-        await supabase.from("orders").update({ status: "fulfilled", failure_reason: isTestKey ? "Test Mode Fulfillment" : "Mock fulfillment (Provider not configured)" }).eq("id", orderId);
+      // FORCED MOCK FOR MISSING CONFIG
+      if (!DATA_PROVIDER_API_KEY || !DATA_PROVIDER_BASE_URL) {
+        await supabase.from("orders").update({ status: "fulfilled", failure_reason: "Mock fulfillment (Provider not configured)" }).eq("id", orderId);
         const { data: w } = await supabase.from("wallets").select("balance").eq("agent_id", profile.user_id).maybeSingle();
         return json({ success: true, order_id: orderId, status: "fulfilled", message: "Purchase simulated successfully", balance: Number(w?.balance ?? 0) });
       }
@@ -399,7 +382,7 @@ serve(async (req: Request) => {
       const { data: w } = await supabase.from("wallets").select("balance").eq("agent_id", profile.user_id).maybeSingle();
       return json({
         success: true,
-        transaction_id: `JBG_BILL_${orderId.slice(0, 10).toUpperCase()}`,
+        transaction_id: `SWFT_BILL_${orderId.slice(0, 10).toUpperCase()}`,
         cost: payAmount,
         balance: Number(w?.balance ?? 0)
       });

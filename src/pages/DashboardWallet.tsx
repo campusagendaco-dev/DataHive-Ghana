@@ -12,7 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Wallet, Loader2, Send, CreditCard } from "lucide-react";
+import { Wallet, Loader2, Send, CreditCard, Gift, ArrowRightLeft } from "lucide-react";
 import { basePackages, networks, getPublicPrice } from "@/lib/data";
 
 interface WalletTopupRow {
@@ -72,6 +72,8 @@ const DashboardWallet = () => {
   const navigate = useNavigate();
   const [balance, setBalance] = useState(0);
   const [availableProfit, setAvailableProfit] = useState(0);
+  const [loyaltyBalance, setLoyaltyBalance] = useState(0);
+  const [convertingPoints, setConvertingPoints] = useState(false);
   const [loading, setLoading] = useState(true);
   const [globalSettings, setGlobalSettings] = useState<GlobalPackageSetting[]>([]);
   const [parentAssignedPrices, setParentAssignedPrices] = useState<Record<string, Record<string, string | number>>>({});
@@ -146,7 +148,7 @@ const DashboardWallet = () => {
     if (!user) return;
 
     const [walletRes, ordersRes, parentProfitRes, withdrawalsRes] = await Promise.all([
-      supabase.from("wallets").select("balance").eq("agent_id", user.id).maybeSingle(),
+      supabase.from("wallets").select("balance, loyalty_balance").eq("agent_id", user.id).maybeSingle(),
       supabase.from("orders").select("profit").eq("agent_id", user.id).in("status", ["paid", "fulfilled", "fulfillment_failed"]),
       supabase.from("orders").select("parent_profit").eq("parent_agent_id", user.id).in("status", ["paid", "fulfilled", "fulfillment_failed"]),
       supabase.from("withdrawals").select("amount, status").eq("agent_id", user.id).in("status", ["completed", "pending", "processing"]),
@@ -160,6 +162,7 @@ const DashboardWallet = () => {
     const profitBalance = parseFloat(((totalProfit + totalParentProfit) - withdrawnProfit).toFixed(2));
 
     setBalance(walletBalance);
+    setLoyaltyBalance(Number(walletRes.data?.loyalty_balance || 0));
     setAvailableProfit(Math.max(0, profitBalance));
     setLoading(false);
   }, [user]);
@@ -301,6 +304,28 @@ const DashboardWallet = () => {
     setBuying(false);
   };
 
+  const handleConvertPoints = async () => {
+    if (loyaltyBalance < 100) {
+      toast({ title: "Minimum 100 points required", description: "100 points = GHS 1.00", variant: "destructive" });
+      return;
+    }
+    setConvertingPoints(true);
+    const { data, error } = await supabase.rpc("convert_loyalty_points", {
+      user_id: user?.id,
+      points_to_convert: loyaltyBalance
+    });
+    if (error || !data?.success) {
+      toast({ title: "Conversion failed", description: data?.error || error?.message, variant: "destructive" });
+    } else {
+      toast({ 
+        title: "Points Converted!", 
+        description: `GHS ${data.cash_added} has been added to your wallet.` 
+      });
+      await fetchBalance();
+    }
+    setConvertingPoints(false);
+  };
+
   const handleSyncPendingDeposits = async () => {
     if (!user) return;
     setSyncingDeposits(true);
@@ -341,59 +366,65 @@ const DashboardWallet = () => {
         Top up with Paystack instantly, then use your wallet balance to buy data directly from your dashboard.
       </p>
 
-      {/* Balance + Paystack Topup */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      {/* Balance + Paystack Topup + Loyalty */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <Card className="border-primary/30 bg-primary/5">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-primary">Total Funds</CardTitle>
+            <CardTitle className="text-sm font-medium text-primary">Wallet Balance</CardTitle>
             <Wallet className="w-5 h-5 text-primary" />
           </CardHeader>
           <CardContent>
-            <p className="font-display text-3xl font-black text-primary">GHS {totalFunds.toFixed(2)}</p>
-            <p className="text-xs text-muted-foreground mt-1">Wallet: GHS {balance.toFixed(2)}</p>
-            <Button variant="outline" size="sm" className="mt-3" onClick={handleSyncPendingDeposits} disabled={syncingDeposits}>
-              {syncingDeposits ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+            <p className="font-display text-3xl font-black text-primary">GHS {balance.toFixed(2)}</p>
+            <p className="text-[10px] text-muted-foreground mt-1 uppercase font-bold tracking-widest">Available Balance</p>
+            <Button variant="ghost" size="sm" className="mt-3 h-8 text-[10px] uppercase font-black tracking-widest border border-primary/20 hover:bg-primary/10" onClick={handleSyncPendingDeposits} disabled={syncingDeposits}>
+              {syncingDeposits ? <Loader2 className="w-3 h-3 animate-spin mr-2" /> : null}
               Verify Pending Deposit
             </Button>
           </CardContent>
         </Card>
 
-        <Card className="border-accent/30 bg-accent/5">
+        <Card className="border-amber-400/30 bg-amber-400/5">
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium text-amber-500">SwiftPoints (Loyalty)</CardTitle>
+            <Gift className="w-5 h-5 text-amber-500" />
+          </CardHeader>
+          <CardContent>
+            <p className="font-display text-3xl font-black text-amber-500">{loyaltyBalance.toFixed(0)} pts</p>
+            <p className="text-[10px] text-muted-foreground mt-1 uppercase font-bold tracking-widest">Value: GHS {(loyaltyBalance / 100).toFixed(2)}</p>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              className="mt-3 h-8 text-[10px] uppercase font-black tracking-widest bg-amber-400/10 border-amber-400/20 text-amber-500 hover:bg-amber-400/20" 
+              onClick={handleConvertPoints} 
+              disabled={convertingPoints || loyaltyBalance < 100}
+            >
+              {convertingPoints ? <Loader2 className="w-3 h-3 animate-spin mr-2" /> : <ArrowRightLeft className="w-3 h-3 mr-2" />}
+              Convert to Cash
+            </Button>
+          </CardContent>
+        </Card>
+
+        <Card className="border-blue-400/30 bg-blue-400/5">
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-accent-foreground">Top Up with Paystack</CardTitle>
+            <CardTitle className="text-sm font-medium text-blue-500">Fast Top Up</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
-            <Label htmlFor="topup-amount" className="text-xs text-muted-foreground">Wallet Credit Amount (GHS)</Label>
-            <Input
-              id="topup-amount"
-              type="number"
-              min="15"
-              step="0.01"
-              placeholder="e.g. 50"
-              value={topupAmount}
-              onChange={(e) => setTopupAmount(e.target.value)}
-              className="bg-secondary"
-            />
+            <div className="flex gap-2">
+              <Input
+                type="number"
+                placeholder="Amt"
+                value={topupAmount}
+                onChange={(e) => setTopupAmount(e.target.value)}
+                className="h-9 bg-black/40 text-sm"
+              />
+              <Button onClick={handlePaystackTopup} disabled={toppingUp} size="sm" className="h-9 gap-2 shrink-0 bg-blue-500 hover:bg-blue-600">
+                {toppingUp ? <Loader2 className="w-3 h-3 animate-spin" /> : <CreditCard className="w-3 h-3" />}
+                Pay
+              </Button>
+            </div>
             {topupChargeTotal > 0 && (
-              <div className="rounded-lg border border-border/60 bg-background/60 p-3 text-xs space-y-1">
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Wallet Credit</span>
-                  <span className="font-medium">GHS {topupRequestedAmount.toFixed(2)}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Paystack Fee (3%)</span>
-                  <span className="font-medium">GHS {topupFee.toFixed(2)}</span>
-                </div>
-                <div className="flex justify-between border-t border-border pt-1">
-                  <span className="text-muted-foreground font-medium">Total to Pay</span>
-                  <span className="font-bold">GHS {topupChargeTotal.toFixed(2)}</span>
-                </div>
-              </div>
+              <p className="text-[9px] text-muted-foreground font-bold">Total with fee: GHS {topupChargeTotal.toFixed(2)}</p>
             )}
-            <Button onClick={handlePaystackTopup} disabled={toppingUp} className="w-full gap-2">
-              {toppingUp ? <Loader2 className="w-4 h-4 animate-spin" /> : <CreditCard className="w-4 h-4" />}
-              {toppingUp ? "Initializing..." : topupChargeTotal > 0 ? `Pay GHS ${topupChargeTotal.toFixed(2)}` : "Top Up Now"}
-            </Button>
           </CardContent>
         </Card>
       </div>

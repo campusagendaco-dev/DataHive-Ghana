@@ -55,21 +55,41 @@ const AdminAgents = () => {
   const [approvingId, setApprovingId] = useState<string | null>(null);
   const [stuckActivations, setStuckActivations] = useState<StuckActivation[]>([]);
   const [forcingId, setForcingId] = useState<string | null>(null);
+  const [page, setPage] = useState(0);
+  const [hasMore, setHasMore] = useState(true);
+  const PAGE_SIZE = 50;
   const { toast } = useToast();
   const { user: currentUser, session } = useAuth();
 
-  const fetchAgents = useCallback(async () => {
-    setLoading(true);
-    const { data } = await supabase
+  const fetchAgents = useCallback(async (isLoadMore = false) => {
+    if (!isLoadMore) {
+      setLoading(true);
+      setPage(0);
+    }
+    
+    const currentPage = isLoadMore ? page + 1 : 0;
+    const from = currentPage * PAGE_SIZE;
+    const to = from + PAGE_SIZE - 1;
+
+    let q = supabase
       .from("profiles")
-      .select("*")
+      .select("*", { count: "exact" })
       .eq("is_agent", true)
       .eq("is_sub_agent" as any, false)
-      .order("created_at", { ascending: false });
+      .order("created_at", { ascending: false })
+      .range(from, to);
 
+    if (search) {
+      q = q.or(`full_name.ilike.%${search}%,email.ilike.%${search}%,store_name.ilike.%${search}%,phone.ilike.%${search}%`);
+    }
+
+    if (filter === "approved") q = q.eq("agent_approved", true);
+    if (filter === "pending") q = q.eq("agent_approved", false);
+
+    const { data, count } = await q;
     const rows = ((data as any[]) || []) as AgentRow[];
 
-    // Fetch wallet balances
+    // Fetch wallet balances for this batch only
     const ids = rows.map(r => r.user_id);
     if (ids.length > 0) {
       const [walletsRes, subCountRes, salesRes] = await Promise.all([
@@ -82,7 +102,8 @@ const AdminAgents = () => {
       const salesMap = new Map((salesRes.data || []).map((s: any) => [s.user_id, s.total_sales_volume]));
       const subCountMap: Record<string, number> = {};
       (subCountRes.data || []).forEach((sa: any) => {
-        subCountMap[sa.parent_agent_id] = (subCountMap[sa.parent_agent_id] || 0) + 1;
+        const pid = sa.parent_agent_id;
+        subCountMap[pid] = (subCountMap[pid] || 0) + 1;
       });
 
       rows.forEach(r => {
@@ -92,7 +113,9 @@ const AdminAgents = () => {
       });
     }
 
-    setAgents(rows);
+    setAgents(prev => isLoadMore ? [...prev, ...rows] : rows);
+    setHasMore(count ? (from + rows.length < count) : rows.length === PAGE_SIZE);
+    if (isLoadMore) setPage(currentPage);
 
     // Find agents who paid for activation but store is still not activated
     const { data: activationOrders } = await supabase
@@ -138,7 +161,10 @@ const AdminAgents = () => {
     setLoading(false);
   }, []);
 
-  useEffect(() => { fetchAgents(); }, [fetchAgents]);
+  useEffect(() => { 
+    const timer = setTimeout(() => fetchAgents(false), 300);
+    return () => clearTimeout(timer);
+  }, [filter, search]);
 
   const handleApprove = async (userId: string) => {
     setApprovingId(userId);
@@ -239,13 +265,7 @@ const AdminAgents = () => {
     setLoadingSubAgents(null);
   };
 
-  const filtered = agents.filter(a => {
-    const matchSearch = [a.full_name, a.email, a.store_name, a.phone]
-      .filter(Boolean).some(v => v.toLowerCase().includes(search.toLowerCase()));
-    if (filter === "approved") return matchSearch && a.agent_approved;
-    if (filter === "pending") return matchSearch && !a.agent_approved;
-    return matchSearch;
-  });
+  const filtered = agents;
 
   if (loading) {
     return (
@@ -602,6 +622,19 @@ const AdminAgents = () => {
               )}
             </div>
           ))}
+          {hasMore && (
+            <div className="pt-8 flex justify-center">
+              <Button
+                variant="outline"
+                onClick={() => fetchAgents(true)}
+                disabled={loading}
+                className="bg-white/5 border-white/10 text-white rounded-xl px-10 font-black tracking-widest uppercase text-xs"
+              >
+                {loading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <ChevronDown className="w-4 h-4 mr-2" />}
+                Load More Agents
+              </Button>
+            </div>
+          )}
         </div>
       )}
     </div>

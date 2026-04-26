@@ -517,7 +517,7 @@ serve(async (req) => {
         const { data: dbSettings } = await supabaseAdmin.from("system_settings").select("*").eq("id", 1).maybeSingle();
         
         const apiKey = Deno.env.get("DATA_PROVIDER_API_KEY") || Deno.env.get("PRIMARY_DATA_PROVIDER_API_KEY") || dbSettings?.data_provider_api_key || "";
-        const baseUrl = (Deno.env.get("DATA_PROVIDER_BASE_URL") || Deno.env.get("PRIMARY_DATA_PROVIDER_BASE_URL") || dbSettings?.data_provider_base_url || "https://dev.justbuygh.com").replace(/\/+$/, "");
+        const baseUrl = (Deno.env.get("DATA_PROVIDER_BASE_URL") || Deno.env.get("PRIMARY_DATA_PROVIDER_BASE_URL") || dbSettings?.data_provider_base_url || "").replace(/\/+$/, "");
         
         const airtimeKey = Deno.env.get("AIRTIME_PROVIDER_API_KEY") || dbSettings?.airtime_provider_api_key || apiKey;
         

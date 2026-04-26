@@ -10,7 +10,7 @@ const Footer = () => {
   useEffect(() => {
     const loadSupportSettings = async () => {
       const { data } = await supabase
-        .from("system_settings")
+        .from("public_system_settings")
         .select("customer_service_number, support_channel_link")
         .eq("id", 1)
         .maybeSingle();

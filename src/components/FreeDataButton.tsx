@@ -105,7 +105,7 @@ const FreeDataButton = () => {
   useEffect(() => {
     const fetchCampaign = async () => {
       const { data } = await supabase
-        .from("system_settings")
+        .from("public_system_settings")
         .select("free_data_enabled, free_data_network, free_data_package_size")
         .eq("id", 1)
         .maybeSingle();

@@ -16,52 +16,56 @@ interface AuditLog {
 const AdminAuditLogs = () => {
   const [logs, setLogs] = useState<AuditLog[]>([]);
   const [loading, setLoading] = useState(true);
+  const [hasMore, setHasMore] = useState(true);
+  const [page, setPage] = useState(0);
+  const PAGE_SIZE = 50;
   const [error, setError] = useState<string | null>(null);
 
-  const fetchLogs = async () => {
-    setLoading(true);
+  const fetchLogs = async (isLoadMore = false) => {
+    if (!isLoadMore) {
+      setLoading(true);
+      setPage(0);
+    }
     setError(null);
     try {
-      // 1. Fetch the raw audit logs
+      const currentPage = isLoadMore ? page + 1 : 0;
+      const from = currentPage * PAGE_SIZE;
+      const to = from + PAGE_SIZE - 1;
+
       const { data: logData, error: logError } = await supabase
         .from("audit_logs")
         .select("*")
         .order("created_at", { ascending: false })
-        .limit(100);
+        .range(from, to);
       
       if (logError) throw logError;
 
       if (logData && logData.length > 0) {
-        // 2. Get unique admin IDs to fetch their names
         const adminIds = [...new Set(logData.map(l => l.admin_id).filter(Boolean))];
-        
         let profileMap: Record<string, string> = {};
         if (adminIds.length > 0) {
           const { data: profileData } = await supabase
             .from("profiles")
             .select("user_id, full_name")
             .in("user_id", adminIds);
-          
           if (profileData) {
-            profileMap = profileData.reduce((acc, curr) => ({
-              ...acc,
-              [curr.user_id]: curr.full_name
-            }), {});
+            profileMap = profileData.reduce((acc, curr) => ({ ...acc, [curr.user_id]: curr.full_name }), {});
           }
         }
 
-        // 3. Map the names back to the logs
         const enrichedLogs = logData.map(log => ({
           ...log,
           profiles: log.admin_id ? { full_name: profileMap[log.admin_id] || "Unknown Admin" } : null
         }));
 
-        setLogs(enrichedLogs as any[]);
+        setLogs(prev => isLoadMore ? [...prev, ...enrichedLogs] : enrichedLogs as any[]);
+        setHasMore(logData.length === PAGE_SIZE);
+        if (isLoadMore) setPage(currentPage);
       } else {
-        setLogs([]);
+        if (!isLoadMore) setLogs([]);
+        setHasMore(false);
       }
     } catch (err: any) {
-      console.error("Fetch logs error:", err);
       setError(err.message || "Could not load audit logs.");
     } finally {
       setLoading(false);
@@ -104,7 +108,7 @@ const AdminAuditLogs = () => {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const formatAction = (action: string) => {
     return action.split("_").map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(" ");
@@ -127,7 +131,7 @@ const AdminAuditLogs = () => {
           </div>
         </div>
         <button 
-          onClick={fetchLogs} 
+          onClick={() => fetchLogs(false)} 
           disabled={loading}
           className="flex items-center gap-2 text-xs font-semibold bg-white/5 hover:bg-white/10 px-4 py-2 rounded-lg transition-colors border border-white/10"
         >
@@ -238,6 +242,18 @@ const AdminAuditLogs = () => {
                   </div>
                 ))}
               </div>
+                {hasMore && (
+                  <div className="pt-8 flex justify-center border-t border-white/5 mt-6">
+                    <button
+                      onClick={() => fetchLogs(true)}
+                      disabled={loading}
+                      className="text-xs font-bold text-amber-400 hover:text-amber-300 flex items-center gap-2"
+                    >
+                      {loading ? <Loader2 className="w-3 h-3 animate-spin" /> : <FileSearch className="w-3 h-3" />}
+                      Load Older Logs
+                    </button>
+                  </div>
+                )}
             </>
           )}
         </CardContent>

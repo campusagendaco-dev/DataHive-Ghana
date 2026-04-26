@@ -246,7 +246,6 @@ function buildProviderUrls(baseUrl: string, endpoint: string): string[] {
     for (const alias of endpointAliases) {
       urls.add(`${rootUrl}/api/${alias}`);
       urls.add(`${rootUrl}/${alias}`);
-      // Automatic detection for JustBuy Developer API internal path
       urls.add(`${rootUrl}/functions/v1/developer-api/${alias}`);
     }
   }

@@ -32,7 +32,7 @@ const FreeDataClaimBanner = () => {
     const checkCampaignAndClaim = async () => {
       const [settingsRes, claimRes] = await Promise.all([
         supabase
-          .from("system_settings")
+          .from("public_system_settings")
           .select("free_data_enabled, free_data_network, free_data_package_size, free_data_max_claims")
           .eq("id", 1)
           .maybeSingle(),

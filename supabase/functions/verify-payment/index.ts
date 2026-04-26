@@ -24,7 +24,7 @@ async function getProviderCredentials(supabaseAdmin: any): Promise<{ apiKey: str
     "PRIMARY_DATA_PROVIDER_BASE_URL",
     "DATA_PROVIDER_BASE_URL",
     "DATA_PROVIDER_PRIMARY_BASE_URL",
-  ]) || dbSettings?.data_provider_base_url || "https://dev.justbuygh.com").replace(/\/+$/, "");
+  ]) || dbSettings?.data_provider_base_url || "").replace(/\/+$/, "");
 
   return {
     apiKey: primaryApiKey,

@@ -80,6 +80,7 @@ import DashboardReferral from "./pages/DashboardReferral";
 import AdminSupport from "./pages/AdminSupport";
 import { OfflineAlert } from "@/components/OfflineAlert";
 import { useRegisterSW } from "virtual:pwa-register/react";
+import DashboardBulk from "./pages/DashboardBulk";
 
 
 const queryClient = new QueryClient();
@@ -277,6 +278,7 @@ const AppContent = () => {
           <Route path="profile" element={<DashboardProfile />} />
           <Route path="customers" element={<DashboardCustomers />} />
           <Route path="referral" element={<DashboardReferral />} />
+          <Route path="bulk" element={<AgentFeatureGuard><DashboardBulk /></AgentFeatureGuard>} />
 
           {/* Paid agent-only pages */}
           <Route path="cheaper-prices" element={<AgentFeatureGuard><DashboardPricing /></AgentFeatureGuard>} />

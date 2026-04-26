@@ -60,7 +60,7 @@ const AdminOrders = () => {
   const [allOrders, setAllOrders] = useState<OrderRow[]>([]);
   const [profiles, setProfiles] = useState<Record<string, AgentProfile>>({});
   const [loading, setLoading] = useState(true);
-  const [fetchProgress, setFetchProgress] = useState(0);
+  const [totalCount, setTotalCount] = useState(0);
   const [searchParams] = useSearchParams();
   const initialSearch = searchParams.get("agent") || "";
   const [search, setSearch] = useState(initialSearch);
@@ -75,44 +75,50 @@ const AdminOrders = () => {
 
   const fetchOrders = useCallback(async () => {
     setLoading(true);
-    setFetchProgress(0);
 
-    // Fetch profiles first
-    const profilesRes = await supabase
-      .from("profiles")
-      .select("user_id, full_name, email, is_sub_agent")
-      .or("agent_approved.eq.true,sub_agent_approved.eq.true");
+    const from = (page - 1) * PAGE_SIZE;
+    const to = from + PAGE_SIZE - 1;
 
-    const profileMap: Record<string, AgentProfile> = {};
-    for (const p of (profilesRes.data ?? [])) {
-      profileMap[p.user_id] = p as AgentProfile;
-    }
-    setProfiles(profileMap);
+    let q = supabase
+      .from("orders")
+      .select("*", { count: "exact" })
+      .order("created_at", { ascending: false })
+      .range(from, to);
 
-    // Batch-fetch ALL orders — 1000 rows per request until exhausted
-    let fetched: any[] = [];
-    let from = 0;
-    let hasMore = true;
-
-    while (hasMore) {
-      const { data, error } = await supabase
-        .from("orders")
-        .select("*")
-        .order("created_at", { ascending: false })
-        .range(from, from + 999);
-
-      if (error || !data || data.length === 0) {
-        hasMore = false;
-      } else {
-        fetched = [...fetched, ...data];
-        setFetchProgress(fetched.length);
-        from += 1000;
-        if (data.length < 1000) hasMore = false;
-      }
+    if (search) {
+      q = q.or(`customer_phone.ilike.%${search}%,network.ilike.%${search}%,status.ilike.%${search}%`);
     }
 
-    // Enrich with agent info
-    const enriched: OrderRow[] = fetched.map((o: any) => ({
+    if (statusFilter !== "all") q = q.eq("status", statusFilter);
+    if (networkFilter !== "all") q = q.eq("network", networkFilter);
+
+    const { data, count, error } = await q;
+    
+    if (error) {
+      toast({ title: "Failed to fetch orders", variant: "destructive" });
+      setLoading(false);
+      return;
+    }
+
+    setTotalCount(count || 0);
+
+    // Resolve profile info for this batch
+    const agentIds = [...new Set((data || []).map((o: any) => o.agent_id))];
+    let profileMap: Record<string, AgentProfile> = { ...profiles };
+    
+    if (agentIds.length > 0) {
+      const { data: profData } = await supabase
+        .from("profiles")
+        .select("user_id, full_name, email, is_sub_agent")
+        .in("user_id", agentIds);
+      
+      (profData || []).forEach(p => {
+        profileMap[p.user_id] = p as AgentProfile;
+      });
+      setProfiles(profileMap);
+    }
+
+    const enriched: OrderRow[] = (data || []).map((o: any) => ({
       ...o,
       agent_name: profileMap[o.agent_id]?.full_name || "Unknown",
       agent_email: profileMap[o.agent_id]?.email || "",
@@ -121,10 +127,12 @@ const AdminOrders = () => {
 
     setAllOrders(enriched);
     setLoading(false);
-    setFetchProgress(0);
-  }, []);
+  }, [page, search, statusFilter, networkFilter]);
 
-  useEffect(() => { fetchOrders(); }, [fetchOrders]);
+  useEffect(() => { 
+    const timer = setTimeout(() => fetchOrders(), 300);
+    return () => clearTimeout(timer);
+  }, [fetchOrders]);
 
   const handleRetry = async (orderId: string) => {
     setRetrying(orderId);
@@ -155,24 +163,10 @@ const AdminOrders = () => {
   };
 
   // Client-side filtering
-  const filtered = allOrders.filter((o) => {
-    if (typeFilter === "agents" && o.is_sub_agent) return false;
-    if (typeFilter === "sub_agents" && !o.is_sub_agent) return false;
-    if (statusFilter !== "all" && o.status !== statusFilter) return false;
-    if (networkFilter !== "all" && o.network !== networkFilter) return false;
-    if (search) {
-      const q = search.toLowerCase();
-      return [o.id, o.customer_phone, o.network, o.status, o.agent_name, o.agent_email, o.package_size]
-        .filter(Boolean)
-        .some((v) => v!.toLowerCase().includes(q));
-    }
-    return true;
-  });
-
-  // Pagination
-  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
-  const safePage = Math.min(page, totalPages);
-  const paginated = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
+  const filtered = allOrders;
+  const paginated = allOrders;
+  const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
+  const safePage = page;
 
   // Stats from ALL loaded orders (not just current page)
   const totalRevenue = allOrders.reduce((s, o) => s + Number(o.amount || 0), 0);
@@ -182,14 +176,11 @@ const AdminOrders = () => {
   const subAgentOrders = allOrders.filter((o) => o.is_sub_agent).length;
   const uniqueNetworks = [...new Set(allOrders.map((o) => o.network).filter(Boolean))] as string[];
 
-  if (loading) return (
+  if (loading && allOrders.length === 0) return (
     <div className="flex flex-col items-center justify-center py-24 gap-4">
       <Loader2 className="w-7 h-7 animate-spin text-amber-400" />
       <div className="text-center">
-        <p className="text-white/60 text-sm font-medium">Loading all orders…</p>
-        {fetchProgress > 0 && (
-          <p className="text-white/35 text-xs mt-1">{fetchProgress.toLocaleString()} fetched so far</p>
-        )}
+        <p className="text-white/60 text-sm font-medium">Loading orders…</p>
       </div>
     </div>
   );
@@ -207,7 +198,7 @@ const AdminOrders = () => {
         <div>
           <h1 className="font-display text-2xl font-bold">All Orders</h1>
           <p className="text-sm text-muted-foreground mt-0.5">
-            Full transaction history — {allOrders.length.toLocaleString()} total orders
+            Full transaction history — {totalCount.toLocaleString()} total orders
           </p>
         </div>
         <Button variant="outline" size="sm" className="gap-2 self-start" onClick={fetchOrders}>
@@ -282,7 +273,7 @@ const AdminOrders = () => {
         </select>
 
         <span className="text-xs text-white/30 ml-auto">
-          {filtered.length.toLocaleString()} result{filtered.length !== 1 ? "s" : ""}
+          {totalCount.toLocaleString()} result{totalCount !== 1 ? "s" : ""}
         </span>
       </div>
 
@@ -442,7 +433,7 @@ const AdminOrders = () => {
         ))}
       </div>
 
-      {filtered.length === 0 && (
+      {allOrders.length === 0 && !loading && (
         <div className="py-16 text-center">
           <ShoppingCart className="w-10 h-10 text-white/10 mx-auto mb-3" />
           <p className="text-white/40 text-sm">No orders match your filters.</p>
@@ -453,7 +444,7 @@ const AdminOrders = () => {
       {totalPages > 1 && (
         <div className="flex items-center justify-between gap-4 pt-2">
           <p className="text-xs text-white/35">
-            Showing {((safePage - 1) * PAGE_SIZE) + 1}–{Math.min(safePage * PAGE_SIZE, filtered.length)} of {filtered.length.toLocaleString()}
+            Showing {((safePage - 1) * PAGE_SIZE) + 1}–{Math.min(safePage * PAGE_SIZE, totalCount)} of {totalCount.toLocaleString()}
           </p>
 
           <div className="flex items-center gap-1">

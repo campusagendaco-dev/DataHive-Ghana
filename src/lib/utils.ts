@@ -40,3 +40,35 @@ export function getNetworkCardColors(network: string): {
       };
   }
 }
+
+/**
+ * Detects the network provider based on Ghanaian phone number prefixes.
+ */
+export function detectNetwork(phone: string): "MTN" | "Telecel" | "AirtelTigo" | null {
+  const digits = phone.replace(/\D+/g, "");
+  if (digits.length < 3) return null;
+  
+  // Normalize to 10 digits if possible (e.g. 23324... -> 024...)
+  let prefix = "";
+  if (digits.startsWith("233") && digits.length >= 6) {
+    prefix = digits.slice(3, 6);
+  } else if (digits.startsWith("0") && digits.length >= 3) {
+    prefix = digits.slice(1, 3);
+  } else if (digits.length >= 2) {
+    prefix = digits.slice(0, 2);
+  }
+
+  // Prepend 0 if it's just 2 digits
+  if (prefix.length === 2) prefix = "0" + prefix;
+  else if (prefix.length === 3 && !prefix.startsWith("0")) prefix = "0" + prefix.slice(1);
+
+  const mtn = ["024", "054", "055", "059", "025", "053"];
+  const telecel = ["020", "050"];
+  const at = ["027", "057", "026", "056"];
+
+  if (mtn.some(p => prefix.startsWith(p))) return "MTN";
+  if (telecel.some(p => prefix.startsWith(p))) return "Telecel";
+  if (at.some(p => prefix.startsWith(p))) return "AirtelTigo";
+
+  return null;
+}

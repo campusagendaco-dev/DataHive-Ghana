@@ -30,6 +30,7 @@ export interface Profile {
   sub_agent_prices: Record<string, Record<string, string>>;
   referral_code: string | null;
   referred_by: string | null;
+  api_key: string | null;
 }
 
 interface AuthContextType {

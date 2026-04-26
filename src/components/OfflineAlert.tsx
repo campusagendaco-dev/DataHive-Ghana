@@ -1,5 +1,5 @@
-import { useState, useEffect } from "react";
-import { WifiOff, AlertTriangle, Wifi, CheckCircle2, X } from "lucide-react";
+import { useState, useEffect, useRef } from "react";
+import { WifiOff, AlertTriangle, CheckCircle2, X } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useConnectivity } from "@/hooks/useConnectivity";
 
@@ -7,17 +7,20 @@ export const OfflineAlert = () => {
   const { isOnline, quality } = useConnectivity();
   const [showRestored, setShowRestored] = useState(false);
   const [dismissed, setDismissed] = useState(false);
+  const prevOnline = useRef(isOnline);
 
-  // Track when we come back online to show a "Back Online" message
+  // Only show "Back Online" when transitioning from offline → online (not on first mount)
   useEffect(() => {
-    if (isOnline) {
-      if (!isOnline) return; // Logic check
+    if (!prevOnline.current && isOnline) {
       setShowRestored(true);
       const timer = setTimeout(() => setShowRestored(false), 5000);
+      prevOnline.current = true;
       return () => clearTimeout(timer);
-    } else {
+    }
+    if (!isOnline) {
       setShowRestored(false);
       setDismissed(false);
+      prevOnline.current = false;
     }
   }, [isOnline]);
 

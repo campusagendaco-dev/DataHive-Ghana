@@ -34,23 +34,50 @@ const AdminUsers = () => {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [tab, setTab] = useState<RoleTab>("all");
+  const [page, setPage] = useState(0);
+  const [hasMore, setHasMore] = useState(true);
+  const [totalCount, setTotalCount] = useState(0);
+  const PAGE_SIZE = 50;
   const [actionLoading, setActionLoading] = useState<Record<string, "reset" | "delete" | "approve-sub" | "approve-agent" | null>>({});
 
-  const fetchUsers = useCallback(async () => {
-    setLoading(true);
-    const { data } = await supabase
+  const fetchUsers = useCallback(async (isLoadMore = false) => {
+    if (!isLoadMore) {
+      setLoading(true);
+      setPage(0);
+    }
+    
+    const currentPage = isLoadMore ? page + 1 : 0;
+    const from = currentPage * PAGE_SIZE;
+    const to = from + PAGE_SIZE - 1;
+
+    let q = supabase
       .from("profiles")
-      .select("*")
-      .order("created_at", { ascending: false });
+      .select("*", { count: "exact" })
+      .order("created_at", { ascending: false })
+      .range(from, to);
 
+    if (search) {
+      q = q.or(`full_name.ilike.%${search}%,email.ilike.%${search}%,phone.ilike.%${search}%`);
+    }
+
+    if (tab === "customers") {
+      q = q.eq("is_agent", false).eq("is_sub_agent" as any, false);
+    } else if (tab === "agents") {
+      q = q.eq("is_agent", true).eq("is_sub_agent" as any, false);
+    } else if (tab === "sub-agents") {
+      q = q.eq("is_sub_agent" as any, true);
+    }
+
+    const { data, count } = await q;
     const rows = ((data as any[]) || []) as UserRow[];
+    setTotalCount(count || 0);
 
-    // Resolve parent agent names for sub-agents
-    const parentIds = [...new Set(rows.filter(r => r.parent_agent_id).map(r => r.parent_agent_id as string))];
-    if (parentIds.length > 0) {
+    const userIds = rows.map(r => r.user_id);
+    if (userIds.length > 0) {
+      const parentIds = [...new Set(rows.filter(r => r.parent_agent_id).map(r => r.parent_agent_id as string))];
       const [parentsRes, salesRes] = await Promise.all([
-        supabase.from("profiles").select("user_id, full_name").in("user_id", parentIds),
-        supabase.from("user_sales_stats").select("user_id, total_sales_volume").in("user_id", rows.map(r => r.user_id)),
+        parentIds.length > 0 ? supabase.from("profiles").select("user_id, full_name").in("user_id", parentIds) : Promise.resolve({ data: [] }),
+        supabase.from("user_sales_stats").select("user_id, total_sales_volume").in("user_id", userIds),
       ]);
       const parentMap = new Map((parentsRes.data || []).map((p: any) => [p.user_id, p.full_name]));
       const salesMap = new Map((salesRes.data || []).map((s: any) => [s.user_id, s.total_sales_volume]));
@@ -58,22 +85,18 @@ const AdminUsers = () => {
         if (r.parent_agent_id) r.parent_name = parentMap.get(r.parent_agent_id) || "Unknown";
         r.total_sales_volume = salesMap.get(r.user_id) ?? 0;
       });
-    } else {
-      const { data: sales } = await supabase
-        .from("user_sales_stats")
-        .select("user_id, total_sales_volume")
-        .in("user_id", rows.map(r => r.user_id));
-      const salesMap = new Map((sales || []).map((s: any) => [s.user_id, s.total_sales_volume]));
-      rows.forEach(r => {
-        r.total_sales_volume = salesMap.get(r.user_id) ?? 0;
-      });
     }
 
-    setUsers(rows);
+    setUsers(prev => isLoadMore ? [...prev, ...rows] : rows);
+    setHasMore(count ? (from + rows.length < count) : rows.length === PAGE_SIZE);
+    if (isLoadMore) setPage(currentPage);
     setLoading(false);
-  }, []);
+  }, [page, search, tab]);
 
-  useEffect(() => { fetchUsers(); }, [fetchUsers]);
+  useEffect(() => { 
+    const timer = setTimeout(() => fetchUsers(false), 300);
+    return () => clearTimeout(timer);
+  }, [tab, search]);
 
   const setRowAction = (userId: string, action: UserRow["is_agent"] extends boolean ? any : any) => {
     setActionLoading((prev) => ({ ...prev, [userId]: action }));
@@ -174,21 +197,13 @@ const AdminUsers = () => {
   };
 
   const tabCounts = {
-    all: users.length,
-    customers: users.filter(u => !u.is_agent && !(u as any).is_sub_agent).length,
-    agents: users.filter(u => u.is_agent && !(u as any).is_sub_agent).length,
-    "sub-agents": users.filter(u => (u as any).is_sub_agent).length,
+    all: tab === "all" ? totalCount : 0,
+    customers: tab === "customers" ? totalCount : 0,
+    agents: tab === "agents" ? totalCount : 0,
+    "sub-agents": tab === "sub-agents" ? totalCount : 0,
   };
 
-  const filtered = users.filter(u => {
-    const matchSearch = [u.full_name, u.email, u.phone, u.parent_name]
-      .filter(Boolean).some(v => v!.toLowerCase().includes(search.toLowerCase()));
-    if (!matchSearch) return false;
-    if (tab === "customers") return !u.is_agent && !(u as any).is_sub_agent;
-    if (tab === "agents") return u.is_agent && !(u as any).is_sub_agent;
-    if (tab === "sub-agents") return (u as any).is_sub_agent;
-    return true;
-  });
+  const filtered = users;
 
   if (loading) {
     return (
@@ -429,11 +444,21 @@ const AdminUsers = () => {
         ))}
       </div>
 
-      {filtered.length === 0 && (
-        <div className="p-12 text-center text-white/30 text-sm">No users found.</div>
+      {hasMore && (
+        <div className="pt-8 flex justify-center">
+          <Button
+            variant="outline"
+            onClick={() => fetchUsers(true)}
+            disabled={loading}
+            className="bg-white/5 border-white/10 text-white rounded-xl px-10 font-black tracking-widest uppercase text-xs"
+          >
+            {loading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <ChevronDown className="w-4 h-4 mr-2" />}
+            Load More Users
+          </Button>
+        </div>
       )}
 
-      <p className="text-xs text-white/30 text-center">Showing {filtered.length} of {users.length} total users</p>
+      <p className="text-xs text-white/30 text-center mt-4">Showing {users.length} of {totalCount} total users</p>
     </div>
   );
 };

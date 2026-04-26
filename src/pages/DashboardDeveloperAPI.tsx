@@ -48,8 +48,7 @@ const DashboardDeveloperAPI = () => {
     if (apiKey && !confirmRegen) { setConfirmRegen(true); return; }
     setGenerating(true);
     setConfirmRegen(false);
-    // Use the JustBuy 'jbg_' prefix
-    const newKey = `jbg_live_${crypto.randomUUID().replace(/-/g, "")}`;
+    const newKey = `swft_live_${crypto.randomUUID().replace(/-/g, "")}`;
     const { error } = await supabase
       .from("profiles")
       .update({ api_key: newKey })
@@ -77,10 +76,10 @@ const DashboardDeveloperAPI = () => {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="font-display text-2xl font-bold flex items-center gap-2">
-            <Zap className="w-6 h-6 text-sky-400" /> JustBuy Developers
+            <Zap className="w-6 h-6 text-sky-400" /> SwiftData Developers
           </h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Integrate JustBuy Ghana directly into your own applications.
+            Integrate SwiftData Ghana directly into your own applications.
           </p>
         </div>
         <Link to="/api-docs">

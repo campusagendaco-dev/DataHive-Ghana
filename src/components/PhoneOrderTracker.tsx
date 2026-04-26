@@ -3,6 +3,9 @@ import { Loader2, Search, CheckCircle2, Clock, XCircle, ShieldCheck, AlertTriang
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { useAuth } from "@/hooks/useAuth";
+import { invokePublicFunctionAsUser } from "@/lib/public-function-client";
+import { cn } from "@/lib/utils";
 
 const LOOKBACK_DAYS = 30;
 
@@ -131,6 +134,8 @@ const PhoneOrderTracker = ({
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState("");
   const [searched, setSearched] = useState(false);
+  const [retryingIds, setRetryingIds] = useState<Set<string>>(new Set());
+  const { user } = useAuth();
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
 
   const isPhoneValid = useMemo(() => {
@@ -215,6 +220,19 @@ const PhoneOrderTracker = ({
     finally { setRefreshing(false); }
   };
 
+  const handleRetry = async (orderId: string) => {
+    setRetryingIds((prev) => new Set(prev).add(orderId));
+    try {
+      await invokePublicFunctionAsUser("verify-payment", { body: { reference: orderId } });
+      // Realtime listener will update the status, but let's refresh too
+      await handleRefresh();
+    } catch {
+      // ignore
+    } finally {
+      setRetryingIds((prev) => { const n = new Set(prev); n.delete(orderId); return n; });
+    }
+  };
+
   const handleKey = (e: React.KeyboardEvent) => { if (e.key === "Enter" && isPhoneValid) handleTrack(); };
 
   return (
@@ -225,16 +243,16 @@ const PhoneOrderTracker = ({
       <div className="relative rounded-3xl border border-white/8 bg-[#0A0A0C]/80 backdrop-blur-xl overflow-hidden shadow-2xl">
         {/* Header Strip */}
         <div className="p-6 border-b border-white/5 bg-white/[0.02]">
-          <div className="flex items-center justify-between gap-4 mb-6">
-            <div className="flex items-center gap-3.5">
-              <div className="w-11 h-11 rounded-2xl bg-amber-400/10 border border-amber-400/20 flex items-center justify-center shrink-0 shadow-lg shadow-amber-400/5">
-                <Activity className="w-5 h-5 text-amber-400" />
+            <div className="flex items-center justify-between gap-3 sm:gap-4 mb-4 sm:mb-6">
+              <div className="flex items-center gap-2.5 sm:gap-3.5">
+                <div className="w-9 h-9 sm:w-11 sm:h-11 rounded-xl sm:rounded-2xl bg-amber-400/10 border border-amber-400/20 flex items-center justify-center shrink-0 shadow-lg shadow-amber-400/5">
+                  <Activity className="w-4 h-4 sm:w-5 sm:h-5 text-amber-400" />
+                </div>
+                <div>
+                  <h3 className="font-black text-base sm:text-lg tracking-tight text-white">{title}</h3>
+                  <p className="text-[10px] sm:text-xs font-medium text-white/40">{subtitle}</p>
+                </div>
               </div>
-              <div>
-                <h3 className="font-black text-lg tracking-tight text-white">{title}</h3>
-                <p className="text-xs font-medium text-white/40">{subtitle}</p>
-              </div>
-            </div>
             {searched && orders.length > 0 && (
               <button
                 onClick={handleRefresh}
@@ -286,7 +304,7 @@ const PhoneOrderTracker = ({
         )}
 
         {/* Results */}
-        <div className="p-6">
+        <div className="p-4 sm:p-6">
           {loading ? (
             <div className="space-y-3">
               {[1, 2, 3].map((i) => (
@@ -307,39 +325,60 @@ const PhoneOrderTracker = ({
                     className="group/card flex items-center gap-4 rounded-2xl border border-white/5 bg-white/[0.02] p-4 transition-all hover:bg-white/[0.04] hover:border-white/10"
                   >
                     {/* Network Badge */}
-                    <div className={`w-14 h-14 rounded-2xl ${nc.bg} ${nc.text} flex flex-col items-center justify-center shrink-0 shadow-xl shadow-black/20`}>
-                      <span className="text-[10px] font-black uppercase opacity-60 leading-none">{order.network}</span>
-                      <span className="text-sm font-black mt-0.5 leading-none">{order.package_size}</span>
+                    <div className={`w-12 h-12 sm:w-14 sm:h-14 rounded-xl sm:rounded-2xl ${nc.bg} ${nc.text} flex flex-col items-center justify-center shrink-0 shadow-xl shadow-black/20`}>
+                      <span className="text-[8px] sm:text-[10px] font-black uppercase opacity-60 leading-none">{order.network}</span>
+                      <span className="text-xs sm:text-sm font-black mt-0.5 leading-none">{order.package_size}</span>
                     </div>
 
                     {/* Order Details */}
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1">
-                        <span className="font-bold text-sm text-white/90">
-                          {order.order_type === "airtime" ? "Airtime Purchase" : order.order_type === "utility" ? "Utility Bill" : `${order.network} Bundle`}
+                      <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2 mb-1">
+                        <span className="font-bold text-[13px] sm:text-sm text-white/90 truncate">
+                          {order.order_type === "airtime" ? "Airtime" : order.order_type === "utility" ? "Utility" : `${order.network} Bundle`}
                         </span>
-                        <div className={`flex items-center gap-1.5 px-2 py-0.5 rounded-full border ${ds.bg} ${ds.border} ${ds.color} text-[10px] font-bold`}>
-                          <ds.icon className={`w-3 h-3 ${isSpinning ? "animate-spin" : ""}`} />
+                        <div className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full border ${ds.bg} ${ds.border} ${ds.color} text-[9px] sm:text-[10px] font-bold w-fit`}>
+                          <ds.icon className={`w-2.5 h-2.5 sm:w-3 h-3 ${isSpinning ? "animate-spin" : ""}`} />
                           {ds.shortLabel}
                         </div>
                       </div>
-                      <div className="flex items-center gap-2 text-[11px] text-white/30 font-medium">
+                      <div className="flex items-center gap-1.5 text-[10px] sm:text-[11px] text-white/30 font-medium">
                         <span>{date}</span>
-                        <span className="w-1 h-1 rounded-full bg-white/10" />
+                        <span className="w-0.5 h-0.5 rounded-full bg-white/10" />
                         <span>{time}</span>
                       </div>
                     </div>
 
                     {/* Pricing & Final Status */}
                     <div className="text-right shrink-0">
-                      <p className="text-base font-black text-white leading-none mb-2">
-                        <span className="text-[10px] text-white/40 font-bold mr-1">GHS</span>
+                      <p className="text-sm sm:text-base font-black text-white leading-none mb-2">
+                        <span className="text-[9px] sm:text-[10px] text-white/40 font-bold mr-0.5 sm:mr-1">GHS</span>
                         {Number(order.amount).toFixed(2)}
                       </p>
-                      <div className="flex items-center justify-end gap-1.5 opacity-60 group-hover/card:opacity-100 transition-opacity">
-                        <span className={`w-1.5 h-1.5 rounded-full bg-current ${ds.color} ${isSpinning ? "animate-pulse" : ""}`} />
-                        <span className={`text-[9px] font-black uppercase tracking-wider ${ds.color}`}>{ds.key}</span>
-                      </div>
+                      
+                      {order.status === "pending" || order.status === "paid" || (user && order.status === "fulfillment_failed") ? (
+                        <button
+                          onClick={(e) => { e.stopPropagation(); handleRetry(order.id); }}
+                          disabled={retryingIds.has(order.id)}
+                          className={cn(
+                            "flex items-center gap-1.5 ml-auto px-2 py-1 rounded-lg border text-[9px] font-black uppercase tracking-wider transition-all",
+                            order.status === "fulfillment_failed" 
+                              ? "text-red-400 border-red-500/20 bg-red-500/10 hover:bg-red-500/20"
+                              : "text-amber-400 border-amber-500/20 bg-amber-500/10 hover:bg-amber-400/20"
+                          )}
+                        >
+                          {retryingIds.has(order.id) ? (
+                            <Loader2 className="w-2.5 h-2.5 animate-spin" />
+                          ) : (
+                            <RefreshCw className="w-2.5 h-2.5" />
+                          )}
+                          {order.status === "fulfillment_failed" ? "Retry" : "Check Status"}
+                        </button>
+                      ) : (
+                        <div className="flex items-center justify-end gap-1.5 opacity-60 group-hover/card:opacity-100 transition-opacity">
+                          <span className={`w-1.5 h-1.5 rounded-full bg-current ${ds.color} ${isSpinning ? "animate-pulse" : ""}`} />
+                          <span className={`text-[9px] font-black uppercase tracking-wider ${ds.color}`}>{ds.key}</span>
+                        </div>
+                      )}
                     </div>
                   </div>
                 );

@@ -27,7 +27,8 @@ import {
   Activity,
   Star,
   MessageCircle,
-  Gift
+  Gift,
+  Send
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -64,6 +65,7 @@ const agentNavItems = [
   { to: "/dashboard/admin-support", label: "Support Inbox", icon: MessageCircle },
   { to: "/dashboard/result-checker", label: "Result Checker", icon: GraduationCap },
   { to: "/dashboard/api", label: "Developer API", icon: Key },
+  { to: "/dashboard/bulk", label: "Bulk Disbursement", icon: Send },
   { to: "/dashboard/leaderboard", label: "Agent Leaderboard", icon: Trophy },
 ];
 

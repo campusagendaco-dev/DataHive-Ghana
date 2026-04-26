@@ -20,7 +20,7 @@ const StoreVisitorPopup = ({ agentSlug, showSubAgentLink = true }: StoreVisitorP
     if (isAgent) return;
 
     supabase
-      .from("system_settings")
+      .from("public_system_settings")
       .select("store_visitor_popup_enabled")
       .eq("id", 1)
       .maybeSingle()

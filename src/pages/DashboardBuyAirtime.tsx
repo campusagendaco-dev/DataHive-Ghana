@@ -7,7 +7,7 @@ import {
   CheckCircle2, Phone, RotateCcw, ArrowRight, ShieldCheck,
   Sparkles,
 } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { cn, detectNetwork } from "@/lib/utils";
 import { MTNLogo, TelecelLogo, AirtelTigoLogo } from "@/components/BrandLogos";
 import { getFunctionErrorMessage } from "@/lib/function-errors";
 import OrderStatusBanner from "@/components/OrderStatusBanner";
@@ -71,6 +71,19 @@ const DashboardBuyAirtime = () => {
     };
     fetchBalance();
   }, [user]);
+
+  // Auto-detect network
+  useEffect(() => {
+    const detected = detectNetwork(phone);
+    if (detected && detected !== network) {
+      setNetwork(detected);
+      toast({ 
+        title: `Network set to ${detected}`, 
+        description: `We detected an ${detected} number.`,
+        duration: 2000
+      });
+    }
+  }, [phone, network, toast]);
 
   const numAmount = Number(amount);
   const canPay = !!phone.trim() && phone.length >= 10 && numAmount >= 1;
@@ -139,7 +152,7 @@ const DashboardBuyAirtime = () => {
     const reference = crypto.randomUUID();
     const { data, error } = await supabase.functions.invoke("initialize-payment", {
       body: {
-        email: user.email || `${user.id}@justbuy.gh`,
+        email: user.email || `${user.id}@swiftdataghana.com`,
         amount: numAmount,
         reference,
         callback_url: `${window.location.origin}/dashboard/buy-airtime?ref=${reference}`,

@@ -18,7 +18,7 @@ const LANG_LABELS: Record<Lang, string> = { curl: "cURL", node: "Node.js", pytho
 
 // ─── Code Snippets ────────────────────────────────────────────────────────────
 const makeSnippets = (key: string): Record<string, Record<Lang, string>> => {
-  const K = key || "jbg_live_xxxxxxxxxxxxxxxxxxxx";
+  const K = key || "swft_live_xxxxxxxxxxxxxxxxxxxx";
   return {
     balance: {
       curl: `curl -X GET "${BASE_URL}/balance" \\\n  -H "X-API-Key: ${K}"`,
@@ -28,15 +28,21 @@ const makeSnippets = (key: string): Record<string, Record<Lang, string>> => {
     },
     plans: {
       curl: `curl -X GET "${BASE_URL}/plans" \\\n  -H "X-API-Key: ${K}"`,
-      node: `const res = await fetch("${BASE_URL}/plans", {\n  headers: { "X-API-Key": "${K}" },\n});\nconst { plans } = await res.json();\nplans.forEach(p => console.log(p.package_size, p.api_price));`,
-      python: `import requests\n\nres = requests.get(\n    "${BASE_URL}/plans",\n    headers={"X-API-Key": "${K}"},\n)\nfor plan in res.json()["plans"]:\n    print(plan["package_size"], plan["api_price"])`,
-      php: `<?php\n$ch = curl_init("${BASE_URL}/plans");\ncurl_setopt_array($ch, [\n    CURLOPT_HTTPHEADER    => ["X-API-Key: ${K}"],\n    CURLOPT_RETURNTRANSFER => true,\n]);\n$data = json_decode(curl_exec($ch));\nforeach ($data->plans as $plan) {\n    echo $plan->package_size . " → GH₵" . $plan->api_price . "\\n";\n}`,
+      node: `const res = await fetch("${BASE_URL}/plans", {\n  headers: { "X-API-Key": "${K}" },\n});\nconst { plans } = await res.json();\nplans.forEach(p => console.log(p.network, p.package_size, "GH₵" + p.api_price));`,
+      python: `import requests\n\nres = requests.get(\n    "${BASE_URL}/plans",\n    headers={"X-API-Key": "${K}"},\n)\nfor plan in res.json()["plans"]:\n    print(plan["network"], plan["package_size"], plan["api_price"])`,
+      php: `<?php\n$ch = curl_init("${BASE_URL}/plans");\ncurl_setopt_array($ch, [\n    CURLOPT_HTTPHEADER    => ["X-API-Key: ${K}"],\n    CURLOPT_RETURNTRANSFER => true,\n]);\n$data = json_decode(curl_exec($ch));\nforeach ($data->plans as $plan) {\n    echo $plan->network . " " . $plan->package_size . " → GH₵" . $plan->api_price . "\\n";\n}`,
     },
     airtime: {
-      curl: `curl -X POST "${BASE_URL}/airtime" \\\n  -H "X-API-Key: ${K}" \\\n  -H "Content-Type: application/json" \\\n  -d '{\n    "networkCode": "MTN",\n    "amount": 5.00,\n    "customerNumber": "0241234567",\n    "description": "Airtime topup"\n  }'`,
-      node: `const res = await fetch("${BASE_URL}/airtime", {\n  method: "POST",\n  headers: {\n    "X-API-Key": "${K}",\n    "Content-Type": "application/json",\n  },\n  body: JSON.stringify({\n    networkCode: "MTN",\n    amount: 5.00,\n    customerNumber: "0241234567",\n    description: "Airtime topup"\n  }),\n});\n\nconst data = await res.json();\nconsole.log(data.status); // "fulfilled"`,
-      python: `import requests\n\nres = requests.post(\n    "${BASE_URL}/airtime",\n    headers={\n        "X-API-Key": "${K}",\n        "Content-Type": "application/json",\n    },\n    json={\n        "networkCode": "MTN",\n        "amount": 5.00,\n        "customerNumber": "0241234567",\n        "description": "Airtime topup"\n    },\n)\nprint(res.json())`,
-      php: `<?php\n$payload = json_encode([\n    "networkCode"    => "MTN",\n    "amount"         => 5.00,\n    "customerNumber" => "0241234567",\n    "description"    => "Airtime topup",\n]);\n$ch = curl_init("${BASE_URL}/airtime");\ncurl_setopt_array($ch, [\n    CURLOPT_POST           => true,\n    CURLOPT_POSTFIELDS     => $payload,\n    CURLOPT_HTTPHEADER     => [\n        "X-API-Key: ${K}",\n        "Content-Type: application/json",\n    ],\n    CURLOPT_RETURNTRANSFER => true,\n]);\necho curl_exec($ch);`,
+      curl: `curl -X POST "${BASE_URL}/airtime" \\\n  -H "X-API-Key: ${K}" \\\n  -H "Content-Type: application/json" \\\n  -d '{\n    "network": "MTN",\n    "amount": 5.00,\n    "phone": "0241234567",\n    "request_id": "unique_id_123"\n  }'`,
+      node: `const res = await fetch("${BASE_URL}/airtime", {\n  method: "POST",\n  headers: {\n    "X-API-Key": "${K}",\n    "Content-Type": "application/json",\n  },\n  body: JSON.stringify({\n    network: "MTN",           // MTN | TELECEL | AT | GLO\n    amount: 5.00,             // GHS amount\n    phone: "0241234567",\n    request_id: "unique_id_123",\n  }),\n});\n\nconst data = await res.json();\nconsole.log(data.status); // "fulfilled"`,
+      python: `import requests\n\nres = requests.post(\n    "${BASE_URL}/airtime",\n    headers={\n        "X-API-Key": "${K}",\n        "Content-Type": "application/json",\n    },\n    json={\n        "network": "MTN",        # MTN | TELECEL | AT | GLO\n        "amount": 5.00,\n        "phone": "0241234567",\n        "request_id": "unique_id_123",\n    },\n)\nprint(res.json())`,
+      php: `<?php\n$payload = json_encode([\n    "network"    => "MTN",\n    "amount"     => 5.00,\n    "phone"      => "0241234567",\n    "request_id" => "unique_id_123",\n]);\n$ch = curl_init("${BASE_URL}/airtime");\ncurl_setopt_array($ch, [\n    CURLOPT_POST           => true,\n    CURLOPT_POSTFIELDS     => $payload,\n    CURLOPT_HTTPHEADER     => [\n        "X-API-Key: ${K}",\n        "Content-Type: application/json",\n    ],\n    CURLOPT_RETURNTRANSFER => true,\n]);\necho curl_exec($ch);`,
+    },
+    data: {
+      curl: `curl -X POST "${BASE_URL}/airtime" \\\n  -H "X-API-Key: ${K}" \\\n  -H "Content-Type: application/json" \\\n  -d '{\n    "network": "MTN",\n    "plan_id": "5GB",\n    "phone": "0241234567",\n    "request_id": "unique_id_123"\n  }'`,
+      node: `const res = await fetch("${BASE_URL}/airtime", {\n  method: "POST",\n  headers: {\n    "X-API-Key": "${K}",\n    "Content-Type": "application/json",\n  },\n  body: JSON.stringify({\n    network: "MTN",           // MTN | TELECEL | AT | GLO\n    plan_id: "5GB",           // package size from /plans\n    phone: "0241234567",\n    request_id: "unique_id_123",\n  }),\n});\n\nconst data = await res.json();\nconsole.log(data.status); // "fulfilled"`,
+      python: `import requests\n\nres = requests.post(\n    "${BASE_URL}/airtime",\n    headers={\n        "X-API-Key": "${K}",\n        "Content-Type": "application/json",\n    },\n    json={\n        "network": "MTN",        # MTN | TELECEL | AT | GLO\n        "plan_id": "5GB",        # package size from /plans\n        "phone": "0241234567",\n        "request_id": "unique_id_123",\n    },\n)\nprint(res.json())`,
+      php: `<?php\n$payload = json_encode([\n    "network"    => "MTN",\n    "plan_id"    => "5GB",\n    "phone"      => "0241234567",\n    "request_id" => "unique_id_123",\n]);\n$ch = curl_init("${BASE_URL}/airtime");\ncurl_setopt_array($ch, [\n    CURLOPT_POST           => true,\n    CURLOPT_POSTFIELDS     => $payload,\n    CURLOPT_HTTPHEADER     => [\n        "X-API-Key: ${K}",\n        "Content-Type: application/json",\n    ],\n    CURLOPT_RETURNTRANSFER => true,\n]);\necho curl_exec($ch);`,
     },
     validate: {
       curl: `curl -X POST "${BASE_URL}/payment/bills/validate" \\\n  -H "X-API-Key: ${K}" \\\n  -H "Content-Type: application/json" \\\n  -d '{\n    "customerNumber": "8226349986",\n    "billType": "DSTV"\n  }'`,
@@ -46,7 +52,7 @@ const makeSnippets = (key: string): Record<string, Record<Lang, string>> => {
     },
     ecg: {
       curl: `curl -X POST "${BASE_URL}/ecg" \\\n  -H "X-API-Key: ${K}" \\\n  -H "Content-Type: application/json" \\\n  -d '{\n    "customerNumber": "8226349986",\n    "billType": "DSTV",\n    "amount": 41.00,\n    "senderName": "JOHN DOE"\n  }'`,
-      node: `const res = await fetch("${BASE_URL}/ecg", {\n  method: "POST",\n  headers: {\n    "X-API-Key": "${K}",\n    "Content-Type": "application/json",\n  },\n  body: JSON.stringify({\n    customerNumber: "8226349986",\n    billType: "DSTV",\n    amount: 41.00,\n    senderName: "JOHN DOE"\n  }),\n});\n\nconst data = await res.json();\nconsole.log(data.transaction_id); // "JBG_BILL_..."`,
+      node: `const res = await fetch("${BASE_URL}/ecg", {\n  method: "POST",\n  headers: {\n    "X-API-Key": "${K}",\n    "Content-Type": "application/json",\n  },\n  body: JSON.stringify({\n    customerNumber: "8226349986",\n    billType: "DSTV",\n    amount: 41.00,\n    senderName: "JOHN DOE"\n  }),\n});\n\nconst data = await res.json();\nconsole.log(data.transaction_id); // "SWFT_BILL_..."`,
       python: `import requests\n\nres = requests.post(\n    "${BASE_URL}/ecg",\n    headers={\n        "X-API-Key": "${K}",\n        "Content-Type": "application/json",\n    },\n    json={\n        "customerNumber": "8226349986",\n        "billType": "DSTV",\n        "amount": 41.00,\n        "senderName": "JOHN DOE"\n    },\n)\nprint(res.json())`,
       php: `<?php\n$payload = json_encode([\n    "customerNumber" => "8226349986",\n    "billType"       => "DSTV",\n    "amount"         => 41.00,\n    "senderName"     => "JOHN DOE",\n]);\n$ch = curl_init("${BASE_URL}/ecg");\ncurl_setopt_array($ch, [\n    CURLOPT_POST           => true,\n    CURLOPT_POSTFIELDS     => $payload,\n    CURLOPT_HTTPHEADER     => [\n        "X-API-Key: ${K}",\n        "Content-Type: application/json",\n    ],\n    CURLOPT_RETURNTRANSFER => true,\n]);\necho curl_exec($ch);`,
     }
@@ -56,11 +62,11 @@ const makeSnippets = (key: string): Record<string, Record<Lang, string>> => {
 // ─── Responses ────────────────────────────────────────────────────────────────
 const RESPONSES: Record<string, string> = {
   balance: `{\n  "success": true,\n  "balance": 50.00,\n  "currency": "GHS"\n}`,
-  account: `{\n  "success": true,\n  "name": "Your Name",\n  "balance": 50.00,\n  "apiKey": "jbg_live_...",\n  "active": true\n}`,
-  plans: `{\n  "success": true,\n  "plans": [\n    {\n      "network": "MTN",\n      "package_size": "1 GB",\n      "api_price": 5.00,\n      "is_unavailable": false\n    }\n  ]\n}`,
+  account: `{\n  "success": true,\n  "name": "Your Name",\n  "balance": 50.00,\n  "apiKey": "swft_live_...",\n  "active": true\n}`,
+  plans: `{\n  "success": true,\n  "plans": [\n    {\n      "network": "MTN",\n      "package_size": "5GB",\n      "api_price": 22.00,\n      "is_unavailable": false\n    },\n    {\n      "network": "TELECEL",\n      "package_size": "6GB",\n      "api_price": 20.00,\n      "is_unavailable": false\n    }\n  ]\n}`,
   buy_ok: `{\n  "success": true,\n  "order_id": "a3f2b1c0-...",\n  "status": "fulfilled",\n  "balance": 45.00\n}`,
   validate_ok: `{\n  "success": true,\n  "customerName": "JOHN DOE",\n  "validatedAmount": 41.00\n}`,
-  bill_ok: `{\n  "success": true,\n  "transaction_id": "JBG_BILL_1234567890",\n  "cost": 41.00,\n  "balance": 9.00\n}`,
+  bill_ok: `{\n  "success": true,\n  "transaction_id": "SWFT_BILL_1234567890",\n  "cost": 41.00,\n  "balance": 9.00\n}`,
   error_401: `{\n  "success": false,\n  "error": "Invalid API key"\n}`,
   error_402: `{\n  "success": false,\n  "error": "Insufficient balance"\n}`,
 };
@@ -160,7 +166,7 @@ const APIDocumentation = () => {
   const scrollRef = useRef<HTMLDivElement>(null);
 
   // Use the key provided by the user if available, otherwise use profile key
-  const userApiKey = "jbg_live_g436mah07m37rqruejreeedd" || profile?.api_key || null;
+  const userApiKey = profile?.api_key || null;
   const snippets = makeSnippets(userApiKey);
 
   useEffect(() => {
@@ -188,7 +194,7 @@ const APIDocumentation = () => {
           <Code2 className="w-3.5 h-3.5 text-sky-400" />
         </div>
         <div>
-          <p className="text-xs font-black text-white tracking-tight leading-none">JustBuy Devs</p>
+          <p className="text-xs font-black text-white tracking-tight leading-none">SwiftData API</p>
           <p className="text-[9px] text-white/30 uppercase tracking-widest mt-0.5">v2.0 REST</p>
         </div>
       </div>
@@ -259,10 +265,10 @@ const APIDocumentation = () => {
             <div className="flex items-start justify-between gap-4 mb-8">
               <div>
                 <div className="inline-flex items-center gap-2 px-3 py-1 bg-sky-400/10 border border-sky-400/20 rounded-full text-xs font-bold text-sky-400 mb-4">
-                  <Zap className="w-3 h-3" /> JustBuy Developers · REST API
+                  <Zap className="w-3 h-3" /> SwiftData Developers · REST API
                 </div>
                 <h1 className="text-4xl lg:text-5xl font-black tracking-tight leading-none mb-4">
-                  JustBuy Ghana<br />
+                  SwiftData Ghana<br />
                   <span className="bg-gradient-to-r from-sky-400 via-blue-400 to-sky-500 bg-clip-text text-transparent">
                     API Reference
                   </span>
@@ -336,6 +342,26 @@ const APIDocumentation = () => {
             </div>
           </section>
 
+          {/* ── List Plans ─────────────────────────────────────────────── */}
+          <section>
+            <SectionAnchor id="plans" />
+            <div className="flex items-center gap-3 mb-2">
+              <div className="w-8 h-8 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center shrink-0">
+                <List className="w-4 h-4 text-white/40" />
+              </div>
+              <h2 className="text-2xl font-black">List Data Plans</h2>
+            </div>
+            <div className="ml-11 flex flex-wrap items-center gap-3 mb-4">
+              <MethodBadge method="GET" />
+              <code className="text-white/55 text-sm font-mono bg-white/5 px-3 py-1 rounded-lg border border-white/8">/plans</code>
+            </div>
+            <p className="text-white/40 text-sm mb-6 ml-11 max-w-xl">Returns all available data packages with prices. Use the <code className="text-amber-400 bg-white/5 px-1.5 py-0.5 rounded-md">package_size</code> from this response when placing a data order.</p>
+            <div className="grid lg:grid-cols-2 gap-6 ml-11">
+              <CodeBlock code={snippets.plans[activeLang]} label="Request" />
+              <ResponseBlock code={RESPONSES.plans} label="Response · 200 OK" />
+            </div>
+          </section>
+
           {/* ── Airtime & Data ────────────────────────────────────────── */}
           <section>
             <SectionAnchor id="buy" />
@@ -345,23 +371,71 @@ const APIDocumentation = () => {
               </div>
               <h2 className="text-2xl font-black">Purchase Airtime & Data</h2>
             </div>
-            <div className="ml-11 flex flex-wrap items-center gap-3 mb-6">
+            <div className="ml-11 flex flex-wrap items-center gap-3 mb-4">
               <MethodBadge method="POST" />
               <code className="text-white/55 text-sm font-mono bg-white/5 px-3 py-1 rounded-lg border border-white/8">/airtime</code>
             </div>
-            <div className="ml-11 space-y-6">
+
+            {/* Key distinction callout */}
+            <div className="ml-11 mb-6 rounded-xl border border-amber-500/20 bg-amber-500/5 p-4 flex gap-3">
+              <Zap className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+              <div>
+                <p className="text-xs font-bold text-amber-300 mb-1.5">Same endpoint — two modes</p>
+                <ul className="text-[11px] text-white/50 space-y-1 leading-relaxed">
+                  <li><span className="text-amber-400 font-mono font-bold">Airtime</span> — send <code className="text-sky-400 bg-white/5 px-1 rounded">amount</code> (GHS). Do <em>not</em> include <code className="bg-white/5 px-1 rounded">package_size</code>.</li>
+                  <li><span className="text-emerald-400 font-mono font-bold">Data bundle</span> — send <code className="text-sky-400 bg-white/5 px-1 rounded">package_size</code> (e.g. "5GB" from <code className="bg-white/5 px-1 rounded">/plans</code>). Do <em>not</em> include <code className="bg-white/5 px-1 rounded">amount</code>.</li>
+                </ul>
+              </div>
+            </div>
+
+            <div className="ml-11 space-y-8">
+              {/* Parameters table */}
               <div className="rounded-xl border border-white/8 overflow-hidden">
                 <div className="px-4 py-2.5 bg-white/[0.03] border-b border-white/5">
                   <span className="text-[10px] font-bold uppercase tracking-widest text-white/25">Body Parameters</span>
                 </div>
+                <ParamRow name="networkCode" type="string" required desc="MTN · TELECEL · AT · GLO" />
                 <ParamRow name="customerNumber" type="string" required desc="Recipient phone number (e.g. 0241234567)" />
-                <ParamRow name="networkCode" type="string" required desc="MTN | VOD | AT | GLO" />
-                <ParamRow name="amount" type="number" required desc="Amount in GHS. Minimum 0.50" />
-                <ParamRow name="description" type="string" required={false} desc="Optional transaction note" />
+                <ParamRow name="amount" type="number" required={false} desc="GHS amount — required for airtime. Omit for data." />
+                <ParamRow name="package_size" type="string" required={false} desc="Bundle size from /plans (e.g. 5GB) — required for data. Omit for airtime." />
+                <ParamRow name="request_id" type="string" required={false} desc="Idempotency key. Resend the same ID to avoid duplicate charges." />
               </div>
-              <div className="grid lg:grid-cols-2 gap-6">
-                <CodeBlock code={snippets.airtime[activeLang]} label="Request" />
-                <ResponseBlock code={RESPONSES.buy_ok} label="Response · 201 Created" />
+
+              {/* Airtime example */}
+              <div>
+                <p className="text-xs font-black uppercase tracking-widest text-amber-400 mb-3">Airtime Purchase</p>
+                <div className="grid lg:grid-cols-2 gap-6">
+                  <CodeBlock code={snippets.airtime[activeLang]} label="Request" />
+                  <ResponseBlock code={RESPONSES.buy_ok} label="Response · 200 OK" />
+                </div>
+              </div>
+
+              {/* Data example */}
+              <div>
+                <p className="text-xs font-black uppercase tracking-widest text-emerald-400 mb-3">Data Bundle Purchase</p>
+                <div className="grid lg:grid-cols-2 gap-6">
+                  <CodeBlock code={snippets.data[activeLang]} label="Request" />
+                  <ResponseBlock code={RESPONSES.buy_ok} label="Response · 200 OK" />
+                </div>
+              </div>
+
+              {/* Network codes quick ref */}
+              <div className="rounded-xl border border-white/8 overflow-hidden">
+                <div className="px-4 py-2.5 bg-white/[0.03] border-b border-white/5">
+                  <span className="text-[10px] font-bold uppercase tracking-widest text-white/25">networkCode Reference</span>
+                </div>
+                {[
+                  { code: "MTN", name: "MTN Ghana", note: "Most popular network" },
+                  { code: "TELECEL", name: "Telecel (Vodafone)", note: "Also accepts: VOD, VODAFONE" },
+                  { code: "AT", name: "AirtelTigo", note: "Also accepts: AIRTELTIGO" },
+                  { code: "GLO", name: "Glo Ghana", note: "" },
+                ].map(({ code, name, note }) => (
+                  <div key={code} className="grid grid-cols-12 gap-2 px-4 py-3 text-xs border-b border-white/5 last:border-0 hover:bg-white/[0.02]">
+                    <div className="col-span-3 font-mono font-black text-amber-300">{code}</div>
+                    <div className="col-span-5 font-semibold text-white/70">{name}</div>
+                    <div className="col-span-4 text-white/30 italic">{note}</div>
+                  </div>
+                ))}
               </div>
             </div>
           </section>

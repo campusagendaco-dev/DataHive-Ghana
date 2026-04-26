@@ -80,7 +80,7 @@ const AdminSettings = () => {
     order_failed_sms_message: "Order for {package} to {phone} failed. GHS {amount} has been refunded to your wallet.",
     manual_credit_sms_message: "Your account has been manually credited with GHS {amount} by admin.",
     data_provider_api_key: "",
-    data_provider_base_url: "https://dev.justbuygh.com",
+    data_provider_base_url: "",
     airtime_provider_api_key: "",
   });
 
@@ -124,7 +124,7 @@ const AdminSettings = () => {
           order_failed_sms_message: data.order_failed_sms_message || "Order for {package} to {phone} failed. GHS {amount} has been refunded to your wallet.",
           manual_credit_sms_message: data.manual_credit_sms_message || "Your account has been manually credited with GHS {amount} by admin.",
           data_provider_api_key: String(data.data_provider_api_key || ""),
-          data_provider_base_url: String(data.data_provider_base_url || "https://dev.justbuygh.com"),
+          data_provider_base_url: String(data.data_provider_base_url || ""),
           airtime_provider_api_key: String(data.airtime_provider_api_key || ""),
         });
       }
@@ -554,11 +554,11 @@ const AdminSettings = () => {
               <div className="pt-4 border-t border-white/5 space-y-4">
                 <div className="flex items-center justify-between gap-2">
                   <div className="flex items-center gap-2">
-                    <Badge variant="outline" className="bg-sky-500/10 text-sky-400 border-sky-500/20">JustBuy Ghana</Badge>
+                    <Badge variant="outline" className="bg-sky-500/10 text-sky-400 border-sky-500/20">DataHive</Badge>
                     <h3 className="text-sm font-bold">Data & Airtime Provider</h3>
                   </div>
                   <a 
-                    href={settings.data_provider_base_url || "https://dev.justbuygh.com"} 
+                    href={settings.data_provider_base_url || "#"}
                     target="_blank" 
                     rel="noopener noreferrer"
                     className="text-[10px] font-black uppercase text-sky-400 hover:text-sky-300 transition-colors underline underline-offset-4"
@@ -568,11 +568,11 @@ const AdminSettings = () => {
                 </div>
                 <div className="space-y-2">
                   <Label>API Base URL</Label>
-                  <Input value={settings.data_provider_base_url} onChange={(e) => setSettings({ ...settings, data_provider_base_url: e.target.value })} placeholder="https://dev.justbuygh.com" />
+                  <Input value={settings.data_provider_base_url} onChange={(e) => setSettings({ ...settings, data_provider_base_url: e.target.value })} placeholder="https://your-provider-base-url.com" />
                 </div>
                 <div className="space-y-2">
                   <Label>Main API Key (Data)</Label>
-                  <Input type="password" value={settings.data_provider_api_key} onChange={(e) => setSettings({ ...settings, data_provider_api_key: e.target.value })} placeholder="jbg_live_..." />
+                  <Input type="password" value={settings.data_provider_api_key} onChange={(e) => setSettings({ ...settings, data_provider_api_key: e.target.value })} placeholder="api_..." />
                 </div>
                 <div className="space-y-2">
                   <Label>Airtime API Key (Optional)</Label>

@@ -107,11 +107,21 @@ const DashboardOrders = () => {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [retryingIds, setRetryingIds] = useState<Set<string>>(new Set());
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [hasMore, setHasMore] = useState(true);
+  const [page, setPage] = useState(0);
+  const PAGE_SIZE = 50;
   const retryCountRef = useRef<Record<string, number>>({});
 
-  const fetchOrders = useCallback(async () => {
+  const fetchOrders = useCallback(async (isLoadMore = false) => {
     if (!user) return;
-    setLoading(true);
+    if (!isLoadMore) {
+      setLoading(true);
+      setPage(0);
+    }
+
+    const currentPage = isLoadMore ? page + 1 : 0;
+    const from = currentPage * PAGE_SIZE;
+    const to = from + PAGE_SIZE - 1;
 
     const candidateAgentIds = Array.from(new Set([
       user.id,
@@ -119,45 +129,36 @@ const DashboardOrders = () => {
       profile?.id,
     ].filter(Boolean) as string[]));
 
-    // Batch-fetch all orders — no arbitrary limit
-    let fetched: any[] = [];
-    let from = 0;
-    let hasMore = true;
+    let q = supabase
+      .from("orders")
+      .select("*", { count: "exact" })
+      .in("agent_id", candidateAgentIds)
+      .in("status", ["pending", "paid", "processing", "fulfilled", "fulfillment_failed"])
+      .order("created_at", { ascending: false })
+      .range(from, to);
 
-    while (hasMore) {
-      let q = supabase
-        .from("orders")
-        .select("*")
-        .in("agent_id", candidateAgentIds)
-        .in("status", ["pending", "paid", "processing", "fulfilled", "fulfillment_failed"])
-        .order("created_at", { ascending: false })
-        .range(from, from + 999);
-
-      if (filter !== "all") {
-        if (filter === "data" || filter === "airtime" || filter === "utility") {
-          q = q.eq("order_type", filter);
-        } else {
-          q = q.eq("status", filter);
-        }
-      }
-
-      const { data } = await q;
-      if (!data || data.length === 0) {
-        hasMore = false;
+    if (filter !== "all") {
+      if (filter === "data" || filter === "airtime" || filter === "utility") {
+        q = q.eq("order_type", filter);
       } else {
-        fetched = [...fetched, ...data];
-        from += 1000;
-        if (data.length < 1000) hasMore = false;
+        q = q.eq("status", filter);
       }
     }
 
-    setOrders(fetched);
+    const { data, count } = await q;
+    
+    if (data) {
+      setOrders(prev => isLoadMore ? [...prev, ...data] : data);
+      setHasMore(count ? (from + data.length < count) : data.length === PAGE_SIZE);
+      if (isLoadMore) setPage(currentPage);
+    }
+    
     setLoading(false);
-  }, [filter, profile?.id, profile?.user_id, user]);
+  }, [filter, page, profile?.id, profile?.user_id, user]);
 
   useEffect(() => {
-    fetchOrders();
-  }, [fetchOrders]);
+    fetchOrders(false);
+  }, [filter, user, profile?.id]);
 
   // Live realtime updates for all current orders
   useEffect(() => {
@@ -277,12 +278,12 @@ const DashboardOrders = () => {
   );
 
   return (
-    <div className="p-6 md:p-8 max-w-5xl space-y-6">
+    <div className="p-4 sm:p-6 md:p-8 max-w-5xl space-y-4 sm:space-y-6">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="font-display text-3xl font-bold flex items-center gap-2">
-            <ClipboardList className="w-7 h-7 text-primary" /> Transactions
+          <h1 className="font-display text-2xl sm:text-3xl font-bold flex items-center gap-2">
+            <ClipboardList className="w-6 h-6 sm:w-7 sm:h-7 text-primary" /> Transactions
           </h1>
           <p className="text-muted-foreground text-sm mt-0.5">
             Live delivery status for all your orders &mdash; updates instantly.
@@ -311,29 +312,29 @@ const DashboardOrders = () => {
 
       {/* Summary stats */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <div className="rounded-xl bg-green-500/8 border border-green-500/20 px-4 py-3 text-center">
-          {loading ? <Skeleton className="h-7 w-10 mx-auto mb-1" /> : (
-            <p className="font-black text-2xl text-green-600 dark:text-green-400">{stats.delivered}</p>
+        <div className="rounded-xl bg-green-500/8 border border-green-500/20 px-3 py-2.5 sm:px-4 sm:py-3 text-center">
+          {loading ? <Skeleton className="h-6 w-8 mx-auto mb-1" /> : (
+            <p className="font-black text-xl sm:text-2xl text-green-600 dark:text-green-400">{stats.delivered}</p>
           )}
-          <p className="text-[11px] text-muted-foreground uppercase tracking-wide">Delivered</p>
+          <p className="text-[10px] sm:text-[11px] text-muted-foreground uppercase tracking-wide">Delivered</p>
         </div>
-        <div className="rounded-xl bg-blue-500/8 border border-blue-500/20 px-4 py-3 text-center">
-          {loading ? <Skeleton className="h-7 w-10 mx-auto mb-1" /> : (
-            <p className="font-black text-2xl text-blue-600 dark:text-blue-400">{stats.processing}</p>
+        <div className="rounded-xl bg-blue-500/8 border border-blue-500/20 px-3 py-2.5 sm:px-4 sm:py-3 text-center">
+          {loading ? <Skeleton className="h-6 w-8 mx-auto mb-1" /> : (
+            <p className="font-black text-xl sm:text-2xl text-blue-600 dark:text-blue-400">{stats.processing}</p>
           )}
-          <p className="text-[11px] text-muted-foreground uppercase tracking-wide">Processing</p>
+          <p className="text-[10px] sm:text-[11px] text-muted-foreground uppercase tracking-wide">Processing</p>
         </div>
-        <div className="rounded-xl bg-card border border-border px-4 py-3 text-center">
-          {loading ? <Skeleton className="h-7 w-24 mx-auto mb-1" /> : (
-            <p className="font-black text-xl text-primary">GH₵ {stats.totalSales.toFixed(2)}</p>
+        <div className="rounded-xl bg-card border border-border px-3 py-2.5 sm:px-4 sm:py-3 text-center">
+          {loading ? <Skeleton className="h-6 w-16 mx-auto mb-1" /> : (
+            <p className="font-black text-lg sm:text-xl text-primary truncate">₵{stats.totalSales.toFixed(2)}</p>
           )}
-          <p className="text-[11px] text-muted-foreground uppercase tracking-wide">Total Sales</p>
+          <p className="text-[10px] sm:text-[11px] text-muted-foreground uppercase tracking-wide">Total Sales</p>
         </div>
-        <div className="rounded-xl bg-card border border-border px-4 py-3 text-center">
-          {loading ? <Skeleton className="h-7 w-24 mx-auto mb-1" /> : (
-            <p className="font-black text-xl text-primary">GH₵ {stats.totalProfit.toFixed(2)}</p>
+        <div className="rounded-xl bg-card border border-border px-3 py-2.5 sm:px-4 sm:py-3 text-center">
+          {loading ? <Skeleton className="h-6 w-16 mx-auto mb-1" /> : (
+            <p className="font-black text-lg sm:text-xl text-primary truncate">₵{stats.totalProfit.toFixed(2)}</p>
           )}
-          <p className="text-[11px] text-muted-foreground uppercase tracking-wide">Total Profit</p>
+          <p className="text-[10px] sm:text-[11px] text-muted-foreground uppercase tracking-wide">Total Profit</p>
         </div>
       </div>
 
@@ -389,26 +390,42 @@ const DashboardOrders = () => {
                   },
                 ];
 
-              const isPendingOrPaid = order.status === "pending" || order.status === "paid";
+              const isStuck = ["pending", "paid", "processing", "fulfillment_failed"].includes(order.status);
               const isRetrying = retryingIds.has(order.id);
               const retryCount = retryCountRef.current[order.id] ?? 0;
 
               return (
                 <div key={order.id} className="rounded-xl border border-border bg-secondary/30 overflow-hidden">
                   {/* Pending payment notice bar */}
-                  {isPendingOrPaid && (
-                    <div className="flex items-center justify-between px-3 py-2 bg-amber-400/8 border-b border-amber-400/15">
-                      <span className="flex items-center gap-1.5 text-[11px] font-semibold text-amber-600 dark:text-amber-400">
-                        <Loader2 className="w-3 h-3 animate-spin" />
-                        {order.status === "paid" ? "Payment received — delivering data…" : "Awaiting payment confirmation…"}
-                        {retryCount > 0 && <span className="text-amber-400/60 ml-1">(check #{retryCount})</span>}
+                  {isStuck && (
+                    <div className={cn(
+                      "flex items-center justify-between px-3 py-2 border-b transition-colors",
+                      order.status === "fulfillment_failed" ? "bg-red-500/8 border-red-500/15" : "bg-amber-400/8 border-amber-400/15"
+                    )}>
+                      <span className={cn(
+                        "flex items-center gap-1.5 text-[10px] sm:text-[11px] font-semibold leading-tight",
+                        order.status === "fulfillment_failed" ? "text-red-600 dark:text-red-400" : "text-amber-600 dark:text-amber-400"
+                      )}>
+                        {order.status === "fulfillment_failed" ? (
+                          <><XCircle className="w-3 h-3 shrink-0" /> Failed &mdash; click retry</>
+                        ) : order.status === "paid" || order.status === "processing" ? (
+                          <><Loader2 className="w-3 h-3 shrink-0 animate-spin" /> Received &mdash; delivering…</>
+                        ) : (
+                          <><Loader2 className="w-3 h-3 shrink-0 animate-spin" /> Verifying payment…</>
+                        )}
+                        {retryCount > 0 && <span className="opacity-60 ml-0.5">(#{retryCount})</span>}
                       </span>
                       <button
                         onClick={() => retryOrder(order.id)}
                         disabled={isRetrying}
-                        className="text-[10px] font-bold text-amber-400 hover:text-amber-300 bg-amber-400/10 hover:bg-amber-400/20 border border-amber-400/20 px-2 py-1 rounded-lg transition-all disabled:opacity-50"
+                        className={cn(
+                          "text-[10px] font-bold px-2 py-1 rounded-lg transition-all disabled:opacity-50 border",
+                          order.status === "fulfillment_failed" 
+                            ? "text-red-500 hover:text-red-400 bg-red-500/10 hover:bg-red-500/20 border-red-500/20"
+                            : "text-amber-400 hover:text-amber-300 bg-amber-400/10 hover:bg-amber-400/20 border-amber-400/20"
+                        )}
                       >
-                        {isRetrying ? <Loader2 className="w-3 h-3 animate-spin" /> : "Check Now"}
+                        {isRetrying ? <Loader2 className="w-3 h-3 animate-spin" /> : order.status === "fulfillment_failed" ? "Retry Fulfillment" : "Check Status"}
                       </button>
                     </div>
                   )}
@@ -434,9 +451,9 @@ const DashboardOrders = () => {
                         <p className="text-[10px] text-purple-500 font-bold mt-0.5 leading-none">Utility</p>
                       </div>
                     ) : (
-                      <div className={`${nc.bg} ${nc.text} rounded-lg px-2.5 py-1.5 text-center shrink-0`}>
-                        <p className="font-black text-[10px] leading-none">{order.network || "—"}</p>
-                        <p className="font-black text-base leading-tight mt-0.5">{order.package_size || "—"}</p>
+                      <div className={`${nc.bg} ${nc.text} rounded-lg px-2 sm:px-2.5 py-1.5 text-center shrink-0 w-[48px] sm:w-[52px]`}>
+                        <p className="font-black text-[9px] sm:text-[10px] leading-none">{order.network || "—"}</p>
+                        <p className="font-black text-sm sm:text-base leading-tight mt-0.5">{order.package_size || "—"}</p>
                       </div>
                     )}
 
@@ -562,7 +579,22 @@ const DashboardOrders = () => {
               );
             })}
 
-            <p className="text-[10px] text-muted-foreground text-center pt-1">
+            {hasMore && (
+              <div className="pt-4 flex justify-center border-t border-border mt-4">
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={() => fetchOrders(true)} 
+                  disabled={loading}
+                  className="rounded-xl px-8 font-bold"
+                >
+                  {loading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <ChevronDown className="w-4 h-4 mr-2" />}
+                  Load More Orders
+                </Button>
+              </div>
+            )}
+
+            <p className="text-[10px] text-muted-foreground text-center pt-3">
               Showing {orders.length} order{orders.length !== 1 ? "s" : ""} &middot; Updates live
             </p>
           </div>

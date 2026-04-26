@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Wallet, ShoppingCart, TrendingUp, ArrowDownToLine, ArrowUpRight,
-  Users2, Zap, Store, ClipboardList, ChevronRight, RefreshCw, CloudOff
+  Users2, Zap, Store, ClipboardList, ChevronRight, RefreshCw, CloudOff, Gift
 } from "lucide-react";
 
 import { useAuth } from "@/hooks/useAuth";
@@ -18,6 +18,7 @@ interface DashboardStats {
   totalSalesAmount: number;
   subAgentEarnings: number;
   totalProfit: number;
+  loyaltyBalance: number;
 }
 
 const Dashboard = () => {
@@ -35,6 +36,7 @@ const Dashboard = () => {
     totalSalesAmount: 0,
     subAgentEarnings: 0,
     totalProfit: 0,
+    loyaltyBalance: 0,
   });
 
   const fetchData = async () => {
@@ -44,7 +46,7 @@ const Dashboard = () => {
     
     try {
       const [walletRes, ordersRes] = await Promise.all([
-        supabase.from("wallets").select("balance").eq("agent_id", user.id).single(),
+        supabase.from("wallets").select("balance, loyalty_balance").eq("agent_id", user.id).single(),
         supabase
           .from("orders")
           .select("amount, order_type, status, profit")
@@ -67,7 +69,15 @@ const Dashboard = () => {
       const subAgentEarnings = subAgentActivationOrders.reduce((s: number, o: any) => s + Number(o.profit || 0), 0);
       const totalProfit = allOrders.reduce((s: number, o: any) => s + Number(o.profit || 0), 0);
 
-      setStats({ walletBalance: balance, totalOrders: allOrders.length, totalDeposited, totalSalesAmount, subAgentEarnings, totalProfit });
+      setStats({ 
+        walletBalance: balance, 
+        totalOrders: allOrders.length, 
+        totalDeposited, 
+        totalSalesAmount, 
+        subAgentEarnings, 
+        totalProfit,
+        loyaltyBalance: Number(walletRes.data?.loyalty_balance || 0)
+      });
     } catch (err) {
       console.error("Dashboard fetch error:", err);
       setError(true);
@@ -115,6 +125,18 @@ const Dashboard = () => {
               ? <Skeleton className="h-10 w-44 bg-white/10" />
               : <p className="text-4xl sm:text-5xl font-black leading-none">GH₵ {stats.walletBalance.toFixed(2)}</p>}
             <p className="text-white/40 text-xs mt-2">Available to spend on data bundles</p>
+            
+            {/* Loyalty Points Display */}
+            <div 
+              onClick={() => navigate("/dashboard/wallet")}
+              className="mt-4 inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-white/10 border border-white/10 hover:bg-white/20 transition-all cursor-pointer"
+            >
+              <Gift className="w-3.5 h-3.5 text-amber-400" />
+              <span className="text-[10px] font-black uppercase tracking-widest text-white/80">
+                {stats.loyaltyBalance} SwiftPoints
+              </span>
+              <ChevronRight className="w-3 h-3 text-white/30" />
+            </div>
           </div>
           <div className="flex flex-row sm:flex-col gap-3 sm:gap-2 sm:items-end">
             <button
