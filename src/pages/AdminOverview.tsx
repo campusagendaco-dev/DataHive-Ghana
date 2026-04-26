@@ -90,7 +90,8 @@ const AdminOverview = () => {
     todaySignups: 0, 
     pendingWithdrawals: 0, 
     unreadTickets: 0,
-    totalSystemBalance: 0
+    totalSystemBalance: 0,
+    totalRangePurchase: 0
   });
   const [recentOrders, setRecentOrders] = useState<RecentOrder[]>([]);
   const [dailySales, setDailySales] = useState<DailySalesPoint[]>([]);
@@ -226,6 +227,7 @@ const AdminOverview = () => {
       unreadTickets: ticketsRes.count || 0,
       totalSystemBalance,
       todaySignups: todayUsers,
+      totalRangePurchase: rangeOrders.reduce((s: number, o: any) => s + (o.amount || 0), 0),
     });
     setRecentOrders((recentRes.data || []) as RecentOrder[]);
     if (providerRes.data?.success) {
@@ -356,7 +358,7 @@ const AdminOverview = () => {
     { title: "Today's New Users", value: todaySales.newUsers,     icon: Users,        color: "text-indigo-500",  bg: "bg-indigo-500/10",  border: "border-indigo-500/20"  },
     { title: "Pending Withdrawals", value: stats.pendingWithdrawals, icon: Wallet,   color: stats.pendingWithdrawals > 0 ? "text-red-500" : "text-emerald-500", bg: stats.pendingWithdrawals > 0 ? "bg-red-500/10" : "bg-emerald-500/10", border: stats.pendingWithdrawals > 0 ? "border-red-500/20" : "border-emerald-500/20" },
     { title: "Open Tickets",      value: stats.unreadTickets,      icon: MessageCircle, color: stats.unreadTickets > 0 ? "text-amber-500" : "text-emerald-500", bg: stats.unreadTickets > 0 ? "bg-amber-500/10" : "bg-emerald-500/10", border: stats.unreadTickets > 0 ? "border-amber-500/20" : "border-emerald-500/20" },
-    { title: "Total Purchase", value: `GH₵ ${rangeOrders.reduce((s, o) => s + (o.amount || 0), 0).toFixed(2)}`, icon: ShoppingCart, color: "text-purple-500", bg: "bg-purple-500/10", border: "border-purple-500/20" },
+    { title: "Total Purchase", value: `GH₵ ${(stats.totalRangePurchase || 0).toFixed(2)}`, icon: ShoppingCart, color: "text-purple-500", bg: "bg-purple-500/10", border: "border-purple-500/20" },
   ];
 
   // Chart axis/grid colors
