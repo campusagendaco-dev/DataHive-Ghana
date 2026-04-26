@@ -77,7 +77,6 @@ import DashboardMarketing from "./pages/DashboardMarketing";
 import DashboardUtilities from "./pages/DashboardUtilities";
 import DashboardAirtimeCash from "./pages/DashboardAirtimeCash";
 import DashboardReferral from "./pages/DashboardReferral";
-import AdminSupport from "./pages/AdminSupport";
 import { OfflineAlert } from "@/components/OfflineAlert";
 import { useRegisterSW } from "virtual:pwa-register/react";
 import DashboardBulk from "./pages/DashboardBulk";
@@ -291,7 +290,6 @@ const AppContent = () => {
           <Route path="result-checker" element={<AgentFeatureGuard><DashboardResultCheckers /></AgentFeatureGuard>} />
           <Route path="leaderboard" element={<AgentFeatureGuard><DashboardLeaderboard /></AgentFeatureGuard>} />
           <Route path="marketing" element={<AgentFeatureGuard><DashboardMarketing /></AgentFeatureGuard>} />
-          <Route path="admin-support" element={<AgentFeatureGuard><AdminSupport /></AgentFeatureGuard>} />
 
           {/* Legacy aliases */}
           <Route path="orders" element={<Navigate to="/dashboard/transactions" replace />} />
