@@ -167,22 +167,6 @@ function stripHtml(value: string): string {
   return value.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
 }
 
-async function sendPaymentSms(supabaseAdmin: any, customerPhone: string, type: "payment_success" | "order_failed" = "payment_success", vars: Record<string, string | number> = {}) {
-  try {
-    const { apiKey, senderId, templates } = await getSmsConfig(supabaseAdmin);
-    const recipient = normalizePhone(customerPhone);
-    
-    if (!apiKey || !recipient) return;
-
-    const template = templates[type] || templates.payment_success;
-    const message = formatTemplate(template, vars);
-
-    await sendSmsViaTxtConnect(apiKey, senderId, recipient, message);
-  } catch (error) {
-    console.error("sendPaymentSms error:", error);
-  }
-}
-
 async function sendWalletTopupSms(supabaseAdmin: any, userId: string, amount: number) {
   try {
     const { data: profile } = await supabaseAdmin.from("profiles").select("phone").eq("user_id", userId).maybeSingle();
@@ -873,8 +857,9 @@ serve(async (req) => {
           await supabase.rpc("credit_order_profits", { p_order_id: reference });
         }
 
-        if (customerPhone) {
-          await sendPaymentSms(supabase, customerPhone, "payment_success");
+        const afaPhone = order?.customer_phone ?? metadata.customer_phone;
+        if (afaPhone) {
+          await sendPaymentSms(supabase, String(afaPhone), "payment_success");
         }
       } else {
         await supabase.from("orders").update({

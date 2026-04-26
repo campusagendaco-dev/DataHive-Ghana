@@ -157,22 +157,6 @@ function stripHtml(value: string): string {
   return value.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
 }
 
-async function sendPaymentSms(supabaseAdmin: any, customerPhone: string, type: "payment_success" | "order_failed" = "payment_success", vars: Record<string, string | number> = {}) {
-  try {
-    const { apiKey, senderId, templates } = await getSmsConfig(supabaseAdmin);
-    const recipient = normalizePhone(customerPhone);
-    
-    if (!apiKey || !recipient) return;
-
-    const template = templates[type] || templates.payment_success;
-    const message = formatTemplate(template, vars);
-
-    await sendSmsViaTxtConnect(apiKey, senderId, recipient, message);
-  } catch (error) {
-    console.error("sendPaymentSms error:", error);
-  }
-}
-
 async function sendWalletTopupSms(supabaseAdmin: any, userId: string, amount: number) {
   try {
     const { data: profile } = await supabaseAdmin.from("profiles").select("phone").eq("user_id", userId).maybeSingle();
@@ -357,38 +341,6 @@ function amountMatches(expected: number, actual: number, tolerance = 0.01): bool
   return Math.abs(expected - actual) <= tolerance;
 }
 
-function mapNetworkKey(network: string): string {
-  const normalized = network.trim().toUpperCase();
-  if (normalized === "MTN") return "YELLO";
-  if (normalized === "TELECEL" || normalized === "VODAFONE") return "TELECEL";
-  if (normalized === "AIRTELTIGO" || normalized === "AIRTEL TIGO" || normalized === "AT") return "AT_PREMIUM";
-  return normalized;
-}
-
-function parseCapacity(packageSize: string): number {
-  const match = packageSize.replace(/\s+/g, "").match(/(\d+(?:\.\d+)?)/);
-  return match ? parseFloat(match[1]) : 0;
-}
-
-function normalizeRecipient(phone: string): string {
-  const digits = phone.replace(/\D+/g, "");
-  if (digits.length === 9) return `0${digits}`;
-  if (digits.length === 10 && digits.startsWith("0")) return digits;
-  if (digits.startsWith("233") && digits.length === 12) return `0${digits.slice(3)}`;
-  return phone.trim();
-}
-
-function buildAfaPayload(data: any) {
-  return {
-    afa_full_name: data.afa_full_name,
-    afa_ghana_card: data.afa_ghana_card,
-    afa_occupation: data.afa_occupation,
-    afa_email: data.afa_email,
-    afa_residence: data.afa_residence,
-    afa_date_of_birth: data.afa_date_of_birth,
-  };
-}
-
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -563,12 +515,13 @@ serve(async (req) => {
       await sendPaymentSms(supabase, smsPhone, "payment_success");
     }
 
+    // Declare orderType BEFORE first use to avoid temporal dead zone crash
+    const orderType = (existingOrder?.order_type || orderTypeFromMetadata || "data") as string;
+    const existingAmount = Number(existingOrder?.amount || 0);
+
     if (orderType === "wallet_topup" && existingOrder?.agent_id) {
       await sendWalletTopupSms(supabase, existingOrder.agent_id, verifiedAmount);
     }
-
-    const orderType = (existingOrder?.order_type || orderTypeFromMetadata || "data") as string;
-    const existingAmount = Number(existingOrder?.amount || 0);
 
     if (orderType !== "wallet_topup" && Number.isFinite(existingAmount) && existingAmount > 0 && !amountMatches(existingAmount, verifiedAmount)) {
       await supabase.from("orders").update({
