@@ -35,6 +35,8 @@ interface DailySalesPoint {
   Customers: number;
   Agents: number;
   "Sub-Agents": number;
+  Deposits: number;
+  Purchases: number;
 }
 
 interface TodaySales {
@@ -81,7 +83,8 @@ const AdminOverview = () => {
 
   const [stats, setStats] = useState({ 
     totalOrders: 0, 
-    totalRevenue: 0, 
+    totalRevenue: 0, // This will be Total Inflow (Deposits + Activations)
+    totalPurchases: 0, // This will be Total Consumption (Data/Airtime)
     totalUsers: 0, 
     pendingAgents: 0, 
     swiftDataSubAgentShare: 0, 
@@ -191,25 +194,36 @@ const AdminOverview = () => {
       
       // Update totals if today
       if (fullKey === todayStr) {
-        if (o.agent_id && subAgentIds.has(o.agent_id)) todaySubAgents += amt;
-        else if (o.agent_id && agentIds.has(o.agent_id)) todayAgents += amt;
-        else todayCustomers += amt;
+      if (["wallet_topup", "agent_activation", "sub_agent_activation"].includes(o.order_type)) {
+        chartMap[dateKey].Deposits += amt;
+      } else {
+        chartMap[dateKey].Purchases += amt;
       }
-
-      // Update chart data
-      if (chartMap[chartKey]) {
-        if (o.agent_id && subAgentIds.has(o.agent_id)) chartMap[chartKey]["Sub-Agents"] += amt;
-        else if (o.agent_id && agentIds.has(o.agent_id)) chartMap[chartKey].Agents += amt;
-        else chartMap[chartKey].Customers += amt;
-      }
+      if (agentIds.has(o.agent_id)) chartMap[dateKey].Agents += amt;
+      else if (subAgentIds.has(o.agent_id)) chartMap[dateKey]["Sub-Agents"] += amt;
+      else chartMap[dateKey].Customers += amt;
     });
 
     setDailySales(Object.values(chartMap));
+    
+    const todayOrders = rangeOrders.filter((o: any) => (o.created_at as string).slice(0, 10) === todayStr);
+    const todaySuccess = todayOrders.filter((o: any) => o.status === "fulfilled").length;
+    const todayFailed = todayOrders.filter((o: any) => o.status === "fulfillment_failed").length;
+    const todayPending = todayOrders.filter((o: any) => o.status === "pending").length;
+    const todayUsers = profiles.filter((p: any) => (p.created_at as string)?.slice(0, 10) === todayStr).length;
+
+    const inflowOrders = orders.filter((o: any) => o.status === "fulfilled" && ["wallet_topup", "agent_activation", "sub_agent_activation"].includes(o.order_type));
+    const purchaseOrders = orders.filter((o: any) => o.status === "fulfilled" && ["data", "airtime", "utility", "afa"].includes(o.order_type));
+
+    const totalRevenue = inflowOrders.reduce((s: number, o: any) => s + (Number(o.amount) || 0), 0);
+    const totalPurchases = purchaseOrders.reduce((s: number, o: any) => s + (Number(o.amount) || 0), 0);
+    const displayRevenue = totalRevenue > 0 ? totalRevenue : totalVolumeAllTime;
+
     setTodaySales({ 
-      total: todayCustomers + todayAgents + todaySubAgents, 
-      customers: todayCustomers, 
-      agents: todayAgents, 
-      subAgents: todaySubAgents,
+      total: todayOrders.reduce((s, o) => s + (Number(o.amount) || 0), 0),
+      customers: todayOrders.filter(o => !agentIds.has(o.agent_id) && !subAgentIds.has(o.agent_id)).reduce((s, o) => s + (Number(o.amount) || 0), 0),
+      agents: todayOrders.filter(o => agentIds.has(o.agent_id)).reduce((s, o) => s + (Number(o.amount) || 0), 0),
+      subAgents: todayOrders.filter(o => subAgentIds.has(o.agent_id)).reduce((s, o) => s + (Number(o.amount) || 0), 0),
       successCount: todaySuccess,
       failedCount: todayFailed,
       pendingCount: todayPending,
@@ -217,17 +231,18 @@ const AdminOverview = () => {
     });
     setStats({
       totalOrders: orders.length,
-      totalRevenue: totalVolumeAllTime, // Use aggregated volume instead of client-side sum
+      totalRevenue: displayRevenue,
+      totalPurchases: totalPurchases,
       totalUsers: profiles.length,
-      pendingAgents: profiles.filter((p: any) => p.is_agent && p.onboarding_complete && !p.agent_approved).length,
-      swiftDataSubAgentShare: orders.filter((o: any) => o.status === "fulfilled" && o.order_type === "sub_agent_activation").reduce((s: number, o: any) => s + (Number(o.amount || 0) * 0.5), 0),
+      pendingAgents: profiles.filter((p: any) => p.is_agent && !p.agent_approved && p.onboarding_complete).length,
+      swiftDataSubAgentShare: totalVolumeAllTime - totalAgentProfitsAllTime,
       totalAgentProfit: totalAgentProfitsAllTime,
-      totalSubAgentProfit: 0, // already included in totalAgentProfitsAllTime
+      totalSubAgentProfit: 0,
       pendingWithdrawals: withdrawalsRes.count || 0,
       unreadTickets: ticketsRes.count || 0,
       totalSystemBalance,
       todaySignups: todayUsers,
-      totalRangePurchase: rangeOrders.reduce((s: number, o: any) => s + (o.amount || 0), 0),
+      totalRangePurchase: rangeOrders.reduce((s: number, o: any) => s + (Number(o.amount) || 0), 0),
     });
     setRecentOrders((recentRes.data || []) as RecentOrder[]);
     if (providerRes.data?.success) {
@@ -261,7 +276,6 @@ const AdminOverview = () => {
             description: `Amount: GHS ${payload.new.amount}. Customer: ${payload.new.customer_phone || "Unknown"}`,
           });
         }
-        // Flash the revenue/profit cards
         setUpdatedKeys(new Set(["totalRevenue", "Agent Profits", "Platform Share"]));
         setTimeout(() => setUpdatedKeys(new Set()), 1500);
       })
@@ -276,7 +290,6 @@ const AdminOverview = () => {
       })
       .subscribe();
 
-    // Fallback refresh every 60 seconds
     const interval = setInterval(fetchData, 60_000);
 
     return () => {
@@ -284,7 +297,6 @@ const AdminOverview = () => {
       supabase.removeChannel(profilesChannel);
       clearInterval(interval);
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [timeRange]);
 
   const saveMaintenance = async () => {
@@ -332,10 +344,11 @@ const AdminOverview = () => {
   };
 
   const statCards = [
-    { title: "Total Revenue",   value: `GH₵ ${(stats.totalRevenue || 0).toFixed(2)}`,                                icon: DollarSign, color: "text-green-500",  bg: "bg-green-500/10",  border: "border-green-500/20"  },
+    { title: "Total Inflow",     value: `GH₵ ${(stats.totalRevenue || 0).toFixed(2)}`,                                icon: DollarSign, color: "text-emerald-500",  bg: "bg-emerald-500/10",  border: "border-emerald-500/20"  },
+    { title: "Data/Airtime Volume",   value: `GH₵ ${(stats.totalPurchases || 0).toFixed(2)}`,                                icon: ShoppingCart, color: "text-blue-500",  bg: "bg-blue-500/10",  border: "border-blue-500/20"  },
     { title: "Agent Profits",   value: `GH₵ ${(stats.totalAgentProfit || 0).toFixed(2)}`, icon: DollarSign, color: "text-amber-500",  bg: "bg-amber-400/10",  border: "border-amber-400/20"  },
     { title: "User Balances",   value: `GH₵ ${(stats.totalSystemBalance || 0).toFixed(2)}`,                        icon: Wallet,     color: "text-red-400",    bg: "bg-red-400/10",    border: "border-red-400/20"    },
-    { title: "Platform Share",  value: `GH₵ ${(stats.swiftDataSubAgentShare || 0).toFixed(2)}`,                      icon: Activity,   color: "text-blue-500",   bg: "bg-blue-400/10",   border: "border-blue-400/20"   },
+    { title: "Platform Share",  value: `GH₵ ${(stats.swiftDataSubAgentShare || 0).toFixed(2)}`,                      icon: Activity,   color: "text-sky-500",   bg: "bg-sky-400/10",   border: "border-sky-400/20"   },
     { title: "Active Users",    value: stats.totalUsers.toLocaleString(),                                      icon: Users,      color: "text-purple-500", bg: "bg-purple-500/10", border: "border-purple-500/20" },
     {
       title: "Pending Agents",
@@ -361,12 +374,10 @@ const AdminOverview = () => {
     { title: "Total Purchase", value: `GH₵ ${(stats.totalRangePurchase || 0).toFixed(2)}`, icon: ShoppingCart, color: "text-purple-500", bg: "bg-purple-500/10", border: "border-purple-500/20" },
   ];
 
-  // Chart axis/grid colors
   const axisColor  = isDark ? "rgba(255,255,255,0.35)" : "rgba(0,0,0,0.35)";
   const gridColor  = isDark ? "rgba(255,255,255,0.05)" : "rgba(0,0,0,0.06)";
   const legendColor= isDark ? "rgba(255,255,255,0.55)" : "rgba(0,0,0,0.55)";
 
-  // Shared card classes
   const card  = isDark ? "bg-white/[0.02] border-white/5" : "bg-white border-gray-200 shadow-sm";
   const card2 = isDark ? "bg-white/[0.03] border-white/5" : "bg-gray-50 border-gray-200";
   const muted = isDark ? "text-white/40" : "text-gray-400";
@@ -385,8 +396,6 @@ const AdminOverview = () => {
 
   return (
     <div className="space-y-8 pb-10">
-
-      {/* Page header */}
       <div className={`flex flex-col sm:flex-row sm:items-end justify-between gap-4 border-b pb-6 ${divider}`}>
         <div>
           <h1 className={`text-3xl font-black tracking-tight ${head}`}>Overview</h1>
@@ -413,10 +422,9 @@ const AdminOverview = () => {
         </Button>
       </div>
 
-      {/* Stats grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
         {statCards.map((c) => {
-          const isFlashing = updatedKeys.has(c.title) || updatedKeys.has("totalRevenue" ) && c.title === "Total Revenue";
+          const isFlashing = updatedKeys.has(c.title);
           return (
             <div
               key={c.title}
@@ -439,7 +447,6 @@ const AdminOverview = () => {
         })}
       </div>
 
-      {/* Reconciliation Alert */}
       <div className={`p-6 rounded-[2rem] border ${isDark ? "bg-[#0d0d12] border-amber-500/20 shadow-[0_20px_50px_rgba(0,0,0,0.3)]" : "bg-amber-50/50 border-amber-200"}`}>
         <div className="flex flex-col md:flex-row gap-6 items-start">
           <div className="w-12 h-12 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center shrink-0">
@@ -479,14 +486,12 @@ const AdminOverview = () => {
         </div>
       </div>
 
-      {/* Provider Diagnostics Alert */}
       {providerDiagnostics && (
         <div className={`relative group overflow-hidden rounded-3xl border transition-all duration-500 ${
           providerBalance !== null && providerBalance < 50 
             ? "bg-red-500/10 border-red-500/20 shadow-[0_8px_32px_rgba(239,68,68,0.1)]" 
             : "bg-white/[0.03] border-white/10"
         }`}>
-          {/* Ambient background glow */}
           <div className={`absolute top-0 right-0 w-64 h-64 blur-[80px] -mr-32 -mt-32 rounded-full transition-all duration-700 ${
             providerBalance !== null && providerBalance < 50 ? "bg-red-500/15" : "bg-sky-500/10"
           }`} />
@@ -549,7 +554,6 @@ const AdminOverview = () => {
         </div>
       )}
 
-      {/* Daily Sales */}
       <div className="space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
           <div>
@@ -581,7 +585,6 @@ const AdminOverview = () => {
           </div>
         </div>
 
-        {/* Today totals */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           {[
             { label: "Today Total", value: `GH₵ ${todaySales.total.toFixed(2)}`,     color: head,             bg: isDark ? "bg-white/[0.03] border-white/8" : "bg-white border-gray-200 shadow-sm" },
@@ -596,7 +599,6 @@ const AdminOverview = () => {
           ))}
         </div>
 
-        {/* Chart container */}
         <div className={`rounded-2xl border p-6 ${card}`}>
           <h3 className={`font-bold mb-1 ${head}`}>
             {timeRange === "1y" || timeRange === "all" ? "Monthly Sales Volume" : "Daily Sales Volume"}
@@ -611,9 +613,8 @@ const AdminOverview = () => {
               <YAxis tick={{ fill: axisColor, fontSize: 11 }} axisLine={false} tickLine={false} />
               <Tooltip content={(props) => <DailySalesTooltip {...props} isDark={isDark} />} />
               <Legend formatter={(v) => <span style={{ color: legendColor, fontSize: 12 }}>{v}</span>} />
-              <Bar dataKey="Customers"  stackId="a" fill="#38bdf8" radius={[0, 0, 0, 0]} />
-              <Bar dataKey="Agents"     stackId="a" fill="#f59e0b" radius={[0, 0, 0, 0]} />
-              <Bar dataKey="Sub-Agents" stackId="a" fill="#a855f7" radius={[6, 6, 0, 0]} />
+              <Bar dataKey="Deposits" name="Cash Inflow" stackId="a" fill="#10b981" radius={[0, 0, 0, 0]} />
+              <Bar dataKey="Purchases" name="Product Sales" stackId="a" fill="#3b82f6" radius={[6, 6, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </div>
