@@ -11,7 +11,7 @@ import { invokePublicFunction } from "@/lib/public-function-client";
 const benefits = [
   { icon: TrendingUp, title: "Set Your Own Profit", desc: "Set your reseller prices above our wholesale base and keep the margin." },
   { icon: Globe, title: "Your Own Website", desc: "Get a branded reseller website to sell data under your name." },
-  { icon: Users, title: "Instant Activation", desc: "Pay GHS 80 and get approved automatically — no waiting." },
+  { icon: Users, title: "Manual Approval", desc: "Pay GHS 80 and get approved by our team — usually within 1-2 hours." },
   { icon: Layers, title: "Full Dashboard", desc: "Track orders, profits, and manage your reseller business in one place." },
 ];
 
@@ -19,7 +19,7 @@ const steps = [
   "Create or sign in to your SwiftData account",
   "Click Request Approval below",
   "Pay GHS 80 activation fee via Paystack (MoMo or Card)",
-  "Your account is automatically approved after payment",
+  "Your account is reviewed and approved after payment",
   "Complete your reseller store setup",
   "Set your prices and share your store link",
   "Earn profit on every successful data purchase",
@@ -61,7 +61,7 @@ const AgentProgram = () => {
             to: "/agent/pending",
             title: "Complete Activation",
             description: "Pay GHS 80 to activate your reseller account instantly.",
-            label: "Pay & Activate",
+            label: "Pay & Request Approval",
           }
       : {
           type: "action" as const,
@@ -135,7 +135,7 @@ const AgentProgram = () => {
             Become a <span className="text-gradient">SwiftData Reseller</span>
           </h1>
           <p className="text-lg text-muted-foreground max-w-xl mx-auto">
-            Start your own data reselling business. Pay GHS 80 for instant activation, set your own prices, run a branded store, and earn from each order.
+            Start your own data reselling business. Pay GHS 80 for activation, set your own prices, run a branded store, and earn from each order after a quick manual review.
           </p>
         </div>
 

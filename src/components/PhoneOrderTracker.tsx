@@ -271,9 +271,17 @@ const PhoneOrderTracker = ({
 
         {/* Error State */}
         {error && (
-          <div className="mx-6 mt-6 flex items-center gap-3 rounded-2xl border border-red-500/20 bg-red-500/5 p-4 text-sm text-red-400 animate-in fade-in slide-in-from-top-2">
-            <AlertTriangle className="w-4 h-4 shrink-0" />
-            <span className="font-semibold">{error}</span>
+          <div className="mx-6 mt-6 relative overflow-hidden rounded-2xl border border-red-500/20 bg-red-500/[0.03] p-4 animate-in fade-in slide-in-from-top-2 duration-500">
+            <div className="absolute top-0 left-0 w-1 h-full bg-red-500" />
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-lg bg-red-500/20 flex items-center justify-center shrink-0">
+                <AlertTriangle className="w-4 h-4 text-red-500" />
+              </div>
+              <div>
+                <p className="text-[10px] font-black text-red-400 uppercase tracking-[0.2em] mb-0.5">Sync Error</p>
+                <p className="text-xs text-white/40 font-medium">{error}</p>
+              </div>
+            </div>
           </div>
         )}
 

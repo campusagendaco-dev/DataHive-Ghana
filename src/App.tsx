@@ -30,6 +30,7 @@ import DashboardProfile from "./pages/DashboardProfile";
 import DashboardSubAgentPricing from "./pages/DashboardSubAgentPricing";
 import AuthPage from "./pages/AuthPage";
 import BuyData from "./pages/BuyData";
+import BuyAirtime from "./pages/BuyAirtime";
 import AuthCallback from "./pages/AuthCallback";
 import { ThemeProvider } from "@/contexts/ThemeContext";
 import ThemeSelector from "@/components/ThemeSelector";
@@ -249,6 +250,7 @@ const AppContent = () => {
 
         {/* Public buy page — no login required */}
         <Route path="/buy-data" element={<BuyData />} />
+        <Route path="/buy-airtime" element={<BuyAirtime />} />
 
         {/* Sub agent routes */}
         <Route path="/store/:slug/sub-agent" element={<SubAgentSignup />} />
@@ -316,6 +318,7 @@ const AppContent = () => {
           <Route path="audit-logs" element={<AdminAuditLogs />} />
           <Route path="api-users" element={<AdminAPIUsers />} />
           <Route path="profits" element={<AdminProfits />} />
+          <Route path="account-settings" element={<DashboardAccountSettings />} />
         </Route>
 
         <Route path="*" element={<NotFound />} />

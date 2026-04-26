@@ -38,6 +38,7 @@ import { useConnectivity } from "@/hooks/useConnectivity";
 const userNavItems = [
   { to: "/dashboard", label: "Overview", icon: LayoutDashboard },
   { to: "/dashboard/profile", label: "My Profile", icon: User },
+  { to: "/dashboard/account-settings", label: "Account & Security", icon: UserCog },
   { to: "/dashboard/wallet", label: "Wallet", icon: Wallet },
   { to: "/dashboard/transactions", label: "Transactions", icon: ClipboardList },
   { to: "/dashboard/buy-data/mtn", label: "Buy Data - MTN", icon: ShoppingCart },
@@ -50,7 +51,6 @@ const userNavItems = [
   { to: "/dashboard/report-issue", label: "Report Issue", icon: Flag },
   { to: "/dashboard/customers", label: "Address Book", icon: Users2 },
   { to: "/dashboard/referral", label: "Referral Program", icon: Gift },
-  { to: "/dashboard/account-settings", label: "Account Settings", icon: UserCog },
 ];
 
 const agentNavItems = [

@@ -362,9 +362,30 @@ serve(async (req) => {
           });
         }
 
+        // Dynamically fetch existing columns to avoid crashing on missing columns
+        const { data: existing, error: fetchError } = await supabaseAdmin
+          .from("system_settings")
+          .select("*")
+          .limit(1)
+          .maybeSingle();
+
+        if (fetchError) throw fetchError;
+
+        // Filter settings to only include keys that exist in the DB
+        const validKeys = existing ? Object.keys(existing) : [];
+        const filteredSettings: Record<string, any> = {};
+        
+        Object.keys(settings).forEach(key => {
+          if (validKeys.includes(key)) {
+            filteredSettings[key] = settings[key];
+          } else {
+            console.warn(`Skipping unknown setting key: ${key}`);
+          }
+        });
+
         const { error: updateError } = await supabaseAdmin
           .from("system_settings")
-          .update({ ...settings })
+          .update(filteredSettings)
           .eq("id", 1);
 
         if (updateError) {
@@ -374,7 +395,10 @@ serve(async (req) => {
           });
         }
 
-        return new Response(JSON.stringify({ success: true }), {
+        return new Response(JSON.stringify({ 
+          success: true, 
+          skipped: Object.keys(settings).filter(k => !validKeys.includes(k)) 
+        }), {
           status: 200,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
@@ -489,12 +513,26 @@ serve(async (req) => {
       }
 
       case "get_provider_balance": {
-        const apiKey = Deno.env.get("DATA_PROVIDER_API_KEY") || Deno.env.get("PRIMARY_DATA_PROVIDER_API_KEY") || "";
-        const baseUrl = (Deno.env.get("DATA_PROVIDER_BASE_URL") || Deno.env.get("PRIMARY_DATA_PROVIDER_BASE_URL") || "").replace(/\/+$/, "");
+        // Fetch from DB if available
+        const { data: dbSettings } = await supabaseAdmin.from("system_settings").select("*").eq("id", 1).maybeSingle();
         
+        const apiKey = Deno.env.get("DATA_PROVIDER_API_KEY") || Deno.env.get("PRIMARY_DATA_PROVIDER_API_KEY") || dbSettings?.data_provider_api_key || "";
+        const baseUrl = (Deno.env.get("DATA_PROVIDER_BASE_URL") || Deno.env.get("PRIMARY_DATA_PROVIDER_BASE_URL") || dbSettings?.data_provider_base_url || "https://dev.justbuygh.com").replace(/\/+$/, "");
+        
+        const airtimeKey = Deno.env.get("AIRTIME_PROVIDER_API_KEY") || dbSettings?.airtime_provider_api_key || apiKey;
+        
+        const mask = (key: string) => key ? `${key.slice(0, 8)}...${key.slice(-4)}` : "not set";
+
         if (!apiKey || !baseUrl) {
-          return new Response(JSON.stringify({ error: "Provider not configured" }), {
-            status: 400,
+          return new Response(JSON.stringify({ 
+            error: "Provider not configured",
+            diagnostics: {
+              DATA_PROVIDER_API_KEY: mask(Deno.env.get("DATA_PROVIDER_API_KEY") || ""),
+              PRIMARY_DATA_PROVIDER_API_KEY: mask(Deno.env.get("PRIMARY_DATA_PROVIDER_API_KEY") || ""),
+              baseUrl: baseUrl || "not set"
+            }
+          }), {
+            status: 200,
             headers: { ...corsHeaders, "Content-Type": "application/json" },
           });
         }
@@ -523,7 +561,18 @@ serve(async (req) => {
                 const data = JSON.parse(text);
                 const balance = data.balance ?? data.data?.balance ?? data.wallet_balance;
                 if (balance !== undefined) {
-                  return new Response(JSON.stringify({ success: true, balance: Number(balance) }), {
+                  return new Response(JSON.stringify({ 
+                    success: true, 
+                    balance: Number(balance),
+                    diagnostics: {
+                      DATA_PROVIDER_API_KEY: mask(Deno.env.get("DATA_PROVIDER_API_KEY") || ""),
+                      PRIMARY_DATA_PROVIDER_API_KEY: mask(Deno.env.get("PRIMARY_DATA_PROVIDER_API_KEY") || ""),
+                      AIRTIME_PROVIDER_API_KEY: mask(Deno.env.get("AIRTIME_PROVIDER_API_KEY") || ""),
+                      baseUrl: baseUrl,
+                      activeKey: mask(apiKey),
+                      activeAirtimeKey: mask(airtimeKey)
+                    }
+                  }), {
                     status: 200,
                     headers: { ...corsHeaders, "Content-Type": "application/json" },
                   });

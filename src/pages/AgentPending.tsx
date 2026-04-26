@@ -1,11 +1,12 @@
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
-import { CreditCard, Clock, CheckCircle, LogOut, Loader2 } from "lucide-react";
+import { CreditCard, Clock, CheckCircle, LogOut, Loader2, RefreshCw } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { getAppBaseUrl } from "@/lib/app-base-url";
 import { invokePublicFunction, invokePublicFunctionAsUser } from "@/lib/public-function-client";
+import { supabase } from "@/integrations/supabase/client";
 
 const ACTIVATION_FEE = 80;
 const PAYSTACK_FEE_RATE = 0.03;
@@ -19,7 +20,24 @@ const AgentPending = () => {
   const { toast } = useToast();
   const [paying, setPaying] = useState(false);
   const [verifying, setVerifying] = useState(false);
+  const [hasPaid, setHasPaid] = useState(false);
   const approvedButSetupIncomplete = Boolean(profile?.agent_approved && !profile?.onboarding_complete);
+
+  useEffect(() => {
+    if (!user) return;
+    const checkPaid = async () => {
+      const { data } = await supabase
+        .from("orders")
+        .select("status")
+        .eq("agent_id", user.id)
+        .eq("order_type", "agent_activation")
+        .in("status", ["paid", "fulfilled"])
+        .maybeSingle();
+      
+      if (data) setHasPaid(true);
+    };
+    checkPaid();
+  }, [user]);
 
   // Auto-verify on return from Paystack
   useEffect(() => {
@@ -97,38 +115,57 @@ const AgentPending = () => {
         <p className="text-muted-foreground mb-8">
           {approvedButSetupIncomplete
             ? "Your reseller request is approved. Click check status to continue with setup."
-            : `Pay a one-time activation fee of GHS ${ACTIVATION_FEE} + GHS ${paystackFee.toFixed(2)} transaction fee (Total: GHS ${ACTIVATION_TOTAL.toFixed(2)}) to activate your reseller account instantly.`}
+            : hasPaid 
+              ? "Your activation payment has been received! We are now reviewing your store details. You will be notified once approved."
+              : `Pay a one-time activation fee of GHS ${ACTIVATION_FEE} + GHS ${paystackFee.toFixed(2)} transaction fee (Total: GHS ${ACTIVATION_TOTAL.toFixed(2)}) to activate your reseller account instantly.`}
         </p>
 
         {!approvedButSetupIncomplete && (
           <div className="bg-card border border-border rounded-2xl p-6 mb-6 glow-yellow">
-            <div className="text-sm text-left space-y-3 mb-6">
-              <div className="flex items-center gap-3 p-3 rounded-xl bg-primary/5 border border-primary/10">
-                <CreditCard className="w-5 h-5 text-primary flex-shrink-0" />
-                <div>
-                  <p className="font-semibold text-foreground">Activation Fee: GHS {ACTIVATION_FEE}</p>
-                  <p className="text-xs text-muted-foreground">+ GHS {paystackFee.toFixed(2)} Paystack fee = GHS {ACTIVATION_TOTAL.toFixed(2)} total</p>
-                  <p className="text-xs text-muted-foreground">One-time payment via Paystack (MoMo or Card)</p>
+            {hasPaid ? (
+              <div className="py-4 space-y-4">
+                <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mx-auto">
+                  <Clock className="w-8 h-8 text-primary animate-pulse" />
                 </div>
+                <div className="space-y-1">
+                  <p className="font-bold text-foreground">Awaiting Admin Approval</p>
+                  <p className="text-xs text-muted-foreground">Your payment was successful. Our team usually approves accounts within 1-2 hours.</p>
+                </div>
+                <Button variant="outline" onClick={refreshProfile} className="w-full mt-2">
+                  <RefreshCw className="w-4 h-4 mr-2" /> Refresh Status
+                </Button>
               </div>
-              <p className="text-muted-foreground text-xs">
-                After payment, your account will be automatically approved and you can start setting up your reseller store.
-              </p>
-            </div>
-            <Button
-              size="lg"
-              className="w-full"
-              onClick={handlePayActivation}
-              disabled={paying || verifying}
-            >
-              {paying ? (
-                <><Loader2 className="w-5 h-5 mr-2 animate-spin" /> Processing...</>
-              ) : verifying ? (
-                <><Loader2 className="w-5 h-5 mr-2 animate-spin" /> Verifying...</>
-              ) : (
-                <><CreditCard className="w-5 h-5 mr-2" /> Pay GHS {ACTIVATION_TOTAL.toFixed(2)} to Activate</>
-              )}
-            </Button>
+            ) : (
+              <>
+                <div className="text-sm text-left space-y-3 mb-6">
+                  <div className="flex items-center gap-3 p-3 rounded-xl bg-primary/5 border border-primary/10">
+                    <CreditCard className="w-5 h-5 text-primary flex-shrink-0" />
+                    <div>
+                      <p className="font-semibold text-foreground">Activation Fee: GHS {ACTIVATION_FEE}</p>
+                      <p className="text-xs text-muted-foreground">+ GHS {paystackFee.toFixed(2)} Paystack fee = GHS {ACTIVATION_TOTAL.toFixed(2)} total</p>
+                      <p className="text-xs text-muted-foreground">One-time payment via Paystack (MoMo or Card)</p>
+                    </div>
+                  </div>
+                  <p className="text-muted-foreground text-xs">
+                    After payment, our team will review and approve your account so you can start setting up your reseller store.
+                  </p>
+                </div>
+                <Button
+                  size="lg"
+                  className="w-full"
+                  onClick={handlePayActivation}
+                  disabled={paying || verifying}
+                >
+                  {paying ? (
+                    <><Loader2 className="w-5 h-5 mr-2 animate-spin" /> Processing...</>
+                  ) : verifying ? (
+                    <><Loader2 className="w-5 h-5 mr-2 animate-spin" /> Verifying...</>
+                  ) : (
+                    <><CreditCard className="w-5 h-5 mr-2" /> Pay GHS {ACTIVATION_TOTAL.toFixed(2)} to Activate</>
+                  )}
+                </Button>
+              </>
+            )}
           </div>
         )}
 

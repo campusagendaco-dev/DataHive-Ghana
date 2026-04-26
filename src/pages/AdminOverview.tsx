@@ -79,6 +79,7 @@ const AdminOverview = () => {
   const [dailySales, setDailySales] = useState<DailySalesPoint[]>([]);
   const [todaySales, setTodaySales] = useState<TodaySales>({ total: 0, customers: 0, agents: 0, subAgents: 0 });
   const [providerBalance, setProviderBalance] = useState<number | null>(null);
+  const [providerDiagnostics, setProviderDiagnostics] = useState<any>(null);
   const [timeRange, setTimeRange] = useState<"7d" | "30d" | "1y" | "all">("7d");
   const [maintenanceEnabled, setMaintenanceEnabled] = useState(false);
   const [maintenanceMessage, setMaintenanceMessage] = useState("We are performing scheduled maintenance. Please check back soon.");
@@ -105,7 +106,7 @@ const AdminOverview = () => {
       supabase.functions.invoke("maintenance-mode", { body: { action: "get" } }),
       supabase.from("orders").select("id, network, package_size, customer_phone, amount, status, created_at").order("created_at", { ascending: false }).limit(8),
       supabase.from("orders").select("id, amount, agent_id, created_at").gte("created_at", startDate.toISOString()).eq("status", "fulfilled"),
-      supabase.functions.invoke("admin-user-actions", { body: { action: "get_provider_balance" } }),
+      supabase.functions.invoke("admin-user-actions", { body: { action: "get_provider_balance" } }).catch(e => ({ data: { success: false, error: e.message }, error: e })),
     ]);
 
     const orders = ordersRes.data || [];
@@ -174,7 +175,12 @@ const AdminOverview = () => {
       totalSubAgentProfit: orders.filter((o: any) => o.status === "fulfilled").reduce((s: number, o: any) => s + Number(o.parent_profit || 0), 0),
     });
     setRecentOrders((recentRes.data || []) as RecentOrder[]);
-    if (providerRes.data?.success) setProviderBalance(providerRes.data.balance);
+    if (providerRes.data?.success) {
+      setProviderBalance(providerRes.data.balance);
+      setProviderDiagnostics(providerRes.data.diagnostics);
+    } else if (providerRes.data?.diagnostics) {
+      setProviderDiagnostics(providerRes.data.diagnostics);
+    }
 
     if (maintenanceError) {
       setMaintenanceTableReady(false);
@@ -370,6 +376,76 @@ const AdminOverview = () => {
           );
         })}
       </div>
+
+      {/* Provider Diagnostics Alert */}
+      {providerDiagnostics && (
+        <div className={`relative group overflow-hidden rounded-3xl border transition-all duration-500 ${
+          providerBalance !== null && providerBalance < 50 
+            ? "bg-red-500/10 border-red-500/20 shadow-[0_8px_32px_rgba(239,68,68,0.1)]" 
+            : "bg-white/[0.03] border-white/10"
+        }`}>
+          {/* Ambient background glow */}
+          <div className={`absolute top-0 right-0 w-64 h-64 blur-[80px] -mr-32 -mt-32 rounded-full transition-all duration-700 ${
+            providerBalance !== null && providerBalance < 50 ? "bg-red-500/15" : "bg-sky-500/10"
+          }`} />
+
+          <div className="relative z-10 p-5 flex flex-col md:flex-row md:items-center justify-between gap-6">
+            <div className="flex items-center gap-4">
+              <div className={`w-14 h-14 rounded-2xl flex items-center justify-center border shadow-inner transition-transform group-hover:scale-110 ${
+                providerBalance !== null && providerBalance < 50 
+                  ? "bg-red-500/20 border-red-500/30 text-red-500" 
+                  : "bg-sky-500/10 border-sky-500/20 text-sky-500"
+              }`}>
+                <Activity className="w-7 h-7" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h3 className={`font-black text-lg tracking-tight ${isDark ? "text-white" : "text-gray-900"}`}>Provider Health</h3>
+                  <span className={`w-2 h-2 rounded-full animate-pulse ${providerBalance !== null && providerBalance < 50 ? "bg-red-500" : "bg-emerald-500"}`} />
+                  {providerBalance !== null && providerBalance < 50 && (
+                    <a 
+                      href={providerDiagnostics.baseUrl} 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="ml-2 px-2 py-0.5 rounded-md bg-red-500 text-white text-[10px] font-black uppercase tracking-tighter hover:bg-red-600 transition-colors"
+                    >
+                      Top Up Now
+                    </a>
+                  )}
+                </div>
+                <div className="flex items-center gap-2 mt-0.5">
+                  <Badge variant="outline" className={`text-[10px] font-black tracking-widest px-2 py-0.5 uppercase border ${
+                    isDark ? "border-white/10 bg-white/5 text-white/40" : "border-gray-200 bg-gray-50 text-gray-400"
+                  }`}>
+                    {providerDiagnostics.baseUrl.replace(/https?:\/\//, "")}
+                  </Badge>
+                  {providerBalance !== null && (
+                    <span className={`text-[10px] font-bold ${providerBalance < 50 ? "text-red-500" : "text-emerald-500"}`}>
+                      {providerBalance < 50 ? "⚠️ Critical Balance" : "✓ Active"}
+                    </span>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-3">
+              {[
+                { label: "Data API",    value: providerDiagnostics.activeKey },
+                { label: "Airtime API", value: providerDiagnostics.activeAirtimeKey },
+              ].map(d => (
+                <div key={d.label} className={`px-4 py-3 rounded-2xl border transition-all ${
+                  isDark ? "bg-black/40 border-white/5 hover:border-white/10" : "bg-white border-gray-100 hover:border-gray-200"
+                }`}>
+                  <p className={`text-[9px] uppercase font-black tracking-widest mb-1 ${isDark ? "text-white/20" : "text-gray-400"}`}>{d.label}</p>
+                  <p className={`text-xs font-mono font-bold ${isDark ? "text-white/70" : "text-gray-700"}`}>
+                    {d.value}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Daily Sales */}
       <div className="space-y-4">

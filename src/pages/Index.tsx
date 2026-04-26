@@ -265,23 +265,20 @@ const Index = () => {
           </p>
 
           {/* CTA buttons */}
-          <div
-            className="flex flex-col sm:flex-row gap-3 justify-center mb-12"
-            style={{ animation: "fade-in 0.6s cubic-bezier(0.22,1,0.36,1) 0.3s both" }}
-          >
-            <Link
-              to="/buy-data"
-              className="inline-flex items-center justify-center gap-2.5 rounded-2xl bg-amber-400 hover:bg-amber-300 text-black font-black text-base px-10 py-4 transition-all duration-200 hover:scale-[1.02] active:scale-[0.98] shadow-xl shadow-amber-400/20"
-            >
-              Buy Data Now <ArrowRight className="w-5 h-5" />
-            </Link>
-            <Link
-              to="/agent-program"
-              className="inline-flex items-center justify-center gap-2 rounded-2xl border border-gray-200 dark:border-white/10 hover:border-gray-300 dark:hover:border-white/20 hover:bg-gray-100 dark:hover:bg-white/5 text-gray-600 dark:text-white/60 hover:text-gray-900 dark:hover:text-white font-semibold text-base px-8 py-4 transition-all duration-200"
-            >
-              Start Selling Data
-            </Link>
-          </div>
+            <div className="flex flex-col sm:flex-row gap-3 justify-center mb-12">
+              <Link
+                to="/buy-data"
+                className="inline-flex items-center justify-center gap-2.5 rounded-2xl bg-amber-400 hover:bg-amber-300 text-black font-black text-base px-8 py-4 transition-all duration-200 hover:scale-[1.02] active:scale-[0.98] shadow-xl shadow-amber-400/20"
+              >
+                Buy Data <ArrowRight className="w-5 h-5" />
+              </Link>
+              <Link
+                to="/agent-program"
+                className="inline-flex items-center justify-center gap-2 rounded-2xl border border-gray-200 dark:border-white/10 hover:border-gray-300 dark:hover:border-white/20 hover:bg-gray-100 dark:hover:bg-white/5 text-gray-600 dark:text-white/60 hover:text-gray-900 dark:hover:text-white font-semibold text-base px-8 py-4 transition-all duration-200"
+              >
+                Start Selling
+              </Link>
+            </div>
 
           {/* Trust pills */}
           <div

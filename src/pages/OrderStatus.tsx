@@ -206,30 +206,48 @@ const OrderStatus = () => {
               {/* Progress Stepper */}
               <div className="p-8">
                 {failed ? (
-                  <div className="space-y-4 rounded-2xl border border-red-500/20 bg-red-500/5 p-5 animate-in zoom-in-95 duration-300">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-xl bg-red-500/20 flex items-center justify-center shrink-0">
-                        <XCircle className="w-5 h-5 text-red-500" />
+                  <div className="relative overflow-hidden rounded-[2.5rem] border border-red-500/20 bg-red-500/[0.03] backdrop-blur-xl p-8 animate-in zoom-in-95 duration-500">
+                    {/* Background decoration */}
+                    <div className="absolute top-0 right-0 w-32 h-32 bg-red-500/10 blur-[50px] -mr-16 -mt-16 rounded-full" />
+                    
+                    <div className="relative flex flex-col items-center text-center gap-6">
+                      <div className="w-20 h-20 rounded-[2rem] bg-red-500/20 border border-red-500/30 flex items-center justify-center shadow-2xl shadow-red-500/20">
+                        <XCircle className="w-10 h-10 text-red-500" />
                       </div>
-                      <div>
-                        <p className="font-black text-sm text-red-400">Delivery Interrupted</p>
-                        <p className="text-[11px] text-white/40">We encountered an issue with the carrier.</p>
+                      
+                      <div className="space-y-2">
+                        <h3 className="font-black text-2xl tracking-tight text-white">Delivery Interrupted</h3>
+                        <p className="text-sm text-white/40 font-medium">We encountered a temporary issue with the carrier network.</p>
                       </div>
-                    </div>
-                    <div className="pt-4 border-t border-red-500/10 space-y-3">
-                      <p className="text-xs text-white/60 leading-relaxed">
-                        Don't worry — your payment is safe. Our team has been notified. Please contact support with this reference:
-                        <code className="block mt-2 font-mono text-amber-500 bg-black/40 p-2 rounded-lg border border-white/5">{reference}</code>
-                      </p>
-                      <button
-                        onClick={copyReceipt}
-                        className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-bold border transition-all duration-150"
-                        style={copied
-                          ? { background: "rgba(34,197,94,0.12)", borderColor: "rgba(34,197,94,0.30)", color: "rgb(74,222,128)" }
-                          : { background: "rgba(255,255,255,0.05)", borderColor: "rgba(255,255,255,0.10)", color: "rgba(255,255,255,0.55)" }}
-                      >
-                        {copied ? <><Check className="w-3.5 h-3.5" /> Receipt Copied!</> : <><Copy className="w-3.5 h-3.5" /> Copy Receipt</>}
-                      </button>
+
+                      <div className="w-full space-y-4 pt-4 border-t border-white/5">
+                        <div className="space-y-1.5">
+                          <p className="text-[10px] font-black uppercase tracking-[0.2em] text-white/20">Transaction Reference</p>
+                          <div className="relative group/ref">
+                            <code className="block w-full font-mono text-sm text-amber-400 bg-black/40 p-4 rounded-2xl border border-white/5 tracking-wider">
+                              {reference}
+                            </code>
+                            <button 
+                              onClick={copyReceipt}
+                              className="absolute right-3 top-1/2 -translate-y-1/2 p-2 rounded-lg bg-white/5 hover:bg-white/10 border border-white/5 transition-all"
+                            >
+                              {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5 text-white/30" />}
+                            </button>
+                          </div>
+                        </div>
+
+                        <div className="flex flex-col gap-3">
+                          <Button 
+                            asChild 
+                            className="w-full h-12 rounded-2xl bg-white/5 hover:bg-white/10 border border-white/10 text-white font-bold"
+                          >
+                            <a href="https://wa.me/233540000000" target="_blank" rel="noreferrer">
+                              Contact Support
+                            </a>
+                          </Button>
+                          <p className="text-[10px] text-white/20 font-bold uppercase tracking-widest">Don't worry, your payment is safe.</p>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 ) : (

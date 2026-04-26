@@ -53,21 +53,27 @@ function buildProviderUrls(baseUrl: string, aliases: string[]): string[] {
   return Array.from(urls);
 }
 
-function getAirtimeCredentials(): { apiKey: string; directUrl: string; baseUrl: string } {
+async function getAirtimeCredentials(supabaseAdmin: any): Promise<{ apiKey: string; directUrl: string; baseUrl: string }> {
+  // Try fetching from DB first
+  const { data: dbSettings } = await supabaseAdmin.from("system_settings").select("*").eq("id", 1).maybeSingle();
+
   const directUrl = getFirstEnvValue(["AIRTIME_PROVIDER_URL", "AIRTIME_API_URL"]).replace(/\/+$/, "");
+  
   const apiKey = getFirstEnvValue([
     "AIRTIME_PROVIDER_API_KEY",
     "PRIMARY_DATA_PROVIDER_API_KEY",
     "DATA_PROVIDER_API_KEY",
     "DATA_PROVIDER_PRIMARY_API_KEY",
-  ]);
+  ]) || dbSettings?.airtime_provider_api_key || dbSettings?.data_provider_api_key || "";
+  
   const baseUrl = getFirstEnvValue([
     "AIRTIME_PROVIDER_BASE_URL",
     "PRIMARY_DATA_PROVIDER_BASE_URL",
     "DATA_PROVIDER_BASE_URL",
     "DATA_PROVIDER_PRIMARY_BASE_URL",
-  ]).replace(/\/+$/, "");
-  return { apiKey, directUrl, baseUrl };
+  ]) || dbSettings?.data_provider_base_url || "";
+  
+  return { apiKey, directUrl, baseUrl: baseUrl.replace(/\/+$/, "") };
 }
 
 function isHtmlResponse(contentType: string | null, body: string): boolean {
@@ -91,11 +97,11 @@ function getProviderFailureReason(status: number, body: string, contentType: str
   }
 }
 
-function mapNetworkKey(network: string): string {
+function mapNetworkKey(network: string, variant: number = 0): string {
   const n = network.trim().toUpperCase();
-  if (n === "MTN" || n === "YELLO") return "YELLO";
-  if (n === "VOD" || n === "VODAFONE" || n === "TELECEL") return "TELECEL";
-  if (n === "AT" || n === "AIRTELTIGO" || n === "AIRTEL TIGO") return "AT_PREMIUM";
+  if (n === "MTN" || n === "YELLO") return variant === 0 ? "MTN" : "MTN-GH";
+  if (n === "VOD" || n === "VODAFONE" || n === "TELECEL") return variant === 0 ? "TELECEL" : "VODAFONE";
+  if (n === "AT" || n === "AIRTELTIGO" || n === "AIRTEL TIGO") return variant === 0 ? "AIRTELTIGO" : "AIRTEL-TIGO";
   if (n === "GLO") return "GLO";
   return n;
 }
@@ -197,7 +203,7 @@ serve(async (req) => {
       status: "paid",
     });
 
-    const { apiKey, directUrl, baseUrl } = getAirtimeCredentials();
+    const { apiKey, directUrl, baseUrl } = await getAirtimeCredentials(supabaseAdmin);
     if (!apiKey || (!directUrl && !baseUrl)) {
       // No provider configured — mock success
       await supabaseAdmin.from("orders").update({ status: "fulfilled", failure_reason: "Mock fulfillment (provider not configured)" }).eq("id", orderId);
@@ -205,22 +211,18 @@ serve(async (req) => {
     }
 
     // Same provider endpoint as data — try all variations for maximum reliability
-    const AIRTIME_ALIASES = ["purchase", "order", "airtime", "buy"];
+    const AIRTIME_ALIASES = ["purchase", "order", "airtime", "buy", "topup", "recharge"];
     const urls = buildProviderUrls(directUrl || baseUrl, AIRTIME_ALIASES);
 
     try {
       const networkKey = mapNetworkKey(network);
       const recipient = normalizeRecipient(phone);
+      
       const airtimePayload = {
-        networkRaw: network,
-        networkKey,
-        networkCode: networkKey,
-        recipient,
         customerNumber: recipient,
-        capacity: amount,
-        amount,
-        description: `Airtime: GHS ${amount} for ${recipient}`,
-        order_type: "airtime"
+        amount: amount,
+        networkCode: networkKey,
+        description: `Airtime topup: GHS ${amount} for ${recipient}`
       };
 
       let lastError = "All provider endpoints failed (404 or connection error). Check AIRTIME_PROVIDER_URL.";
@@ -233,7 +235,7 @@ serve(async (req) => {
               "Content-Type": "application/json",
               "Accept": "application/json",
               "X-API-Key": apiKey,
-              "Authorization": `Bearer ${apiKey}`, // Added for extra compatibility
+              "Authorization": `Bearer ${apiKey}`,
             },
             body: JSON.stringify(airtimePayload),
           });
@@ -292,8 +294,39 @@ serve(async (req) => {
       }).eq("id", orderId);
       
       await supabaseAdmin.rpc("credit_wallet", { p_agent_id: user.id, p_amount: amount });
+      
+      let finalError = `Fulfillment failed: ${err.message}. Refunded.`;
+      const isInsufficient = err.message.toLowerCase().includes("insufficient") || err.message.toLowerCase().includes("balance");
+      
+      let currentBalance = "Unknown";
+      if (isInsufficient) {
+        // Try to fetch current balance to show in error
+        try {
+          const balanceUrls = buildProviderUrls(directUrl || baseUrl, ["balance"]);
+          for (const bUrl of balanceUrls) {
+            const bRes = await fetch(bUrl, { headers: { "X-API-Key": apiKey, "Authorization": `Bearer ${apiKey}` } });
+            if (bRes.ok) {
+              const bData = await bRes.json();
+              const bal = bData.balance ?? bData.data?.balance ?? bData.wallet_balance;
+              if (bal !== undefined) {
+                currentBalance = `GH₵ ${bal}`;
+                break;
+              }
+            }
+          }
+        } catch { /* ignore balance fetch error */ }
+
+        finalError = `Provider balance is insufficient (Current: ${currentBalance}). Please top up your provider wallet in Admin Settings. Your agent wallet has been refunded.`;
+      }
+
       return new Response(JSON.stringify({ 
-        error: `Fulfillment failed: ${err.message}. Refunded.`
+        error: finalError,
+        diagnostics: {
+          provider_error: err.message,
+          attempted_urls: urls,
+          api_key_used: apiKey ? `${apiKey.slice(0, 8)}...` : "missing",
+          network_mapped: mapNetworkKey(network)
+        }
       }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
   } catch (error) {

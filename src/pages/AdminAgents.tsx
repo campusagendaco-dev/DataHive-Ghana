@@ -318,61 +318,61 @@ const AdminAgents = () => {
 
       {/* ── Stuck Activations Banner ── */}
       {stuckActivations.length > 0 && (
-        <div className="rounded-2xl border border-red-500/30 bg-red-500/5 overflow-hidden">
-          <div className="flex items-center gap-3 px-5 py-4 border-b border-red-500/20 bg-red-500/8">
-            <div className="w-9 h-9 rounded-xl bg-red-500/20 flex items-center justify-center shrink-0">
-              <AlertTriangle className="w-5 h-5 text-red-400" />
-            </div>
-            <div>
-              <p className="font-bold text-red-400 text-sm">
-                {stuckActivations.length} Store Activation{stuckActivations.length !== 1 ? "s" : ""} Need Manual Approval
-              </p>
-              <p className="text-xs text-red-400/70 mt-0.5">
-                These agents paid their activation fee but their store is still inactive. Force-activate to fix.
-              </p>
-            </div>
-          </div>
-          <div className="divide-y divide-red-500/10">
-            {stuckActivations.map((s) => (
-              <div key={s.order_id} className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-5 py-4">
-                <div className="flex-1 min-w-0">
-                  <div className="flex flex-wrap items-center gap-2 mb-1">
-                    <p className="font-bold text-white text-sm">{s.full_name}</p>
-                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-400 border border-amber-500/25">
-                      Paid GH₵{s.amount.toFixed(2)}
-                    </span>
-                  </div>
-                  <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-white/40">
-                    {s.store_name && (
-                      <span className="flex items-center gap-1.5">
-                        <Store className="w-3 h-3 text-white/20" /> {s.store_name}
-                      </span>
-                    )}
-                    {s.phone && (
-                      <span className="flex items-center gap-1.5">
-                        <Phone className="w-3 h-3 text-white/20" /> {s.phone}
-                      </span>
-                    )}
-                    <span>{s.email}</span>
-                    <span className="text-[10px] text-white/25">
-                      Paid {new Date(s.paid_at).toLocaleDateString()}
-                    </span>
-                  </div>
-                </div>
-                <Button
-                  size="sm"
-                  onClick={() => handleForceActivate(s.agent_id, s.full_name)}
-                  disabled={forcingId === s.agent_id}
-                  className="bg-red-500 hover:bg-red-400 text-white font-bold rounded-xl h-9 px-4 shadow-lg shadow-red-500/20 shrink-0"
-                >
-                  {forcingId === s.agent_id ? (
-                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                  ) : (
-                    "Force Activate Store"
-                  )}
-                </Button>
+        <div className="relative group overflow-hidden rounded-[2rem] border border-amber-500/20 bg-amber-500/[0.03] backdrop-blur-xl animate-in fade-in slide-in-from-top-4 duration-700">
+          <div className="absolute top-0 left-0 w-1.5 h-full bg-gradient-to-b from-amber-500 via-amber-400 to-amber-600" />
+          
+          <div className="flex flex-col lg:flex-row lg:items-center gap-6 px-8 py-6">
+            <div className="flex items-center gap-5">
+              <div className="w-14 h-14 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center shrink-0 shadow-xl shadow-amber-500/5">
+                <Clock className="w-7 h-7 text-amber-500" />
               </div>
-            ))}
+              <div>
+                <h3 className="font-black text-xl tracking-tight text-white">
+                  {stuckActivations.length} Pending Approval{stuckActivations.length !== 1 ? "s" : ""}
+                </h3>
+                <p className="text-sm text-white/40 mt-0.5">
+                  These agents have paid their activation fee and are waiting for your approval.
+                </p>
+              </div>
+            </div>
+            
+            <div className="flex-1 overflow-x-auto pb-2 lg:pb-0">
+              <div className="flex gap-4">
+                {stuckActivations.map((s) => (
+                  <div key={s.order_id} className="min-w-[300px] rounded-2xl border border-white/5 bg-white/[0.02] p-5 group/item hover:bg-white/[0.04] transition-all">
+                    <div className="flex items-center justify-between mb-3">
+                      <div>
+                        <p className="font-bold text-sm text-white truncate">{s.full_name}</p>
+                        <p className="text-[10px] text-white/30 font-medium">{s.email}</p>
+                      </div>
+                      <Badge className="bg-emerald-500/10 text-emerald-500 border-emerald-500/20 text-[10px] font-black tracking-widest uppercase">
+                        GH₵{s.amount}
+                      </Badge>
+                    </div>
+                    <div className="flex items-center justify-between gap-3 pt-3 border-t border-white/5">
+                      <div className="flex flex-col gap-0.5 min-w-0">
+                        {s.phone && (
+                          <div className="flex items-center gap-1.5 text-[10px] text-white/30 truncate">
+                            <Phone className="w-3 h-3" /> {s.phone}
+                          </div>
+                        )}
+                        <div className="flex items-center gap-1.5 text-[10px] text-white/30 truncate">
+                          <Store className="w-3 h-3" /> {s.store_name || "No Store Name"}
+                        </div>
+                      </div>
+                      <Button
+                        size="sm"
+                        onClick={() => handleForceActivate(s.agent_id, s.full_name)}
+                        disabled={forcingId === s.agent_id}
+                        className="h-9 px-4 rounded-xl bg-amber-400 hover:bg-amber-300 text-black font-black text-[10px] uppercase tracking-widest shrink-0 shadow-lg shadow-amber-400/20"
+                      >
+                        {forcingId === s.agent_id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : "Approve Store"}
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
         </div>
       )}
@@ -384,7 +384,6 @@ const AdminAgents = () => {
         <div className="space-y-3">
           {filtered.map((agent) => (
             <div key={agent.user_id} className="rounded-2xl bg-white/[0.02] border border-white/5 overflow-hidden">
-              {/* Agent row */}
               {/* Agent row */}
               <div className="p-4 flex flex-col gap-4">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">

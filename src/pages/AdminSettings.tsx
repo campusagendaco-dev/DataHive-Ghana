@@ -11,6 +11,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Textarea } from "@/components/ui/textarea";
 import { logAudit } from "@/utils/auditLogger";
 import { useAuth } from "@/hooks/useAuth";
+import { Badge } from "@/components/ui/badge";
 
 interface SystemSettings {
   auto_api_switch: boolean;
@@ -40,6 +41,9 @@ interface SystemSettings {
   withdrawal_completed_sms_message: string;
   order_failed_sms_message: string;
   manual_credit_sms_message: string;
+  data_provider_api_key: string;
+  data_provider_base_url: string;
+  airtime_provider_api_key: string;
 }
 
 const AdminSettings = () => {
@@ -75,6 +79,9 @@ const AdminSettings = () => {
     withdrawal_completed_sms_message: "Your withdrawal of GHS {amount} has been completed. Thanks for using SwiftData.",
     order_failed_sms_message: "Order for {package} to {phone} failed. GHS {amount} has been refunded to your wallet.",
     manual_credit_sms_message: "Your account has been manually credited with GHS {amount} by admin.",
+    data_provider_api_key: "",
+    data_provider_base_url: "https://dev.justbuygh.com",
+    airtime_provider_api_key: "",
   });
 
   useEffect(() => {
@@ -116,6 +123,9 @@ const AdminSettings = () => {
           withdrawal_completed_sms_message: data.withdrawal_completed_sms_message || "Your withdrawal of GHS {amount} has been completed. Thanks for using SwiftData.",
           order_failed_sms_message: data.order_failed_sms_message || "Order for {package} to {phone} failed. GHS {amount} has been refunded to your wallet.",
           manual_credit_sms_message: data.manual_credit_sms_message || "Your account has been manually credited with GHS {amount} by admin.",
+          data_provider_api_key: String(data.data_provider_api_key || ""),
+          data_provider_base_url: String(data.data_provider_base_url || "https://dev.justbuygh.com"),
+          airtime_provider_api_key: String(data.airtime_provider_api_key || ""),
         });
       }
       setLoading(false);
@@ -128,13 +138,7 @@ const AdminSettings = () => {
     setSaving(true);
     
     const payload = {
-      auto_api_switch: settings.auto_api_switch,
-      preferred_provider: settings.preferred_provider,
-      backup_provider: settings.backup_provider,
-      holiday_mode_enabled: settings.holiday_mode_enabled,
-      holiday_message: settings.holiday_message,
-      disable_ordering: settings.disable_ordering,
-      dark_mode_enabled: settings.dark_mode_enabled,
+      ...settings,
       customer_service_number: settings.customer_service_number.trim(),
       support_channel_link: settings.support_channel_link.trim(),
       sub_agent_base_fee: parseFloat(settings.sub_agent_base_fee) || 5.0,
@@ -146,36 +150,64 @@ const AdminSettings = () => {
       mtn_markup_percentage: parseFloat(settings.mtn_markup_percentage) || 0,
       telecel_markup_percentage: parseFloat(settings.telecel_markup_percentage) || 0,
       at_markup_percentage: parseFloat(settings.at_markup_percentage) || 0,
-      auto_pending_sms_enabled: settings.auto_pending_sms_enabled,
-      auto_pending_sms_message: settings.auto_pending_sms_message,
-      payment_success_sms_message: settings.payment_success_sms_message,
-      wallet_topup_sms_message: settings.wallet_topup_sms_message,
-      withdrawal_request_sms_message: settings.withdrawal_request_sms_message,
-      withdrawal_completed_sms_message: settings.withdrawal_completed_sms_message,
-      order_failed_sms_message: settings.order_failed_sms_message,
-      manual_credit_sms_message: settings.manual_credit_sms_message,
-      store_visitor_popup_enabled: settings.store_visitor_popup_enabled,
+      data_provider_api_key: (settings.data_provider_api_key || "").trim(),
+      data_provider_base_url: (settings.data_provider_base_url || "").trim(),
+      airtime_provider_api_key: (settings.airtime_provider_api_key || "").trim(),
     };
 
-    const { data, error } = await supabase.functions.invoke("admin-user-actions", {
-      body: { action: "update_system_settings", settings: payload },
-      headers: { Authorization: `Bearer ${session?.access_token}` },
-    });
+    try {
+      const { data, error } = await supabase.functions.invoke("admin-user-actions", {
+        body: { action: "update_system_settings", settings: payload },
+        headers: { Authorization: `Bearer ${session?.access_token}` },
+      });
 
-    if (error || data?.error) {
-      toast({ title: "Failed to save settings", description: data?.error || error?.message, variant: "destructive" });
-    } else {
-      // Log the audit action
-      const { data: { user: currentUser } } = await supabase.auth.getUser();
-      if (currentUser) {
-        await logAudit(currentUser.id, "update_system_settings", {
-          updated_fields: Object.keys(settings).filter(k => (settings as any)[k] !== ""),
-          timestamp: new Date().toISOString()
+      if (error || data?.error) {
+        const errorMsg = data?.error || error?.message || "Unknown error";
+        console.error("Save error details:", { error, data });
+        
+        const normalized = errorMsg.toLowerCase();
+        if ((normalized.includes("insufficient") || normalized.includes("low")) && normalized.includes("balance")) {
+          toast({ 
+            title: "Insufficient Provider Balance", 
+            description: "The platform's provider balance is currently low. Please top up your provider wallet to ensure orders process successfully.", 
+            variant: "destructive" 
+          });
+        } else if (errorMsg.includes("column") || errorMsg.includes("non-2xx")) {
+          toast({ 
+            title: "🚀 Database Sync Required", 
+            description: "The new configuration settings require a schema update. Please run 'npx supabase db push' to apply these changes.", 
+            variant: "destructive" 
+          });
+        } else {
+          toast({ 
+            title: "⚠️ Save Interrupted", 
+            description: `We couldn't save your changes: ${errorMsg}`, 
+            variant: "destructive" 
+          });
+        }
+      } else {
+        toast({ 
+          title: "✨ Settings Locked In",
+          description: "Your system configuration has been updated successfully."
         });
+        if (data?.skipped?.length > 0) {
+          console.warn("Some settings were skipped by the server:", data.skipped);
+        }
+        
+        // Log the audit action
+        const { data: { user: currentUser } } = await supabase.auth.getUser();
+        if (currentUser) {
+          await logAudit(currentUser.id, "update_system_settings", {
+            updated_fields: Object.keys(payload).filter(k => (payload as any)[k] !== ""),
+            timestamp: new Date().toISOString()
+          });
+        }
       }
-      toast({ title: "Settings saved successfully" });
+    } catch (err: any) {
+      toast({ title: "Save failed", description: err.message, variant: "destructive" });
+    } finally {
+      setSaving(false);
     }
-    setSaving(false);
   };
 
   if (loading) {
@@ -239,12 +271,20 @@ const AdminSettings = () => {
               </div>
 
               {settings.disable_ordering && (
-                <Alert variant="destructive">
-                  <AlertCircle className="h-4 w-4" />
-                  <AlertDescription className="text-xs">
-                    Ordering is currently disabled. Users will see a maintenance message at checkout.
-                  </AlertDescription>
-                </Alert>
+                <div className="relative group overflow-hidden rounded-2xl border border-red-500/20 bg-red-500/10 p-4 transition-all hover:bg-red-500/15">
+                  <div className="absolute top-0 left-0 w-1 h-full bg-red-500" />
+                  <div className="flex items-start gap-3">
+                    <div className="shrink-0 w-8 h-8 rounded-lg bg-red-500/20 border border-red-500/20 flex items-center justify-center">
+                      <AlertCircle className="h-4 w-4 text-red-500" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-bold text-red-400">Ordering is Disabled</p>
+                      <p className="text-xs text-red-500/60 mt-0.5">
+                        Your platform is currently in lock-down. Users will see a maintenance message at checkout.
+                      </p>
+                    </div>
+                  </div>
+                </div>
               )}
             </CardContent>
           </Card>
@@ -508,6 +548,35 @@ const AdminSettings = () => {
                 <div className="space-y-2">
                   <Label>Hubtel Client Secret</Label>
                   <Input type="password" value={settings.hubtel_client_secret} onChange={(e) => setSettings({ ...settings, hubtel_client_secret: e.target.value })} placeholder="Your Hubtel Secret" />
+                </div>
+              </div>
+
+              <div className="pt-4 border-t border-white/5 space-y-4">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <Badge variant="outline" className="bg-sky-500/10 text-sky-400 border-sky-500/20">JustBuy Ghana</Badge>
+                    <h3 className="text-sm font-bold">Data & Airtime Provider</h3>
+                  </div>
+                  <a 
+                    href={settings.data_provider_base_url || "https://dev.justbuygh.com"} 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="text-[10px] font-black uppercase text-sky-400 hover:text-sky-300 transition-colors underline underline-offset-4"
+                  >
+                    Top Up Wallet
+                  </a>
+                </div>
+                <div className="space-y-2">
+                  <Label>API Base URL</Label>
+                  <Input value={settings.data_provider_base_url} onChange={(e) => setSettings({ ...settings, data_provider_base_url: e.target.value })} placeholder="https://dev.justbuygh.com" />
+                </div>
+                <div className="space-y-2">
+                  <Label>Main API Key (Data)</Label>
+                  <Input type="password" value={settings.data_provider_api_key} onChange={(e) => setSettings({ ...settings, data_provider_api_key: e.target.value })} placeholder="jbg_live_..." />
+                </div>
+                <div className="space-y-2">
+                  <Label>Airtime API Key (Optional)</Label>
+                  <Input type="password" value={settings.airtime_provider_api_key} onChange={(e) => setSettings({ ...settings, airtime_provider_api_key: e.target.value })} placeholder="Defaults to Main Key if empty" />
                 </div>
               </div>
             </CardContent>

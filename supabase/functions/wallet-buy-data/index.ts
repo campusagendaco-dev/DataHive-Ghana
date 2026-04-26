@@ -321,7 +321,7 @@ function getProviderFailureReason(status: number, body: string, contentType: str
   const normalized = `${parsedMessage || stripHtml(body)}`.toLowerCase();
 
   if ((normalized.includes("insufficient") || normalized.includes("low")) && normalized.includes("balance")) {
-    return "Provider balance is too low. Refill the API source and retry this order.";
+    return "The platform's provider balance is currently insufficient. Please top up your provider wallet in Admin Settings. Your agent wallet has been refunded.";
   }
 
   if (normalized.includes("cloudflare")) {

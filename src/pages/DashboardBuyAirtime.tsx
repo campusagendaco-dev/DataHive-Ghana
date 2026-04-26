@@ -92,7 +92,28 @@ const DashboardBuyAirtime = () => {
           error || data?.error,
           "Purchase failed. Please check your balance."
         );
-        toast({ title: "Purchase Failed", description, variant: "destructive" });
+        
+        // Log diagnostics for admins and show in toast if possible
+        if (data?.diagnostics) {
+          console.error("Provider Diagnostics:", data.diagnostics);
+          const diag = data.diagnostics;
+          const diagMsg = `API Key: ${diag.api_key_used}\nURL: ${diag.attempted_urls?.[0] || 'N/A'}\nError: ${diag.provider_error}`;
+          
+          toast({ 
+            title: "Purchase Failed (Admin Info)", 
+            description: (
+              <div className="mt-2 space-y-2">
+                <p className="text-sm font-semibold text-destructive">{description}</p>
+                <div className="p-2 rounded bg-black/50 border border-white/10 text-[10px] font-mono whitespace-pre-wrap">
+                  {diagMsg}
+                </div>
+              </div>
+            ), 
+            variant: "destructive" 
+          });
+        } else {
+          toast({ title: "Purchase Failed", description, variant: "destructive" });
+        }
       } else {
         setLastOrder({
           id: data.order_id,

@@ -48,6 +48,12 @@ const NAV_SECTIONS = [
       { label: "Settings",      icon: Settings,   path: "/admin/settings" },
     ],
   },
+  {
+    title: "Account",
+    items: [
+      { label: "My Security",   icon: Key,        path: "/admin/account-settings" },
+    ],
+  },
 ];
 
 const SidebarContent = ({ onNavigate }: { onNavigate?: () => void }) => {

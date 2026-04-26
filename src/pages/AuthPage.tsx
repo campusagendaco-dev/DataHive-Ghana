@@ -136,9 +136,29 @@ const AuthPage = () => {
 
         {/* Form Card */}
         <div className="bg-card border border-border rounded-2xl p-6 sm:p-8">
-          <h2 className="font-display text-lg font-bold text-center mb-5">
-            {isSignUp ? "Create Account" : "Sign In"}
-          </h2>
+          {/* Enhanced Tab Switcher */}
+          <div className="flex p-1.5 bg-secondary/80 rounded-2xl mb-8 border border-border/50">
+            <button
+              onClick={() => { setIsSignUp(false); resetForm(); }}
+              className={`flex-1 py-3 text-xs font-black uppercase tracking-widest rounded-xl transition-all duration-300 ${
+                !isSignUp 
+                  ? "bg-card text-foreground shadow-md ring-1 ring-border translate-y-[-1px]" 
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              Sign In
+            </button>
+            <button
+              onClick={() => { setIsSignUp(true); resetForm(); }}
+              className={`flex-1 py-3 text-xs font-black uppercase tracking-widest rounded-xl transition-all duration-300 ${
+                isSignUp 
+                  ? "bg-primary text-primary-foreground shadow-[0_4px_20px_rgba(251,191,36,0.3)] translate-y-[-1px]" 
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              Sign Up
+            </button>
+          </div>
 
           <form onSubmit={handleSubmit} className="space-y-3.5">
             {isSignUp && (
@@ -222,15 +242,7 @@ const AuthPage = () => {
             </Button>
           </form>
 
-          {/* Toggle Sign Up / Sign In */}
-          <div className="mt-5 text-center">
-            <button
-              onClick={() => { setIsSignUp(!isSignUp); resetForm(); }}
-              className="text-sm text-muted-foreground hover:text-primary transition-colors"
-            >
-              {isSignUp ? "Already have an account? Sign in" : "Don't have an account? Sign up"}
-            </button>
-          </div>
+          {/* Toggle Sign Up / Sign In (Removed old toggle) */}
 
           <div className="mt-3 text-center border-t border-border pt-3">
             <Link to="/agent-program" className="text-xs text-primary hover:underline">

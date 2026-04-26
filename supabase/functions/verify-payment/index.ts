@@ -11,18 +11,20 @@ function getFirstEnvValue(keys: string[]): string {
   return "";
 }
 
-function getProviderCredentials(): { apiKey: string; baseUrl: string } {
+async function getProviderCredentials(supabaseAdmin: any): Promise<{ apiKey: string; baseUrl: string }> {
+  const { data: dbSettings } = await supabaseAdmin.from("system_settings").select("*").eq("id", 1).maybeSingle();
+
   const primaryApiKey = getFirstEnvValue([
     "PRIMARY_DATA_PROVIDER_API_KEY",
     "DATA_PROVIDER_API_KEY",
     "DATA_PROVIDER_PRIMARY_API_KEY",
-  ]);
+  ]) || dbSettings?.data_provider_api_key || "";
 
-  const primaryBaseUrl = getFirstEnvValue([
+  const primaryBaseUrl = (getFirstEnvValue([
     "PRIMARY_DATA_PROVIDER_BASE_URL",
     "DATA_PROVIDER_BASE_URL",
     "DATA_PROVIDER_PRIMARY_BASE_URL",
-  ]).replace(/\/+$/, "");
+  ]) || dbSettings?.data_provider_base_url || "https://dev.justbuygh.com").replace(/\/+$/, "");
 
   return {
     apiKey: primaryApiKey,
@@ -371,7 +373,7 @@ serve(async (req) => {
   const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
   try {
-    const providerConfig = getProviderCredentials();
+    const providerConfig = await getProviderCredentials(supabase);
     const DATA_PROVIDER_API_KEY = providerConfig.apiKey;
     const DATA_PROVIDER_BASE_URL = providerConfig.baseUrl;
 
@@ -768,7 +770,7 @@ serve(async (req) => {
     if (orderType === "agent_activation" && resolvedAgentId) {
       console.log("Processing agent activation for:", resolvedAgentId);
       const { data: profile } = await supabase.from("profiles").select("full_name, store_name, slug").eq("user_id", resolvedAgentId).maybeSingle();
-      const updates: Record<string, any> = { is_agent: true, agent_approved: true };
+      const updates: Record<string, any> = { is_agent: true, agent_approved: false };
 
       if (!profile?.slug) {
         const nameSource = profile?.store_name || profile?.full_name || "Agent";

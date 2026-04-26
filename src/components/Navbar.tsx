@@ -49,6 +49,8 @@ const Navbar = () => {
 
   const mainLinks = [
     { to: "/", label: "Home", icon: Home },
+    { to: "/buy-data", label: "Buy Data", icon: Zap },
+    { to: "/buy-airtime", label: "Buy Airtime", icon: Wallet },
     { to: "/order-status", label: "Track Order", icon: LayoutDashboard },
     ...(!user || !agentApproved ? [{ to: "/agent-program", label: "Agent", icon: TrendingUp }] : []),
   ];
