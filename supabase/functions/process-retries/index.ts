@@ -3,6 +3,8 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { corsHeaders } from "../_shared/cors.ts";
 import { sendPaymentSms } from "../_shared/sms.ts";
 
+declare const Deno: any;
+
 const supabaseAdmin = createClient(
   (Deno as any).env.get("SUPABASE_URL") ?? "",
   (Deno as any).env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""

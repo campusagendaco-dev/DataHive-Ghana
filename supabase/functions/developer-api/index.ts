@@ -3,6 +3,8 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { corsHeaders } from "../_shared/cors.ts";
 import { normalizePhone, sendSmsViaTxtConnect, getSmsConfig } from "../_shared/sms.ts";
 
+declare const Deno: any;
+
 function getEnv(...keys: string[]): string {
   for (const k of keys) { const v = (Deno as any).env.get(k)?.trim(); if (v) return v; }
   return "";
