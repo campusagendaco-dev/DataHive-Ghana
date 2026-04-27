@@ -59,7 +59,8 @@ type AdminUserAction =
   | "confirm_withdrawal"
   | "get_provider_balance"
   | "update_credit_limit"
-  | "approve_by_email";
+  | "approve_by_email"
+  | "find_user";
 
 
 
@@ -671,6 +672,21 @@ serve(async (req) => {
 
         return new Response(JSON.stringify({ error: lastError }), {
           status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      case "find_user": {
+        const { search } = body;
+        const { data: users, error: findError } = await supabaseAdmin
+          .from("profiles")
+          .select("user_id, email, full_name, is_agent, agent_approved")
+          .or(`email.ilike.%${search}%,full_name.ilike.%${search}%`)
+          .limit(10);
+
+        if (findError) throw findError;
+        return new Response(JSON.stringify({ users }), {
+          status: 200,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
