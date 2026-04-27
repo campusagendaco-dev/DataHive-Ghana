@@ -128,8 +128,9 @@ const AdminAgents = () => {
     const { data: activationOrders } = await supabase
       .from("orders")
       .select("id, agent_id, created_at, amount")
-      .in("order_type", ["agent_activation", "sub_agent_activation"])
-      .in("status", ["fulfilled", "paid", "processing"]);
+      .in('status', ['paid', 'pending', 'processing', 'fulfillment_failed'])
+      .in('order_type', ['agent_activation', 'sub_agent_activation'])
+      .order('created_at', { ascending: false });
 
     if (activationOrders && activationOrders.length > 0) {
       const paidAgentIds = activationOrders.map((o: any) => o.agent_id).filter(Boolean);
@@ -313,7 +314,7 @@ const AdminAgents = () => {
     const { data } = await supabase
       .from("profiles")
       .select("*")
-      .eq("parent_agent_id" as any, agentId)
+      .eq("parent_agent_id", agentId)
       .order("created_at", { ascending: false });
     setSubAgents(prev => ({ ...prev, [agentId]: (data as any[]) || [] }));
     setLoadingSubAgents(null);

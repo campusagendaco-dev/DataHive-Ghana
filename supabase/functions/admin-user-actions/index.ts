@@ -60,7 +60,8 @@ type AdminUserAction =
   | "get_provider_balance"
   | "update_credit_limit"
   | "approve_by_email"
-  | "find_user";
+  | "find_user"
+  | "get_system_errors";
 
 
 
@@ -686,6 +687,26 @@ serve(async (req) => {
 
         if (findError) throw findError;
         return new Response(JSON.stringify({ users }), {
+          status: 200,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      case "get_system_errors": {
+        const { data: failedOrders } = await supabaseAdmin
+          .from("orders")
+          .select("id, order_type, status, failure_reason, created_at, agent_id")
+          .eq("status", "failed")
+          .order("created_at", { ascending: false })
+          .limit(20);
+
+        const { data: recentLogs } = await supabaseAdmin
+          .from("audit_logs")
+          .select("*")
+          .order("created_at", { ascending: false })
+          .limit(20);
+
+        return new Response(JSON.stringify({ failedOrders, recentLogs }), {
           status: 200,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });

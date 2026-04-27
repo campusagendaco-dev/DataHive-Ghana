@@ -329,7 +329,7 @@ const DashboardWallet = () => {
     try {
       const { data: pendingRows, error } = await supabase
         .from("orders").select("id, status").eq("agent_id", user.id)
-        .eq("order_type", "wallet_topup").in("status", ["pending", "paid"])
+        .eq("order_type", "wallet_topup").in("status", ["pending", "paid", "processing", "fulfillment_failed"])
         .order("created_at", { ascending: false }).limit(10);
 
       if (error) { toast({ title: "Sync failed", description: error.message, variant: "destructive" }); return; }
