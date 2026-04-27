@@ -108,20 +108,12 @@ async function resolveOrderDetails(
   const normalizedNetwork = normalizeNetworkForPricing(network);
   const normalizedPackage = packageSize.replace(/\s+/g, "").toUpperCase();
 
-  const { data: profile } = await supabaseAdmin
-    .from("profiles")
-    .select("is_sub_agent, parent_agent_id, agent_prices")
-    .eq("user_id", userId)
-    .maybeSingle();
+  // Run profile + global pricing lookups in parallel
+  const [{ data: profile }, { data: globalRow }] = await Promise.all([
+    supabaseAdmin.from("profiles").select("is_sub_agent, parent_agent_id, agent_prices").eq("user_id", userId).maybeSingle(),
+    supabaseAdmin.from("global_package_settings").select("agent_price").eq("network", normalizedNetwork).eq("package_size", normalizedPackage).maybeSingle(),
+  ]);
 
-  // Get admin cost as base floor
-  const { data: globalRow } = await supabaseAdmin
-    .from("global_package_settings")
-    .select("agent_price")
-    .eq("network", normalizedNetwork)
-    .eq("package_size", normalizedPackage)
-    .maybeSingle();
-  
   const adminBase = Number(globalRow?.agent_price || 0);
   if (!(adminBase > 0)) return null;
   const adminCost = Number((adminBase * multiplier).toFixed(2));
@@ -407,7 +399,7 @@ async function placeDataOrder(
   for (const url of urls) {
     for (let attempt = 1; attempt <= 2; attempt++) {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 25000);
+      const timeoutId = setTimeout(() => controller.abort(), 10000);
 
       try {
         const response = await fetch(url, {
@@ -447,7 +439,7 @@ async function placeDataOrder(
           (isHtmlResponse(contentType, body) && response.status !== 401 && response.status !== 403);
 
         if (retryable && attempt < 2) {
-          await new Promise((resolve) => setTimeout(resolve, 1000 * attempt));
+          await new Promise((resolve) => setTimeout(resolve, 300));
           continue;
         }
 
@@ -465,7 +457,7 @@ async function placeDataOrder(
         };
 
         if (attempt < 2) {
-          await new Promise((resolve) => setTimeout(resolve, 1000 * attempt));
+          await new Promise((resolve) => setTimeout(resolve, 300));
           continue;
         }
       }
@@ -512,7 +504,13 @@ serve(async (req) => {
   });
 
   try {
-    const { data: { user }, error: userError } = await supabaseUser.auth.getUser();
+    // Parallel: verify user session and fetch system settings simultaneously
+    const [userResult, settingsResult] = await Promise.all([
+      supabaseUser.auth.getUser(),
+      supabaseAdmin.from("system_settings").select("disable_ordering, holiday_message, data_provider_api_key, data_provider_base_url, secondary_data_provider_api_key, secondary_data_provider_base_url, auto_failover_enabled").eq("id", 1).maybeSingle(),
+    ]);
+
+    const { data: { user }, error: userError } = userResult;
     if (userError || !user) {
       return new Response(JSON.stringify({ error: "Unauthorized" }), {
         status: 200,
@@ -520,16 +518,11 @@ serve(async (req) => {
       });
     }
 
+    const settings = settingsResult.data;
     const network = typeof payload?.network === "string" ? payload.network.trim() : "";
     const package_size = typeof payload?.package_size === "string" ? payload.package_size.trim() : "";
     const customer_phone = typeof payload?.customer_phone === "string" ? payload.customer_phone.trim() : "";
     const requestedAmount = Number(payload?.amount);
-
-    const { data: settings } = await supabaseAdmin
-      .from("system_settings")
-      .select("disable_ordering, holiday_message")
-      .eq("id", 1)
-      .maybeSingle();
 
     if (settings?.disable_ordering) {
       return new Response(JSON.stringify({
@@ -675,8 +668,6 @@ serve(async (req) => {
       failure_reason: null,
     });
 
-    await sendPaymentSms(supabaseAdmin, customer_phone, "payment_success");
-
     console.log("Wallet buy data:", { orderId, network, package_size, customer_phone });
 
     let fulfillmentResult = await placeDataOrder(
@@ -720,15 +711,12 @@ serve(async (req) => {
     });
 
     if (fulfillmentResult.ok) {
-      await supabaseAdmin.from("orders").update({ status: "fulfilled", failure_reason: null }).eq("id", orderId);
-      
-      // Credit profits after successful fulfillment
-      if (parentProfit > 0 && parentAgentId) {
-        await supabaseAdmin.rpc("credit_order_profits", { p_order_id: orderId });
-      }
-
-      // Send success SMS
-      await sendPaymentSms(supabaseAdmin, customer_phone, "payment_success");
+      // Fire post-fulfillment DB updates and SMS in parallel, don't block response
+      void Promise.all([
+        supabaseAdmin.from("orders").update({ status: "fulfilled", failure_reason: null }).eq("id", orderId),
+        ...((parentProfit ?? 0) > 0 && parentAgentId ? [supabaseAdmin.rpc("credit_order_profits", { p_order_id: orderId })] : []),
+        sendPaymentSms(supabaseAdmin, customer_phone, "payment_success"),
+      ]);
 
       return new Response(JSON.stringify({ success: true, order_id: orderId, status: "fulfilled" }), {
         status: 200,
@@ -736,27 +724,28 @@ serve(async (req) => {
       });
     }
 
-    await supabaseAdmin.from("orders").update({
-      status: "fulfillment_failed",
-      failure_reason: fulfillmentResult.reason,
-    }).eq("id", orderId);
+    // Fire failure updates without blocking the response
+    void (async () => {
+      await supabaseAdmin.from("orders").update({
+        status: "fulfillment_failed",
+        failure_reason: fulfillmentResult.reason,
+      }).eq("id", orderId);
 
-    // ── REFUND SUB-AGENT ON FAILURE ──────────────────────────────────────────
-    // Since this was a wallet order, we must return the funds if delivery failed.
-    const { error: refundError } = await supabaseAdmin.rpc("credit_wallet", {
-      p_agent_id: user.id,
-      p_amount: expectedAmount,
-    });
-    if (!refundError) {
-      console.log(`Refunded GHS ${expectedAmount} to ${user.id} due to fulfillment failure.`);
-      if (customer_phone) {
-        await sendPaymentSms(supabaseAdmin, customer_phone, "order_failed", {
-          package: package_size,
-          phone: customer_phone,
-          amount: expectedAmount.toFixed(2)
-        });
+      const { error: refundError } = await supabaseAdmin.rpc("credit_wallet", {
+        p_agent_id: user.id,
+        p_amount: expectedAmount,
+      });
+      if (!refundError) {
+        console.log(`Refunded GHS ${expectedAmount} to ${user.id} due to fulfillment failure.`);
+        if (customer_phone) {
+          void sendPaymentSms(supabaseAdmin, customer_phone, "order_failed", {
+            package: package_size,
+            phone: customer_phone,
+            amount: expectedAmount.toFixed(2)
+          });
+        }
       }
-    }
+    })();
     // ─────────────────────────────────────────────────────────────────────────
 
     return new Response(JSON.stringify({

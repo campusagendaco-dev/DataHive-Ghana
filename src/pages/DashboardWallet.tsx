@@ -442,7 +442,7 @@ const DashboardWallet = () => {
         {/* Quick Topup (Pro Design) */}
         <Card className="border-white/10 bg-white/5 backdrop-blur-xl">
           <CardHeader className="pb-2 flex flex-row items-center justify-between">
-            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-white/40">Quick Recharge</p>
+            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-white/40">Quick Top Up</p>
             <Zap className="w-4 h-4 text-blue-400" />
           </CardHeader>
           <CardContent className="space-y-3">
@@ -463,7 +463,7 @@ const DashboardWallet = () => {
               disabled={toppingUp} 
               className="w-full h-11 bg-blue-500 hover:bg-blue-600 text-white font-black text-xs uppercase tracking-widest rounded-xl shadow-lg shadow-blue-500/10"
             >
-              {toppingUp ? <Loader2 className="w-4 h-4 animate-spin" /> : <><CreditCard className="w-4 h-4 mr-2" /> Recharge Now</>}
+              {toppingUp ? <Loader2 className="w-4 h-4 animate-spin" /> : <><CreditCard className="w-4 h-4 mr-2" /> Top Up Now</>}
             </Button>
             {topupChargeTotal > 0 && (
               <div className="flex justify-between items-center px-1">
