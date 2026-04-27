@@ -5,7 +5,7 @@ import { normalizePhone, sendPaymentSms } from "../_shared/sms.ts";
 
 function getFirstEnvValue(keys: string[]): string {
   for (const key of keys) {
-    const value = Deno.env.get(key)?.trim();
+    const value = (Deno as any).env.get(key)?.trim();
     if (value) return value;
   }
   return "";
@@ -27,7 +27,7 @@ function buildProviderUrls(baseUrl: string, aliases: string[]): string[] {
     }
   }
 
-  const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
+  const supabaseUrl = (Deno as any).env.get("SUPABASE_URL") || "";
   let projectUrl = "";
   try {
     if (supabaseUrl) projectUrl = new URL(supabaseUrl).origin;
@@ -125,9 +125,9 @@ function normalizeRecipient(phone: string): string {
 serve(async (req: Request) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
-  const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
-  const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-  const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY");
+  const SUPABASE_URL = (Deno as any).env.get("SUPABASE_URL");
+  const SUPABASE_SERVICE_ROLE_KEY = (Deno as any).env.get("SUPABASE_SERVICE_ROLE_KEY");
+  const SUPABASE_ANON_KEY = (Deno as any).env.get("SUPABASE_ANON_KEY");
 
   if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY || !SUPABASE_ANON_KEY) {
     return new Response(JSON.stringify({ error: "Server misconfigured" }), {

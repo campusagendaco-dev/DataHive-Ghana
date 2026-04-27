@@ -71,8 +71,8 @@ serve(async (req: Request) => {
     return new Response(null, { headers: corsHeaders });
   }
 
-  const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
-  const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+  const SUPABASE_URL = (Deno as any).env.get("SUPABASE_URL");
+  const SUPABASE_SERVICE_ROLE_KEY = (Deno as any).env.get("SUPABASE_SERVICE_ROLE_KEY");
 
   if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
     return new Response(JSON.stringify({ error: "Server misconfigured" }), {
@@ -147,7 +147,7 @@ serve(async (req: Request) => {
           });
         }
 
-        const userIds = (users || []).map(u => u.user_id);
+        const userIds = (users || []).map((u: any) => u.user_id);
         let statsMap: Record<string, any> = {};
         
         if (userIds.length > 0) {
@@ -157,11 +157,11 @@ serve(async (req: Request) => {
             .in("user_id", userIds);
           
           if (stats) {
-            statsMap = Object.fromEntries(stats.map(s => [s.user_id, s.total_sales_volume]));
+            statsMap = Object.fromEntries(stats.map((s: any) => [s.user_id, s.total_sales_volume]));
           }
         }
 
-        const enrichedUsers = (users || []).map(u => ({
+        const enrichedUsers = (users || []).map((u: any) => ({
           ...u,
           total_sales_volume: statsMap[u.user_id] || 0,
           stats: [{ total_sales_volume: statsMap[u.user_id] || 0 }]
@@ -531,7 +531,7 @@ serve(async (req: Request) => {
           });
         }
 
-        const appOrigin = Deno.env.get("SITE_URL") || req.headers.get("origin") || "";
+        const appOrigin = (Deno as any).env.get("SITE_URL") || req.headers.get("origin") || "";
         const redirectTo = appOrigin
           ? `${appOrigin}${redirect_path || "/reset-password"}`
           : undefined;
@@ -602,10 +602,10 @@ serve(async (req: Request) => {
         // Fetch from DB if available
         const { data: dbSettings } = await supabaseAdmin.from("system_settings").select("*").eq("id", 1).maybeSingle();
         
-        const apiKey = Deno.env.get("DATA_PROVIDER_API_KEY") || Deno.env.get("PRIMARY_DATA_PROVIDER_API_KEY") || dbSettings?.data_provider_api_key || "";
-        const baseUrl = (Deno.env.get("DATA_PROVIDER_BASE_URL") || Deno.env.get("PRIMARY_DATA_PROVIDER_BASE_URL") || dbSettings?.data_provider_base_url || "").replace(/\/+$/, "");
+        const apiKey = (Deno as any).env.get("DATA_PROVIDER_API_KEY") || (Deno as any).env.get("PRIMARY_DATA_PROVIDER_API_KEY") || dbSettings?.data_provider_api_key || "";
+        const baseUrl = ((Deno as any).env.get("DATA_PROVIDER_BASE_URL") || (Deno as any).env.get("PRIMARY_DATA_PROVIDER_BASE_URL") || dbSettings?.data_provider_base_url || "").replace(/\/+$/, "");
         
-        const airtimeKey = Deno.env.get("AIRTIME_PROVIDER_API_KEY") || dbSettings?.airtime_provider_api_key || apiKey;
+        const airtimeKey = (Deno as any).env.get("AIRTIME_PROVIDER_API_KEY") || dbSettings?.airtime_provider_api_key || apiKey;
         
         const mask = (key: string) => key ? `${key.slice(0, 8)}...${key.slice(-4)}` : "not set";
 
@@ -613,8 +613,8 @@ serve(async (req: Request) => {
           return new Response(JSON.stringify({ 
             error: "Provider not configured",
             diagnostics: {
-              DATA_PROVIDER_API_KEY: mask(Deno.env.get("DATA_PROVIDER_API_KEY") || ""),
-              PRIMARY_DATA_PROVIDER_API_KEY: mask(Deno.env.get("PRIMARY_DATA_PROVIDER_API_KEY") || ""),
+              DATA_PROVIDER_API_KEY: mask((Deno as any).env.get("DATA_PROVIDER_API_KEY") || ""),
+              PRIMARY_DATA_PROVIDER_API_KEY: mask((Deno as any).env.get("PRIMARY_DATA_PROVIDER_API_KEY") || ""),
               baseUrl: baseUrl || "not set"
             }
           }), {
@@ -651,9 +651,9 @@ serve(async (req: Request) => {
                     success: true, 
                     balance: Number(balance),
                     diagnostics: {
-                      DATA_PROVIDER_API_KEY: mask(Deno.env.get("DATA_PROVIDER_API_KEY") || ""),
-                      PRIMARY_DATA_PROVIDER_API_KEY: mask(Deno.env.get("PRIMARY_DATA_PROVIDER_API_KEY") || ""),
-                      AIRTIME_PROVIDER_API_KEY: mask(Deno.env.get("AIRTIME_PROVIDER_API_KEY") || ""),
+                      DATA_PROVIDER_API_KEY: mask((Deno as any).env.get("DATA_PROVIDER_API_KEY") || ""),
+                      PRIMARY_DATA_PROVIDER_API_KEY: mask((Deno as any).env.get("PRIMARY_DATA_PROVIDER_API_KEY") || ""),
+                      AIRTIME_PROVIDER_API_KEY: mask((Deno as any).env.get("AIRTIME_PROVIDER_API_KEY") || ""),
                       baseUrl: baseUrl,
                       activeKey: mask(apiKey),
                       activeAirtimeKey: mask(airtimeKey)
