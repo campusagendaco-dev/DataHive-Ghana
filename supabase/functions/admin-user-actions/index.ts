@@ -261,60 +261,60 @@ serve(async (req) => {
       }
 
       case "approve_by_email": {
-        if (!email) throw new Error("Email is required for approve_by_email");
-        
-        let { data: profile, error: fetchError } = await supabaseAdmin
-          .from("profiles")
-          .select("user_id")
-          .eq("email", email)
-          .maybeSingle();
+        try {
+          console.log("APPROVE_BY_EMAIL_START", email);
+          if (!email) throw new Error("Email is required");
           
-        if (fetchError) throw fetchError;
-        if (!profile) {
-          // Try case insensitive search if exact match fails
-          const { data: profiles, error: searchError } = await supabaseAdmin
+          const { data: profile, error: findError } = await supabaseAdmin
             .from("profiles")
             .select("user_id")
-            .ilike("email", email)
-            .limit(1);
-          
-          if (searchError) throw searchError;
-          if (!profiles || profiles.length === 0) {
-            return new Response(JSON.stringify({ error: `User with email ${email} not found` }), {
-              status: 404,
-              headers: { ...corsHeaders, "Content-Type": "application/json" },
-            });
+            .ilike("email", email.trim())
+            .maybeSingle();
+
+          if (findError) throw findError;
+          if (!profile) {
+             return new Response(JSON.stringify({ error: `User ${email} not found in profiles.` }), {
+               status: 404,
+               headers: { ...corsHeaders, "Content-Type": "application/json" },
+             });
           }
-          profile = profiles[0];
+
+          const targetId = profile.user_id;
+          console.log("APPROVE_BY_EMAIL_TARGET", targetId);
+
+          const { error: updError } = await supabaseAdmin
+            .from("profiles")
+            .update({ 
+              is_agent: true, 
+              agent_approved: true,
+              sub_agent_approved: true,
+              onboarding_complete: true,
+              is_sub_agent: false,
+              parent_agent_id: null
+            })
+            .eq("user_id", targetId);
+
+          if (updError) throw updError;
+
+          await supabaseAdmin
+            .from("orders")
+            .update({ status: "fulfilled" })
+            .eq("agent_id", targetId)
+            .in("order_type", ["agent_activation", "sub_agent_activation"])
+            .in("status", ["paid", "pending", "processing"]);
+
+          console.log("APPROVE_BY_EMAIL_SUCCESS");
+          return new Response(JSON.stringify({ success: true }), {
+            status: 200,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        } catch (e) {
+          console.error("APPROVE_BY_EMAIL_FATAL", e);
+          return new Response(JSON.stringify({ error: e instanceof Error ? e.message : String(e) }), {
+            status: 400,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
         }
-        
-        const targetUserId = profile.user_id;
-        
-        const { error: updateError } = await supabaseAdmin
-          .from("profiles")
-          .update({ 
-            is_agent: true, 
-            agent_approved: true,
-            sub_agent_approved: true,
-            onboarding_complete: true,
-            is_sub_agent: false,
-            parent_agent_id: null
-          })
-          .eq("user_id", targetUserId);
-
-        if (updateError) throw updateError;
-
-        await supabaseAdmin
-          .from("orders")
-          .update({ status: "fulfilled", failure_reason: null })
-          .eq("agent_id", targetUserId)
-          .in("order_type", ["agent_activation", "sub_agent_activation"])
-          .in("status", ["paid", "pending", "processing"]);
-
-        return new Response(JSON.stringify({ success: true, user_id: targetUserId }), {
-          status: 200,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
       }
 
       case "revoke_agent": {

@@ -58,6 +58,7 @@ const AdminAgents = () => {
   const [approvingId, setApprovingId] = useState<string | null>(null);
   const [stuckActivations, setStuckActivations] = useState<StuckActivation[]>([]);
   const [forcingId, setForcingId] = useState<string | null>(null);
+  const [page, setPage] = useState(0);
   const [hasMore, setHasMore] = useState(true);
   const [forceEmail, setForceEmail] = useState("");
   const [forcingEmail, setForcingEmail] = useState(false);
