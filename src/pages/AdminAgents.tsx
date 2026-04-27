@@ -76,22 +76,26 @@ const AdminAgents = () => {
     const from = currentPage * PAGE_SIZE;
     const to = from + PAGE_SIZE - 1;
 
-    let q = supabase
+    let query = supabase
       .from("profiles")
-      .select("*", { count: "exact" })
-      .eq("is_agent", true)
-      .eq("is_sub_agent" as any, false)
-      .order("created_at", { ascending: false })
-      .range(from, to);
+      .select("*", { count: "exact" });
+
+    query = query.eq("is_agent", true);
+    query = query.eq("is_sub_agent" as any, false);
 
     if (search) {
-      q = q.or(`full_name.ilike.%${search}%,email.ilike.%${search}%,store_name.ilike.%${search}%,phone.ilike.%${search}%`);
+      query = query.or(`full_name.ilike.%${search}%,email.ilike.%${search}%,store_name.ilike.%${search}%,phone.ilike.%${search}%`);
     }
 
-    if (filter === "approved") q = q.eq("agent_approved", true);
-    if (filter === "pending") q = q.eq("agent_approved", false);
+    if (filter === "approved") {
+      query = query.eq("agent_approved", true);
+    } else if (filter === "pending") {
+      query = query.eq("agent_approved", false);
+    }
 
-    const { data, count } = await q;
+    const { data, count } = await query
+      .order("created_at", { ascending: false })
+      .range(from, to);
     const rows = ((data as any[]) || []) as AgentRow[];
 
     // Fetch wallet balances for this batch only
@@ -167,12 +171,12 @@ const AdminAgents = () => {
     }
 
     setLoading(false);
-  }, []);
+  }, [filter, page, search]);
 
   useEffect(() => { 
     const timer = setTimeout(() => fetchAgents(false), 300);
     return () => clearTimeout(timer);
-  }, [filter, search]);
+  }, [fetchAgents]);
 
   const handleApprove = async (userId: string) => {
     setApprovingId(userId);
@@ -344,7 +348,7 @@ const AdminAgents = () => {
           </h1>
           <p className="text-sm text-white/50 mt-1">Approve, manage wallets, and view sub-agents for all parent agents.</p>
         </div>
-        <Button onClick={fetchAgents} className="gap-2 bg-white/5 hover:bg-white/10 text-white border border-white/10 rounded-xl">
+        <Button onClick={() => fetchAgents(false)} className="gap-2 bg-white/5 hover:bg-white/10 text-white border border-white/10 rounded-xl">
           <RefreshCw className="w-4 h-4" /> Refresh
         </Button>
       </div>
