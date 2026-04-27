@@ -58,8 +58,9 @@ const AdminAgents = () => {
   const [approvingId, setApprovingId] = useState<string | null>(null);
   const [stuckActivations, setStuckActivations] = useState<StuckActivation[]>([]);
   const [forcingId, setForcingId] = useState<string | null>(null);
-  const [page, setPage] = useState(0);
   const [hasMore, setHasMore] = useState(true);
+  const [forceEmail, setForceEmail] = useState("");
+  const [forcingEmail, setForcingEmail] = useState(false);
   const PAGE_SIZE = 50;
   const { toast } = useToast();
   const { user: currentUser, session } = useAuth();
@@ -276,6 +277,32 @@ const AdminAgents = () => {
     }
     setUpdatingLimit(null);
   };
+  
+  const handleForceApproveByEmail = async () => {
+    if (!forceEmail || !forceEmail.includes("@")) {
+      toast({ title: "Enter a valid email", variant: "destructive" });
+      return;
+    }
+    
+    setForcingEmail(true);
+    const { data, error } = await supabase.functions.invoke("admin-user-actions", {
+      body: { action: "approve_by_email", email: forceEmail.trim() },
+      headers: { Authorization: `Bearer ${session?.access_token}` },
+    });
+    
+    if (error || data?.error) {
+      toast({ 
+        title: "Approval Failed", 
+        description: data?.error || error?.message || "User not found", 
+        variant: "destructive" 
+      });
+    } else {
+      toast({ title: "Agent Approved", description: `User ${forceEmail} is now an active agent.` });
+      setForceEmail("");
+      await fetchAgents();
+    }
+    setForcingEmail(false);
+  };
 
   const toggleExpand = async (agentId: string) => {
     if (expandedId === agentId) { setExpandedId(null); return; }
@@ -332,6 +359,29 @@ const AdminAgents = () => {
             <p className="text-xs text-white/40 mt-1">{s.label}</p>
           </div>
         ))}
+      </div>
+
+      {/* Force Approve Tool */}
+      <div className="rounded-2xl bg-amber-400/5 border border-amber-400/10 p-4 flex flex-col sm:flex-row items-center gap-4">
+        <div className="flex-1">
+          <p className="text-sm font-bold text-amber-400">Force Approve by Email</p>
+          <p className="text-xs text-white/40 mt-0.5">Activation orders will be automatically fulfilled.</p>
+        </div>
+        <div className="flex items-center gap-2 w-full sm:w-auto">
+          <Input 
+            placeholder="user@example.com" 
+            value={forceEmail}
+            onChange={(e) => setForceEmail(e.target.value)}
+            className="bg-white/5 border-white/10 text-white text-sm rounded-xl h-10 w-full sm:w-64 focus:border-amber-400/40"
+          />
+          <Button 
+            onClick={handleForceApproveByEmail}
+            disabled={forcingEmail}
+            className="bg-amber-400 hover:bg-amber-300 text-black font-bold h-10 px-6 rounded-xl shrink-0"
+          >
+            {forcingEmail ? <Loader2 className="w-4 h-4 animate-spin" /> : "Approve"}
+          </Button>
+        </div>
       </div>
 
       {/* Filters */}

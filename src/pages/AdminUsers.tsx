@@ -313,15 +313,15 @@ const AdminUsers = () => {
                   </td>
                   <td className="p-4">
                     <div className="flex flex-wrap gap-2">
-                      {/* Approve pending agent */}
-                      {user.is_agent && !(user as any).is_sub_agent && user.onboarding_complete && !user.agent_approved && (
+                      {/* Promote/Approve agent */}
+                      {!user.agent_approved && (
                         <Button
                           size="sm"
                           onClick={() => handleApproveAgent(user)}
                           disabled={!!actionLoading[user.user_id]}
                           className="bg-amber-400/20 text-amber-400 hover:bg-amber-400/30 border border-amber-400/30 font-bold text-xs rounded-xl"
                         >
-                          {actionLoading[user.user_id] === "approve-agent" ? <Loader2 className="w-3 h-3 animate-spin" /> : "Approve Agent"}
+                          {actionLoading[user.user_id] === "approve-agent" ? <Loader2 className="w-3 h-3 animate-spin" /> : user.is_agent ? "Approve Agent" : "Promote to Agent"}
                         </Button>
                       )}
                       {/* Approve pending sub-agent */}
@@ -397,14 +397,14 @@ const AdminUsers = () => {
             </div>
 
             <div className="flex flex-wrap gap-2 pt-1">
-              {user.is_agent && !(user as any).is_sub_agent && user.onboarding_complete && !user.agent_approved && (
+              {!user.agent_approved && (
                 <Button
                   size="sm"
                   onClick={() => handleApproveAgent(user)}
                   disabled={!!actionLoading[user.user_id]}
                   className="flex-1 bg-amber-400/20 text-amber-400 hover:bg-amber-400/30 border border-amber-400/30 font-bold text-[11px] h-9 rounded-xl"
                 >
-                  {actionLoading[user.user_id] === "approve-agent" ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : "Approve Agent"}
+                  {actionLoading[user.user_id] === "approve-agent" ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : user.is_agent ? "Approve Agent" : "Promote Agent"}
                 </Button>
               )}
               {(user as any).is_sub_agent && !user.sub_agent_approved && (
