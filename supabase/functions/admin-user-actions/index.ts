@@ -237,7 +237,9 @@ serve(async (req) => {
             is_agent: true, 
             agent_approved: true,
             sub_agent_approved: true,
-            onboarding_complete: true 
+            onboarding_complete: true,
+            is_sub_agent: false,
+            parent_agent_id: null
           })
           .eq("user_id", user_id);
 

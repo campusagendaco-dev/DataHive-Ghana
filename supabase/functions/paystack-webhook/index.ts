@@ -613,7 +613,13 @@ serve(async (req) => {
       }
       const agentId = metadata?.agent_id;
       if (agentId) {
-        await supabase.from("profiles").update({ is_agent: true, agent_approved: true }).eq("user_id", agentId);
+        await supabase.from("profiles").update({ 
+          is_agent: true, 
+          agent_approved: true,
+          onboarding_complete: true,
+          is_sub_agent: false,
+          parent_agent_id: null
+        }).eq("user_id", agentId);
         await supabase.from("orders").update({ status: "fulfilled", failure_reason: null }).eq("id", orderId);
         console.log("Agent activated via webhook:", agentId);
       }

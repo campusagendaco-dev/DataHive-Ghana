@@ -127,7 +127,7 @@ const AdminAgents = () => {
       .from("orders")
       .select("id, agent_id, created_at, amount")
       .in("order_type", ["agent_activation", "sub_agent_activation"])
-      .in("status", ["fulfilled", "paid"]);
+      .in("status", ["fulfilled", "paid", "processing"]);
 
     if (activationOrders && activationOrders.length > 0) {
       const paidAgentIds = activationOrders.map((o: any) => o.agent_id).filter(Boolean);
