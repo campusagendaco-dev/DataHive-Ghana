@@ -321,9 +321,9 @@ const DashboardBuyDataNetwork = ({ network }: DashboardBuyDataNetworkProps) => {
         },
       });
 
-      // Ensure the "Processing" state lasts at least 5 seconds for the "session" experience
+      // Ensure the "Processing" state lasts at least 0.1 seconds for an ultra-fast "swift" experience
       const elapsedTime = Date.now() - startTime;
-      const remainingTime = Math.max(0, 5000 - elapsedTime);
+      const remainingTime = Math.max(0, 100 - elapsedTime);
       if (remainingTime > 0) await new Promise(resolve => setTimeout(resolve, remainingTime));
 
       if (error || data?.error) {
