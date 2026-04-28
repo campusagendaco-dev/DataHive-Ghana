@@ -44,6 +44,7 @@ interface SystemSettings {
   data_provider_api_key: string;
   data_provider_base_url: string;
   airtime_provider_api_key: string;
+  airtime_provider_base_url: string;
   secondary_data_provider_api_key: string;
   secondary_data_provider_base_url: string;
   auto_failover_enabled: boolean;
@@ -92,6 +93,7 @@ const AdminSettings = () => {
     data_provider_api_key: "",
     data_provider_base_url: "",
     airtime_provider_api_key: "",
+    airtime_provider_base_url: "",
     secondary_data_provider_api_key: "",
     secondary_data_provider_base_url: "",
     auto_failover_enabled: false,
@@ -147,6 +149,7 @@ const AdminSettings = () => {
           data_provider_api_key: String(d.data_provider_api_key || ""),
           data_provider_base_url: String(d.data_provider_base_url || ""),
           airtime_provider_api_key: String(d.airtime_provider_api_key || ""),
+          airtime_provider_base_url: String(d.airtime_provider_base_url || ""),
           secondary_data_provider_api_key: String(d.secondary_data_provider_api_key || ""),
           secondary_data_provider_base_url: String(d.secondary_data_provider_base_url || ""),
           auto_failover_enabled: d.auto_failover_enabled || false,
@@ -184,6 +187,7 @@ const AdminSettings = () => {
       data_provider_api_key: (settings.data_provider_api_key || "").trim(),
       data_provider_base_url: (settings.data_provider_base_url || "").trim(),
       airtime_provider_api_key: (settings.airtime_provider_api_key || "").trim(),
+      airtime_provider_base_url: (settings.airtime_provider_base_url || "").trim(),
       secondary_data_provider_api_key: (settings.secondary_data_provider_api_key || "").trim(),
       secondary_data_provider_base_url: (settings.secondary_data_provider_base_url || "").trim(),
       auto_failover_enabled: settings.auto_failover_enabled,
@@ -720,6 +724,10 @@ const AdminSettings = () => {
                   <div className="space-y-2">
                     <Label>Main API Key (Data)</Label>
                     <Input type="password" value={settings.data_provider_api_key} onChange={(e) => setSettings({ ...settings, data_provider_api_key: e.target.value })} placeholder="api_..." />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Airtime API Base URL (Optional)</Label>
+                    <Input value={settings.airtime_provider_base_url} onChange={(e) => setSettings({ ...settings, airtime_provider_base_url: e.target.value })} placeholder="Defaults to Main URL if empty" />
                   </div>
                   <div className="space-y-2">
                     <Label>Airtime API Key (Optional)</Label>

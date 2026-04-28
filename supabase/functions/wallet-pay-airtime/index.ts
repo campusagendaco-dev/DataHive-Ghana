@@ -73,7 +73,7 @@ async function getAirtimeCredentials(supabaseAdmin: any): Promise<{ apiKey: stri
     "PRIMARY_DATA_PROVIDER_BASE_URL",
     "DATA_PROVIDER_BASE_URL",
     "DATA_PROVIDER_PRIMARY_BASE_URL",
-  ]) || dbSettings?.data_provider_base_url || "";
+  ]) || dbSettings?.airtime_provider_base_url || dbSettings?.data_provider_base_url || "";
   
   return { apiKey, directUrl, baseUrl: baseUrl.replace(/\/+$/, "") };
 }
@@ -259,7 +259,11 @@ serve(async (req: Request) => {
               
               // If we have success: true or equivalent, proceed
               if (success) {
-                await supabaseAdmin.from("orders").update({ status: "fulfilled" }).eq("id", orderId);
+                const providerOrderId = parsed?.transaction_id || parsed?.order_id || parsed?.reference;
+                await supabaseAdmin.from("orders").update({ 
+                  status: "fulfilled",
+                  provider_order_id: providerOrderId
+                }).eq("id", orderId);
                 await sendPaymentSms(supabaseAdmin, phone, "payment_success", {
                   service: `${network} Airtime`,
                   recipient: phone,

@@ -31,6 +31,23 @@ function getProviderCredentials(): { apiKey: string; baseUrl: string } {
   };
 }
 
+async function getAirtimeCredentials(supabaseAdmin: any): Promise<{ apiKey: string; baseUrl: string }> {
+  // Try fetching from DB first
+  const { data: dbSettings } = await supabaseAdmin.from("system_settings").select("*").eq("id", 1).maybeSingle();
+
+  const apiKey = Deno.env.get("AIRTIME_PROVIDER_API_KEY") || 
+                 Deno.env.get("PRIMARY_DATA_PROVIDER_API_KEY") || 
+                 dbSettings?.airtime_provider_api_key || 
+                 dbSettings?.data_provider_api_key || "";
+  
+  const baseUrl = Deno.env.get("AIRTIME_PROVIDER_BASE_URL") || 
+                  Deno.env.get("PRIMARY_DATA_PROVIDER_BASE_URL") || 
+                  dbSettings?.airtime_provider_base_url || 
+                  dbSettings?.data_provider_base_url || "";
+  
+  return { apiKey, baseUrl: (baseUrl || "").replace(/\/+$/, "") };
+}
+
 function mapNetworkKey(network: string): string {
   const n = (network || "").trim().toUpperCase();
   if (n === "MTN" || n === "YELLO") return "YELLO";
@@ -760,26 +777,37 @@ serve(async (req) => {
         });
       }
 
-            // Same provider endpoint as data — capacity carries the GHS amount for airtime
+      // Use Airtime-specific credentials and format
+      const { apiKey: AIRTIME_KEY, baseUrl: AIRTIME_BASE } = await getAirtimeCredentials(supabase);
+      
       const airtimeNetworkKey = mapNetworkKey(network);
       const airtimeRecipient = normalizeRecipient(customerPhone);
       const airtimeResult = await callProviderApi(
-        DATA_PROVIDER_BASE_URL,
-        DATA_PROVIDER_API_KEY,
+        AIRTIME_BASE,
+        AIRTIME_KEY,
         "purchase",
         {
-          networkRaw: network,
-          networkKey: airtimeNetworkKey,
-          recipient: airtimeRecipient,
-          capacity: airtimeAmount,
+          customerNumber: airtimeRecipient,
           amount: airtimeAmount,
-          order_type: "airtime"
+          networkCode: airtimeNetworkKey,
+          description: `Airtime topup: GHS ${airtimeAmount} for ${airtimeRecipient}`
         },
         DATA_PROVIDER_WEBHOOK_URL
       );
 
       if (airtimeResult.ok) {
-        await supabase.from("orders").update({ status: "fulfilled", failure_reason: null }).eq("id", orderId);
+        let providerOrderId = null;
+        try {
+          const parsed = JSON.parse(airtimeResult.body);
+          providerOrderId = parsed.transaction_id || parsed.order_id || parsed.reference;
+        } catch { /* ignore */ }
+
+        await supabase.from("orders").update({ 
+          status: "fulfilled", 
+          failure_reason: null,
+          provider_order_id: providerOrderId 
+        }).eq("id", orderId);
+        
         if (existingOrder?.agent_id && (existingOrder.profit > 0 || existingOrder.parent_profit > 0)) {
           await supabase.rpc("credit_order_profits", { p_order_id: orderId });
         }
@@ -832,7 +860,17 @@ serve(async (req) => {
     });
 
     if (result.ok) {
-      await supabase.from("orders").update({ status: "fulfilled", failure_reason: null }).eq("id", orderId);
+      let providerOrderId = null;
+      try {
+        const parsed = JSON.parse(result.body);
+        providerOrderId = parsed.transaction_id || parsed.order_id || parsed.reference;
+      } catch { /* ignore */ }
+
+      await supabase.from("orders").update({ 
+        status: "fulfilled", 
+        failure_reason: null,
+        provider_order_id: providerOrderId
+      }).eq("id", orderId);
       
       // Credit profits
       if (existingOrder?.agent_id && (existingOrder.profit > 0 || existingOrder.parent_profit > 0)) {
