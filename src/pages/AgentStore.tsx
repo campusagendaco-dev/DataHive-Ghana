@@ -60,6 +60,7 @@ interface GlobalPkgSetting {
   network: string;
   package_size: string;
   agent_price: number | null;
+  sub_agent_price: number | null;
   public_price: number | null;
   is_unavailable: boolean;
 }
@@ -113,7 +114,7 @@ const AgentStore = () => {
             .select("user_id, store_name, full_name, whatsapp_number, support_number, email, whatsapp_group_link, agent_prices, disabled_packages, is_agent, is_sub_agent, agent_approved, sub_agent_approved, parent_agent_id, sub_agent_activation_markup, store_logo_url, store_primary_color")
             .eq("slug", slug)
             .maybeSingle(),
-          supabase.from("global_package_settings").select("network, package_size, agent_price, public_price, is_unavailable"),
+          supabase.from("global_package_settings").select("network, package_size, agent_price, sub_agent_price, public_price, is_unavailable"),
           fetchApiPricingContext().catch(() => ({ source: "primary", multiplier: 1 })),
         ]);
 
@@ -183,7 +184,14 @@ const AgentStore = () => {
     }
     
     const gs = globalSettings[`${network}-${size}`];
-    const gsBase = Number(gs?.agent_price) > 0 ? Number(gs!.agent_price) : Number(gs?.public_price);
+    let gsBase = Number(gs?.agent_price) > 0 ? Number(gs!.agent_price) : Number(gs?.public_price);
+    
+    // For sub-agent stores, if no explicit prices set, use sub_agent_price as base
+    if (agent.is_sub_agent) {
+      const gsSub = Number(gs?.sub_agent_price);
+      if (Number.isFinite(gsSub) && gsSub > 0) gsBase = gsSub;
+    }
+    
     if (Number.isFinite(gsBase) && gsBase > 0) return applyPriceMultiplier(gsBase, priceMultiplier);
     return applyPriceMultiplier(fallbackPrice, priceMultiplier);
   }, [agent, globalSettings, parentAssignedPrices, priceMultiplier]);

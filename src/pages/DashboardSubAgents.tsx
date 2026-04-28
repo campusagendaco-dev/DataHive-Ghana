@@ -22,6 +22,7 @@ interface GlobalPkgSetting {
   network: string;
   package_size: string;
   agent_price: number | null;
+  sub_agent_price: number | null;
 }
 
 type Tab = "sub-agents" | "activation-fee" | "pricing" | "transactions";
@@ -70,7 +71,7 @@ const DashboardSubAgents = () => {
         .select("user_id, full_name, email, phone, store_name, slug, sub_agent_approved, created_at")
         .eq("parent_agent_id", user.id)
         .order("created_at", { ascending: false }),
-      supabase.from("global_package_settings").select("network, package_size, agent_price"),
+      supabase.from("global_package_settings").select("network, package_size, agent_price, sub_agent_price"),
     ]);
 
     if (saRes.data) setSubAgents(saRes.data as SubAgent[]);
@@ -114,9 +115,16 @@ const DashboardSubAgents = () => {
     const gs = globalSettings.find(
       (s) => s.network === network && normalizePackageSize(s.package_size) === normalizePackageSize(size),
     );
+    const adminSubAgentPrice = Number(gs?.sub_agent_price || 0);
     const adminAgentPrice = Number(gs?.agent_price || 0);
-    if (Number.isFinite(adminAgentPrice) && adminAgentPrice > 0) {
-      return applyPriceMultiplier(adminAgentPrice, priceMultiplier);
+    
+    // We show the sub_agent_price as the base for the sub-agent if set, otherwise agent_price
+    const priceToUse = (Number.isFinite(adminSubAgentPrice) && adminSubAgentPrice > 0) 
+      ? adminSubAgentPrice 
+      : adminAgentPrice;
+
+    if (Number.isFinite(priceToUse) && priceToUse > 0) {
+      return applyPriceMultiplier(priceToUse, priceMultiplier);
     }
     return null;
   }, [globalSettings, priceMultiplier]);

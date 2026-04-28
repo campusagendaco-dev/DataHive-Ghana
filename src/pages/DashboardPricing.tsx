@@ -73,13 +73,20 @@ const DashboardPricing = () => {
 
       const { data } = await supabase
         .from("global_package_settings")
-        .select("network, package_size, agent_price");
+        .select("network, package_size, agent_price, sub_agent_price");
 
       (data || []).forEach((row: any) => {
         const numericAgentPrice = Number(row?.agent_price);
-        if (!Number.isFinite(numericAgentPrice) || numericAgentPrice <= 0) return;
+        const numericSubAgentPrice = Number(row?.sub_agent_price);
+        
+        // For sub-agents, we default to the sub_agent_price if available
+        const priceToUse = (profile?.is_sub_agent && Number.isFinite(numericSubAgentPrice) && numericSubAgentPrice > 0)
+          ? numericSubAgentPrice
+          : numericAgentPrice;
+
+        if (!Number.isFinite(priceToUse) || priceToUse <= 0) return;
         if (!nextBasePrices[row.network]) nextBasePrices[row.network] = {};
-        nextBasePrices[row.network][row.package_size] = applyPriceMultiplier(numericAgentPrice, pricingContext.multiplier);
+        nextBasePrices[row.network][row.package_size] = applyPriceMultiplier(priceToUse, pricingContext.multiplier);
       });
 
       // For sub-agents, base prices come from the parent agent's assigned wholesale

@@ -51,6 +51,7 @@ interface GlobalPackageSetting {
   package_size: string;
   public_price: number | null;
   agent_price: number | null;
+  sub_agent_price: number | null;
   is_unavailable: boolean;
 }
 
@@ -137,7 +138,7 @@ const DashboardBuyDataNetwork = ({ network }: DashboardBuyDataNetworkProps) => {
   useEffect(() => {
     const loadPricing = async () => {
       const [settingsRes, pricingContext] = await Promise.all([
-        supabase.from("global_package_settings").select("network, package_size, public_price, agent_price, is_unavailable"),
+        supabase.from("global_package_settings").select("network, package_size, public_price, agent_price, sub_agent_price, is_unavailable"),
         fetchApiPricingContext(),
       ]);
       setGlobalSettings((settingsRes.data || []) as GlobalPackageSetting[]);
@@ -179,6 +180,15 @@ const DashboardBuyDataNetwork = ({ network }: DashboardBuyDataNetworkProps) => {
 
         const resolvedBasePrice = (() => {
           if (assignedPrice && assignedPrice > 0) return assignedPrice;
+          
+          if (profile?.is_sub_agent) {
+            const baseSubAgent = Number(setting?.sub_agent_price);
+            if (Number.isFinite(baseSubAgent) && baseSubAgent > 0) return baseSubAgent;
+            // Fallback to agent price if subagent price not set
+            if (Number.isFinite(baseAgent) && baseAgent > 0) return baseAgent;
+            return item.price;
+          }
+
           if (isPaidAgent) {
             if (Number.isFinite(baseAgent) && baseAgent > 0) return baseAgent;
             return item.price;
