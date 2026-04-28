@@ -50,9 +50,9 @@ async function getAirtimeCredentials(supabaseAdmin: any): Promise<{ apiKey: stri
 
 function mapNetworkKey(network: string): string {
   const n = (network || "").trim().toUpperCase();
-  if (n === "MTN" || n === "YELLO") return "YELLO";
+  if (n === "MTN" || n === "YELLO") return "MTN";
   if (n === "VOD" || n === "VODAFONE" || n === "TELECEL") return "TELECEL";
-  if (n === "AT" || n === "AIRTELTIGO" || n === "AT_PREMIUM") return "AT_PREMIUM";
+  if (n === "AT" || n === "AIRTELTIGO" || n === "AT_PREMIUM") return "AIRTELTIGO";
   return n;
 }
 
@@ -483,7 +483,9 @@ serve(async (req) => {
         failure_reason: null,
         network: typeof metadata?.network === "string" ? metadata.network : null,
         package_size: typeof metadata?.package_size === "string" ? metadata.package_size : null,
-        customer_phone: typeof metadata?.customer_phone === "string" ? metadata.customer_phone : null,
+        customer_phone: typeof (metadata?.customer_phone || metadata?.phone) === "string" 
+          ? (metadata.customer_phone || metadata.phone) 
+          : null,
         afa_full_name: typeof metadata?.afa_full_name === "string" ? metadata.afa_full_name : null,
         afa_ghana_card: typeof metadata?.afa_ghana_card === "string" ? metadata.afa_ghana_card : null,
         afa_occupation: typeof metadata?.afa_occupation === "string" ? metadata.afa_occupation : null,
@@ -514,7 +516,9 @@ serve(async (req) => {
       if (hasPlaceholderAgentId && recoveredAgentId) patch.agent_id = recoveredAgentId;
       if (!existingOrder.network && typeof metadata?.network === "string") patch.network = metadata.network;
       if (!existingOrder.package_size && typeof metadata?.package_size === "string") patch.package_size = metadata.package_size;
-      if (!existingOrder.customer_phone && typeof metadata?.customer_phone === "string") patch.customer_phone = metadata.customer_phone;
+      if (!existingOrder.customer_phone && typeof (metadata?.customer_phone || metadata?.phone) === "string") {
+        patch.customer_phone = metadata.customer_phone || metadata.phone;
+      }
       if (!existingOrder.parent_agent_id && typeof metadata?.parent_agent_id === "string" && metadata.parent_agent_id) {
         patch.parent_agent_id = metadata.parent_agent_id;
       }
@@ -754,7 +758,7 @@ serve(async (req) => {
       : (typeof metadata?.package_size === "string" ? metadata.package_size : "");
     const customerPhone = typeof existingOrder?.customer_phone === "string"
       ? existingOrder.customer_phone
-      : (typeof metadata?.customer_phone === "string" ? metadata.customer_phone : "");
+      : (typeof (metadata?.customer_phone || metadata?.phone) === "string" ? (metadata.customer_phone || metadata.phone) : "");
 
     // Airtime orders have no package_size — they use amount instead.
     if (orderType === "airtime") {

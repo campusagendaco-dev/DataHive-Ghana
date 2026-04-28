@@ -159,9 +159,11 @@ const DashboardBuyAirtime = () => {
         reference,
         callback_url: `${window.location.origin}/dashboard/buy-airtime?ref=${reference}`,
         metadata: {
+          order_id: reference,
           order_type: "airtime",
           network,
-          phone: phone.trim(),
+          customer_phone: phone.trim(),
+          package_size: `GHS ${numAmount} Airtime`,
           amount: numAmount,
           agent_id: user.id,
         },
