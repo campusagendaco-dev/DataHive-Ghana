@@ -63,7 +63,10 @@ type AdminUserAction =
   | "update_credit_limit"
   | "approve_by_email"
   | "find_user"
-  | "get_system_errors";
+  | "get_system_errors"
+  | "purge_test_accounts"
+  | "bulk_suspend_users"
+  | "manage_blacklist";
 
 
 
@@ -479,14 +482,19 @@ serve(async (req: Request) => {
           });
         }
 
-        const { error: updateError } = await supabaseAdmin
-          .from("withdrawals")
-          .update({ status: "completed", completed_at: new Date().toISOString() })
-          .eq("id", withdrawal_id);
+        // Use the new atomic RPC to finalize withdrawal and deduct balance
+        const { data: result, error: rpcError } = await supabaseAdmin.rpc("finalize_withdrawal", {
+          p_withdrawal_id: withdrawal_id
+        });
 
-        if (updateError) throw updateError;
+        if (rpcError || !result?.success) {
+          return new Response(JSON.stringify({ error: rpcError?.message || result?.error || "Failed to finalize withdrawal" }), {
+            status: 400,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
 
-        // Fetch withdrawal details to send SMS
+        // Fetch withdrawal details to send SMS (the RPC already confirmed it)
         const { data: withdrawal } = await supabaseAdmin
           .from("withdrawals")
           .select("agent_id, amount")
@@ -497,7 +505,7 @@ serve(async (req: Request) => {
           await sendWithdrawalCompletedSms(supabaseAdmin, withdrawal.agent_id, withdrawal.amount);
         }
 
-        return new Response(JSON.stringify({ success: true }), {
+        return new Response(JSON.stringify({ success: true, new_balance: result.new_balance }), {
           status: 200,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
@@ -709,6 +717,46 @@ serve(async (req: Request) => {
           .limit(20);
 
         return new Response(JSON.stringify({ failedOrders, recentLogs }), {
+          status: 200,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      case "purge_test_accounts": {
+        const { data: result, error: rpcError } = await supabaseAdmin.rpc("purge_test_accounts");
+        if (rpcError) throw rpcError;
+        return new Response(JSON.stringify(result), {
+          status: 200,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      case "bulk_suspend_users": {
+        const { user_ids, suspend } = body;
+        if (!Array.isArray(user_ids)) throw new Error("user_ids must be an array");
+        const { data: result, error: rpcError } = await supabaseAdmin.rpc("bulk_suspend_users", {
+          p_user_ids: user_ids,
+          p_suspend: !!suspend
+        });
+        if (rpcError) throw rpcError;
+        return new Response(JSON.stringify(result), {
+          status: 200,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      case "manage_blacklist": {
+        const { op, type, value, reason } = body;
+        if (op === "add") {
+          const { error: insError } = await supabaseAdmin.from("security_blacklist").insert({
+            type, value, reason, created_by: actor.id
+          });
+          if (insError) throw insError;
+        } else if (op === "remove") {
+          const { error: delError } = await supabaseAdmin.from("security_blacklist").delete().eq("value", value);
+          if (delError) throw delError;
+        }
+        return new Response(JSON.stringify({ success: true }), {
           status: 200,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });

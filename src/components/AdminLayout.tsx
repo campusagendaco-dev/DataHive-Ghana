@@ -7,6 +7,7 @@ import {
   LayoutDashboard, Users, ShieldCheck, ShoppingCart, LogOut, Menu,
   Wallet, Bell, Package, CreditCard, Activity, Settings, ChevronRight,
   BarChart3, Ticket, LifeBuoy, FileSearch, Key, TrendingUp, Sun, Moon,
+  Sparkles,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
@@ -36,12 +37,14 @@ const NAV_SECTIONS = [
     items: [
       { label: "Support Tickets", icon: LifeBuoy,   path: "/admin/tickets" },
       { label: "Notifications",   icon: Bell,        path: "/admin/notifications" },
+      { label: "Engagement Hub",  icon: Sparkles,    path: "/admin/engagement" },
       { label: "Users",           icon: Users,       path: "/admin/users" },
     ],
   },
   {
     title: "System",
     items: [
+      { label: "Security",      icon: ShieldCheck, path: "/admin/security" },
       { label: "System Health", icon: Activity,   path: "/admin/system-health" },
       { label: "Audit Logs",    icon: FileSearch, path: "/admin/audit-logs" },
       { label: "API Users",     icon: Key,        path: "/admin/api-users" },

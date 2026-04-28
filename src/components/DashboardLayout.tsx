@@ -70,6 +70,8 @@ const DashboardLayout = () => {
         )}>
           <button 
             onClick={() => setSidebarOpen(true)} 
+            aria-label="Open sidebar menu"
+            title="Open Menu"
             className={cn(
               "md:hidden p-2 rounded-xl transition-all",
               isDark ? "bg-white/5 text-white/70 hover:text-white" : "bg-gray-100 text-gray-900 hover:bg-gray-200"
@@ -120,6 +122,8 @@ const DashboardLayout = () => {
               </div>
               <button
                 onClick={() => navigate("/dashboard/wallet")}
+                aria-label="Top up wallet balance"
+                title="Top up Wallet"
                 className="bg-amber-400 text-black p-1.5 rounded-xl hover:bg-amber-300 transition-all shadow-lg shadow-amber-400/20 active:scale-95"
               >
                 <PlusCircle className="w-4 h-4" />
@@ -129,6 +133,7 @@ const DashboardLayout = () => {
             {/* Theme Toggle */}
             <button
               onClick={toggleDark}
+              aria-label={isDark ? "Switch to light mode" : "Switch to dark mode"}
               className={cn(
                 "p-2.5 rounded-xl border transition-all hover:scale-105 active:scale-95",
                 isDark ? "bg-white/5 border-white/10 text-white/70 hover:text-white" : "bg-gray-50 border-gray-200 text-gray-500 hover:text-gray-900"
@@ -139,10 +144,14 @@ const DashboardLayout = () => {
             </button>
 
             {/* Notification Bell */}
-            <button className={cn(
-              "relative p-2.5 rounded-xl border transition-all group",
-              isDark ? "bg-white/5 border-white/10 hover:bg-white/10 hover:border-white/20" : "bg-gray-50 border-gray-200 hover:bg-gray-100 hover:border-gray-300"
-            )}>
+            <button 
+              aria-label="View notifications"
+              title="Notifications"
+              className={cn(
+                "relative p-2.5 rounded-xl border transition-all group",
+                isDark ? "bg-white/5 border-white/10 hover:bg-white/10 hover:border-white/20" : "bg-gray-50 border-gray-200 hover:bg-gray-100 hover:border-gray-300"
+              )}
+            >
               <Bell className={cn("w-5 h-5 transition-colors", isDark ? "text-white/70 group-hover:text-white" : "text-gray-500 group-hover:text-gray-900")} />
               <span className={cn("absolute top-2 right-2.5 w-2 h-2 rounded-full border-2", isDark ? "bg-red-500 border-[#0d140d]" : "bg-red-500 border-white")}></span>
             </button>
@@ -152,6 +161,8 @@ const DashboardLayout = () => {
             {/* User Profile Trigger */}
             <button 
               onClick={() => navigate("/dashboard/profile")}
+              aria-label="View user profile and settings"
+              title="My Profile"
               className={cn(
                 "flex items-center gap-3 pl-1 pr-1 sm:pr-2 py-1 rounded-2xl transition-all group",
                 isDark ? "hover:bg-white/5" : "hover:bg-gray-100"
@@ -189,6 +200,8 @@ const DashboardLayout = () => {
             </div>
             <button
               onClick={() => setAlertDismissed(true)}
+              aria-label="Dismiss low balance alert"
+              title="Dismiss"
               className="text-amber-400/60 hover:text-amber-300 transition-colors shrink-0"
             >
               <X className="w-4 h-4" />

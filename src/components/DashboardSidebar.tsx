@@ -124,6 +124,8 @@ const DashboardSidebar = ({ open, onClose }: DashboardSidebarProps) => {
           </Link>
           <button 
             onClick={onClose} 
+            aria-label="Close sidebar menu"
+            title="Close Menu"
             className={cn(
               "md:hidden p-2 rounded-full transition-colors",
               isDark ? "hover:bg-white/5 text-white/50 hover:text-white" : "hover:bg-gray-100 text-gray-400 hover:text-gray-900"

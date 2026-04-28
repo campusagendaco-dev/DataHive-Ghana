@@ -12,6 +12,7 @@ import { useAppTheme } from "@/contexts/ThemeContext";
 import FreeDataClaimBanner from "@/components/FreeDataClaimBanner";
 import WelcomeAnnouncement from "@/components/WelcomeAnnouncement";
 import ReferAndEarn from "@/components/ReferAndEarn";
+import DailyCheckIn from "@/components/DailyCheckIn";
 
 interface DashboardStats {
   walletBalance: number;
@@ -62,18 +63,20 @@ const Dashboard = () => {
 
       const balance = walletRes.data ? Number(walletRes.data.balance) : 0;
       const allOrders = ordersRes.data ?? [];
-      const depositedOrders = allOrders.filter((o: any) => o.order_type === "wallet_topup");
-      const dataOrders = allOrders.filter((o: any) => o.order_type === "data");
-      const subAgentActivationOrders = allOrders.filter((o: any) => o.order_type === "sub_agent_activation");
+      const fulfilledOrders = allOrders.filter((o: any) => o.status === "fulfilled");
+      
+      const depositedOrders = allOrders.filter((o: any) => o.order_type === "wallet_topup" && o.status === "fulfilled");
+      const dataOrders = allOrders.filter((o: any) => o.order_type === "data" && o.status === "fulfilled");
+      const subAgentActivationOrders = allOrders.filter((o: any) => o.order_type === "sub_agent_activation" && o.status === "fulfilled");
 
       const totalDeposited = depositedOrders.reduce((s: number, o: any) => s + Number(o.amount || 0), 0);
       const totalSalesAmount = dataOrders.reduce((s: number, o: any) => s + Number(o.amount || 0), 0);
       const subAgentEarnings = subAgentActivationOrders.reduce((s: number, o: any) => s + Number(o.profit || 0), 0);
-      const totalProfit = allOrders.reduce((s: number, o: any) => s + Number(o.profit || 0), 0);
+      const totalProfit = fulfilledOrders.reduce((s: number, o: any) => s + Number(o.profit || 0), 0);
 
       setStats({ 
         walletBalance: balance, 
-        totalOrders: allOrders.length, 
+        totalOrders: fulfilledOrders.length, 
         totalDeposited, 
         totalSalesAmount, 
         subAgentEarnings, 
@@ -117,6 +120,7 @@ const Dashboard = () => {
     <div className="p-4 sm:p-6 max-w-5xl space-y-5">
 
       <FreeDataClaimBanner />
+      <DailyCheckIn />
       <WelcomeAnnouncement />
 
       {/* ── Hero balance card ── */}

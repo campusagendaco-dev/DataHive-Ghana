@@ -7,7 +7,8 @@ import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { logAudit } from "@/utils/auditLogger";
-import { Loader2, Search, RefreshCw, Phone, User, ShieldCheck, Users2, ShoppingCart, ChevronDown } from "lucide-react";
+import { Loader2, Search, RefreshCw, Phone, User, ShieldCheck, Users2, ShoppingCart, ChevronDown, Globe, Clock, Ban, MessageCircle } from "lucide-react";
+import UserDetailDrawer from "@/components/UserDetailDrawer";
 
 interface UserRow {
   user_id: string;
@@ -21,8 +22,13 @@ interface UserRow {
   sub_agent_approved: boolean;
   parent_agent_id: string | null;
   created_at: string;
+  last_ip?: string | null;
+  last_seen_at?: string | null;
+  last_location?: string | null;
+  login_count?: number;
   parent_name?: string;
   total_sales_volume?: number;
+  is_suspended?: boolean;
 }
 
 type RoleTab = "all" | "customers" | "agents" | "sub-agents";
@@ -39,6 +45,7 @@ const AdminUsers = () => {
   const [totalCount, setTotalCount] = useState(0);
   const PAGE_SIZE = 50;
   const [actionLoading, setActionLoading] = useState<Record<string, "reset" | "delete" | "approve-sub" | "approve-agent" | null>>({});
+  const [selectedUser, setSelectedUser] = useState<UserRow | null>(null);
 
   const fetchUsers = useCallback(async (isLoadMore = false) => {
     if (!isLoadMore) {
@@ -205,6 +212,68 @@ const AdminUsers = () => {
 
   const filtered = users;
 
+  const [selectedUsers, setSelectedUsers] = useState<string[]>([]);
+  const [bulkActionLoading, setBulkActionLoading] = useState(false);
+
+  const toggleSelectAll = () => {
+    if (selectedUsers.length === users.length) {
+      setSelectedUsers([]);
+    } else {
+      setSelectedUsers(users.map(u => u.user_id));
+    }
+  };
+
+  const toggleSelectUser = (userId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setSelectedUsers(prev => prev.includes(userId) ? prev.filter(id => id !== userId) : [...prev, userId]);
+  };
+
+  const handleBulkSuspend = async (suspend: boolean) => {
+    if (!selectedUsers.length) return;
+    setBulkActionLoading(true);
+    try {
+      const { error } = await supabase.functions.invoke("admin-user-actions", {
+        body: { action: "bulk_suspend_users", user_ids: selectedUsers, suspend }
+      });
+      if (error) throw error;
+      toast({ title: suspend ? "Users Suspended" : "Users Restored", description: `${selectedUsers.length} users updated.` });
+      setUsers(prev => prev.map(u => selectedUsers.includes(u.user_id) ? { ...u, is_suspended: suspend } : u));
+      setSelectedUsers([]);
+    } catch (err: any) {
+      toast({ title: "Bulk action failed", description: err.message, variant: "destructive" });
+    } finally {
+      setBulkActionLoading(false);
+    }
+  };
+
+  const handleBulkSMS = async () => {
+    if (!selectedUsers.length) return;
+    const msg = window.prompt(`Enter SMS message for ${selectedUsers.length} users:`);
+    if (!msg) return;
+    setBulkActionLoading(true);
+    try {
+      const selectedProfiles = users.filter(u => selectedUsers.includes(u.user_id) && u.phone);
+      if (!selectedProfiles.length) {
+        toast({ title: "No phone numbers", description: "Selected users don't have phone numbers.", variant: "destructive" });
+        return;
+      }
+      const { error } = await supabase.functions.invoke("admin-send-sms", {
+        body: { 
+          recipients: selectedProfiles.map(u => u.phone),
+          message: msg,
+          broadcast: true
+        }
+      });
+      if (error) throw error;
+      toast({ title: "Bulk SMS Sent", description: `Message queued for ${selectedProfiles.length} users.` });
+      setSelectedUsers([]);
+    } catch (err: any) {
+      toast({ title: "Bulk SMS failed", description: err.message, variant: "destructive" });
+    } finally {
+      setBulkActionLoading(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center h-64 gap-4">
@@ -215,7 +284,7 @@ const AdminUsers = () => {
   }
 
   return (
-    <div className="space-y-6 pb-10">
+    <div className="space-y-6 pb-24">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 border-b border-white/5 pb-6">
         <div>
@@ -272,18 +341,33 @@ const AdminUsers = () => {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-white/5 bg-white/[0.02]">
+                <th className="p-4 w-10">
+                   <input 
+                     type="checkbox" 
+                     checked={selectedUsers.length === users.length && users.length > 0} 
+                     onChange={toggleSelectAll}
+                     className="rounded border-white/10 bg-white/5 text-amber-500 focus:ring-amber-500/30"
+                   />
+                </th>
                 <th className="text-left p-4 font-semibold text-white/40 text-xs uppercase tracking-wider">User</th>
                 <th className="text-left p-4 font-semibold text-white/40 text-xs uppercase tracking-wider">Phone</th>
                 <th className="text-left p-4 font-semibold text-white/40 text-xs uppercase tracking-wider">Role</th>
                 <th className="text-left p-4 font-semibold text-white/40 text-xs uppercase tracking-wider">Sales</th>
                 <th className="text-left p-4 font-semibold text-white/40 text-xs uppercase tracking-wider hidden md:table-cell">Parent Agent</th>
-                <th className="text-left p-4 font-semibold text-white/40 text-xs uppercase tracking-wider hidden lg:table-cell">Joined</th>
                 <th className="text-left p-4 font-semibold text-white/40 text-xs uppercase tracking-wider">Actions</th>
               </tr>
             </thead>
             <tbody>
               {filtered.map((user) => (
-                <tr key={user.user_id} className="border-b border-white/5 hover:bg-white/[0.03] transition-colors">
+                <tr key={user.user_id} onClick={() => setSelectedUser(user)} className="border-b border-white/5 hover:bg-white/[0.03] transition-colors cursor-pointer group">
+                  <td className="p-4" onClick={e => toggleSelectUser(user.user_id, e)}>
+                     <input 
+                       type="checkbox" 
+                       checked={selectedUsers.includes(user.user_id)} 
+                       onChange={() => {}}
+                       className="rounded border-white/10 bg-white/5 text-amber-500 focus:ring-amber-500/30"
+                     />
+                  </td>
                   <td className="p-4">
                     <p className="font-semibold text-white">{user.full_name || "—"}</p>
                     <p className="text-xs text-white/40 mt-0.5">{user.email}</p>
@@ -297,7 +381,14 @@ const AdminUsers = () => {
                       <span className="text-white/20">—</span>
                     )}
                   </td>
-                  <td className="p-4">{getRoleBadge(user)}</td>
+                  <td className="p-4">
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      {getRoleBadge(user)}
+                      {user.is_suspended && (
+                        <Badge className="bg-red-500/20 text-red-400 border-red-500/30 text-[10px]">Suspended</Badge>
+                      )}
+                    </div>
+                  </td>
                   <td className="p-4">
                     <p className="font-bold text-green-400">GH₵{(user.total_sales_volume || 0).toFixed(2)}</p>
                   </td>
@@ -308,56 +399,22 @@ const AdminUsers = () => {
                       <span className="text-white/20">—</span>
                     )}
                   </td>
-                  <td className="p-4 text-white/40 text-xs hidden lg:table-cell">
-                    {new Date(user.created_at).toLocaleDateString()}
-                  </td>
-                  <td className="p-4">
+                  <td className="p-4" onClick={(e) => e.stopPropagation()}>
                     <div className="flex flex-wrap gap-2">
-                      {/* Promote/Approve agent */}
-                      {!user.agent_approved && (
-                        <Button
-                          size="sm"
-                          onClick={() => handleApproveAgent(user)}
-                          disabled={!!actionLoading[user.user_id]}
-                          className="bg-amber-400/20 text-amber-400 hover:bg-amber-400/30 border border-amber-400/30 font-bold text-xs rounded-xl"
-                        >
-                          {actionLoading[user.user_id] === "approve-agent" ? <Loader2 className="w-3 h-3 animate-spin" /> : user.is_agent ? "Approve Agent" : "Promote to Agent"}
-                        </Button>
-                      )}
-                      {/* Approve pending sub-agent */}
-                      {(user as any).is_sub_agent && !user.sub_agent_approved && (
-                        <Button
-                          size="sm"
-                          onClick={() => handleApproveSubAgent(user)}
-                          disabled={!!actionLoading[user.user_id]}
-                          className="bg-blue-500/20 text-blue-400 hover:bg-blue-500/30 border border-blue-500/30 font-bold text-xs rounded-xl"
-                        >
-                          {actionLoading[user.user_id] === "approve-sub" ? <Loader2 className="w-3 h-3 animate-spin" /> : "Approve Sub-Agent"}
-                        </Button>
-                      )}
                       <Button
                         size="sm" variant="outline"
                         onClick={() => handleResetPassword(user)}
                         disabled={!!actionLoading[user.user_id]}
-                        className="text-xs border-white/10 text-white/60 hover:text-white rounded-xl"
+                        className="text-xs border-white/10 text-white/60 hover:text-white rounded-xl h-8"
                       >
-                        {actionLoading[user.user_id] === "reset" ? <Loader2 className="w-3 h-3 animate-spin" /> : "Reset PWD"}
+                        {actionLoading[user.user_id] === "reset" ? <Loader2 className="w-3 h-3 animate-spin" /> : "Reset"}
                       </Button>
                       <Link
                         to={`/admin/orders?agent=${encodeURIComponent(user.full_name || user.email)}`}
                         className="w-8 h-8 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-400 hover:bg-blue-500/20 transition-colors"
-                        title="View Sales History"
                       >
                         <ShoppingCart className="w-3.5 h-3.5" />
                       </Link>
-                      <Button
-                        size="sm" variant="destructive"
-                        onClick={() => handleDeleteUser(user)}
-                        disabled={!!actionLoading[user.user_id] || currentUser?.id === user.user_id}
-                        className="text-xs rounded-xl"
-                      >
-                        {actionLoading[user.user_id] === "delete" ? <Loader2 className="w-3 h-3 animate-spin" /> : "Delete"}
-                      </Button>
                     </div>
                   </td>
                 </tr>
@@ -367,82 +424,52 @@ const AdminUsers = () => {
         </div>
       </div>
 
-      {/* Mobile Card View */}
-      <div className="md:hidden space-y-4">
-        {filtered.map((user) => (
-          <div key={user.user_id} className="rounded-2xl bg-white/[0.03] border border-white/5 p-4 space-y-4">
-            <div className="flex items-start justify-between gap-3">
-              <div className="min-w-0">
-                <p className="font-bold text-white truncate">{user.full_name || "—"}</p>
-                <p className="text-xs text-white/40 truncate">{user.email}</p>
-              </div>
-              <div className="shrink-0">{getRoleBadge(user)}</div>
+      {/* Bulk Actions Bar */}
+      {selectedUsers.length > 0 && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 animate-in fade-in slide-in-from-bottom-4">
+          <div className="bg-[#1a1a2e] border border-amber-500/30 rounded-2xl p-4 shadow-2xl shadow-black/50 flex items-center gap-4">
+            <div className="px-3 border-r border-white/10">
+               <p className="text-xs font-black text-amber-500 uppercase tracking-widest">{selectedUsers.length} Selected</p>
             </div>
-
-            <div className="grid grid-cols-2 gap-4 py-3 border-y border-white/5">
-              <div>
-                <p className="text-[10px] uppercase tracking-wider text-white/30 mb-1">Phone</p>
-                <p className="text-xs text-white/70 font-mono">{user.phone || "—"}</p>
-              </div>
-              <div>
-                <p className="text-[10px] uppercase tracking-wider text-white/30 mb-1">Total Sales</p>
-                <p className="text-xs font-black text-green-400">GH₵{(user.total_sales_volume || 0).toFixed(2)}</p>
-              </div>
-              {(user as any).is_sub_agent && (
-                <div className="col-span-2">
-                  <p className="text-[10px] uppercase tracking-wider text-white/30 mb-1">Parent Agent</p>
-                  <p className="text-xs text-white/60">{user.parent_name || "—"}</p>
-                </div>
-              )}
-            </div>
-
-            <div className="flex flex-wrap gap-2 pt-1">
-              {!user.agent_approved && (
-                <Button
-                  size="sm"
-                  onClick={() => handleApproveAgent(user)}
-                  disabled={!!actionLoading[user.user_id]}
-                  className="flex-1 bg-amber-400/20 text-amber-400 hover:bg-amber-400/30 border border-amber-400/30 font-bold text-[11px] h-9 rounded-xl"
-                >
-                  {actionLoading[user.user_id] === "approve-agent" ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : user.is_agent ? "Approve Agent" : "Promote Agent"}
-                </Button>
-              )}
-              {(user as any).is_sub_agent && !user.sub_agent_approved && (
-                <Button
-                  size="sm"
-                  onClick={() => handleApproveSubAgent(user)}
-                  disabled={!!actionLoading[user.user_id]}
-                  className="flex-1 bg-blue-500/20 text-blue-400 hover:bg-blue-500/30 border border-blue-500/30 font-bold text-[11px] h-9 rounded-xl"
-                >
-                  {actionLoading[user.user_id] === "approve-sub" ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : "Approve Sub"}
-                </Button>
-              )}
-              <Button
-                size="sm" variant="outline"
-                onClick={() => handleResetPassword(user)}
-                disabled={!!actionLoading[user.user_id]}
-                className="flex-1 text-[11px] h-9 border-white/10 text-white/60 rounded-xl"
-              >
-                {actionLoading[user.user_id] === "reset" ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : "Reset PWD"}
-              </Button>
-              <Link
-                to={`/admin/orders?agent=${encodeURIComponent(user.full_name || user.email)}`}
-                className="flex-1 h-9 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-400 hover:bg-blue-500/20 transition-colors text-[11px] font-bold"
-              >
-                Sales
-              </Link>
-              <Button
-                size="sm" variant="destructive"
-                onClick={() => handleDeleteUser(user)}
-                disabled={!!actionLoading[user.user_id] || currentUser?.id === user.user_id}
-                className="flex-1 text-[11px] h-9 rounded-xl"
-              >
-                {actionLoading[user.user_id] === "delete" ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : "Delete"}
-              </Button>
+            <div className="flex items-center gap-2">
+               <Button 
+                 size="sm" 
+                 variant="outline"
+                 onClick={() => handleBulkSuspend(true)}
+                 disabled={bulkActionLoading}
+                 className="h-9 rounded-xl border-white/10 text-xs font-bold gap-2"
+               >
+                 <Ban className="w-3.5 h-3.5 text-red-400" /> Suspend
+               </Button>
+               <Button 
+                 size="sm" 
+                 variant="outline"
+                 onClick={() => handleBulkSuspend(false)}
+                 disabled={bulkActionLoading}
+                 className="h-9 rounded-xl border-white/10 text-xs font-bold gap-2"
+               >
+                 <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" /> Restore
+               </Button>
+               <Button 
+                 size="sm" 
+                 onClick={handleBulkSMS}
+                 disabled={bulkActionLoading}
+                 className="h-9 rounded-xl bg-blue-500 hover:bg-blue-600 text-white text-xs font-bold gap-2"
+               >
+                 <MessageCircle className="w-3.5 h-3.5" /> Send Bulk SMS
+               </Button>
+               <Button 
+                 size="sm" 
+                 variant="ghost"
+                 onClick={() => setSelectedUsers([])}
+                 className="h-9 rounded-xl text-white/30 hover:text-white"
+               >
+                 Cancel
+               </Button>
             </div>
           </div>
-        ))}
-      </div>
+        </div>
+      )}
 
       {hasMore && (
         <div className="pt-8 flex justify-center">
@@ -458,7 +485,7 @@ const AdminUsers = () => {
         </div>
       )}
 
-      <p className="text-xs text-white/30 text-center mt-4">Showing {users.length} of {totalCount} total users</p>
+      <UserDetailDrawer user={selectedUser} onClose={() => setSelectedUser(null)} />
     </div>
   );
 };

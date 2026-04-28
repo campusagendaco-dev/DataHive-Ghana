@@ -79,7 +79,12 @@ const InstallPrompt = () => {
       <div className="flex-1 min-w-0">
         <div className="flex justify-between items-start mb-1">
           <h3 className="font-display font-bold text-base tracking-tight leading-tight">Install SwiftData App</h3>
-          <button onClick={handleDismiss} className="text-muted-foreground hover:text-foreground transition-colors -mt-1 -mr-1 p-1">
+          <button 
+            onClick={handleDismiss} 
+            aria-label="Dismiss install prompt"
+            title="Dismiss"
+            className="text-muted-foreground hover:text-foreground transition-colors -mt-1 -mr-1 p-1"
+          >
             <X className="w-4 h-4" />
           </button>
         </div>

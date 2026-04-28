@@ -6,6 +6,7 @@ import {
   Target, Crown, Star, Zap, Users, BarChart3, RefreshCw,
 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
+import SpinTheWheel from "@/components/SpinTheWheel";
 
 interface LeaderboardEntry {
   rank_position: number;
@@ -184,6 +185,7 @@ const DashboardLeaderboard = () => {
           </div>
         </div>
       </div>
+      <SpinTheWheel />
 
       {/* ── Podium (top 3) ───────────────────────────────────────────────── */}
       {topThree.length > 0 && (

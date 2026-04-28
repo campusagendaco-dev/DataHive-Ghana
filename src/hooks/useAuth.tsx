@@ -112,7 +112,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }, 7000);
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (_event, session) => {
+      async (event, session) => {
         try {
           if (!mounted) return;
           setSession(session);
@@ -125,6 +125,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             ]).catch((error) => {
               console.error("Background auth profile refresh failed:", error);
             });
+            // Log IP on every fresh sign-in (not on token refreshes)
+            if (event === "SIGNED_IN") {
+              void supabase.functions.invoke("log-user-activity", {
+                headers: { Authorization: `Bearer ${session.access_token}` },
+              });
+            }
           } else {
             setProfile(null);
             setIsAdmin(false);

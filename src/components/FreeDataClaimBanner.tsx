@@ -150,6 +150,7 @@ const FreeDataClaimBanner = () => {
           <button
             onClick={handleClaim}
             disabled={claiming}
+            aria-label={claiming ? "Claiming free data" : "Claim free data now"}
             className="flex items-center gap-2 px-5 py-2.5 rounded-xl font-black text-sm text-black transition-all hover:scale-105 active:scale-95 disabled:opacity-60"
             style={{ background: accentColor }}
           >
@@ -158,6 +159,8 @@ const FreeDataClaimBanner = () => {
           </button>
           <button
             onClick={() => setDismissed(true)}
+            aria-label="Dismiss banner"
+            title="Dismiss banner"
             className="w-8 h-8 rounded-xl bg-white/5 flex items-center justify-center text-white/40 hover:text-white/70 hover:bg-white/10 transition-colors"
           >
             <X className="w-4 h-4" />

@@ -1,5 +1,6 @@
 -- Fix public_system_settings view to include missing free_data columns
-CREATE OR REPLACE VIEW public.public_system_settings AS
+DROP VIEW IF EXISTS public.public_system_settings;
+CREATE VIEW public.public_system_settings AS
 SELECT
   id,
   holiday_mode_enabled,
