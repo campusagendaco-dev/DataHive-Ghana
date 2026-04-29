@@ -122,7 +122,7 @@ const AdminWithdrawals = () => {
       .order("created_at", { ascending: false })
       .limit(500);
 
-    const rows = (data || []) as WithdrawalRow[];
+    const rows = (data || []) as unknown as WithdrawalRow[];
 
     const agentIds = [...new Set(rows.map(r => r.agent_id))];
     if (agentIds.length > 0) {
@@ -222,7 +222,7 @@ const AdminWithdrawals = () => {
   const toggleSelect = (id: string) => {
     setSelectedIds(prev => {
       const next = new Set(prev);
-      next.has(id) ? next.delete(id) : next.add(id);
+      if (next.has(id)) next.delete(id); else next.add(id);
       return next;
     });
   };
@@ -453,10 +453,12 @@ const AdminWithdrawals = () => {
 
           <input
             type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)}
+            title="From date" placeholder="From"
             className="px-3 py-2 rounded-lg text-xs bg-secondary border border-border text-foreground"
           />
           <input
             type="date" value={dateTo} onChange={e => setDateTo(e.target.value)}
+            title="To date" placeholder="To"
             className="px-3 py-2 rounded-lg text-xs bg-secondary border border-border text-foreground"
           />
 

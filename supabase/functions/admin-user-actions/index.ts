@@ -67,7 +67,8 @@ type AdminUserAction =
   | "purge_test_accounts"
   | "bulk_suspend_users"
   | "manage_blacklist"
-  | "paystack_payout";
+  | "paystack_payout"
+  | "reject_withdrawal";
 
 
 
@@ -931,6 +932,41 @@ serve(async (req: Request) => {
           const { error: delError } = await supabaseAdmin.from("security_blacklist").delete().eq("value", value);
           if (delError) throw delError;
         }
+        return new Response(JSON.stringify({ success: true }), {
+          status: 200,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      case "reject_withdrawal": {
+        const { withdrawal_id, reason } = body;
+        if (!withdrawal_id || !isValidUuid(withdrawal_id)) {
+          return new Response(JSON.stringify({ error: "Invalid or missing withdrawal_id" }), {
+            status: 400,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+
+        const { data: wd } = await supabaseAdmin
+          .from("withdrawals")
+          .select("status")
+          .eq("id", withdrawal_id)
+          .maybeSingle();
+
+        if (!wd || wd.status !== "pending") {
+          return new Response(JSON.stringify({ error: "Withdrawal is not pending" }), {
+            status: 400,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+
+        const { error: updateError } = await supabaseAdmin
+          .from("withdrawals")
+          .update({ status: "failed", failure_reason: reason || "Rejected by admin" })
+          .eq("id", withdrawal_id);
+
+        if (updateError) throw updateError;
+
         return new Response(JSON.stringify({ success: true }), {
           status: 200,
           headers: { ...corsHeaders, "Content-Type": "application/json" },

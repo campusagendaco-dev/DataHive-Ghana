@@ -1,688 +1,516 @@
-import { type ReactNode, useEffect, useState, useCallback } from "react";
+import { type ReactNode, useEffect, useState, useCallback, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import type { LucideIcon } from "lucide-react";
 import {
-  Shield, Globe, AlertTriangle, Clock, RefreshCw,
-  Loader2, CheckCircle2, Eye, Search, Zap, Gift,
-  TrendingUp, FileDown, Activity, BookOpen, Hash,
-  BarChart2, Ban, ChevronDown,
+  Shield, Globe, AlertTriangle, Clock, RefreshCw, Loader2, CheckCircle2,
+  Eye, Search, Zap, Gift, TrendingUp, FileDown, Activity, BookOpen, Hash,
+  BarChart2, Ban, ChevronDown, ChevronUp, Copy, Lock, ShieldAlert,
+  UserX, MapPin, LogIn, AlertCircle, Flame, Filter,
 } from "lucide-react";
 
-import { cn } from "@/lib/utils";
+/* ─── interfaces ──────────────────────────────────────────────────── */
 
 interface ProfileRow {
-  user_id: string;
-  full_name: string;
-  email: string;
-  last_ip: string | null;
-  last_seen_at: string | null;
-  last_location: string | null;
-  login_count: number;
-  is_agent: boolean;
-  agent_approved: boolean;
-  is_sub_agent: boolean;
-  referred_by: string | null;
-  created_at: string;
-  is_suspended: boolean;
+  user_id: string; full_name: string; email: string;
+  last_ip: string | null; last_seen_at: string | null;
+  last_location: string | null; login_count: number;
+  is_agent: boolean; agent_approved: boolean; is_sub_agent: boolean;
+  referred_by: string | null; created_at: string; is_suspended: boolean;
 }
-
-interface IpCluster {
-  ip: string;
-  location: string | null;
-  accounts: ProfileRow[];
-}
-
+interface IpCluster  { ip: string; location: string | null; accounts: ProfileRow[] }
 interface RecentLogin {
-  user_id: string;
-  full_name: string;
-  email: string;
-  last_ip: string | null;
-  last_seen_at: string | null;
-  last_location: string | null;
-  login_count: number;
-  is_agent: boolean;
+  user_id: string; full_name: string; email: string;
+  last_ip: string | null; last_seen_at: string | null;
+  last_location: string | null; login_count: number; is_agent: boolean;
 }
-
-interface SystemSettings {
-  maintenance_mode: boolean;
-  registration_enabled: boolean;
-  dark_mode_enabled: boolean;
-  store_visitor_popup_enabled: boolean;
-}
-
 interface VelocityAccount {
-  user_id: string;
-  full_name: string;
-  email: string;
-  joined_at: string;
-  first_order_at: string;
-  minutes_to_first_order: number;
+  user_id: string; full_name: string; email: string;
+  joined_at: string; first_order_at: string; minutes_to_first_order: number;
 }
-
 interface ReferralGroup {
-  referrer_id: string;
-  referrer_name: string;
-  referrer_email: string;
-  count: number;
-  members: { user_id: string; full_name: string; email: string }[];
+  referrer_id: string; referrer_name: string; referrer_email: string;
+  count: number; members: { user_id: string; full_name: string; email: string }[];
 }
-
 interface FailedOrderUser {
-  user_id: string;
-  full_name: string;
-  email: string;
-  total: number;
-  failed: number;
-  rate: number;
+  user_id: string; full_name: string; email: string;
+  total: number; failed: number; rate: number;
 }
-
-interface SignupDay {
-  date: string;
-  count: number;
-}
-
+interface SignupDay   { date: string; count: number }
 interface AdminAction {
-  id: string;
-  admin_email: string;
-  action: string;
-  target_email: string | null;
-  metadata: Record<string, unknown>;
-  created_at: string;
+  id: string; admin_email: string; action: string;
+  target_email: string | null; metadata: Record<string, unknown>; created_at: string;
+}
+interface LiveAlert   { id: string; message: string; time: Date }
+interface SystemSettings {
+  maintenance_mode: boolean; registration_enabled: boolean;
+  dark_mode_enabled: boolean; store_visitor_popup_enabled: boolean;
 }
 
-interface Alert {
-  id: string;
-  message: string;
-  time: Date;
-}
+/* ─── helpers ─────────────────────────────────────────────────────── */
 
 const roleLabel = (p: ProfileRow) => {
-  if (p.is_sub_agent) return { label: "Sub-Agent", cls: "bg-blue-500/20 text-blue-400 border-blue-500/30" };
-  if (p.is_agent && p.agent_approved) return { label: "Agent", cls: "bg-green-500/20 text-green-400 border-green-500/30" };
-  if (p.is_agent) return { label: "Agent (Pending)", cls: "bg-amber-500/20 text-amber-400 border-amber-500/30" };
-  return { label: "Customer", cls: "bg-white/5 text-white/40 border-white/10" };
+  if (p.is_sub_agent)                      return { label: "Sub-Agent",      cls: "bg-blue-500/20 text-blue-400 border-blue-500/30" };
+  if (p.is_agent && p.agent_approved)      return { label: "Agent",          cls: "bg-green-500/20 text-green-400 border-green-500/30" };
+  if (p.is_agent)                          return { label: "Pending Agent",  cls: "bg-amber-500/20 text-amber-400 border-amber-500/30" };
+  return                                          { label: "Customer",       cls: "bg-white/5 text-white/40 border-white/10" };
 };
 
 const exportCsv = (rows: Record<string, unknown>[], filename: string) => {
   if (!rows.length) return;
-  const headers = Object.keys(rows[0]);
-  const csv = [
-    headers.join(","),
-    ...rows.map(r => headers.map(h => JSON.stringify(r[h] ?? "")).join(",")),
-  ].join("\n");
-  const url = URL.createObjectURL(new Blob([csv], { type: "text/csv" }));
+  const keys = Object.keys(rows[0]);
+  const csv  = [keys.join(","), ...rows.map(r => keys.map(k => JSON.stringify(r[k] ?? "")).join(","))].join("\n");
+  const url  = URL.createObjectURL(new Blob([csv], { type: "text/csv" }));
   Object.assign(document.createElement("a"), { href: url, download: filename }).click();
   URL.revokeObjectURL(url);
 };
 
-interface SectionProps {
-  icon: LucideIcon;
-  title: string;
-  badge: ReactNode;
-  iconColor: string;
-  children: ReactNode;
-  onExport?: () => void;
-  defaultOpen?: boolean;
-}
+const fmt = (d: string | null) => d ? new Date(d).toLocaleString("en-GH", { dateStyle: "short", timeStyle: "short" }) : "—";
 
-const Section = ({ icon: Icon, title, badge, iconColor, children, onExport, defaultOpen = true }: SectionProps) => {
+/* ─── sub-components ──────────────────────────────────────────────── */
+
+const Badge = ({ children, className = "" }: { children: ReactNode; className?: string }) => (
+  <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-black border ${className}`}>{children}</span>
+);
+
+const SectionCard = ({ title, count, icon: Icon, color, children, onExport, defaultOpen = true }: {
+  title: string; count?: number; icon: typeof Shield; color: string;
+  children: ReactNode; onExport?: () => void; defaultOpen?: boolean;
+}) => {
   const [open, setOpen] = useState(defaultOpen);
   return (
-    <div>
-      <div className="flex items-center justify-between mb-4">
+    <div className="rounded-2xl border border-white/8 bg-white/[0.02] overflow-hidden">
+      <button
+        type="button"
+        onClick={() => setOpen(o => !o)}
+        className="w-full flex items-center justify-between px-5 py-4 hover:bg-white/[0.03] transition-colors"
+      >
         <div className="flex items-center gap-3">
-          <button
-            type="button"
-            onClick={() => setOpen(o => !o)}
-            className="flex items-center gap-2 cursor-pointer group bg-transparent border-none p-0 text-left outline-none"
-          >
-            <Icon className={`w-4 h-4 ${iconColor} group-hover:scale-110 transition-transform`} />
-            <h2 className="font-black text-lg text-white group-hover:text-white/80 transition-colors">{title}</h2>
-            <ChevronDown className={`w-4 h-4 text-white/30 transition-transform ${open ? "rotate-180" : ""} group-hover:text-white/60`} />
-          </button>
-          {badge}
+          <div className={`p-2 rounded-xl ${color.replace("text-", "bg-").replace("400", "500/10")} border ${color.replace("text-", "border-").replace("400", "500/20")}`}>
+            <Icon className={`w-4 h-4 ${color}`} />
+          </div>
+          <span className="font-black text-white text-sm">{title}</span>
+          {count !== undefined && (
+            <span className={`text-[10px] font-black px-2 py-0.5 rounded-full border ${
+              count > 0 ? `${color.replace("text-", "bg-").replace("400", "500/20")} ${color} ${color.replace("text-", "border-").replace("400", "500/30")}` : "bg-green-500/20 text-green-400 border-green-500/30"
+            }`}>{count}</span>
+          )}
         </div>
-        {onExport && (
-          <button
-            type="button"
-            onClick={onExport}
-            className="flex items-center gap-1.5 text-[11px] text-white/30 hover:text-white/60 transition-colors"
-          >
-            <FileDown className="w-3.5 h-3.5" /> Export CSV
-          </button>
-        )}
-      </div>
-      {open && children}
+        <div className="flex items-center gap-2">
+          {onExport && (
+            <button
+              type="button"
+              onClick={e => { e.stopPropagation(); onExport(); }}
+              className="flex items-center gap-1 text-[10px] text-white/30 hover:text-white/60 transition-colors px-2 py-1 rounded-lg hover:bg-white/5"
+            >
+              <FileDown className="w-3 h-3" /> CSV
+            </button>
+          )}
+          {open ? <ChevronUp className="w-4 h-4 text-white/30" /> : <ChevronDown className="w-4 h-4 text-white/30" />}
+        </div>
+      </button>
+      {open && <div className="border-t border-white/5 p-5">{children}</div>}
     </div>
   );
 };
 
-const EmptyState = ({ message }: { message: string }) => (
-  <div className="rounded-2xl border border-white/5 bg-white/[0.02] p-8 text-center">
-    <CheckCircle2 className="w-7 h-7 text-green-400 mx-auto mb-2" />
-    <p className="text-sm text-white/50">{message}</p>
+const EmptyState = ({ icon: Icon = CheckCircle2, message }: { icon?: typeof Shield; message: string }) => (
+  <div className="flex flex-col items-center justify-center py-10 gap-3 opacity-40">
+    <Icon className="w-8 h-8 text-green-400" />
+    <p className="text-sm text-white/60 text-center">{message}</p>
   </div>
 );
 
+const TH = ({ children }: { children: ReactNode }) => (
+  <th className="text-left px-4 py-3 text-[10px] font-black uppercase tracking-widest text-white/30 whitespace-nowrap">{children}</th>
+);
+
+/* ─── main component ──────────────────────────────────────────────── */
+
+type TabId = "overview" | "threats" | "activity" | "access" | "audit";
+
+const TABS: { id: TabId; label: string; icon: typeof Shield }[] = [
+  { id: "overview",  label: "Overview",       icon: Shield      },
+  { id: "threats",   label: "Threats",        icon: ShieldAlert },
+  { id: "activity",  label: "Activity",       icon: Activity    },
+  { id: "access",    label: "Access Control", icon: Lock        },
+  { id: "audit",     label: "Audit Log",      icon: BookOpen    },
+];
+
 const AdminSecurity = () => {
-  const { toast } = useToast();
-  const [clusters, setClusters] = useState<IpCluster[]>([]);
-  const [recentLogins, setRecentLogins] = useState<RecentLogin[]>([]);
-  const [velocityAccounts, setVelocityAccounts] = useState<VelocityAccount[]>([]);
-  const [referralGroups, setReferralGroups] = useState<ReferralGroup[]>([]);
-  const [highLogins, setHighLogins] = useState<ProfileRow[]>([]);
-  const [failedUsers, setFailedUsers] = useState<FailedOrderUser[]>([]);
-  const [signupTrend, setSignupTrend] = useState<SignupDay[]>([]);
-  const [actionLog, setActionLog] = useState<AdminAction[]>([]);
-  const [alerts, setAlerts] = useState<Alert[]>([]);
-  const [suspendedCount, setSuspendedCount] = useState(0);
-  const [loading, setLoading] = useState(true);
-  const [purging, setPurging] = useState(false);
+  const { toast }           = useToast();
+  const { session }         = useAuth();
+  const [tab, setTab]       = useState<TabId>("overview");
   const [search, setSearch] = useState("");
+  const [loading, setLoading]   = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [purging,  setPurging]  = useState(false);
   const [expandedIp, setExpandedIp] = useState<string | null>(null);
-  const [blacklist, setBlacklist] = useState<{id: string, type: string, value: string, reason: string}[]>([]);
-  const [sysSettings, setSysSettings] = useState<SystemSettings | null>(null);
 
-  const fetchData = useCallback(async () => {
-    setLoading(true);
-    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
-    const fourteenDaysAgo = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString();
-    setLoading(true);
+  /* data */
+  const [clusters,       setClusters]       = useState<IpCluster[]>([]);
+  const [recentLogins,   setRecentLogins]   = useState<RecentLogin[]>([]);
+  const [velocityAccts,  setVelocityAccts]  = useState<VelocityAccount[]>([]);
+  const [referralGroups, setReferralGroups] = useState<ReferralGroup[]>([]);
+  const [highLogins,     setHighLogins]     = useState<ProfileRow[]>([]);
+  const [failedUsers,    setFailedUsers]    = useState<FailedOrderUser[]>([]);
+  const [signupTrend,    setSignupTrend]    = useState<SignupDay[]>([]);
+  const [actionLog,      setActionLog]      = useState<AdminAction[]>([]);
+  const [blacklist,      setBlacklist]      = useState<{ id: string; type: string; value: string; reason: string }[]>([]);
+  const [sysSettings,    setSysSettings]    = useState<SystemSettings | null>(null);
+  const [liveAlerts,     setLiveAlerts]     = useState<LiveAlert[]>([]);
+  const [suspendedCount, setSuspendedCount] = useState(0);
 
-    const [profilesRes, recentRes, velocityRes, ordersRes, signupsRes, actionRes, blacklistRes, settingsRes] = await Promise.all([
-      (supabase as any)
-        .from("profiles")
-        .select("user_id, full_name, email, last_ip, last_seen_at, last_location, login_count, is_agent, agent_approved, is_sub_agent, referred_by, created_at, is_suspended")
-        .order("created_at", { ascending: false })
-        .limit(2000),
+  /* blacklist form state */
+  const [blType,   setBlType]   = useState("ip");
+  const [blValue,  setBlValue]  = useState("");
+  const [blReason, setBlReason] = useState("");
 
-      (supabase as any)
-        .from("profiles")
-        .select("user_id, full_name, email, last_ip, last_seen_at, last_location, login_count, is_agent")
-        .not("last_seen_at", "is", null)
-        .order("last_seen_at", { ascending: false })
-        .limit(30),
+  /* ── fetch ──────────────────────────────────────────────────────── */
+  const fetchData = useCallback(async (silent = false) => {
+    if (silent) setRefreshing(true); else setLoading(true);
+    const d30 = new Date(Date.now() - 30 * 864e5).toISOString();
+    const d14 = new Date(Date.now() - 14 * 864e5).toISOString();
 
-      (supabase as any).rpc("get_velocity_accounts"),
+    const [profilesRes, recentRes, velocityRes, ordersRes, signupsRes, actionRes, blacklistRes, settingsRes] =
+      await Promise.all([
+        (supabase as any).from("profiles")
+          .select("user_id,full_name,email,last_ip,last_seen_at,last_location,login_count,is_agent,agent_approved,is_sub_agent,referred_by,created_at,is_suspended")
+          .order("created_at", { ascending: false }).limit(2000),
+        (supabase as any).from("profiles")
+          .select("user_id,full_name,email,last_ip,last_seen_at,last_location,login_count,is_agent")
+          .not("last_seen_at", "is", null).order("last_seen_at", { ascending: false }).limit(30),
+        (supabase as any).rpc("get_velocity_accounts"),
+        supabase.from("orders").select("agent_id,status").gte("created_at", d30).limit(5000),
+        (supabase as any).from("profiles").select("created_at").gte("created_at", d14).order("created_at", { ascending: true }),
+        (supabase as any).from("admin_action_log")
+          .select("id,admin_email,action,target_email,metadata,created_at")
+          .order("created_at", { ascending: false }).limit(50),
+        supabase.from("security_blacklist").select("*"),
+        supabase.from("system_settings").select("*").eq("id", 1).maybeSingle(),
+      ]);
 
-      supabase
-        .from("orders")
-        .select("agent_id, status")
-        .gte("created_at", thirtyDaysAgo)
-        .limit(5000),
+    const profiles = (profilesRes.data || []) as unknown as ProfileRow[];
 
-      (supabase as any)
-        .from("profiles")
-        .select("created_at")
-        .gte("created_at", fourteenDaysAgo)
-        .order("created_at", { ascending: true }),
-
-      (supabase as any)
-        .from("admin_action_log")
-        .select("id, admin_email, action, target_email, metadata, created_at")
-        .order("created_at", { ascending: false })
-        .limit(50),
-
-      supabase.from("security_blacklist").select("*"),
-      supabase.from("system_settings").select("*").eq("id", 1).maybeSingle(),
-    ]);
-
-    const allProfiles = (profilesRes.data || []) as unknown as ProfileRow[];
-
-    // Shared IP clusters
+    /* shared IPs */
     const ipMap = new Map<string, ProfileRow[]>();
-    for (const row of allProfiles) {
-      if (!row.last_ip) continue;
-      const arr = ipMap.get(row.last_ip) || [];
-      arr.push(row);
-      ipMap.set(row.last_ip, arr);
-    }
-    const sharedClusters: IpCluster[] = [];
-    ipMap.forEach((accounts, ip) => {
-      if (accounts.length >= 2) {
-        sharedClusters.push({ ip, location: accounts.find(a => a.last_location)?.last_location ?? null, accounts });
-      }
-    });
-    sharedClusters.sort((a, b) => b.accounts.length - a.accounts.length);
+    profiles.forEach(p => { if (p.last_ip) { const a = ipMap.get(p.last_ip) || []; a.push(p); ipMap.set(p.last_ip, a); } });
+    const shared: IpCluster[] = [];
+    ipMap.forEach((accs, ip) => { if (accs.length >= 2) shared.push({ ip, location: accs.find(a => a.last_location)?.last_location ?? null, accounts: accs }); });
+    shared.sort((a, b) => b.accounts.length - a.accounts.length);
 
-    // High login frequency (50+)
-    const highLoginAccounts = allProfiles
-      .filter(p => (p.login_count ?? 0) >= 50)
-      .sort((a, b) => (b.login_count ?? 0) - (a.login_count ?? 0));
-
-    // Referral abuse (5+ signups from one referrer)
+    /* referral abuse */
     const refMap = new Map<string, ProfileRow[]>();
-    for (const p of allProfiles) {
-      if (!p.referred_by) continue;
-      const arr = refMap.get(p.referred_by) || [];
-      arr.push(p);
-      refMap.set(p.referred_by, arr);
-    }
+    profiles.forEach(p => { if (p.referred_by) { const a = refMap.get(p.referred_by) || []; a.push(p); refMap.set(p.referred_by, a); } });
     const groups: ReferralGroup[] = [];
-    refMap.forEach((members, referrerId) => {
+    refMap.forEach((members, rid) => {
       if (members.length >= 5) {
-        const referrer = allProfiles.find(p => p.user_id === referrerId);
-        groups.push({
-          referrer_id: referrerId,
-          referrer_name: referrer?.full_name || "Unknown",
-          referrer_email: referrer?.email || referrerId,
-          count: members.length,
-          members: members.map(m => ({ user_id: m.user_id, full_name: m.full_name, email: m.email })),
-        });
+        const r = profiles.find(p => p.user_id === rid);
+        groups.push({ referrer_id: rid, referrer_name: r?.full_name || "Unknown", referrer_email: r?.email || rid, count: members.length, members: members.map(m => ({ user_id: m.user_id, full_name: m.full_name, email: m.email })) });
       }
     });
     groups.sort((a, b) => b.count - a.count);
 
-    // Failed order rate (≥5 orders, ≥50% failure)
-    const orderStats = new Map<string, { total: number; failed: number }>();
-    for (const o of ((ordersRes.data || []) as { agent_id: string; status: string }[])) {
-      const s = orderStats.get(o.agent_id) || { total: 0, failed: 0 };
-      s.total++;
-      if (o.status === "failed" || o.status === "fulfillment_failed") s.failed++;
-      orderStats.set(o.agent_id, s);
-    }
+    /* failed order rate */
+    const os = new Map<string, { total: number; failed: number }>();
+    ((ordersRes.data || []) as { agent_id: string; status: string }[]).forEach(o => {
+      const s = os.get(o.agent_id) || { total: 0, failed: 0 };
+      s.total++; if (o.status === "failed" || o.status === "fulfillment_failed") s.failed++;
+      os.set(o.agent_id, s);
+    });
     const failed: FailedOrderUser[] = [];
-    orderStats.forEach((s, agentId) => {
+    os.forEach((s, id) => {
       if (s.total >= 5 && s.failed / s.total >= 0.5) {
-        const p = allProfiles.find(x => x.user_id === agentId);
-        if (p) failed.push({ user_id: agentId, full_name: p.full_name, email: p.email, total: s.total, failed: s.failed, rate: Math.round((s.failed / s.total) * 100) });
+        const p = profiles.find(x => x.user_id === id);
+        if (p) failed.push({ user_id: id, full_name: p.full_name, email: p.email, total: s.total, failed: s.failed, rate: Math.round((s.failed / s.total) * 100) });
       }
     });
     failed.sort((a, b) => b.rate - a.rate);
 
-    // Signup trend (last 14 days)
+    /* signup trend */
     const dayMap = new Map<string, number>();
-    for (let i = 13; i >= 0; i--) {
-      dayMap.set(new Date(Date.now() - i * 86400000).toISOString().slice(0, 10), 0);
-    }
-    for (const row of ((signupsRes.data || []) as { created_at: string }[])) {
-      const d = row.created_at.slice(0, 10);
-      if (dayMap.has(d)) dayMap.set(d, (dayMap.get(d) || 0) + 1);
-    }
-    const trend = Array.from(dayMap.entries()).map(([date, count]) => ({ date, count }));
+    for (let i = 13; i >= 0; i--) dayMap.set(new Date(Date.now() - i * 864e5).toISOString().slice(0, 10), 0);
+    ((signupsRes.data || []) as { created_at: string }[]).forEach(r => { const d = r.created_at.slice(0, 10); if (dayMap.has(d)) dayMap.set(d, (dayMap.get(d) || 0) + 1); });
 
-    setClusters(sharedClusters);
+    setClusters(shared);
     setRecentLogins((recentRes.data || []) as unknown as RecentLogin[]);
-    setVelocityAccounts(velocityRes.error ? [] : ((velocityRes.data || []) as unknown as VelocityAccount[]));
+    setVelocityAccts(velocityRes.error ? [] : (velocityRes.data || []) as unknown as VelocityAccount[]);
     setReferralGroups(groups);
-    setHighLogins(highLoginAccounts);
+    setHighLogins(profiles.filter(p => (p.login_count ?? 0) >= 50).sort((a, b) => (b.login_count ?? 0) - (a.login_count ?? 0)));
     setFailedUsers(failed);
-    setSignupTrend(trend);
+    setSignupTrend(Array.from(dayMap.entries()).map(([date, count]) => ({ date, count })));
     setActionLog((actionRes.data || []) as unknown as AdminAction[]);
     setBlacklist(blacklistRes.data || []);
     setSysSettings(settingsRes.data);
-    setSuspendedCount(allProfiles.filter(p => p.is_suspended).length);
-    setLoading(false);
+    setSuspendedCount(profiles.filter(p => p.is_suspended).length);
+    setLoading(false); setRefreshing(false);
   }, []);
 
   useEffect(() => { void fetchData(); }, [fetchData]);
 
-  // Real-time: push new logins into the recent logins feed + live alert strip
+  /* live realtime */
   useEffect(() => {
-    const channel = supabase
-      .channel("security-rt")
+    const ch = supabase.channel("sec-rt")
       .on("postgres_changes" as any, { event: "UPDATE", schema: "public", table: "profiles" }, (payload: any) => {
         const p = payload.new as RecentLogin;
         if (!p.last_seen_at) return;
         setRecentLogins(prev => [p, ...prev.filter(l => l.user_id !== p.user_id)].slice(0, 30));
-        setAlerts(prev => [{
-          id: Math.random().toString(36).slice(2),
-          message: `Login: ${p.full_name || p.email || "Unknown"} — ${p.last_ip || "no IP"}${p.last_location ? ` · ${p.last_location}` : ""}`,
-          time: new Date(),
-        }, ...prev].slice(0, 10));
-      })
-      .subscribe();
-    return () => { channel.unsubscribe(); };
+        setLiveAlerts(prev => [{ id: Math.random().toString(36).slice(2), message: `${p.full_name || p.email || "Unknown"} logged in${p.last_ip ? ` from ${p.last_ip}` : ""}${p.last_location ? ` · ${p.last_location}` : ""}`, time: new Date() }, ...prev].slice(0, 15));
+      }).subscribe();
+    return () => { ch.unsubscribe(); };
   }, []);
 
-  const copyIp = (ip: string) => {
-    void navigator.clipboard.writeText(ip);
-    toast({ title: "IP copied", description: ip });
-  };
+  /* ── actions ────────────────────────────────────────────────────── */
+  const invoke = useCallback(async (body: Record<string, unknown>) => {
+    const { data, error } = await supabase.functions.invoke("admin-user-actions", {
+      body, headers: { Authorization: `Bearer ${session?.access_token}` },
+    });
+    if (error || data?.error) throw new Error(data?.error || error?.message || "Unknown error");
+    return data;
+  }, [session]);
 
   const handlePurge = async () => {
-    if (!confirm("Are you sure? This will delete all 'apitest' and '@example.com' accounts, wallets, and orders.")) return;
+    if (!confirm("Delete all test accounts (@example.com / apitest)?")) return;
     setPurging(true);
     try {
-      const { data, error } = await supabase.functions.invoke("admin-user-actions", {
-        body: { action: "purge_test_accounts" },
-        headers: { Authorization: `Bearer ${session?.access_token}` }
-      });
-      if (error) throw error;
-      toast({ title: "Purge Complete", description: `Deleted ${data.deleted_count} test accounts.` });
-      void fetchData();
-    } catch (err: any) {
-      toast({ title: "Purge Failed", description: err.message, variant: "destructive" });
-    } finally {
-      setPurging(false);
-    }
+      const d = await invoke({ action: "purge_test_accounts" });
+      toast({ title: "Purged", description: `${d.deleted_count} accounts deleted` });
+      void fetchData(true);
+    } catch (e: any) { toast({ title: "Purge Failed", description: e.message, variant: "destructive" }); }
+    setPurging(false);
   };
 
-  const handleBulkSuspend = async (userIds: string[], suspend: boolean) => {
+  const handleBulkSuspend = async (ids: string[], suspend: boolean) => {
     try {
-      const { error } = await supabase.functions.invoke("admin-user-actions", {
-        body: { action: "bulk_suspend_users", user_ids: userIds, suspend },
-        headers: { Authorization: `Bearer ${session?.access_token}` }
-      });
-      if (error) throw error;
-      toast({ title: suspend ? "Accounts Suspended" : "Accounts Restored", description: `${userIds.length} accounts updated.` });
-      void fetchData();
-    } catch (err: any) {
-      toast({ title: "Bulk Action Failed", description: err.message, variant: "destructive" });
-    }
+      await invoke({ action: "bulk_suspend_users", user_ids: ids, suspend });
+      toast({ title: suspend ? `${ids.length} accounts suspended` : `${ids.length} accounts restored` });
+      void fetchData(true);
+    } catch (e: any) { toast({ title: "Action Failed", description: e.message, variant: "destructive" }); }
   };
 
-  const handleBlacklist = async (op: "add" | "remove", type?: string, value?: string, reason?: string) => {
+  const handleBlacklist = async (op: "add" | "remove", value: string, type?: string, reason?: string) => {
     try {
-      const { error } = await supabase.functions.invoke("admin-user-actions", {
-        body: { action: "manage_blacklist", op, type, value, reason },
-        headers: { Authorization: `Bearer ${session?.access_token}` }
-      });
-      if (error) throw error;
-      toast({ title: op === "add" ? "Added to Blacklist" : "Removed from Blacklist" });
-      void fetchData();
-    } catch (err: any) {
-      toast({ title: "Blacklist Update Failed", description: err.message, variant: "destructive" });
-    }
+      await invoke({ action: "manage_blacklist", op, type, value, reason });
+      toast({ title: op === "add" ? "Added to blocklist" : "Removed from blocklist" });
+      if (op === "add") { setBlValue(""); setBlReason(""); }
+      void fetchData(true);
+    } catch (e: any) { toast({ title: "Blocklist Error", description: e.message, variant: "destructive" }); }
   };
 
-  const toggleSystemSetting = async (key: string, value: boolean) => {
+  const toggleSetting = async (key: string, val: boolean) => {
     try {
-      const { error } = await supabase.functions.invoke("admin-user-actions", {
-        body: { action: "update_system_settings", settings: { [key]: value } },
-        headers: { Authorization: `Bearer ${session?.access_token}` }
-      });
-      if (error) throw error;
-      toast({ title: "Setting Updated" });
-      void fetchData();
-    } catch (err: any) {
-      toast({ title: "Update Failed", description: err.message, variant: "destructive" });
-    }
+      await invoke({ action: "update_system_settings", settings: { [key]: val } });
+      setSysSettings(prev => prev ? { ...prev, [key]: val } : prev);
+      toast({ title: "Setting updated" });
+    } catch (e: any) { toast({ title: "Update Failed", description: e.message, variant: "destructive" }); }
   };
 
-  const s = search.toLowerCase();
-  const filteredClusters = clusters.filter(c =>
-    !s || c.ip.includes(s) || c.accounts.some(a => a.full_name?.toLowerCase().includes(s) || a.email?.toLowerCase().includes(s))
-  );
-  const filteredLogins = recentLogins.filter(r =>
-    !s || r.full_name?.toLowerCase().includes(s) || r.email?.toLowerCase().includes(s) || r.last_ip?.includes(s)
-  );
-  const filteredHighLogins = highLogins.filter(p =>
-    !s || p.full_name?.toLowerCase().includes(s) || p.email?.toLowerCase().includes(s)
-  );
-  const filteredFailed = failedUsers.filter(u =>
-    !s || u.full_name?.toLowerCase().includes(s) || u.email?.toLowerCase().includes(s)
-  );
-  const filteredVelocity = velocityAccounts.filter(v =>
-    !s || v.full_name?.toLowerCase().includes(s) || v.email?.toLowerCase().includes(s)
-  );
-  const filteredReferrals = referralGroups.filter(g =>
-    !s || g.referrer_name?.toLowerCase().includes(s) || g.referrer_email?.toLowerCase().includes(s)
+  const copyText = (t: string, label = "Copied") => {
+    void navigator.clipboard.writeText(t);
+    toast({ title: label, description: t });
+  };
+
+  /* ── filtered views ─────────────────────────────────────────────── */
+  const q = search.toLowerCase();
+  const fClusters  = useMemo(() => clusters.filter(c => !q || c.ip.includes(q) || c.accounts.some(a => a.full_name?.toLowerCase().includes(q) || a.email?.toLowerCase().includes(q))), [clusters, q]);
+  const fLogins    = useMemo(() => recentLogins.filter(r => !q || r.full_name?.toLowerCase().includes(q) || r.email?.toLowerCase().includes(q) || r.last_ip?.includes(q)), [recentLogins, q]);
+  const fHighLogin = useMemo(() => highLogins.filter(p => !q || p.full_name?.toLowerCase().includes(q) || p.email?.toLowerCase().includes(q)), [highLogins, q]);
+  const fFailed    = useMemo(() => failedUsers.filter(u => !q || u.full_name?.toLowerCase().includes(q) || u.email?.toLowerCase().includes(q)), [failedUsers, q]);
+  const fVelocity  = useMemo(() => velocityAccts.filter(v => !q || v.full_name?.toLowerCase().includes(q) || v.email?.toLowerCase().includes(q)), [velocityAccts, q]);
+  const fReferrals = useMemo(() => referralGroups.filter(g => !q || g.referrer_name?.toLowerCase().includes(q) || g.referrer_email?.toLowerCase().includes(q)), [referralGroups, q]);
+
+  /* ── health score ───────────────────────────────────────────────── */
+  const healthScore = Math.max(0, 100 - clusters.length * 5 - referralGroups.length * 8 - failedUsers.length * 2 - (velocityAccts.length > 5 ? 10 : 0));
+  const scoreColor  = healthScore >= 80 ? "text-green-400" : healthScore >= 60 ? "text-amber-400" : "text-red-400";
+  const scoreBg     = healthScore >= 80 ? "from-green-500/10"  : healthScore >= 60 ? "from-amber-500/10" : "from-red-500/10";
+  const scoreLabel  = healthScore >= 80 ? "Healthy" : healthScore >= 60 ? "At Risk" : "Critical";
+
+  const maxSignup   = Math.max(...signupTrend.map(d => d.count), 1);
+
+  const STATS = [
+    { label: "Shared IPs",    value: clusters.length,       icon: Globe,        danger: clusters.length > 0,       color: "text-red-400",    bg: "bg-red-500/10 border-red-500/20"     },
+    { label: "Velocity Flags",value: velocityAccts.length,  icon: Zap,          danger: velocityAccts.length > 0,  color: "text-orange-400", bg: "bg-orange-500/10 border-orange-500/20"},
+    { label: "Referral Abuse",value: referralGroups.length, icon: Gift,         danger: referralGroups.length > 0, color: "text-purple-400", bg: "bg-purple-500/10 border-purple-500/20"},
+    { label: "High Logins",   value: highLogins.length,     icon: Hash,         danger: false,                     color: "text-amber-400",  bg: "bg-amber-500/10 border-amber-500/20"  },
+    { label: "High Fail Rate",value: failedUsers.length,    icon: TrendingUp,   danger: failedUsers.length > 0,    color: "text-red-400",    bg: "bg-red-500/10 border-red-500/20"     },
+    { label: "Suspended",     value: suspendedCount,        icon: UserX,        danger: suspendedCount > 0,        color: "text-rose-400",   bg: "bg-rose-500/10 border-rose-500/20"   },
+  ];
+
+  if (loading) return (
+    <div className="flex flex-col items-center justify-center h-64 gap-4">
+      <Loader2 className="w-8 h-8 text-amber-400 animate-spin" />
+      <p className="text-white/40 text-sm font-bold uppercase tracking-widest">Loading security data…</p>
+    </div>
   );
 
-  if (loading) {
-    return (
-      <div className="flex flex-col items-center justify-center h-64 gap-4">
-        <Loader2 className="w-8 h-8 text-amber-400 animate-spin" />
-        <p className="text-white/50 text-sm">Loading security data…</p>
-      </div>
-    );
-  }
-
-  const maxSignup = Math.max(...signupTrend.map(d => d.count), 1);
-
-  return (
-    <div className="space-y-8 pb-10">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 border-b border-white/5 pb-6">
-        <div>
-          <div className="flex items-center gap-2 mb-1">
-            <Shield className="w-5 h-5 text-amber-400" />
-            <h1 className="font-display text-3xl font-black tracking-tight bg-gradient-to-r from-white to-white/60 bg-clip-text text-transparent">
-              Security Center
-            </h1>
+  /* ── tab content ────────────────────────────────────────────────── */
+  const renderOverview = () => (
+    <div className="space-y-6">
+      {/* Top row: health + live feed */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        {/* Health score */}
+        <div className={`lg:col-span-2 rounded-2xl border border-white/8 bg-gradient-to-br ${scoreBg} to-transparent p-6`}>
+          <div className="flex items-start justify-between mb-5">
+            <div>
+              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-white/30 mb-1">Security Health</p>
+              <div className="flex items-baseline gap-3">
+                <span className={`text-6xl font-black italic tracking-tighter ${scoreColor}`}>{healthScore}</span>
+                <span className={`text-lg font-black ${scoreColor}`}>/ 100</span>
+                <span className={`text-sm font-black px-3 py-1 rounded-full border ${
+                  healthScore >= 80 ? "bg-green-500/20 text-green-400 border-green-500/30"
+                  : healthScore >= 60 ? "bg-amber-500/20 text-amber-400 border-amber-500/30"
+                  : "bg-red-500/20 text-red-400 border-red-500/30"
+                }`}>{scoreLabel}</span>
+              </div>
+            </div>
+            <Shield className={`w-12 h-12 ${scoreColor} opacity-20`} />
           </div>
-          <p className="text-sm text-white/50">Monitor IP activity, detect fraud patterns, and audit admin actions.</p>
-        </div>
-        <div className="flex items-center gap-2 flex-wrap">
-          <Button
-            onClick={handlePurge}
-            disabled={purging}
-            className="gap-2 bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 rounded-xl text-xs h-9"
-          >
-            {purging ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Ban className="w-3.5 h-3.5" />}
-            Purge Test Data
-          </Button>
-          
-          <div className="flex items-center gap-2 bg-white/5 p-1 rounded-xl border border-white/10">
-            <button
-              onClick={() => toggleSystemSetting("registration_enabled", !sysSettings?.registration_enabled)}
-              className={cn(
-                "px-3 py-1.5 rounded-lg text-[10px] font-black uppercase transition-all",
-                sysSettings?.registration_enabled ? "text-white/40 hover:text-white" : "bg-red-500 text-white shadow-lg shadow-red-500/20"
-              )}
-            >
-              {sysSettings?.registration_enabled ? "Reg Open" : "Reg Locked"}
-            </button>
-            <button
-              onClick={() => toggleSystemSetting("maintenance_mode", !sysSettings?.maintenance_mode)}
-              className={cn(
-                "px-3 py-1.5 rounded-lg text-[10px] font-black uppercase transition-all",
-                !sysSettings?.maintenance_mode ? "text-white/40 hover:text-white" : "bg-amber-500 text-black shadow-lg shadow-amber-500/20"
-              )}
-            >
-              {sysSettings?.maintenance_mode ? "Maintenance ON" : "Live"}
-            </button>
+          <div className="w-full h-2 bg-white/5 rounded-full overflow-hidden mb-5">
+            <div className={`h-full rounded-full transition-all duration-700 ${
+              healthScore >= 80 ? "bg-green-400" : healthScore >= 60 ? "bg-amber-400" : "bg-red-500"
+            }`} style={{ width: `${healthScore}%` }} />
           </div>
-
-          <Button
-            onClick={() => exportCsv([
-              ...clusters.flatMap(c => c.accounts.map(a => ({ section: "shared_ip", ip: c.ip, location: c.location, ...a } as Record<string, unknown>))),
-              ...velocityAccounts.map(v => ({ section: "velocity", ...v } as Record<string, unknown>)),
-              ...referralGroups.flatMap(g => g.members.map(m => ({ section: "referral_abuse", referrer: g.referrer_email, ...m } as Record<string, unknown>))),
-              ...failedUsers.map(u => ({ section: "failed_orders", ...u } as Record<string, unknown>)),
-            ], "security_export.csv")}
-            className="gap-2 bg-white/5 hover:bg-white/10 text-white border border-white/10 rounded-xl text-xs h-9"
-          >
-            <FileDown className="w-3.5 h-3.5" /> Export All
-          </Button>
-          <Button onClick={fetchData} className="gap-2 bg-white/5 hover:bg-white/10 text-white border border-white/10 rounded-xl h-9">
-            <RefreshCw className="w-4 h-4" />
-          </Button>
-        </div>
-      </div>
-
-      {/* Security Health Score */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2 rounded-3xl border border-white/5 bg-gradient-to-br from-white/[0.03] to-transparent p-6">
-          <div className="flex items-center justify-between mb-6">
-             <div>
-                <h3 className="text-xl font-black text-white italic">SECURITY HEALTH</h3>
-                <p className="text-xs text-white/40 uppercase tracking-widest font-bold">Platform integrity assessment</p>
-             </div>
-             <div className="text-right">
-                <span className={cn(
-                  "text-5xl font-black italic tracking-tighter",
-                  clusters.length > 5 || referralGroups.length > 3 ? "text-red-500" : "text-emerald-500"
-                )}>
-                  {Math.max(0, 100 - (clusters.length * 5) - (referralGroups.length * 10) - (failedUsers.length * 2))}%
-                </span>
-             </div>
-          </div>
-          
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-             <div className="space-y-3">
-                <p className="text-[10px] font-black text-white/30 uppercase tracking-[0.2em]">Active Risks</p>
-                <div className="space-y-2">
-                   {clusters.length > 0 && (
-                     <div className="flex items-center gap-3 text-xs text-red-400 bg-red-500/5 p-3 rounded-2xl border border-red-500/10">
-                        <AlertTriangle className="w-4 h-4 shrink-0" />
-                        <span>{clusters.length} shared IP clusters detected</span>
-                     </div>
-                   )}
-                   {referralGroups.length > 0 && (
-                     <div className="flex items-center gap-3 text-xs text-purple-400 bg-purple-500/5 p-3 rounded-2xl border border-purple-500/10">
-                        <Gift className="w-4 h-4 shrink-0" />
-                        <span>{referralGroups.length} referral abuse patterns</span>
-                     </div>
-                   )}
-                   {failedUsers.length > 0 && (
-                     <div className="flex items-center gap-3 text-xs text-orange-400 bg-orange-500/5 p-3 rounded-2xl border border-orange-500/10">
-                        <TrendingUp className="w-4 h-4 shrink-0" />
-                        <span>{failedUsers.length} users with high failure rate</span>
-                     </div>
-                   )}
-                </div>
-             </div>
-             <div className="space-y-3">
-                <p className="text-[10px] font-black text-white/30 uppercase tracking-[0.2em]">Recommendations</p>
-                <div className="space-y-2">
-                   {clusters.length > 0 && (
-                     <div className="flex items-center gap-3 text-xs text-white/60 bg-white/5 p-3 rounded-2xl border border-white/10">
-                        <Ban className="w-4 h-4 shrink-0 text-amber-400" />
-                        <span>Audit accounts on IP {clusters[0].ip}</span>
-                     </div>
-                   )}
-                   <div className="flex items-center gap-3 text-xs text-white/60 bg-white/5 p-3 rounded-2xl border border-white/10">
-                      <Shield className="w-4 h-4 shrink-0 text-emerald-400" />
-                      <span>Regularly rotate admin API keys</span>
-                   </div>
-                </div>
-             </div>
+          <div className="grid grid-cols-2 gap-3">
+            {clusters.length > 0 && (
+              <div className="flex items-center gap-2.5 p-3 rounded-xl bg-red-500/5 border border-red-500/10 text-xs text-red-400">
+                <AlertTriangle className="w-3.5 h-3.5 shrink-0" />{clusters.length} shared IP cluster{clusters.length !== 1 ? "s" : ""}
+              </div>
+            )}
+            {referralGroups.length > 0 && (
+              <div className="flex items-center gap-2.5 p-3 rounded-xl bg-purple-500/5 border border-purple-500/10 text-xs text-purple-400">
+                <Gift className="w-3.5 h-3.5 shrink-0" />{referralGroups.length} referral abuse pattern{referralGroups.length !== 1 ? "s" : ""}
+              </div>
+            )}
+            {failedUsers.length > 0 && (
+              <div className="flex items-center gap-2.5 p-3 rounded-xl bg-orange-500/5 border border-orange-500/10 text-xs text-orange-400">
+                <Flame className="w-3.5 h-3.5 shrink-0" />{failedUsers.length} high failure rate account{failedUsers.length !== 1 ? "s" : ""}
+              </div>
+            )}
+            {clusters.length === 0 && referralGroups.length === 0 && failedUsers.length === 0 && (
+              <div className="flex items-center gap-2.5 p-3 rounded-xl bg-green-500/5 border border-green-500/10 text-xs text-green-400 col-span-2">
+                <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />No active threats detected
+              </div>
+            )}
           </div>
         </div>
-        
-        {/* Live alert feed (moved inside) */}
-        <div className="rounded-3xl border border-cyan-500/20 bg-cyan-500/[0.04] p-6 flex flex-col">
+
+        {/* Live feed */}
+        <div className="rounded-2xl border border-cyan-500/20 bg-cyan-500/[0.03] p-5 flex flex-col">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
-              <Activity className="w-4 h-4 text-cyan-400 animate-pulse" />
-              <span className="text-xs font-black uppercase tracking-widest text-cyan-400">Live Traffic</span>
+              <span className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse" />
+              <span className="text-xs font-black uppercase tracking-widest text-cyan-400">Live Events</span>
             </div>
-            <button type="button" onClick={() => setAlerts([])} className="text-[10px] text-white/30 hover:text-white/60 uppercase font-black">
-              Clear
-            </button>
+            <button type="button" onClick={() => setLiveAlerts([])} className="text-[10px] text-white/20 hover:text-white/50 uppercase font-bold">Clear</button>
           </div>
-          <div className="flex-1 space-y-3 overflow-y-auto max-h-[200px] scrollbar-none">
-            {alerts.length === 0 ? (
-               <div className="flex flex-col items-center justify-center h-full opacity-20">
-                  <Globe className="w-8 h-8 mb-2" />
-                  <p className="text-[10px] font-bold">Waiting for events...</p>
-               </div>
-            ) : alerts.map(a => (
-              <div key={a.id} className="flex flex-col gap-1 text-xs border-l-2 border-cyan-500/30 pl-3 py-1">
-                <span className="text-cyan-400/50 font-mono text-[9px]">{a.time.toLocaleTimeString()}</span>
-                <p className="text-white/70 line-clamp-2">{a.message}</p>
+          <div className="flex-1 space-y-2 overflow-y-auto max-h-48 scrollbar-none">
+            {liveAlerts.length === 0 ? (
+              <div className="flex flex-col items-center justify-center h-full gap-2 opacity-20 py-6">
+                <Globe className="w-7 h-7" /><p className="text-[10px] font-bold uppercase">Waiting for events…</p>
+              </div>
+            ) : liveAlerts.map(a => (
+              <div key={a.id} className="flex flex-col gap-0.5 border-l-2 border-cyan-500/40 pl-3 py-1">
+                <span className="text-[9px] font-mono text-cyan-400/40">{a.time.toLocaleTimeString()}</span>
+                <p className="text-[11px] text-white/60 line-clamp-2">{a.message}</p>
               </div>
             ))}
           </div>
         </div>
       </div>
 
-      {/* Stats strip */}
+      {/* Stats grid */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-        {[
-          { label: "Shared IP Groups", value: clusters.length, icon: AlertTriangle, color: clusters.length > 0 ? "text-red-400" : "text-green-400", bg: clusters.length > 0 ? "bg-red-500/10 border-red-500/20" : "bg-green-500/10 border-green-500/20" },
-          { label: "Velocity Flags", value: velocityAccounts.length, icon: Zap, color: velocityAccounts.length > 0 ? "text-orange-400" : "text-green-400", bg: velocityAccounts.length > 0 ? "bg-orange-500/10 border-orange-500/20" : "bg-green-500/10 border-green-500/20" },
-          { label: "Referral Abuse", value: referralGroups.length, icon: Gift, color: referralGroups.length > 0 ? "text-purple-400" : "text-green-400", bg: referralGroups.length > 0 ? "bg-purple-500/10 border-purple-500/20" : "bg-green-500/10 border-green-500/20" },
-          { label: "High Logins", value: highLogins.length, icon: Hash, color: "text-amber-400", bg: "bg-amber-500/10 border-amber-500/20" },
-          { label: "Failed Orders", value: failedUsers.length, icon: TrendingUp, color: failedUsers.length > 0 ? "text-red-400" : "text-green-400", bg: failedUsers.length > 0 ? "bg-red-500/10 border-red-500/20" : "bg-green-500/10 border-green-500/20" },
-          { label: "Suspended", value: suspendedCount, icon: Ban, color: suspendedCount > 0 ? "text-red-400" : "text-white/30", bg: suspendedCount > 0 ? "bg-red-500/10 border-red-500/20" : "bg-white/[0.02] border-white/5" },
-        ].map(({ label, value, icon: Icon, color, bg }) => (
-          <div key={label} className={`rounded-2xl border p-4 ${bg}`}>
-            <Icon className={`w-5 h-5 mb-2 ${color}`} />
-            <p className={`text-2xl font-black ${color}`}>{value}</p>
-            <p className="text-[11px] text-white/40 uppercase tracking-wider mt-0.5 leading-tight">{label}</p>
+        {STATS.map(({ label, value, icon: Icon, danger, color, bg }) => (
+          <div key={label} className={`rounded-2xl border p-4 ${danger && value > 0 ? bg : "bg-white/[0.02] border-white/5"}`}>
+            <Icon className={`w-5 h-5 mb-2.5 ${danger && value > 0 ? color : "text-white/20"}`} />
+            <p className={`text-2xl font-black tabular-nums ${danger && value > 0 ? color : "text-white/50"}`}>{value}</p>
+            <p className="text-[10px] text-white/30 uppercase tracking-wider mt-0.5 leading-tight">{label}</p>
           </div>
         ))}
       </div>
 
-      {/* Search */}
-      <div className="relative">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/30" />
-        <Input
-          placeholder="Search by IP, name, or email…"
-          value={search}
-          onChange={e => setSearch(e.target.value)}
-          className="pl-9 bg-white/5 border-white/10 text-white placeholder:text-white/30 rounded-xl focus:border-amber-400/40"
-        />
+      {/* Signup trend */}
+      <div className="rounded-2xl border border-white/8 bg-white/[0.02] p-6">
+        <div className="flex items-center justify-between mb-5">
+          <div className="flex items-center gap-2">
+            <BarChart2 className="w-4 h-4 text-cyan-400" />
+            <span className="font-black text-white text-sm">Signup Trend</span>
+            <span className="text-[10px] bg-cyan-500/20 text-cyan-400 border border-cyan-500/30 px-2 py-0.5 rounded-full font-bold">14 days</span>
+          </div>
+          <div className="text-right">
+            <span className="text-xl font-black text-cyan-400">{signupTrend.reduce((s, d) => s + d.count, 0)}</span>
+            <p className="text-[10px] text-white/30">new accounts</p>
+          </div>
+        </div>
+        <div className="flex items-end gap-1 h-20">
+          {signupTrend.map(day => (
+            <div key={day.date} className="flex flex-col items-center gap-1 flex-1 group cursor-default">
+              <span className="text-[9px] text-white/40 opacity-0 group-hover:opacity-100 transition-opacity">{day.count}</span>
+              <div
+                className="w-full bg-cyan-500/30 hover:bg-cyan-400/60 rounded-t-sm transition-colors"
+                style={{ height: `${Math.max(3, (day.count / maxSignup) * 64)}px` }}
+                title={`${day.date}: ${day.count} signups`}
+              />
+            </div>
+          ))}
+        </div>
+        <div className="flex items-center justify-between mt-1.5">
+          <span className="text-[9px] text-white/20">{signupTrend[0]?.date.slice(5)}</span>
+          <span className="text-[9px] text-white/20">{signupTrend[signupTrend.length - 1]?.date.slice(5)}</span>
+        </div>
       </div>
+    </div>
+  );
 
-      {/* ── Shared IP Groups ── */}
-      <Section
-        icon={AlertTriangle}
-        title="Shared IP Groups"
-        iconColor="text-red-400"
-        badge={<span className="text-xs bg-red-500/20 text-red-400 border border-red-500/30 px-2 py-0.5 rounded-full font-bold">{filteredClusters.length}</span>}
+  const renderThreats = () => (
+    <div className="space-y-4">
+      {/* Shared IPs */}
+      <SectionCard title="Shared IP Groups" count={fClusters.length} icon={Globe} color="text-red-400"
         onExport={() => exportCsv(clusters.flatMap(c => c.accounts.map(a => ({ ip: c.ip, location: c.location, ...a } as Record<string, unknown>))), "shared_ips.csv")}
       >
-        {filteredClusters.length === 0 ? (
-          <EmptyState message="No shared IP addresses detected." />
-        ) : (
-          <div className="space-y-3">
-            {filteredClusters.map(cluster => {
-              const isExpanded = expandedIp === cluster.ip;
+        {fClusters.length === 0 ? <EmptyState icon={Globe} message="No shared IP addresses detected." /> : (
+          <div className="space-y-2">
+            {fClusters.map(cluster => {
+              const exp = expandedIp === cluster.ip;
               return (
-                <div key={cluster.ip} className="rounded-2xl border border-red-500/20 bg-red-500/[0.04] overflow-hidden">
-                  <div
-                    className="w-full flex items-center justify-between px-5 py-3.5 hover:bg-red-500/[0.06] transition-colors text-left border-none"
-                  >
-                    <button
-                      type="button"
-                      onClick={() => setExpandedIp(isExpanded ? null : cluster.ip)}
-                      className="flex-1 flex items-center gap-3 flex-wrap cursor-pointer group bg-transparent border-none p-0 text-left outline-none"
+                <div key={cluster.ip} className="rounded-xl border border-red-500/20 bg-red-500/[0.03] overflow-hidden">
+                  <div className="flex items-center justify-between px-4 py-3">
+                    <button type="button" onClick={() => setExpandedIp(exp ? null : cluster.ip)}
+                      className="flex-1 flex items-center gap-3 text-left"
                     >
-                      <Globe className="w-4 h-4 text-red-400 shrink-0 group-hover:scale-110 transition-transform" />
+                      {exp ? <ChevronUp className="w-3.5 h-3.5 text-red-400 shrink-0" /> : <ChevronDown className="w-3.5 h-3.5 text-white/30 shrink-0" />}
                       <span className="font-mono text-sm font-bold text-red-300">{cluster.ip}</span>
-                      {cluster.location && <span className="text-xs text-emerald-400/70">{cluster.location}</span>}
-                      <span className="text-[10px] font-black uppercase tracking-widest bg-red-500/20 text-red-400 border border-red-500/30 px-2 py-0.5 rounded-full">
-                        {cluster.accounts.length} accounts
-                      </span>
-                      <Eye className={`w-3.5 h-3.5 ml-1 transition-transform ${isExpanded ? "rotate-180 text-red-400" : "text-white/20"}`} />
+                      {cluster.location && <span className="flex items-center gap-1 text-[10px] text-emerald-400/60"><MapPin className="w-3 h-3" />{cluster.location}</span>}
+                      <span className="text-[10px] font-black bg-red-500/20 text-red-400 border border-red-500/30 px-2 py-0.5 rounded-full">{cluster.accounts.length} accounts</span>
                     </button>
-
-                    <div className="flex items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() => handleBulkSuspend(cluster.accounts.map(a => a.user_id), true)}
-                        className="text-[10px] font-black uppercase tracking-widest bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 px-3 py-1.5 rounded-xl transition-all"
-                      >
-                        Suspend All
+                    <div className="flex items-center gap-2 shrink-0">
+                      <button type="button" onClick={() => copyText(cluster.ip, "IP copied")}
+                        className="p-1.5 rounded-lg text-white/20 hover:text-white/60 hover:bg-white/5 transition-all">
+                        <Copy className="w-3.5 h-3.5" />
                       </button>
-                      <button
-                        type="button"
-                        onClick={() => copyIp(cluster.ip)}
-                        className="text-[10px] font-bold text-white/30 hover:text-white/70 px-2 py-1.5 rounded-xl border border-white/10 hover:border-white/20 transition-colors"
-                      >
-                        Copy IP
+                      <button type="button" onClick={() => handleBulkSuspend(cluster.accounts.map(a => a.user_id), true)}
+                        className="text-[10px] font-black uppercase bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 px-3 py-1.5 rounded-lg transition-all">
+                        Suspend All
                       </button>
                     </div>
                   </div>
-                  {isExpanded && (
-                    <div className="border-t border-red-500/20 divide-y divide-white/5">
-                      {cluster.accounts.map(account => {
-                        const role = roleLabel(account);
+                  {exp && (
+                    <div className="border-t border-red-500/10 divide-y divide-white/[0.04]">
+                      {cluster.accounts.map(acc => {
+                        const role = roleLabel(acc);
                         return (
-                          <div key={account.user_id} className="flex items-center justify-between px-5 py-3 bg-black/20">
+                          <div key={acc.user_id} className="flex items-center justify-between px-4 py-2.5 bg-black/20">
                             <div className="min-w-0">
-                              <p className="text-sm font-bold text-white truncate">{account.full_name || "—"}</p>
-                              <p className="text-xs text-white/40 truncate">{account.email}</p>
-                              {account.last_seen_at && (
-                                <p className="text-[10px] text-white/25 mt-0.5 flex items-center gap-1">
-                                  <Clock className="w-2.5 h-2.5" />
-                                  Last seen {new Date(account.last_seen_at).toLocaleString()}
-                                </p>
-                              )}
+                              <p className="text-sm font-bold text-white truncate">{acc.full_name || "—"}</p>
+                              <p className="text-[11px] text-white/35 truncate">{acc.email}</p>
+                              {acc.last_seen_at && <p className="text-[10px] text-white/20 mt-0.5">{fmt(acc.last_seen_at)}</p>}
                             </div>
-                            <div className="flex items-center gap-2 shrink-0 ml-3">
-                              {account.is_suspended && (
-                                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full border bg-red-500/20 text-red-400 border-red-500/30">Suspended</span>
-                              )}
-                              <span className="text-[10px] text-white/30">{account.login_count ?? 0} logins</span>
-                              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${role.cls}`}>{role.label}</span>
+                            <div className="flex items-center gap-1.5 shrink-0 ml-3">
+                              {acc.is_suspended && <span className="text-[9px] font-bold px-2 py-0.5 rounded-full border bg-red-500/20 text-red-400 border-red-500/30">Suspended</span>}
+                              <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full border ${role.cls}`}>{role.label}</span>
+                              <span className="text-[10px] text-white/25">{acc.login_count ?? 0} logins</span>
                             </div>
                           </div>
                         );
@@ -694,83 +522,49 @@ const AdminSecurity = () => {
             })}
           </div>
         )}
-      </Section>
+      </SectionCard>
 
-      {/* ── Account Velocity ── */}
-      <Section
-        icon={Zap}
-        title="Account Velocity"
-        iconColor="text-orange-400"
-        badge={<span className="text-xs bg-orange-500/20 text-orange-400 border border-orange-500/30 px-2 py-0.5 rounded-full font-bold">{filteredVelocity.length}</span>}
-        onExport={() => exportCsv(filteredVelocity as unknown as Record<string, unknown>[], "velocity_accounts.csv")}
+      {/* Account Velocity */}
+      <SectionCard title="Account Velocity" count={fVelocity.length} icon={Zap} color="text-orange-400"
+        onExport={() => exportCsv(fVelocity as unknown as Record<string, unknown>[], "velocity.csv")}
       >
-        {filteredVelocity.length === 0 ? (
-          <EmptyState message="No accounts placed orders within 5 minutes of signup." />
-        ) : (
-          <div className="rounded-2xl bg-white/[0.02] border border-white/5 overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-white/5 bg-white/[0.02]">
-                    <th className="text-left p-4 text-[10px] font-black uppercase tracking-widest text-white/30">User</th>
-                    <th className="text-left p-4 text-[10px] font-black uppercase tracking-widest text-white/30">Joined</th>
-                    <th className="text-left p-4 text-[10px] font-black uppercase tracking-widest text-white/30">First Order</th>
-                    <th className="text-left p-4 text-[10px] font-black uppercase tracking-widest text-white/30">Delay</th>
+        {fVelocity.length === 0 ? <EmptyState icon={Zap} message="No accounts placed orders within 5 minutes of signup." /> : (
+          <div className="overflow-x-auto rounded-xl border border-white/5 overflow-hidden">
+            <table className="w-full text-sm">
+              <thead><tr className="bg-white/[0.03] border-b border-white/5"><TH>User</TH><TH>Joined</TH><TH>First Order</TH><TH>Delay</TH></tr></thead>
+              <tbody>
+                {fVelocity.map(v => (
+                  <tr key={v.user_id} className="border-b border-white/[0.04] hover:bg-white/[0.03]">
+                    <td className="px-4 py-3"><p className="font-semibold text-white">{v.full_name || "—"}</p><p className="text-[11px] text-white/35">{v.email}</p></td>
+                    <td className="px-4 py-3 text-xs text-white/40">{fmt(v.joined_at)}</td>
+                    <td className="px-4 py-3 text-xs text-white/40">{fmt(v.first_order_at)}</td>
+                    <td className="px-4 py-3"><span className="text-sm font-black text-orange-400">{v.minutes_to_first_order}m</span></td>
                   </tr>
-                </thead>
-                <tbody>
-                  {filteredVelocity.map(v => (
-                    <tr key={v.user_id} className="border-b border-white/5 hover:bg-white/[0.03]">
-                      <td className="p-4">
-                        <p className="font-semibold text-white">{v.full_name || "—"}</p>
-                        <p className="text-xs text-white/40">{v.email}</p>
-                      </td>
-                      <td className="p-4 text-xs text-white/50">{new Date(v.joined_at).toLocaleString()}</td>
-                      <td className="p-4 text-xs text-white/50">{new Date(v.first_order_at).toLocaleString()}</td>
-                      <td className="p-4">
-                        <span className="text-sm font-black text-orange-400">{v.minutes_to_first_order}m</span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                ))}
+              </tbody>
+            </table>
           </div>
         )}
-      </Section>
+      </SectionCard>
 
-      {/* ── Referral Abuse ── */}
-      <Section
-        icon={Gift}
-        title="Referral Abuse"
-        iconColor="text-purple-400"
-        badge={<span className="text-xs bg-purple-500/20 text-purple-400 border border-purple-500/30 px-2 py-0.5 rounded-full font-bold">{filteredReferrals.length}</span>}
-        onExport={() => exportCsv(
-          referralGroups.flatMap(g => g.members.map(m => ({ referrer: g.referrer_email, ...m } as Record<string, unknown>))),
-          "referral_abuse.csv"
-        )}
+      {/* Referral Abuse */}
+      <SectionCard title="Referral Abuse" count={fReferrals.length} icon={Gift} color="text-purple-400"
+        onExport={() => exportCsv(referralGroups.flatMap(g => g.members.map(m => ({ referrer: g.referrer_email, ...m } as Record<string, unknown>))), "referral_abuse.csv")}
       >
-        {filteredReferrals.length === 0 ? (
-          <EmptyState message="No referral codes with 5+ signups detected." />
-        ) : (
-          <div className="space-y-3">
-            {filteredReferrals.map(group => (
-              <div key={group.referrer_id} className="rounded-2xl border border-purple-500/20 bg-purple-500/[0.04] p-4">
+        {fReferrals.length === 0 ? <EmptyState icon={Gift} message="No referral codes with 5+ signups." /> : (
+          <div className="space-y-2">
+            {fReferrals.map(g => (
+              <div key={g.referrer_id} className="rounded-xl border border-purple-500/20 bg-purple-500/[0.03] p-4">
                 <div className="flex items-center justify-between mb-3">
-                  <div>
-                    <p className="font-bold text-white">{group.referrer_name}</p>
-                    <p className="text-xs text-white/40">{group.referrer_email}</p>
-                  </div>
-                  <span className="text-xs font-black bg-purple-500/20 text-purple-400 border border-purple-500/30 px-2 py-0.5 rounded-full">
-                    {group.count} referrals
-                  </span>
+                  <div><p className="font-bold text-white text-sm">{g.referrer_name}</p><p className="text-[11px] text-white/35">{g.referrer_email}</p></div>
+                  <span className="text-[10px] font-black bg-purple-500/20 text-purple-400 border border-purple-500/30 px-2 py-0.5 rounded-full">{g.count} referrals</span>
                 </div>
-                <div className="space-y-1.5">
-                  {group.members.map(m => (
-                    <div key={m.user_id} className="flex items-center gap-2 text-xs bg-black/20 px-3 py-1.5 rounded-lg">
-                      <span className="text-white/70">{m.full_name || "—"}</span>
-                      <span className="text-white/30">·</span>
-                      <span className="font-mono text-white/40">{m.email}</span>
+                <div className="space-y-1">
+                  {g.members.map(m => (
+                    <div key={m.user_id} className="flex items-center gap-2 text-[11px] bg-black/20 px-3 py-1.5 rounded-lg">
+                      <span className="text-white/60">{m.full_name || "—"}</span>
+                      <span className="text-white/20">·</span>
+                      <span className="font-mono text-white/35">{m.email}</span>
                     </div>
                   ))}
                 </div>
@@ -778,293 +572,285 @@ const AdminSecurity = () => {
             ))}
           </div>
         )}
-      </Section>
+      </SectionCard>
 
-      {/* ── High Login Frequency ── */}
-      <Section
-        icon={Hash}
-        title="High Login Frequency"
-        iconColor="text-amber-400"
-        badge={<span className="text-xs bg-amber-500/20 text-amber-400 border border-amber-500/30 px-2 py-0.5 rounded-full font-bold">{filteredHighLogins.length}</span>}
-        onExport={() => exportCsv(
-          filteredHighLogins.map(p => ({ user_id: p.user_id, full_name: p.full_name, email: p.email, login_count: p.login_count, last_ip: p.last_ip, last_location: p.last_location } as Record<string, unknown>)),
-          "high_logins.csv"
-        )}
+      {/* High Failure Rate */}
+      <SectionCard title="High Failure Rate" count={fFailed.length} icon={TrendingUp} color="text-red-400"
+        onExport={() => exportCsv(fFailed as unknown as Record<string, unknown>[], "failed_rate.csv")}
       >
-        {filteredHighLogins.length === 0 ? (
-          <EmptyState message="No accounts with 50+ logins." />
-        ) : (
-          <div className="rounded-2xl bg-white/[0.02] border border-white/5 overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-white/5 bg-white/[0.02]">
-                    <th className="text-left p-4 text-[10px] font-black uppercase tracking-widest text-white/30">User</th>
-                    <th className="text-left p-4 text-[10px] font-black uppercase tracking-widest text-white/30">Logins</th>
-                    <th className="text-left p-4 text-[10px] font-black uppercase tracking-widest text-white/30 hidden sm:table-cell">IP</th>
-                    <th className="text-left p-4 text-[10px] font-black uppercase tracking-widest text-white/30 hidden sm:table-cell">Location</th>
-                    <th className="text-left p-4 text-[10px] font-black uppercase tracking-widest text-white/30">Role</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredHighLogins.map(p => {
-                    const role = roleLabel(p);
-                    return (
-                      <tr key={p.user_id} className="border-b border-white/5 hover:bg-white/[0.03]">
-                        <td className="p-4">
-                          <p className="font-semibold text-white">{p.full_name || "—"}</p>
-                          <p className="text-xs text-white/40">{p.email}</p>
-                        </td>
-                        <td className="p-4">
-                          <span className="text-sm font-black text-amber-400">{p.login_count}</span>
-                        </td>
-                        <td className="p-4 hidden sm:table-cell">
-                          <span className="font-mono text-xs text-cyan-400/70">{p.last_ip || "—"}</span>
-                        </td>
-                        <td className="p-4 text-xs text-emerald-400/70 hidden sm:table-cell">
-                          {p.last_location || "—"}
-                        </td>
-                        <td className="p-4">
-                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${role.cls}`}>{role.label}</span>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
-      </Section>
-
-      {/* ── High Failure Rate ── */}
-      <Section
-        icon={TrendingUp}
-        title="High Failure Rate"
-        iconColor="text-red-400"
-        badge={<span className="text-xs bg-red-500/20 text-red-400 border border-red-500/30 px-2 py-0.5 rounded-full font-bold">{filteredFailed.length}</span>}
-        onExport={() => exportCsv(filteredFailed as unknown as Record<string, unknown>[], "failed_order_users.csv")}
-      >
-        {filteredFailed.length === 0 ? (
-          <EmptyState message="No users with ≥50% failure rate (min 5 orders)." />
-        ) : (
-          <div className="rounded-2xl bg-white/[0.02] border border-white/5 overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-white/5 bg-white/[0.02]">
-                    <th className="text-left p-4 text-[10px] font-black uppercase tracking-widest text-white/30">User</th>
-                    <th className="text-left p-4 text-[10px] font-black uppercase tracking-widest text-white/30">Total</th>
-                    <th className="text-left p-4 text-[10px] font-black uppercase tracking-widest text-white/30">Failed</th>
-                    <th className="text-left p-4 text-[10px] font-black uppercase tracking-widest text-white/30">Failure Rate</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredFailed.map(u => (
-                    <tr key={u.user_id} className="border-b border-white/5 hover:bg-white/[0.03]">
-                      <td className="p-4">
-                        <p className="font-semibold text-white">{u.full_name || "—"}</p>
-                        <p className="text-xs text-white/40">{u.email}</p>
-                      </td>
-                      <td className="p-4 text-xs text-white/50">{u.total}</td>
-                      <td className="p-4 text-xs text-red-400">{u.failed}</td>
-                      <td className="p-4">
-                        <div className="flex items-center gap-2">
-                          <div className="w-16 h-1.5 rounded-full bg-white/10 overflow-hidden">
-                            <div className="h-full bg-red-500 rounded-full" style={{ width: `${u.rate}%` }} />
-                          </div>
-                          <span className="text-xs font-black text-red-400">{u.rate}%</span>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
-      </Section>
-
-      {/* ── Signup Trend ── */}
-      <Section
-        icon={BarChart2}
-        title="Signup Trend"
-        iconColor="text-cyan-400"
-        badge={<span className="text-xs bg-cyan-500/20 text-cyan-400 border border-cyan-500/30 px-2 py-0.5 rounded-full font-bold">14 days</span>}
-        onExport={() => exportCsv(signupTrend as unknown as Record<string, unknown>[], "signup_trend.csv")}
-      >
-        <div className="rounded-2xl bg-white/[0.02] border border-white/5 p-6">
-          <div className="flex items-end gap-1 h-24">
-            {signupTrend.map(day => (
-              <div key={day.date} className="flex flex-col items-center gap-1 flex-1 group">
-                <span className="text-[9px] text-white/40 opacity-0 group-hover:opacity-100 transition-opacity">{day.count}</span>
-                <div
-                  className="w-full bg-cyan-500/40 hover:bg-cyan-500/70 rounded-t transition-colors"
-                  style={{ height: `${Math.max(3, (day.count / maxSignup) * 72)}px` }}
-                  title={`${day.date}: ${day.count} signups`}
-                />
-              </div>
-            ))}
-          </div>
-          <div className="flex items-center justify-between mt-2">
-            <span className="text-[10px] text-white/25">{signupTrend[0]?.date.slice(5)}</span>
-            <span className="text-[10px] text-white/25">{signupTrend[signupTrend.length - 1]?.date.slice(5)}</span>
-          </div>
-          <p className="text-center text-xs text-white/30 mt-3">
-            Total: <span className="text-cyan-400 font-black">{signupTrend.reduce((s, d) => s + d.count, 0)}</span> new accounts in 14 days
-          </p>
-        </div>
-      </Section>
-
-      {/* ── Recent Logins ── */}
-      <Section
-        icon={Clock}
-        title="Recent Logins"
-        iconColor="text-cyan-400"
-        badge={
-          <div className="flex items-center gap-2">
-            <span className="text-xs bg-cyan-500/20 text-cyan-400 border border-cyan-500/30 px-2 py-0.5 rounded-full font-bold">Last 30</span>
-            <span className="flex items-center gap-1 text-[10px] text-cyan-400/60">
-              <span className="w-1.5 h-1.5 bg-cyan-400 rounded-full animate-pulse inline-block" />
-              Live
-            </span>
-          </div>
-        }
-        onExport={() => exportCsv(
-          filteredLogins.map(l => ({ user_id: l.user_id, full_name: l.full_name, email: l.email, last_ip: l.last_ip, last_location: l.last_location, last_seen_at: l.last_seen_at, login_count: l.login_count } as Record<string, unknown>)),
-          "recent_logins.csv"
-        )}
-      >
-        <div className="rounded-2xl bg-white/[0.02] border border-white/5 overflow-hidden">
-          <div className="overflow-x-auto">
+        {fFailed.length === 0 ? <EmptyState icon={TrendingUp} message="No users with ≥50% failure rate (min 5 orders)." /> : (
+          <div className="overflow-x-auto rounded-xl border border-white/5 overflow-hidden">
             <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-white/5 bg-white/[0.02]">
-                  <th className="text-left p-4 text-[10px] font-black uppercase tracking-widest text-white/30">User</th>
-                  <th className="text-left p-4 text-[10px] font-black uppercase tracking-widest text-white/30">IP Address</th>
-                  <th className="text-left p-4 text-[10px] font-black uppercase tracking-widest text-white/30 hidden sm:table-cell">Location</th>
-                  <th className="text-left p-4 text-[10px] font-black uppercase tracking-widest text-white/30">Last Seen</th>
-                  <th className="text-left p-4 text-[10px] font-black uppercase tracking-widest text-white/30">Logins</th>
-                </tr>
-              </thead>
+              <thead><tr className="bg-white/[0.03] border-b border-white/5"><TH>User</TH><TH>Orders</TH><TH>Failed</TH><TH>Rate</TH></tr></thead>
               <tbody>
-                {filteredLogins.map(login => (
-                  <tr key={login.user_id} className="border-b border-white/5 hover:bg-white/[0.03] transition-colors">
-                    <td className="p-4">
-                      <p className="font-semibold text-white">{login.full_name || "—"}</p>
-                      <p className="text-xs text-white/40">{login.email}</p>
-                    </td>
-                    <td className="p-4">
-                      {login.last_ip ? <span className="font-mono text-xs text-cyan-400/80">{login.last_ip}</span> : <span className="text-white/20">—</span>}
-                    </td>
-                    <td className="p-4 text-xs text-emerald-400/70 hidden sm:table-cell">
-                      {login.last_location || <span className="text-white/20">—</span>}
-                    </td>
-                    <td className="p-4 text-xs text-white/50">
-                      {login.last_seen_at ? new Date(login.last_seen_at).toLocaleString() : "—"}
-                    </td>
-                    <td className="p-4">
-                      <span className="text-xs font-bold text-white/60">{login.login_count ?? 0}</span>
+                {fFailed.map(u => (
+                  <tr key={u.user_id} className="border-b border-white/[0.04] hover:bg-white/[0.03]">
+                    <td className="px-4 py-3"><p className="font-semibold text-white">{u.full_name || "—"}</p><p className="text-[11px] text-white/35">{u.email}</p></td>
+                    <td className="px-4 py-3 text-xs text-white/50">{u.total}</td>
+                    <td className="px-4 py-3 text-xs text-red-400">{u.failed}</td>
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-2">
+                        <div className="w-16 h-1.5 rounded-full bg-white/10 overflow-hidden"><div className="h-full bg-red-500 rounded-full" style={{ width: `${u.rate}%` }} /></div>
+                        <span className="text-xs font-black text-red-400">{u.rate}%</span>
+                      </div>
                     </td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
-        </div>
-      </Section>
+        )}
+      </SectionCard>
+    </div>
+  );
 
-      {/* ── Blacklist Management ── */}
-      <Section
-        icon={Shield}
-        title="Blacklist Management"
-        iconColor="text-red-500"
-        badge={<span className="text-xs bg-red-500/20 text-red-400 border border-red-500/30 px-2 py-0.5 rounded-full font-bold">{blacklist.length}</span>}
-        defaultOpen={false}
+  const renderActivity = () => (
+    <div className="space-y-4">
+      {/* Recent Logins */}
+      <SectionCard title="Recent Logins" count={fLogins.length} icon={LogIn} color="text-cyan-400"
+        onExport={() => exportCsv(fLogins.map(l => ({ user_id: l.user_id, full_name: l.full_name, email: l.email, last_ip: l.last_ip, last_location: l.last_location, last_seen_at: l.last_seen_at, login_count: l.login_count } as Record<string, unknown>)), "recent_logins.csv")}
       >
-        <div className="space-y-4">
-           {/* Add Form */}
-           <div className="grid grid-cols-1 sm:grid-cols-4 gap-2 bg-white/5 p-4 rounded-2xl border border-white/10">
-              <select 
-                id="blacklist-type"
-                className="bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-sm text-white outline-none"
-              >
-                 <option value="ip">IP Address</option>
-                 <option value="domain">Email Domain</option>
-              </select>
-              <Input id="blacklist-value" placeholder="192.168.1.1 or @gmail.com" className="sm:col-span-2 bg-black/40 border-white/10 rounded-xl text-white" />
-              <Button 
-                onClick={() => {
-                  const t = (document.getElementById("blacklist-type") as HTMLSelectElement).value;
-                  const v = (document.getElementById("blacklist-value") as HTMLInputElement).value;
-                  if (v) handleBlacklist("add", t, v, "Manual Admin Addition");
-                }}
-                className="bg-red-500 hover:bg-red-600 text-white rounded-xl font-bold"
-              >
-                Add to Ban List
-              </Button>
-           </div>
-
-           {blacklist.length === 0 ? (
-             <EmptyState message="No IPs or domains blacklisted." />
-           ) : (
-             <div className="rounded-2xl bg-white/[0.02] border border-white/5 divide-y divide-white/5">
-                {blacklist.map(item => (
-                   <div key={item.id} className="flex items-center justify-between p-4">
-                      <div>
-                         <div className="flex items-center gap-2">
-                            <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-red-500/10 text-red-500 border border-red-500/20">{item.type}</span>
-                            <span className="text-sm font-mono text-white font-bold">{item.value}</span>
-                         </div>
-                         <p className="text-[10px] text-white/30 mt-1">{item.reason}</p>
+        <div className="overflow-x-auto rounded-xl border border-white/5 overflow-hidden">
+          <table className="w-full text-sm">
+            <thead><tr className="bg-white/[0.03] border-b border-white/5"><TH>User</TH><TH>IP Address</TH><TH>Location</TH><TH>Last Seen</TH><TH>Logins</TH></tr></thead>
+            <tbody>
+              {fLogins.map(l => (
+                <tr key={l.user_id} className="border-b border-white/[0.04] hover:bg-white/[0.03]">
+                  <td className="px-4 py-3"><p className="font-semibold text-white">{l.full_name || "—"}</p><p className="text-[11px] text-white/35">{l.email}</p></td>
+                  <td className="px-4 py-3">
+                    {l.last_ip ? (
+                      <div className="flex items-center gap-1.5">
+                        <span className="font-mono text-xs text-cyan-400/80">{l.last_ip}</span>
+                        <button type="button" onClick={() => copyText(l.last_ip!, "IP copied")} className="text-white/20 hover:text-white/50 transition-colors"><Copy className="w-3 h-3" /></button>
                       </div>
-                      <Button 
-                        variant="ghost" 
-                        size="sm" 
-                        onClick={() => handleBlacklist("remove", undefined, item.value)}
-                        className="text-white/30 hover:text-red-400"
-                      >
-                         Remove
-                      </Button>
-                   </div>
-                ))}
-             </div>
-           )}
+                    ) : <span className="text-white/20">—</span>}
+                  </td>
+                  <td className="px-4 py-3 text-xs text-emerald-400/60">{l.last_location || <span className="text-white/20">—</span>}</td>
+                  <td className="px-4 py-3 text-xs text-white/40">{fmt(l.last_seen_at)}</td>
+                  <td className="px-4 py-3"><span className="text-xs font-bold text-white/50">{l.login_count ?? 0}</span></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
-      </Section>
+      </SectionCard>
 
-      {/* ── Admin Action Log ── */}
-      <Section
-        icon={BookOpen}
-        title="Admin Action Log"
-        iconColor="text-violet-400"
-        badge={<span className="text-xs bg-violet-500/20 text-violet-400 border border-violet-500/30 px-2 py-0.5 rounded-full font-bold">Last 50</span>}
-        onExport={() => exportCsv(actionLog as unknown as Record<string, unknown>[], "admin_action_log.csv")}
-        defaultOpen={false}
+      {/* High Login Frequency */}
+      <SectionCard title="High Login Frequency" count={fHighLogin.length} icon={Hash} color="text-amber-400"
+        onExport={() => exportCsv(fHighLogin.map(p => ({ user_id: p.user_id, full_name: p.full_name, email: p.email, login_count: p.login_count, last_ip: p.last_ip, last_location: p.last_location } as Record<string, unknown>)), "high_logins.csv")}
       >
-        {actionLog.length === 0 ? (
-          <EmptyState message="No admin actions recorded yet." />
-        ) : (
-          <div className="rounded-2xl bg-white/[0.02] border border-white/5 divide-y divide-white/5">
-            {actionLog.map(entry => (
-              <div key={entry.id} className="flex items-center justify-between px-4 py-3 gap-4">
-                <div className="min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-full border ${
-                      entry.action.includes("suspend") ? "bg-red-500/20 text-red-400 border-red-500/30" :
-                      entry.action.includes("unsuspend") || entry.action.includes("approve") ? "bg-green-500/20 text-green-400 border-green-500/30" :
-                      "bg-white/5 text-white/40 border-white/10"
-                    }`}>{entry.action.replace(/_/g, " ")}</span>
-                    <span className="text-xs text-white/50">{entry.target_email || "—"}</span>
-                  </div>
-                  <p className="text-[11px] text-white/30 mt-0.5">by {entry.admin_email || "unknown"}</p>
-                </div>
-                <span className="text-[10px] text-white/25 shrink-0">{new Date(entry.created_at).toLocaleString()}</span>
-              </div>
-            ))}
+        {fHighLogin.length === 0 ? <EmptyState icon={Hash} message="No accounts with 50+ logins." /> : (
+          <div className="overflow-x-auto rounded-xl border border-white/5 overflow-hidden">
+            <table className="w-full text-sm">
+              <thead><tr className="bg-white/[0.03] border-b border-white/5"><TH>User</TH><TH>Logins</TH><TH>IP</TH><TH>Location</TH><TH>Role</TH></tr></thead>
+              <tbody>
+                {fHighLogin.map(p => {
+                  const role = roleLabel(p);
+                  return (
+                    <tr key={p.user_id} className="border-b border-white/[0.04] hover:bg-white/[0.03]">
+                      <td className="px-4 py-3"><p className="font-semibold text-white">{p.full_name || "—"}</p><p className="text-[11px] text-white/35">{p.email}</p></td>
+                      <td className="px-4 py-3"><span className="text-base font-black text-amber-400">{p.login_count}</span></td>
+                      <td className="px-4 py-3"><span className="font-mono text-xs text-cyan-400/60">{p.last_ip || "—"}</span></td>
+                      <td className="px-4 py-3 text-xs text-emerald-400/60">{p.last_location || "—"}</td>
+                      <td className="px-4 py-3"><span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${role.cls}`}>{role.label}</span></td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
           </div>
         )}
-      </Section>
+      </SectionCard>
+    </div>
+  );
+
+  const renderAccess = () => (
+    <div className="space-y-4">
+      {/* System Controls */}
+      <div className="rounded-2xl border border-white/8 bg-white/[0.02] p-5">
+        <div className="flex items-center gap-2 mb-5">
+          <div className="p-2 rounded-xl bg-amber-500/10 border border-amber-500/20"><Lock className="w-4 h-4 text-amber-400" /></div>
+          <span className="font-black text-white text-sm">Platform Controls</span>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          {[
+            { key: "registration_enabled", label: "User Registration", desc: "Allow new users to sign up", active: sysSettings?.registration_enabled, activeColor: "border-green-500/30 bg-green-500/10 text-green-400", inactiveColor: "border-red-500/30 bg-red-500/10 text-red-400", activeLabel: "Open", inactiveLabel: "Locked" },
+            { key: "maintenance_mode", label: "Maintenance Mode", desc: "Show maintenance message at checkout", active: sysSettings?.maintenance_mode, activeColor: "border-amber-500/30 bg-amber-500/10 text-amber-400", inactiveColor: "border-white/10 bg-white/5 text-white/40", activeLabel: "Active", inactiveLabel: "Off" },
+          ].map(setting => (
+            <div key={setting.key} className="flex items-center justify-between p-4 rounded-xl bg-white/[0.02] border border-white/8">
+              <div>
+                <p className="font-bold text-sm text-white">{setting.label}</p>
+                <p className="text-[11px] text-white/35 mt-0.5">{setting.desc}</p>
+              </div>
+              <button type="button"
+                onClick={() => toggleSetting(setting.key, !setting.active)}
+                className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase transition-all border ${setting.active ? setting.activeColor : setting.inactiveColor}`}
+              >
+                {setting.active ? setting.activeLabel : setting.inactiveLabel}
+              </button>
+            </div>
+          ))}
+        </div>
+        <div className="mt-3 pt-3 border-t border-white/5">
+          <Button onClick={handlePurge} disabled={purging}
+            className="gap-2 bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 rounded-xl text-xs h-9 w-full sm:w-auto">
+            {purging ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Ban className="w-3.5 h-3.5" />}
+            Purge Test Accounts
+          </Button>
+        </div>
+      </div>
+
+      {/* Blocklist */}
+      <div className="rounded-2xl border border-white/8 bg-white/[0.02] overflow-hidden">
+        <div className="flex items-center gap-3 px-5 py-4 border-b border-white/5">
+          <div className="p-2 rounded-xl bg-red-500/10 border border-red-500/20"><Shield className="w-4 h-4 text-red-400" /></div>
+          <span className="font-black text-white text-sm">IP & Domain Blocklist</span>
+          <span className="text-[10px] font-black bg-red-500/20 text-red-400 border border-red-500/30 px-2 py-0.5 rounded-full">{blacklist.length}</span>
+        </div>
+        <div className="p-5 space-y-4">
+          {/* Add form */}
+          <div className="grid grid-cols-1 sm:grid-cols-4 gap-2">
+            <select value={blType} onChange={e => setBlType(e.target.value)}
+              className="bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-sm text-white outline-none focus:border-red-500/40">
+              <option value="ip">IP Address</option>
+              <option value="domain">Email Domain</option>
+            </select>
+            <Input value={blValue} onChange={e => setBlValue(e.target.value)} placeholder="192.168.1.1 or @domain.com"
+              className="sm:col-span-2 bg-white/5 border-white/10 text-white rounded-xl focus:border-red-500/40" />
+            <Button onClick={() => { if (blValue.trim()) handleBlacklist("add", blValue.trim(), blType, blReason || "Manual block"); }}
+              className="bg-red-500 hover:bg-red-600 text-white rounded-xl font-bold">
+              Block
+            </Button>
+          </div>
+
+          {blacklist.length === 0 ? (
+            <EmptyState icon={Shield} message="No IPs or domains blocked." />
+          ) : (
+            <div className="rounded-xl border border-white/5 divide-y divide-white/[0.04] overflow-hidden">
+              {blacklist.map(item => (
+                <div key={item.id} className="flex items-center justify-between px-4 py-3 hover:bg-white/[0.02] transition-colors">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <span className="text-[9px] font-black uppercase px-2 py-0.5 rounded-full bg-red-500/10 text-red-500 border border-red-500/20 shrink-0">{item.type}</span>
+                    <span className="text-sm font-mono text-white font-bold truncate">{item.value}</span>
+                    {item.reason && <span className="text-[10px] text-white/25 truncate hidden sm:block">{item.reason}</span>}
+                  </div>
+                  <button type="button" onClick={() => handleBlacklist("remove", item.value)}
+                    className="text-[10px] font-bold text-white/25 hover:text-red-400 transition-colors ml-3 shrink-0">
+                    Remove
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+
+  const renderAudit = () => (
+    <div className="rounded-2xl border border-white/8 bg-white/[0.02] overflow-hidden">
+      <div className="flex items-center justify-between px-5 py-4 border-b border-white/5">
+        <div className="flex items-center gap-3">
+          <div className="p-2 rounded-xl bg-violet-500/10 border border-violet-500/20"><BookOpen className="w-4 h-4 text-violet-400" /></div>
+          <span className="font-black text-white text-sm">Admin Action Log</span>
+          <span className="text-[10px] font-black bg-violet-500/20 text-violet-400 border border-violet-500/30 px-2 py-0.5 rounded-full">Last 50</span>
+        </div>
+        <button type="button" onClick={() => exportCsv(actionLog as unknown as Record<string, unknown>[], "admin_log.csv")}
+          className="flex items-center gap-1.5 text-[10px] text-white/30 hover:text-white/60 transition-colors px-2 py-1 rounded-lg hover:bg-white/5">
+          <FileDown className="w-3 h-3" /> CSV
+        </button>
+      </div>
+      {actionLog.length === 0 ? (
+        <div className="p-5"><EmptyState icon={BookOpen} message="No admin actions recorded yet." /></div>
+      ) : (
+        <div className="divide-y divide-white/[0.04]">
+          {actionLog.map(entry => (
+            <div key={entry.id} className="flex items-center justify-between px-5 py-3 hover:bg-white/[0.02] transition-colors gap-4">
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-full border ${
+                    entry.action.includes("suspend") ? "bg-red-500/20 text-red-400 border-red-500/30" :
+                    entry.action.includes("approve") || entry.action.includes("unsuspend") ? "bg-green-500/20 text-green-400 border-green-500/30" :
+                    entry.action.includes("reject") ? "bg-orange-500/20 text-orange-400 border-orange-500/30" :
+                    "bg-white/5 text-white/40 border-white/10"
+                  }`}>{entry.action.replace(/_/g, " ")}</span>
+                  <span className="text-xs text-white/50">{entry.target_email || "—"}</span>
+                  <span className="text-[10px] text-white/25 hidden sm:block">by {entry.admin_email}</span>
+                </div>
+              </div>
+              <span className="text-[10px] text-white/25 shrink-0 whitespace-nowrap">{fmt(entry.created_at)}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+
+  /* ── render ─────────────────────────────────────────────────────── */
+  return (
+    <div className="space-y-6 pb-10">
+
+      {/* ── Header ── */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <div className="p-2.5 rounded-2xl bg-amber-500/10 border border-amber-500/20">
+            <Shield className="w-5 h-5 text-amber-400" />
+          </div>
+          <div>
+            <h1 className="font-black text-2xl text-white tracking-tight">Security Center</h1>
+            <p className="text-xs text-white/35 mt-0.5">Fraud detection · Access control · Audit trail</p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-white/25" />
+            <Input placeholder="Search users, IPs…" value={search} onChange={e => setSearch(e.target.value)}
+              className="pl-9 h-9 w-52 bg-white/5 border-white/10 text-white placeholder:text-white/25 rounded-xl text-sm focus:border-amber-400/30" />
+          </div>
+          <button type="button" onClick={() => void fetchData(true)}
+            className="flex items-center justify-center w-9 h-9 rounded-xl bg-white/5 border border-white/10 text-white/50 hover:text-white hover:bg-white/10 transition-all">
+            <RefreshCw className={`w-4 h-4 ${refreshing ? "animate-spin" : ""}`} />
+          </button>
+          <button type="button"
+            onClick={() => exportCsv([
+              ...clusters.flatMap(c => c.accounts.map(a => ({ section: "shared_ip", ip: c.ip, ...a } as Record<string, unknown>))),
+              ...velocityAccts.map(v => ({ section: "velocity", ...v } as Record<string, unknown>)),
+              ...failedUsers.map(u => ({ section: "failed_orders", ...u } as Record<string, unknown>)),
+            ], "security_export.csv")}
+            className="flex items-center gap-1.5 h-9 px-3 rounded-xl bg-white/5 border border-white/10 text-white/50 hover:text-white hover:bg-white/10 transition-all text-xs font-bold">
+            <FileDown className="w-3.5 h-3.5" /> Export
+          </button>
+        </div>
+      </div>
+
+      {/* ── Tabs ── */}
+      <div className="flex items-center gap-1 p-1 bg-white/[0.03] border border-white/8 rounded-2xl w-fit overflow-x-auto">
+        {TABS.map(t => {
+          const active = tab === t.id;
+          const Icon   = t.icon;
+          const danger =
+            (t.id === "threats"  && (clusters.length + referralGroups.length + failedUsers.length + velocityAccts.length) > 0) ||
+            (t.id === "access"   && sysSettings?.maintenance_mode);
+          return (
+            <button key={t.id} type="button" onClick={() => setTab(t.id)}
+              className={`relative flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap ${
+                active ? "bg-white/10 text-white shadow-sm" : "text-white/40 hover:text-white/70"
+              }`}
+            >
+              <Icon className="w-3.5 h-3.5" />
+              {t.label}
+              {danger && !active && <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 bg-red-400 rounded-full" />}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* ── Tab body ── */}
+      {tab === "overview"  && renderOverview()}
+      {tab === "threats"   && renderThreats()}
+      {tab === "activity"  && renderActivity()}
+      {tab === "access"    && renderAccess()}
+      {tab === "audit"     && renderAudit()}
     </div>
   );
 };
