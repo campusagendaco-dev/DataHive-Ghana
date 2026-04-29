@@ -82,6 +82,7 @@ import DashboardReferral from "./pages/DashboardReferral";
 import { OfflineAlert } from "@/components/OfflineAlert";
 import { useRegisterSW } from "virtual:pwa-register/react";
 import DashboardBulk from "./pages/DashboardBulk";
+import DashboardWhatsAppBot from "./pages/DashboardWhatsAppBot";
 
 
 const queryClient = new QueryClient();
@@ -292,6 +293,7 @@ const AppContent = () => {
           <Route path="result-checker" element={<AgentFeatureGuard><DashboardResultCheckers /></AgentFeatureGuard>} />
           <Route path="leaderboard" element={<AgentFeatureGuard><DashboardLeaderboard /></AgentFeatureGuard>} />
           <Route path="marketing" element={<AgentFeatureGuard><DashboardMarketing /></AgentFeatureGuard>} />
+          <Route path="whatsapp-bot" element={<AgentFeatureGuard><DashboardWhatsAppBot /></AgentFeatureGuard>} />
 
           {/* Legacy aliases */}
           <Route path="orders" element={<Navigate to="/dashboard/transactions" replace />} />

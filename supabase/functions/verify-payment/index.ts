@@ -2,6 +2,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { corsHeaders } from "../_shared/cors.ts";
 import { normalizePhone, getSmsConfig, sendSmsViaTxtConnect, formatTemplate, sendPaymentSms } from "../_shared/sms.ts";
+import { sendWhatsAppMessage } from "../_shared/whatsapp.ts";
 
 declare const Deno: any;
 
@@ -948,11 +949,24 @@ serve(async (req: Request) => {
 
           if (customerPhone) {
             const serviceName = isAirtime ? `${network} Airtime` : `${network} Data`;
-            await sendPaymentSms(supabase, customerPhone, "payment_success", {
-              service: serviceName,
-              recipient: customerPhone,
-              order_id: reference.slice(0, 8).toUpperCase()
-            });
+            if (metadata.channel === "whatsapp") {
+              const waText = `✅ *Payment Received & Order Fulfilled!*\n\nService: ${serviceName}\nRecipient: ${customerPhone}\nOrder ID: ${reference.slice(0, 8).toUpperCase()}\n\nThank you for using SwiftData! 🐝`;
+              // Try to find the original sender phone number from metadata (which we set as whatsapp-233... in initialize-payment email, or we can just send it to customerPhone)
+              // Wait, the whatsapp webhook set email as `whatsapp-${from}@swiftdatagh.com`.
+              const emailStr = String(metadata.email || verifyData.data.customer?.email || "");
+              let waRecipient = customerPhone;
+              const waMatch = emailStr.match(/^wa-(.+)@/);
+              if (waMatch) {
+                waRecipient = waMatch[1];
+              }
+              await sendWhatsAppMessage(waRecipient, waText);
+            } else {
+              await sendPaymentSms(supabase, customerPhone, "payment_success", {
+                service: serviceName,
+                recipient: customerPhone,
+                order_id: reference.slice(0, 8).toUpperCase()
+              });
+            }
           }
         } else {
           await supabase.from("orders").update({

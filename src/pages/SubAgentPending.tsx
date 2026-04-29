@@ -62,6 +62,8 @@ const SubAgentPending = () => {
   }, [refreshProfile, navigate, toast]);
 
   const totalFee = parseFloat(activationFee.toFixed(2));
+  const paystackFee = Math.min(totalFee * 0.03, 100);
+  const totalDue = parseFloat((totalFee + paystackFee).toFixed(2));
 
   const handlePay = async () => {
     if (!user || !profile) return;
@@ -78,7 +80,7 @@ const SubAgentPending = () => {
     const { data: paymentData, error: paymentError } = await invokePublicFunction("initialize-payment", {
       body: {
         email: profile.email || `${user.id}@subagent.swiftdata.gh`,
-        amount: totalFee,
+        amount: totalDue,
         reference: orderId,
         callback_url: `${getAppBaseUrl()}/sub-agent/pending?reference=${orderId}`,
         metadata: {
@@ -178,6 +180,7 @@ const SubAgentPending = () => {
                 {[
                   { label: "Platform Base Fee", price: Math.min(totalFee, 80) },
                   { label: "Agent Commission", price: Math.max(0, totalFee - 80) },
+                  { label: "Processing Fee", price: paystackFee },
                 ].map((item) => (
                   <div key={item.label} className="flex justify-between text-sm">
                     <span className="text-white/50">{item.label}</span>
@@ -191,7 +194,7 @@ const SubAgentPending = () => {
                   <p className="text-[10px] font-black text-white/20 uppercase tracking-[0.2em]">Total Due</p>
                   <p className="text-sm font-bold text-amber-400/60 tracking-tight italic">Incl. all taxes</p>
                 </div>
-                <p className="text-4xl font-black text-white tracking-tighter">₵{totalFee.toFixed(2)}</p>
+                <p className="text-4xl font-black text-white tracking-tighter">₵{totalDue.toFixed(2)}</p>
               </div>
             </div>
           </div>
@@ -207,7 +210,7 @@ const SubAgentPending = () => {
             <div className="absolute inset-0 bg-white/30 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700 pointer-events-none" />
             <div className="relative flex items-center justify-center gap-2">
               {paying ? <Loader2 className="w-5 h-5 animate-spin" /> : <CreditCard className="w-5 h-5" />}
-              {paying ? "Opening Secure Checkout..." : `Pay ₵${totalFee.toFixed(2)} Now`}
+              {paying ? "Opening Secure Checkout..." : `Pay ₵${totalDue.toFixed(2)} Now`}
             </div>
           </button>
 

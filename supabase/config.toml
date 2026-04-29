@@ -50,6 +50,9 @@ verify_jwt = false
 [functions.validate-promo]
 verify_jwt = false
 
+[functions.whatsapp-webhook]
+verify_jwt = false
+
 
 [functions.process-retries]
 verify_jwt = false

@@ -28,7 +28,8 @@ import {
   Star,
   MessageCircle,
   Gift,
-  Send
+  Send,
+  Bot
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -65,6 +66,7 @@ const agentNavItems = [
   { to: "/dashboard/result-checker", label: "Result Checker", icon: GraduationCap },
   { to: "/dashboard/api", label: "Developer API", icon: Key },
   { to: "/dashboard/bulk", label: "Bulk Disbursement", icon: Send },
+  { to: "/dashboard/whatsapp-bot", label: "WhatsApp Bot", icon: Bot },
   { to: "/dashboard/leaderboard", label: "Agent Leaderboard", icon: Trophy },
 ];
 
