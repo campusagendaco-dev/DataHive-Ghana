@@ -150,7 +150,7 @@ serve(async (req: Request) => {
       .from("orders")
       .select("*")
       .in("status", ["fulfillment_failed", "processing", "paid"])
-      .lt("retry_count", 4)
+      .lt("retry_count", 3)
       .or(`last_retry_at.is.null,last_retry_at.lt.${twoMinutesAgo}`)
       .limit(15);
 
