@@ -12,11 +12,12 @@ function getFirstEnv(...keys: string[]): string {
   return "";
 }
 
+// Maps network names to the keys the provider API expects (must match wallet-buy-data)
 function mapNetworkKey(network: string): string {
   const n = (network || "").trim().toUpperCase();
-  if (n === "MTN" || n === "YELLO") return "MTN";
-  if (n === "VOD" || n === "VODAFONE" || n === "TELECEL") return "VOD";
-  if (n === "AT" || n === "AIRTELTIGO" || n === "AIRTEL TIGO") return "AT";
+  if (n === "AIRTELTIGO" || n === "AIRTEL TIGO" || n === "AIRTEL-TIGO" || n === "AT") return "AT_PREMIUM";
+  if (n === "TELECEL" || n === "VODAFONE" || n === "VOD") return "TELECEL";
+  if (n === "MTN" || n === "YELLO") return "YELLO";
   return n;
 }
 
@@ -36,7 +37,6 @@ function normalizeRecipient(phone: string | null | undefined): string {
 }
 
 async function getProviderCredentials(supabaseAdmin: any): Promise<{ apiKey: string; baseUrl: string }> {
-  // 1. Try environment variables first (multiple naming conventions)
   const apiKey = getFirstEnv(
     "PRIMARY_DATA_PROVIDER_API_KEY",
     "DATA_PROVIDER_API_KEY",
@@ -50,30 +50,99 @@ async function getProviderCredentials(supabaseAdmin: any): Promise<{ apiKey: str
 
   if (apiKey && baseUrl) return { apiKey, baseUrl };
 
-  // 2. Fall back to system_settings in DB
   const { data: settings } = await supabaseAdmin
     .from("system_settings")
-    .select("data_provider_api_key, data_provider_base_url, active_api_source")
+    .select("data_provider_api_key, data_provider_base_url")
     .eq("id", 1)
     .maybeSingle();
 
-  const dbApiKey = apiKey || settings?.data_provider_api_key || "";
-  const dbBaseUrl = (baseUrl || settings?.data_provider_base_url || "").replace(/\/+$/, "");
+  return {
+    apiKey: apiKey || settings?.data_provider_api_key || "",
+    baseUrl: (baseUrl || settings?.data_provider_base_url || "").replace(/\/+$/, ""),
+  };
+}
 
-  return { apiKey: dbApiKey, baseUrl: dbBaseUrl };
+function buildProviderUrls(baseUrl: string): string[] {
+  const clean = baseUrl.trim().replace(/\/+$/, "");
+  if (!clean) return [];
+
+  const urls = new Set<string>();
+  const aliases = ["purchase", "order", "airtime", "buy"];
+
+  let rootUrl = "";
+  try {
+    rootUrl = new URL(clean).origin;
+  } catch { /* ignore */ }
+
+  // If the configured URL already ends with an alias, use it directly
+  for (const alias of aliases) {
+    if (clean.endsWith(`/${alias}`) || clean.endsWith(`/api/${alias}`)) {
+      urls.add(clean);
+    }
+  }
+
+  // Build /api/<alias> and /<alias> variants from the configured base
+  for (const alias of aliases) {
+    if (clean.endsWith("/api")) {
+      urls.add(`${clean}/${alias}`);
+      urls.add(`${clean.replace(/\/api$/, "")}/api/${alias}`);
+    } else {
+      urls.add(`${clean}/api/${alias}`);
+      urls.add(`${clean}/${alias}`);
+    }
+  }
+
+  // Also try from the root origin in case the base URL has an extra path segment
+  if (rootUrl) {
+    for (const alias of aliases) {
+      urls.add(`${rootUrl}/api/${alias}`);
+      urls.add(`${rootUrl}/${alias}`);
+    }
+  }
+
+  return Array.from(urls);
+}
+
+function isHtmlResponse(contentType: string | null, body: string): boolean {
+  const preview = body.trim().slice(0, 200).toLowerCase();
+  return Boolean(
+    preview.startsWith("<!doctype html") ||
+    preview.startsWith("<html") ||
+    preview.includes("<title>"),
+  );
+}
+
+function parseProviderResponse(body: string, contentType: string | null): { ok: boolean; reason?: string } {
+  try {
+    const parsed = JSON.parse(body);
+    const rawStatus = parsed?.status;
+    const status = String(rawStatus || "").toLowerCase();
+    const message = typeof parsed?.message === "string" ? parsed.message : undefined;
+
+    if (rawStatus === true || status === "true" || status === "success") return { ok: true };
+    if (rawStatus === false || status === "false" || status === "error" || status === "failed" || status === "failure") {
+      return { ok: false, reason: message || "Provider rejected this order." };
+    }
+
+    const statusCode = Number(parsed?.statusCode);
+    if (Number.isFinite(statusCode) && statusCode >= 400) {
+      return { ok: false, reason: message || "Provider rejected this order." };
+    }
+  } catch { /* non-JSON */ }
+
+  if (isHtmlResponse(contentType, body)) {
+    return { ok: false, reason: "Provider returned an HTML response. Check API URL configuration." };
+  }
+
+  return { ok: true };
 }
 
 async function callProviderApi(
   baseUrl: string,
   apiKey: string,
-  endpoint: string,
   data: Record<string, unknown>,
 ): Promise<{ ok: boolean; reason: string }> {
-  // Try both URL patterns the provider may expect
-  const urls = [
-    `${baseUrl}/api/${endpoint}`,
-    `${baseUrl}/${endpoint}`,
-  ];
+  const urls = buildProviderUrls(baseUrl);
 
   let lastReason = "Provider error";
 
@@ -84,40 +153,48 @@ async function callProviderApi(
           method: "POST",
           headers: {
             "Content-Type": "application/json",
+            "Accept": "application/json",
             "Authorization": `Bearer ${apiKey}`,
             "X-API-Key": apiKey,
+            "User-Agent": "DataHiveGH/1.0",
           },
           body: JSON.stringify(data),
           signal: AbortSignal.timeout(25000),
         });
+
+        const contentType = res.headers.get("content-type");
         const text = await res.text();
-        let parsed: any;
-        try { parsed = JSON.parse(text); } catch { parsed = { status: "error", message: text }; }
 
-        const rawStatus = parsed?.status;
-        const ok =
-          rawStatus === true ||
-          String(rawStatus).toLowerCase() === "success" ||
-          String(rawStatus).toLowerCase() === "true";
+        if (res.ok) {
+          const semantic = parseProviderResponse(text, contentType);
+          if (semantic.ok) return { ok: true, reason: "" };
+          return { ok: false, reason: semantic.reason || "Provider rejected this order." };
+        }
 
-        if (res.ok && ok) return { ok: true, reason: "" };
+        let parsedMsg = "";
+        try { parsedMsg = JSON.parse(text)?.message || ""; } catch { /* ignore */ }
+        lastReason = parsedMsg || `Provider returned ${res.status}`;
 
-        lastReason = parsed?.message || `Provider returned ${res.status}`;
-
-        // Don't retry on auth errors
+        // Auth failures — don't retry at all
         if (res.status === 401 || res.status === 403) return { ok: false, reason: lastReason };
 
-        if (attempt < 2 && res.status >= 500) {
-          await new Promise((r) => setTimeout(r, 1000));
+        // 404 or HTML — move to next URL
+        if (res.status === 404 || isHtmlResponse(contentType, text)) break;
+
+        // Retryable server errors
+        if (res.status >= 500 && attempt < 2) {
+          await new Promise((r) => setTimeout(r, 300));
           continue;
         }
-        break; // try next URL
+
+        break;
       } catch (e: any) {
         lastReason = e?.message || "Network error";
-        if (attempt < 2) await new Promise((r) => setTimeout(r, 1000));
+        if (attempt < 2) await new Promise((r) => setTimeout(r, 300));
       }
     }
   }
+
   return { ok: false, reason: lastReason };
 }
 
@@ -260,15 +337,19 @@ serve(async (req: Request) => {
         return new Response(JSON.stringify({ status: "failed", reason: "Missing recipient phone" }), { headers: corsHeaders });
       }
 
-      const result = await callProviderApi(baseUrl, apiKey, "purchase", {
+      const requestBody = {
         networkKey: mapNetworkKey(network),
         networkRaw: network,
         recipient,
         capacity: parseCapacity(packageSize),
         amount: existingOrder?.amount || verifiedAmount,
         order_type: "data",
-        description: `Data: ${packageSize} for ${recipient}`,
-      });
+        description: `Data purchase: ${packageSize} for ${recipient}`,
+      };
+
+      console.log("[verify-payment] Provider request:", { baseUrl, network, networkKey: requestBody.networkKey, recipient, packageSize });
+
+      const result = await callProviderApi(baseUrl, apiKey, requestBody);
 
       if (result.ok) {
         await supabaseAdmin.from("orders").update({ status: "fulfilled", failure_reason: null }).eq("id", reference);

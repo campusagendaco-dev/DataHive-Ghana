@@ -3,7 +3,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { corsHeaders } from "../_shared/cors.ts";
 import { normalizePhone, getSmsConfig, sendSmsViaTxtConnect } from "../_shared/sms.ts";
 
-type TargetType = "all" | "agents" | "sub_agents" | "parent_agents" | "users" | "pending_orders";
+type TargetType = "all" | "agents" | "sub_agents" | "parent_agents" | "users" | "pending_orders" | "all_order_phones";
 
 interface TargetFilters {
   inactive_days?: number;
@@ -49,6 +49,45 @@ async function resolveRecipients(
       }
     }
     return { recipients: Array.from(unique.values()), optOutCount: 0 };
+  }
+
+  if (targetType === "all_order_phones") {
+    // Pull every unique customer phone from fulfilled/completed orders
+    const BATCH = 1000;
+    let offset = 0;
+    let hasMore = true;
+    while (hasMore) {
+      const { data } = await supabaseAdmin
+        .from("orders")
+        .select("customer_phone")
+        .in("status", ["fulfilled", "completed", "paid", "processing"])
+        .not("customer_phone", "is", null)
+        .range(offset, offset + BATCH - 1);
+      for (const row of data || []) {
+        const p = normalizePhone(row.customer_phone);
+        if (p && !unique.has(p)) {
+          unique.set(p, { phone: p, name: "Customer", userId: "", isAgent: false });
+        }
+      }
+      hasMore = (data || []).length === BATCH;
+      offset += BATCH;
+    }
+    // Also merge in profile phones for registered users
+    const { data: profiles } = await supabaseAdmin
+      .from("profiles")
+      .select("user_id, phone, full_name, is_agent, is_sub_agent, sms_opt_out");
+    for (const row of profiles || []) {
+      if (row.sms_opt_out) { optOutCount++; continue; }
+      const p = normalizePhone(row.phone);
+      if (!p || unique.has(p)) continue;
+      unique.set(p, {
+        phone: p,
+        name: row.full_name || "Customer",
+        userId: row.user_id || "",
+        isAgent: Boolean(row.is_agent || row.is_sub_agent),
+      });
+    }
+    return { recipients: Array.from(unique.values()), optOutCount };
   }
 
   // Build query for profiles

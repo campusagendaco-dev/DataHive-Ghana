@@ -3,6 +3,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { corsHeaders } from "../_shared/cors.ts";
 import { normalizePhone, getSmsConfig, sendSmsViaTxtConnect, formatTemplate, sendPaymentSms } from "../_shared/sms.ts";
+import { sendWhatsAppMessage } from "../_shared/whatsapp.ts";
 
 function getFirstEnvValue(keys: string[]): string {
   for (const key of keys) {
@@ -12,7 +13,7 @@ function getFirstEnvValue(keys: string[]): string {
   return "";
 }
 
-function getProviderCredentials(): { apiKey: string; baseUrl: string } {
+async function getProviderCredentials(supabaseAdmin: any): Promise<{ apiKey: string; baseUrl: string }> {
   const primaryApiKey = getFirstEnvValue([
     "PRIMARY_DATA_PROVIDER_API_KEY",
     "DATA_PROVIDER_API_KEY",
@@ -25,9 +26,18 @@ function getProviderCredentials(): { apiKey: string; baseUrl: string } {
     "DATA_PROVIDER_PRIMARY_BASE_URL",
   ]).replace(/\/+$/, "");
 
+  if (primaryApiKey && primaryBaseUrl) return { apiKey: primaryApiKey, baseUrl: primaryBaseUrl };
+
+  // Fall back to DB if env vars are not set
+  const { data: settings } = await supabaseAdmin
+    .from("system_settings")
+    .select("data_provider_api_key, data_provider_base_url")
+    .eq("id", 1)
+    .maybeSingle();
+
   return {
-    apiKey: primaryApiKey,
-    baseUrl: primaryBaseUrl,
+    apiKey: primaryApiKey || settings?.data_provider_api_key || "",
+    baseUrl: (primaryBaseUrl || settings?.data_provider_base_url || "").replace(/\/+$/, ""),
   };
 }
 
@@ -48,12 +58,11 @@ async function getAirtimeCredentials(supabaseAdmin: any): Promise<{ apiKey: stri
   return { apiKey, baseUrl: (baseUrl || "").replace(/\/+$/, "") };
 }
 
-function mapNetworkKey(network: string, variant: number = 0): string {
-  const n = network.trim().toUpperCase();
-  if (n === "MTN" || n === "YELLO") return "MTN";
-  if (n === "VOD" || n === "VODAFONE" || n === "TELECEL") return "VOD";
-  if (n === "AT" || n === "AIRTELTIGO" || n === "AIRTEL TIGO") return "AT";
-  if (n === "GLO") return "GLO";
+function mapNetworkKey(network: string): string {
+  const n = (network || "").trim().toUpperCase();
+  if (n === "AIRTELTIGO" || n === "AIRTEL TIGO" || n === "AIRTEL-TIGO" || n === "AT") return "AT_PREMIUM";
+  if (n === "TELECEL" || n === "VODAFONE" || n === "VOD") return "TELECEL";
+  if (n === "MTN" || n === "YELLO") return "YELLO";
   return n;
 }
 
@@ -192,6 +201,21 @@ async function sendWalletTopupSms(supabaseAdmin: any, userId: string, amount: nu
     await sendSmsViaTxtConnect(apiKey, senderId, recipient, message);
   } catch (error) {
     console.error("sendWalletTopupSms error:", error);
+  }
+}
+
+async function sendWhatsAppFulfillmentNotification(to: string, type: string, net: string, pkg: string, phone: string) {
+  try {
+    const msg = [
+      `✅ *Order Fulfilled!*`,
+      ``,
+      `Your *${net} ${pkg || type}* order for *${phone}* has been delivered successfully. 🚀`,
+      ``,
+      `Thank you for choosing SwiftData!`,
+    ].join("\n");
+    await sendWhatsAppMessage(to, msg);
+  } catch (err) {
+    console.error("[WhatsApp Webhook] Notification error:", err);
   }
 }
 
@@ -405,7 +429,7 @@ serve(async (req) => {
   const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
   try {
-    const providerConfig = getProviderCredentials();
+    const providerConfig = await getProviderCredentials(supabaseAdmin);
     const DATA_PROVIDER_API_KEY = providerConfig.apiKey;
     const DATA_PROVIDER_BASE_URL = providerConfig.baseUrl;
 
@@ -842,6 +866,9 @@ serve(async (req) => {
           await supabaseAdmin.rpc("credit_order_profits", { p_order_id: orderId });
         }
         if (customerPhone) await sendPaymentSms(supabaseAdmin, customerPhone, "payment_success");
+        if (metadata.channel === "whatsapp" && metadata.wa_from) {
+          await sendWhatsAppFulfillmentNotification(String(metadata.wa_from), "airtime", network, `GH₵${airtimeAmount}`, customerPhone);
+        }
         return new Response(JSON.stringify({ received: true, fulfilled: true }), {
           status: 200,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -909,6 +936,10 @@ serve(async (req) => {
 
       if (customerPhone) {
         await sendPaymentSms(supabaseAdmin, customerPhone, "payment_success");
+      }
+
+      if (metadata.channel === "whatsapp" && metadata.wa_from) {
+        await sendWhatsAppFulfillmentNotification(String(metadata.wa_from), orderType, network, packageSize, customerPhone);
       }
 
       return new Response(JSON.stringify({ received: true, fulfilled: true }), {

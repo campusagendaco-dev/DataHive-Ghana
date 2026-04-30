@@ -18,7 +18,7 @@ import {
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-type TargetType = "all" | "agents" | "sub_agents" | "parent_agents" | "users" | "pending_orders";
+type TargetType = "all" | "agents" | "sub_agents" | "parent_agents" | "users" | "pending_orders" | "all_order_phones";
 
 interface TargetFilters {
   inactive_days?: number;
@@ -69,12 +69,13 @@ interface SmsResult {
 const SMS_LIMIT = 160;
 
 const TARGET_LABELS: Record<string, string> = {
-  all: "Everyone",
+  all: "Everyone (registered profiles)",
   agents: "All Agents & Sub-agents",
   sub_agents: "Sub-agents Only",
   parent_agents: "Parent Agents Only",
   users: "Customers Only",
   pending_orders: "Pending Order Phones",
+  all_order_phones: "All Order Recipients (broadest reach)",
 };
 
 const TOKENS = [
