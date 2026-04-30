@@ -62,6 +62,11 @@ const OrderStatus = () => {
   const [orderStatus, setOrderStatus] = useState<OrderStatusType>("pending");
   const [statusMessage, setStatusMessage] = useState<string>("");
   const [providerId, setProviderId] = useState<string>("");
+  const [orderType, setOrderType] = useState<string>("data");
+  const [step, setStep] = useState(0);
+  const [failed, setFailed] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const [initialCheckDone, setInitialCheckDone] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const { user } = useAuth();
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
