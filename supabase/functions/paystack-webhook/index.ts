@@ -390,17 +390,19 @@ serve(async (req) => {
   }
 
   const hash = createHmac("sha512", PAYSTACK_SECRET_KEY).update(rawBody).digest("hex");
-  const hashBuf = Buffer.from(hash, "utf8");
-  const sigBuf = Buffer.from(signature, "utf8");
+  const encoder = new TextEncoder();
+  const hashBuf = encoder.encode(hash);
+  const sigBuf = encoder.encode(signature);
   const signatureValid = hashBuf.length === sigBuf.length && timingSafeEqual(hashBuf, sigBuf);
   if (!signatureValid) {
+    console.error("Invalid signature. Expected:", hash, "Got:", signature);
     return new Response(JSON.stringify({ error: "Invalid signature" }), {
       status: 401,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
 
-  const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+  const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
   try {
     const providerConfig = getProviderCredentials();
@@ -445,7 +447,7 @@ serve(async (req) => {
     const paystackFeeOnVerified = parseFloat(Math.min(verifiedAmount * 0.03 / 1.03, 100).toFixed(2));
     const orderTypeFromMetadata = typeof metadata?.order_type === "string" ? metadata.order_type : null;
 
-    let { data: existingOrder } = await supabase
+    let { data: existingOrder } = await supabaseAdmin
       .from("orders")
       .select("id, order_type, agent_id, parent_agent_id, network, package_size, customer_phone, amount, status, profit, parent_profit")
       .eq("id", orderId)
@@ -499,7 +501,7 @@ serve(async (req) => {
         utility_account_name: typeof metadata?.utility_account_name === "string" ? metadata.utility_account_name : null,
       };
 
-      const { error: recreateError } = await supabase.from("orders").insert(recreatedOrder);
+      const { error: recreateError } = await supabaseAdmin.from("orders").insert(recreatedOrder);
       if (recreateError) {
         console.error("Webhook failed to recreate missing order:", recreateError);
       } else {
@@ -528,12 +530,12 @@ serve(async (req) => {
         patch.status = "paid";
       }
 
-      await supabase.from("orders").update(patch).eq("id", orderId);
+      await supabaseAdmin.from("orders").update(patch).eq("id", orderId);
       existingOrder = { ...existingOrder, ...patch };
     }
 
     if (shouldSendDataPaymentSms && smsPhone) {
-      await sendPaymentSms(supabase, smsPhone, "payment_success");
+      await sendPaymentSms(supabaseAdmin, smsPhone, "payment_success");
     }
 
     // Declare orderType BEFORE first use to avoid temporal dead zone crash
@@ -541,11 +543,11 @@ serve(async (req) => {
     const existingAmount = Number(existingOrder?.amount || 0);
 
     if (orderType === "wallet_topup" && existingOrder?.agent_id) {
-      await sendWalletTopupSms(supabase, existingOrder.agent_id, verifiedAmount);
+      await sendWalletTopupSms(supabaseAdmin, existingOrder.agent_id, verifiedAmount);
     }
 
     if (orderType !== "wallet_topup" && Number.isFinite(existingAmount) && existingAmount > 0 && !amountMatches(existingAmount, verifiedAmount)) {
-      await supabase.from("orders").update({
+      await supabaseAdmin.from("orders").update({
         status: "fulfillment_failed",
         failure_reason: `Payment amount mismatch. Expected GHS ${existingAmount.toFixed(2)}, received GHS ${verifiedAmount.toFixed(2)}.`,
       }).eq("id", orderId);
@@ -557,7 +559,7 @@ serve(async (req) => {
     }
 
     if (orderType === "wallet_topup" && Number.isFinite(existingAmount) && existingAmount > (verifiedAmount + 0.05)) {
-      await supabase.from("orders").update({
+      await supabaseAdmin.from("orders").update({
         status: "fulfillment_failed",
         failure_reason: `Wallet credit mismatch. Credit GHS ${existingAmount.toFixed(2)} exceeds payment GHS ${verifiedAmount.toFixed(2)}.`,
       }).eq("id", orderId);
@@ -569,7 +571,7 @@ serve(async (req) => {
     }
 
     const claimableStatuses = ["pending", "paid", "fulfillment_failed"];
-    const { data: claimedOrder, error: claimError } = await supabase
+    const { data: claimedOrder, error: claimError } = await supabaseAdmin
       .from("orders")
       .update({
         status: "processing",
@@ -587,7 +589,7 @@ serve(async (req) => {
     }
 
     if (!claimedOrder) {
-      const { data: latestOrder } = await supabase
+      const { data: latestOrder } = await supabaseAdmin
         .from("orders")
         .select("status, failure_reason")
         .eq("id", orderId)
@@ -608,7 +610,7 @@ serve(async (req) => {
 
     if (orderType === "utility") {
       // For now, utility payments are marked as 'paid' and require manual fulfillment or an API connection
-      await supabase.from("orders").update({ 
+      await supabaseAdmin.from("orders").update({ 
         status: "paid", 
         failure_reason: "Awaiting manual fulfillment / Token generation" 
       }).eq("id", orderId);
@@ -624,7 +626,7 @@ serve(async (req) => {
     if (orderType === "agent_activation") {
       const AGENT_ACTIVATION_MINIMUM = 80; // GHS — enforced server-side
       if (verifiedAmount < AGENT_ACTIVATION_MINIMUM * 0.97) {
-        await supabase.from("orders").update({
+        await supabaseAdmin.from("orders").update({
           status: "fulfillment_failed",
           failure_reason: `Payment too low for agent activation. Minimum GHS ${AGENT_ACTIVATION_MINIMUM}, received GHS ${verifiedAmount.toFixed(2)}.`,
         }).eq("id", orderId);
@@ -635,14 +637,14 @@ serve(async (req) => {
       }
       const agentId = metadata?.agent_id;
       if (agentId) {
-        await supabase.from("profiles").update({ 
+        await supabaseAdmin.from("profiles").update({ 
           is_agent: true, 
           agent_approved: true,
           onboarding_complete: true,
           is_sub_agent: false,
           parent_agent_id: null
         }).eq("user_id", agentId);
-        await supabase.from("orders").update({ status: "fulfilled", failure_reason: null }).eq("id", orderId);
+        await supabaseAdmin.from("orders").update({ status: "fulfilled", failure_reason: null }).eq("id", orderId);
         console.log("Agent activated via webhook:", agentId);
       }
       return new Response(JSON.stringify({ received: true, fulfilled: true }), {
@@ -654,7 +656,7 @@ serve(async (req) => {
     if (orderType === "sub_agent_activation") {
       const SUB_AGENT_MINIMUM = 80; // Minimum platform base fee
       if (verifiedAmount < SUB_AGENT_MINIMUM * 0.97) {
-        await supabase.from("orders").update({
+        await supabaseAdmin.from("orders").update({
           status: "fulfillment_failed",
           failure_reason: `Payment too low for sub-agent activation. Minimum GHS ${SUB_AGENT_MINIMUM}, received GHS ${verifiedAmount.toFixed(2)}.`,
         }).eq("id", orderId);
@@ -674,14 +676,14 @@ serve(async (req) => {
       
       if (subAgentId) {
         // Fetch parent's sub_agent_prices to copy as the sub agent's agent_prices
-        const { data: parentProfile } = await supabase
+        const { data: parentProfile } = await supabaseAdmin
           .from("profiles")
           .select("sub_agent_prices")
           .eq("user_id", parentAgentId)
           .maybeSingle();
         const subAgentPrices = parentProfile?.sub_agent_prices || {};
 
-        await supabase.from("profiles").update({
+        await supabaseAdmin.from("profiles").update({
           is_agent: true,
           agent_approved: true,
           sub_agent_approved: true,
@@ -693,7 +695,7 @@ serve(async (req) => {
 
         // Set parent_profit on the order BEFORE calling credit_order_profits,
         // so the RPC credits the correct amount to the parent's wallet.
-        await supabase
+        await supabaseAdmin
           .from("orders")
           .update({
             status: "fulfilled",
@@ -705,7 +707,7 @@ serve(async (req) => {
           .eq("id", orderId);
 
         if (parentAgentId && agentProfit > 0) {
-          await supabase.rpc("credit_order_profits", { p_order_id: orderId });
+          await supabaseAdmin.rpc("credit_order_profits", { p_order_id: orderId });
         }
         console.log("Sub agent activated via webhook:", subAgentId, "parent:", parentAgentId);
       }
@@ -716,10 +718,10 @@ serve(async (req) => {
     }
 
     if (orderType === "wallet_topup") {
-      const { data: order } = await supabase.from("orders").select("amount, agent_id").eq("id", orderId).maybeSingle();
+      const { data: order } = await supabaseAdmin.from("orders").select("amount, agent_id").eq("id", orderId).maybeSingle();
       if (order) {
-        await supabase.rpc("credit_wallet", { p_agent_id: order.agent_id, p_amount: order.amount });
-        await supabase.from("orders").update({ status: "fulfilled", failure_reason: null }).eq("id", orderId);
+        await supabaseAdmin.rpc("credit_wallet", { p_agent_id: order.agent_id, p_amount: order.amount });
+        await supabaseAdmin.from("orders").update({ status: "fulfilled", failure_reason: null }).eq("id", orderId);
       }
       return new Response(JSON.stringify({ received: true, fulfilled: true }), {
         status: 200,
@@ -729,7 +731,7 @@ serve(async (req) => {
 
     if (!DATA_PROVIDER_API_KEY || !DATA_PROVIDER_BASE_URL) {
       console.error("Data provider not configured for fulfillment");
-      await supabase.from("orders").update({
+      await supabaseAdmin.from("orders").update({
         status: "fulfillment_failed",
         failure_reason: "Data provider not configured",
       }).eq("id", orderId);
@@ -754,11 +756,11 @@ serve(async (req) => {
       });
 
       if (result.ok) {
-        await supabase.from("orders").update({ status: "fulfilled", failure_reason: null }).eq("id", orderId);
+        await supabaseAdmin.from("orders").update({ status: "fulfilled", failure_reason: null }).eq("id", orderId);
         
         // Credit profits
         if (existingOrder?.agent_id && (existingOrder.profit > 0 || existingOrder.parent_profit > 0)) {
-          await supabase.rpc("credit_order_profits", { p_order_id: orderId });
+          await supabaseAdmin.rpc("credit_order_profits", { p_order_id: orderId });
         }
         
         return new Response(JSON.stringify({ received: true, fulfilled: true }), {
@@ -767,7 +769,7 @@ serve(async (req) => {
         });
       }
 
-      await supabase.from("orders").update({ status: "fulfillment_failed", failure_reason: result.reason }).eq("id", orderId);
+      await supabaseAdmin.from("orders").update({ status: "fulfillment_failed", failure_reason: result.reason }).eq("id", orderId);
       return new Response(JSON.stringify({ received: true, fulfilled: false, failure_reason: result.reason }), {
         status: 200,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -795,7 +797,7 @@ serve(async (req) => {
           : 0);
 
       if (!network || !airtimeAmount || !customerPhone) {
-        await supabase.from("orders").update({
+        await supabaseAdmin.from("orders").update({
           status: "fulfillment_failed",
           failure_reason: "Missing network, amount, or phone for airtime fulfillment.",
         }).eq("id", orderId);
@@ -806,7 +808,7 @@ serve(async (req) => {
       }
 
       // Use Airtime-specific credentials and format
-      const { apiKey: AIRTIME_KEY, baseUrl: AIRTIME_BASE } = await getAirtimeCredentials(supabase);
+      const { apiKey: AIRTIME_KEY, baseUrl: AIRTIME_BASE } = await getAirtimeCredentials(supabaseAdmin);
       
       const airtimeNetworkKey = mapNetworkKey(network);
       const airtimeRecipient = normalizeRecipient(customerPhone);
@@ -830,23 +832,23 @@ serve(async (req) => {
           providerOrderId = parsed.transaction_id || parsed.order_id || parsed.reference;
         } catch { /* ignore */ }
 
-        await supabase.from("orders").update({ 
+        await supabaseAdmin.from("orders").update({ 
           status: "fulfilled", 
           failure_reason: null,
           provider_order_id: providerOrderId 
         }).eq("id", orderId);
         
         if (existingOrder?.agent_id && (existingOrder.profit > 0 || existingOrder.parent_profit > 0)) {
-          await supabase.rpc("credit_order_profits", { p_order_id: orderId });
+          await supabaseAdmin.rpc("credit_order_profits", { p_order_id: orderId });
         }
-        if (customerPhone) await sendPaymentSms(supabase, customerPhone, "payment_success");
+        if (customerPhone) await sendPaymentSms(supabaseAdmin, customerPhone, "payment_success");
         return new Response(JSON.stringify({ received: true, fulfilled: true }), {
           status: 200,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
 
-      await supabase.from("orders").update({ status: "fulfillment_failed", failure_reason: airtimeResult.reason }).eq("id", orderId);
+      await supabaseAdmin.from("orders").update({ status: "fulfillment_failed", failure_reason: airtimeResult.reason }).eq("id", orderId);
       return new Response(JSON.stringify({ received: true, fulfilled: false, failure_reason: airtimeResult.reason }), {
         status: 200,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -854,7 +856,7 @@ serve(async (req) => {
     }
 
     if (!network || !packageSize || !customerPhone) {
-      await supabase.from("orders").update({
+      await supabaseAdmin.from("orders").update({
         status: "fulfillment_failed",
         failure_reason: "Missing order details for fulfillment.",
       }).eq("id", orderId);
@@ -894,7 +896,7 @@ serve(async (req) => {
         providerOrderId = parsed.transaction_id || parsed.order_id || parsed.reference;
       } catch { /* ignore */ }
 
-      await supabase.from("orders").update({ 
+      await supabaseAdmin.from("orders").update({ 
         status: "fulfilled", 
         failure_reason: null,
         provider_order_id: providerOrderId
@@ -902,11 +904,11 @@ serve(async (req) => {
       
       // Credit profits
       if (existingOrder?.agent_id && (existingOrder.profit > 0 || existingOrder.parent_profit > 0)) {
-        await supabase.rpc("credit_order_profits", { p_order_id: orderId });
+        await supabaseAdmin.rpc("credit_order_profits", { p_order_id: orderId });
       }
 
       if (customerPhone) {
-        await sendPaymentSms(supabase, customerPhone, "payment_success");
+        await sendPaymentSms(supabaseAdmin, customerPhone, "payment_success");
       }
 
       return new Response(JSON.stringify({ received: true, fulfilled: true }), {
@@ -915,10 +917,10 @@ serve(async (req) => {
       });
     }
 
-    await supabase.from("orders").update({ status: "fulfillment_failed", failure_reason: result.reason }).eq("id", orderId);
+    await supabaseAdmin.from("orders").update({ status: "fulfillment_failed", failure_reason: result.reason }).eq("id", orderId);
     
     if (customerPhone) {
-      await sendPaymentSms(supabase, customerPhone, "order_failed", {
+      await sendPaymentSms(supabaseAdmin, customerPhone, "order_failed", {
         package: packageSize || "Data",
         phone: customerPhone,
         amount: (existingOrder?.amount || 0).toFixed(2)
