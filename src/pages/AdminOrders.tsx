@@ -9,7 +9,7 @@ import {
   Search, RotateCcw, Loader2, RefreshCw,
   TrendingUp, ShoppingCart, AlertTriangle, Clock,
   ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight,
-  CheckCircle2,
+  CheckCircle2, PlayCircle,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { getFunctionErrorMessage } from "@/lib/function-errors";
@@ -69,6 +69,7 @@ const AdminOrders = () => {
   const initialSearch = searchParams.get("agent") || "";
   const [search, setSearch] = useState(initialSearch);
   const [retrying, setRetrying] = useState<string | null>(null);
+  const [retryingAll, setRetryingAll] = useState(false);
   const [typeFilter, setTypeFilter] = useState<FilterType>("all");
   const [statusFilter, setStatusFilter] = useState("all");
   const [networkFilter, setNetworkFilter] = useState("all");
@@ -166,6 +167,29 @@ const AdminOrders = () => {
     setRetrying(null);
   };
 
+  const handleRetryAll = async () => {
+    const actionable = allOrders.filter(
+      (o) => o.status === "pending" || o.status === "paid" || o.status === "fulfillment_failed"
+    );
+    if (actionable.length === 0) {
+      toast({ title: "No pending orders", description: "All orders are already fulfilled." });
+      return;
+    }
+    setRetryingAll(true);
+    const results = await Promise.allSettled(
+      actionable.map((o) => invokePublicFunctionAsUser("verify-payment", { body: { reference: o.id } }))
+    );
+    const fulfilled = results.filter(
+      (r) => r.status === "fulfilled" && (r as PromiseFulfilledResult<any>).value?.data?.status === "fulfilled"
+    ).length;
+    if (currentUser) {
+      await logAudit(currentUser.id, "bulk_retry_orders", { attempted: actionable.length, fulfilled });
+    }
+    toast({ title: `Retry complete`, description: `${fulfilled} of ${actionable.length} orders fulfilled.` });
+    setRetryingAll(false);
+    await fetchOrders();
+  };
+
   // Client-side filtering
   const filtered = allOrders;
   const paginated = allOrders;
@@ -212,9 +236,20 @@ const AdminOrders = () => {
             Full transaction history — {totalCount.toLocaleString()} total orders
           </p>
         </div>
-        <Button variant="outline" size="sm" className="gap-2 self-start" onClick={fetchOrders}>
-          <RefreshCw className="w-4 h-4" /> Refresh
-        </Button>
+        <div className="flex items-center gap-2 self-start">
+          <Button variant="outline" size="sm" className="gap-2" onClick={fetchOrders}>
+            <RefreshCw className="w-4 h-4" /> Refresh
+          </Button>
+          <Button
+            size="sm"
+            className="gap-2 bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/20"
+            onClick={handleRetryAll}
+            disabled={retryingAll}
+          >
+            {retryingAll ? <Loader2 className="w-4 h-4 animate-spin" /> : <PlayCircle className="w-4 h-4" />}
+            {retryingAll ? "Retrying…" : `Retry All Pending (${pending + failed})`}
+          </Button>
+        </div>
       </div>
 
       {/* Stats */}
