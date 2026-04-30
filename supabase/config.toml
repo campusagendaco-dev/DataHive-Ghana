@@ -9,6 +9,9 @@ verify_jwt = false
 [functions.paystack-webhook]
 verify_jwt = false
 
+[functions.bulk-fulfill-orders]
+verify_jwt = false
+
 [functions.wallet-buy-data]
 verify_jwt = false
 

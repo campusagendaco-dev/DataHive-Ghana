@@ -168,26 +168,25 @@ const AdminOrders = () => {
   };
 
   const handleRetryAll = async () => {
-    const actionable = allOrders.filter(
-      (o) => o.status === "pending" || o.status === "paid" || o.status === "fulfillment_failed"
-    );
-    if (actionable.length === 0) {
+    if (pending + failed === 0) {
       toast({ title: "No pending orders", description: "All orders are already fulfilled." });
       return;
     }
     setRetryingAll(true);
-    const results = await Promise.allSettled(
-      actionable.map((o) => invokePublicFunctionAsUser("verify-payment", { body: { reference: o.id } }))
-    );
-    const fulfilled = results.filter(
-      (r) => r.status === "fulfilled" && (r as PromiseFulfilledResult<any>).value?.data?.status === "fulfilled"
-    ).length;
-    if (currentUser) {
-      await logAudit(currentUser.id, "bulk_retry_orders", { attempted: actionable.length, fulfilled });
+    toast({ title: "Processing…", description: `Verifying and fulfilling ${pending + failed} orders server-side. This may take a moment.` });
+    try {
+      const { data, error } = await supabase.functions.invoke("bulk-fulfill-orders");
+      if (error) throw error;
+      const { fulfilled: done, failed: fail, skipped, total } = data as { fulfilled: number; failed: number; skipped: number; total: number };
+      if (currentUser) {
+        await logAudit(currentUser.id, "bulk_fulfill_orders", { total, fulfilled: done, failed: fail, skipped });
+      }
+      toast({ title: "Done", description: `${done} fulfilled · ${fail} failed · ${skipped} skipped (unpaid) out of ${total} orders.` });
+      await fetchOrders();
+    } catch (e: any) {
+      toast({ title: "Bulk fulfill failed", description: e?.message || "Unknown error", variant: "destructive" });
     }
-    toast({ title: `Retry complete`, description: `${fulfilled} of ${actionable.length} orders fulfilled.` });
     setRetryingAll(false);
-    await fetchOrders();
   };
 
   // Client-side filtering
