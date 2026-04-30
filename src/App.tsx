@@ -365,6 +365,10 @@ const App = () => {
     onRegisterError(error) {
       console.error("SW registration error", error);
     },
+    onNeedRefresh() {
+      // New version available — reload immediately so stale cached bundles never run
+      window.location.reload();
+    },
   });
 
   return (
