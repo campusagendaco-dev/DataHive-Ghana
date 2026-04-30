@@ -451,15 +451,43 @@ serve(async (req: Request) => {
 
         // Filter settings to only include keys that exist in the DB
         const validKeys = existing ? Object.keys(existing) : [];
+
+        // Define expected types for known sensitive settings
+        const BOOLEAN_KEYS = new Set(["disable_ordering", "maintenance_mode", "auto_failover_enabled", "holiday_mode_enabled"]);
+        const NUMERIC_KEYS = new Set(["min_order_amount", "max_order_amount", "agent_activation_fee", "sub_agent_activation_fee"]);
+        const STRING_KEYS = new Set(["holiday_message", "data_provider_base_url", "secondary_data_provider_base_url", "whatsapp_bot_prompt", "site_name"]);
+
         const filteredSettings: Record<string, any> = {};
-        
-        Object.keys(settings).forEach(key => {
-          if (validKeys.includes(key)) {
-            filteredSettings[key] = settings[key];
-          } else {
+
+        for (const key of Object.keys(settings)) {
+          if (!validKeys.includes(key)) {
             console.warn(`Skipping unknown setting key: ${key}`);
+            continue;
           }
-        });
+          const val = settings[key];
+          // Reject null prototype injection
+          if (key === "__proto__" || key === "constructor" || key === "prototype") continue;
+          // Type validation for known fields
+          if (BOOLEAN_KEYS.has(key) && typeof val !== "boolean") {
+            return new Response(JSON.stringify({ error: `Setting '${key}' must be a boolean` }), {
+              status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+            });
+          }
+          if (NUMERIC_KEYS.has(key)) {
+            const n = Number(val);
+            if (!Number.isFinite(n) || n < 0 || n > 100000) {
+              return new Response(JSON.stringify({ error: `Setting '${key}' must be a non-negative number ≤ 100000` }), {
+                status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+              });
+            }
+          }
+          if (STRING_KEYS.has(key) && typeof val !== "string") {
+            return new Response(JSON.stringify({ error: `Setting '${key}' must be a string` }), {
+              status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+            });
+          }
+          filteredSettings[key] = val;
+        }
 
         const { error: updateError } = await supabaseAdmin
           .from("system_settings")
@@ -793,15 +821,13 @@ serve(async (req: Request) => {
         
         const airtimeKey = (Deno as any).env.get("AIRTIME_PROVIDER_API_KEY") || dbSettings?.airtime_provider_api_key || apiKey;
         
-        const mask = (key: string) => key ? `${key.slice(0, 8)}...${key.slice(-4)}` : "not set";
-
         if (!apiKey || !baseUrl) {
-          return new Response(JSON.stringify({ 
+          return new Response(JSON.stringify({
             error: "Provider not configured",
             diagnostics: {
-              DATA_PROVIDER_API_KEY: mask((Deno as any).env.get("DATA_PROVIDER_API_KEY") || ""),
-              PRIMARY_DATA_PROVIDER_API_KEY: mask((Deno as any).env.get("PRIMARY_DATA_PROVIDER_API_KEY") || ""),
-              baseUrl: baseUrl || "not set"
+              DATA_PROVIDER_API_KEY: !!(Deno as any).env.get("DATA_PROVIDER_API_KEY") ? "configured" : "not set",
+              PRIMARY_DATA_PROVIDER_API_KEY: !!(Deno as any).env.get("PRIMARY_DATA_PROVIDER_API_KEY") ? "configured" : "not set",
+              baseUrl: baseUrl ? "configured" : "not set",
             }
           }), {
             status: 200,
@@ -833,16 +859,14 @@ serve(async (req: Request) => {
                 const data = JSON.parse(text);
                 const balance = data.balance ?? data.data?.balance ?? data.wallet_balance;
                 if (balance !== undefined) {
-                  return new Response(JSON.stringify({ 
-                    success: true, 
+                  return new Response(JSON.stringify({
+                    success: true,
                     balance: Number(balance),
                     diagnostics: {
-                      DATA_PROVIDER_API_KEY: mask((Deno as any).env.get("DATA_PROVIDER_API_KEY") || ""),
-                      PRIMARY_DATA_PROVIDER_API_KEY: mask((Deno as any).env.get("PRIMARY_DATA_PROVIDER_API_KEY") || ""),
-                      AIRTIME_PROVIDER_API_KEY: mask((Deno as any).env.get("AIRTIME_PROVIDER_API_KEY") || ""),
-                      baseUrl: baseUrl,
-                      activeKey: mask(apiKey),
-                      activeAirtimeKey: mask(airtimeKey)
+                      DATA_PROVIDER_API_KEY: (Deno as any).env.get("DATA_PROVIDER_API_KEY") ? "configured" : "not set",
+                      PRIMARY_DATA_PROVIDER_API_KEY: (Deno as any).env.get("PRIMARY_DATA_PROVIDER_API_KEY") ? "configured" : "not set",
+                      AIRTIME_PROVIDER_API_KEY: (Deno as any).env.get("AIRTIME_PROVIDER_API_KEY") ? "configured" : "not set",
+                      baseUrl: baseUrl ? "configured" : "not set",
                     }
                   }), {
                     status: 200,

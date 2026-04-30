@@ -498,10 +498,37 @@ serve(async (req) => {
       const normalizedAmount = (orderTypeFromMetadata || "data") === "wallet_topup"
         ? walletCredit
         : (Number.isFinite(verifiedAmount) && verifiedAmount > 0 ? verifiedAmount : 0);
+
+      // Validate metadata agent_id against the DB — never trust client-supplied UUIDs blindly
+      const metaAgentId = typeof metadata?.agent_id === "string" ? metadata.agent_id.trim() : "";
+      const isValidUuidFormat = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(metaAgentId);
+      let verifiedAgentId = "00000000-0000-0000-0000-000000000000";
+      if (isValidUuidFormat) {
+        const { data: agentProfile } = await supabaseAdmin
+          .from("profiles")
+          .select("user_id")
+          .eq("user_id", metaAgentId)
+          .maybeSingle();
+        if (agentProfile?.user_id) verifiedAgentId = agentProfile.user_id;
+      }
+
+      // Validate parent_agent_id the same way
+      const metaParentId = typeof metadata?.parent_agent_id === "string" ? metadata.parent_agent_id.trim() : "";
+      const isValidParentUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(metaParentId);
+      let verifiedParentAgentId: string | null = null;
+      if (isValidParentUuid) {
+        const { data: parentProfile } = await supabaseAdmin
+          .from("profiles")
+          .select("user_id")
+          .eq("user_id", metaParentId)
+          .maybeSingle();
+        if (parentProfile?.user_id) verifiedParentAgentId = parentProfile.user_id;
+      }
+
       const recreatedOrder = {
         id: orderId,
-        agent_id: typeof metadata?.agent_id === "string" ? metadata.agent_id : "00000000-0000-0000-0000-000000000000",
-        parent_agent_id: typeof metadata?.parent_agent_id === "string" ? metadata.parent_agent_id : null,
+        agent_id: verifiedAgentId,
+        parent_agent_id: verifiedParentAgentId,
         order_type: orderTypeFromMetadata || "data",
         amount: normalizedAmount,
         profit: normalizedProfit,
@@ -537,10 +564,17 @@ serve(async (req) => {
       shouldSendDataPaymentSms = existingOrder.status === "pending" && (existingOrder.order_type || "") === "data";
       smsPhone = String(existingOrder.customer_phone || metadata?.customer_phone || "");
       const patch: Record<string, unknown> = { failure_reason: null };
-      const recoveredAgentId = typeof metadata?.agent_id === "string" ? metadata.agent_id : "";
       const hasPlaceholderAgentId = !existingOrder.agent_id || existingOrder.agent_id === "00000000-0000-0000-0000-000000000000";
 
-      if (hasPlaceholderAgentId && recoveredAgentId) patch.agent_id = recoveredAgentId;
+      // Only recover agent_id if the stored one is a placeholder — validate against DB first
+      if (hasPlaceholderAgentId) {
+        const candidateId = typeof metadata?.agent_id === "string" ? metadata.agent_id.trim() : "";
+        const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(candidateId);
+        if (isUuid) {
+          const { data: agentCheck } = await supabaseAdmin.from("profiles").select("user_id").eq("user_id", candidateId).maybeSingle();
+          if (agentCheck?.user_id) patch.agent_id = agentCheck.user_id;
+        }
+      }
       if (!existingOrder.network && typeof metadata?.network === "string") patch.network = metadata.network;
       if (!existingOrder.package_size && typeof metadata?.package_size === "string") patch.package_size = metadata.package_size;
       if (!existingOrder.customer_phone && typeof (metadata?.customer_phone || metadata?.phone) === "string") {
