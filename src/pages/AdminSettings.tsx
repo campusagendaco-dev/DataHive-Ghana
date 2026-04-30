@@ -55,6 +55,7 @@ interface SystemSettings {
   free_data_network: string;
   free_data_package_size: string;
   free_data_max_claims: string;
+  whatsapp_bot_prompt: string;
 }
 
 const AdminSettings = () => {
@@ -104,6 +105,7 @@ const AdminSettings = () => {
     free_data_network: "MTN",
     free_data_package_size: "1GB",
     free_data_max_claims: "100",
+    whatsapp_bot_prompt: "",
   });
 
   useEffect(() => {
@@ -160,6 +162,7 @@ const AdminSettings = () => {
           free_data_network: d.free_data_network || "MTN",
           free_data_package_size: d.free_data_package_size || "1GB",
           free_data_max_claims: String(d.free_data_max_claims || "100"),
+          whatsapp_bot_prompt: d.whatsapp_bot_prompt || "",
         });
       }
       setLoading(false);
@@ -198,6 +201,7 @@ const AdminSettings = () => {
       free_data_network: settings.free_data_network,
       free_data_package_size: settings.free_data_package_size,
       free_data_max_claims: parseInt(settings.free_data_max_claims) || 100,
+      whatsapp_bot_prompt: settings.whatsapp_bot_prompt.trim(),
     };
 
     try {
@@ -552,6 +556,30 @@ const AdminSettings = () => {
                   </div>
                 </div>
               )}
+            </CardContent>
+          </Card>
+
+          <Card className="border-indigo-500/20 bg-indigo-500/5">
+            <CardHeader>
+              <CardTitle className="text-lg flex items-center gap-2">
+                <MessageSquare className="w-5 h-5 text-indigo-500" />
+                WhatsApp Bot AI Prompt
+              </CardTitle>
+              <CardDescription>Train your AI sales assistant by editing its system prompt.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label>System Prompt Instructions</Label>
+                <Textarea
+                  value={settings.whatsapp_bot_prompt}
+                  onChange={(e) => setSettings({ ...settings, whatsapp_bot_prompt: e.target.value })}
+                  placeholder="e.g. You are the SwiftData Pro Assistant. Be very polite and use emojis..."
+                  className="min-h-[250px] font-mono text-xs"
+                />
+                <p className="text-xs text-muted-foreground mt-2">
+                  Leave this empty to use the default hardcoded prompt. You can use <code>{"{{storeName}}"}</code> as a variable.
+                </p>
+              </div>
             </CardContent>
           </Card>
 

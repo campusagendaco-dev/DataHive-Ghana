@@ -69,6 +69,7 @@ import DashboardDeveloperAPI from "./pages/DashboardDeveloperAPI";
 import APIDocumentation from "./pages/APIDocumentation";
 import DeveloperPortal from "./pages/DeveloperPortal";
 import Maintenance from "./pages/Maintenance";
+import IpBlocked from "./pages/IpBlocked";
 import NotFound from "./pages/NotFound";
 import LoadingScreen from "@/components/LoadingScreen";
 import InstallPrompt from "@/components/InstallPrompt";
@@ -88,12 +89,23 @@ import DashboardWhatsAppBot from "./pages/DashboardWhatsAppBot";
 const queryClient = new QueryClient();
 
 
-/** Authenticated dashboard guard that keeps admins on the admin dashboard */
+/** Authenticated dashboard guard that keeps admins on the admin dashboard and unapproved agents/sub-agents on pending */
 const DashboardGuard = ({ children }: { children: React.ReactNode }) => {
-  const { user, isAdmin, loading } = useAuth();
+  const { user, profile, isAdmin, loading } = useAuth();
   if (loading) return <LoadingScreen />;
   if (!user) return <Navigate to="/login" replace />;
   if (isAdmin) return <Navigate to="/admin" replace />;
+  
+  // Strict check for sub-agents
+  if (profile?.is_sub_agent && !profile?.sub_agent_approved) {
+    return <Navigate to="/sub-agent/pending" replace />;
+  }
+
+  // Strict check for main agents
+  if (profile?.is_agent && !profile?.agent_approved) {
+    return <Navigate to="/agent/pending" replace />;
+  }
+  
   return <>{children}</>;
 };
 
@@ -154,6 +166,7 @@ const AppContent = () => {
     is_enabled: false,
     message: "",
   });
+  const [ipBlocked, setIpBlocked] = useState(false);
   const [maintenanceLoading, setMaintenanceLoading] = useState(true);
   // Minimum splash time — guarantees the loading animation is visible for at least 2 s
   const [splashReady, setSplashReady] = useState(false);
@@ -181,13 +194,16 @@ const AppContent = () => {
 
         if (error) {
           setMaintenance({ is_enabled: false, message: "" });
+          setIpBlocked(false);
         } else if (data && !(data as any).error) {
           setMaintenance({
             is_enabled: Boolean((data as any).is_enabled),
             message: String((data as any).message || ""),
           });
+          setIpBlocked(Boolean((data as any).is_blocked));
         } else {
           setMaintenance({ is_enabled: false, message: "" });
+          setIpBlocked(false);
         }
       } catch {
         if (!mounted) return;
@@ -223,6 +239,10 @@ const AppContent = () => {
     location.pathname === "/auth";
   if (authLoading || maintenanceLoading || !splashReady) {
     return <LoadingScreen />;
+  }
+
+  if (ipBlocked && !isAdminUser) {
+    return <IpBlocked />;
   }
 
   if (maintenance.is_enabled && !user && !isAdminUser && !isMaintenanceBypassRoute) {

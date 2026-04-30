@@ -23,6 +23,23 @@ serve(async (req) => {
 
   const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
+  const clientIp =
+    req.headers.get("cf-connecting-ip") ||
+    req.headers.get("x-real-ip") ||
+    (req.headers.get("x-forwarded-for") || "").split(",")[0].trim() ||
+    null;
+
+  const checkIpBlocked = async (): Promise<boolean> => {
+    if (!clientIp) return false;
+    const { data } = await supabaseAdmin
+      .from("security_blacklist")
+      .select("id")
+      .eq("type", "ip")
+      .eq("value", clientIp)
+      .maybeSingle();
+    return Boolean(data);
+  };
+
   const readMaintenance = async () => {
     const { data, error } = await supabaseAdmin
       .from("maintenance_settings")
@@ -53,8 +70,11 @@ serve(async (req) => {
     const action = payload?.action === "set" ? "set" : "get";
 
     if (action === "get") {
-      const maintenance = await readMaintenance();
-      return new Response(JSON.stringify({ success: true, ...maintenance }), {
+      const [maintenance, is_blocked] = await Promise.all([
+        readMaintenance(),
+        checkIpBlocked(),
+      ]);
+      return new Response(JSON.stringify({ success: true, is_blocked, ...maintenance }), {
         status: 200,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });

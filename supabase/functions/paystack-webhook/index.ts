@@ -652,12 +652,26 @@ serve(async (req) => {
     }
 
     if (orderType === "sub_agent_activation") {
+      const SUB_AGENT_MINIMUM = 80; // Minimum platform base fee
+      if (verifiedAmount < SUB_AGENT_MINIMUM * 0.97) {
+        await supabase.from("orders").update({
+          status: "fulfillment_failed",
+          failure_reason: `Payment too low for sub-agent activation. Minimum GHS ${SUB_AGENT_MINIMUM}, received GHS ${verifiedAmount.toFixed(2)}.`,
+        }).eq("id", orderId);
+        return new Response(JSON.stringify({ received: true, fulfilled: false, failure_reason: "Activation payment below minimum" }), {
+          status: 200,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
       const subAgentId = metadata?.sub_agent_id;
       const parentAgentId = metadata?.parent_agent_id;
       const activationAmount = Number(metadata?.activation_fee || existingOrder?.amount || verifiedAmount || 0);
+      
       // Security: Never trust client-supplied profit metadata. 
       // Activation fee base is GHS 80. Anything above that is agent profit.
       const agentProfit = Math.max(0, parseFloat((activationAmount - 80).toFixed(2)));
+      
       if (subAgentId) {
         // Fetch parent's sub_agent_prices to copy as the sub agent's agent_prices
         const { data: parentProfile } = await supabase
@@ -672,6 +686,8 @@ serve(async (req) => {
           agent_approved: true,
           sub_agent_approved: true,
           onboarding_complete: true,
+          is_sub_agent: true,
+          parent_agent_id: parentAgentId || null,
           agent_prices: subAgentPrices,
         }).eq("user_id", subAgentId);
 

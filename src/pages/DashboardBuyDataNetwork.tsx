@@ -179,6 +179,13 @@ const DashboardBuyDataNetwork = ({ network }: DashboardBuyDataNetworkProps) => {
         const baseAgent = Number(setting?.agent_price);
 
         const resolvedBasePrice = (() => {
+          // If NOT approved, always use public price
+          if (!isPaidAgent) {
+            if (Number.isFinite(basePublic) && basePublic > 0) return basePublic;
+            return getPublicPrice(item.price);
+          }
+
+          // Approved agent/sub-agent pricing logic
           if (assignedPrice && assignedPrice > 0) return assignedPrice;
           
           if (profile?.is_sub_agent) {
@@ -189,12 +196,8 @@ const DashboardBuyDataNetwork = ({ network }: DashboardBuyDataNetworkProps) => {
             return item.price;
           }
 
-          if (isPaidAgent) {
-            if (Number.isFinite(baseAgent) && baseAgent > 0) return baseAgent;
-            return item.price;
-          }
-          if (Number.isFinite(basePublic) && basePublic > 0) return basePublic;
-          return getPublicPrice(item.price);
+          if (Number.isFinite(baseAgent) && baseAgent > 0) return baseAgent;
+          return item.price;
         })();
 
         return {
