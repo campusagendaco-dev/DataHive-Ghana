@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { logAudit } from "@/utils/auditLogger";
-import { Loader2, Search, RefreshCw, Phone, User, ShieldCheck, Users2, ShoppingCart, ChevronDown, Globe, Clock, Ban, MessageCircle, Wallet } from "lucide-react";
+import { Loader2, Search, RefreshCw, Phone, User, ShieldCheck, Users2, ShoppingCart, ChevronDown, Globe, Clock, Ban, MessageCircle, Wallet, Eye } from "lucide-react";
 import UserDetailDrawer from "@/components/UserDetailDrawer";
 
 interface UserRow {
@@ -45,7 +45,7 @@ const AdminUsers = () => {
   const [hasMore, setHasMore] = useState(true);
   const [totalCount, setTotalCount] = useState(0);
   const PAGE_SIZE = 50;
-  const [actionLoading, setActionLoading] = useState<Record<string, "reset" | "delete" | "approve-sub" | "approve-agent" | null>>({});
+  const [actionLoading, setActionLoading] = useState<Record<string, "reset" | "delete" | "approve-sub" | "approve-agent" | "impersonate" | null>>({});
   const [selectedUser, setSelectedUser] = useState<UserRow | null>(null);
 
   const fetchUsers = useCallback(async (isLoadMore = false) => {
@@ -179,23 +179,31 @@ const AdminUsers = () => {
     setRowAction(row.user_id, null);
   };
 
-  const handleDeleteUser = async (row: UserRow) => {
-    if (!window.confirm(`Delete ${row.email}? This cannot be undone.`)) return;
-    setRowAction(row.user_id, "delete");
-    const { data, error } = await supabase.functions.invoke("admin-user-actions", {
-      body: { action: "delete_user", user_id: row.user_id },
-      headers: { Authorization: `Bearer ${session?.access_token}` },
-    });
-    if (error || data?.error) {
-      toast({ title: "Failed to delete user", description: data?.error || error?.message, variant: "destructive" });
-    } else {
-      if (currentUser) {
-        await logAudit(currentUser.id, "delete_user", { target_user_id: row.user_id, target_email: row.email });
+  const handleImpersonateUser = async (row: UserRow) => {
+    if (!window.confirm(`Impersonate ${row.email}? You will be logged in as this user.`)) return;
+    setRowAction(row.user_id, "impersonate");
+    try {
+      const { data, error } = await supabase.functions.invoke("admin-user-actions", {
+        body: { action: "impersonate_user", user_id: row.user_id },
+        headers: { Authorization: `Bearer ${session?.access_token}` },
+      });
+
+      if (error || data?.error) throw new Error(data?.error || error?.message);
+
+      if (data?.magic_link) {
+        toast({ title: "Redirecting...", description: "Swapping session to user mode." });
+        // Set a flag in session storage so the app knows it's an impersonation
+        sessionStorage.setItem("impersonating", "true");
+        sessionStorage.setItem("admin_token", session?.access_token || "");
+        
+        // Use magic link to log in as user
+        window.location.href = data.magic_link;
       }
-      setUsers(prev => prev.filter(u => u.user_id !== row.user_id));
-      toast({ title: "User deleted" });
+    } catch (err: any) {
+      toast({ title: "Impersonation failed", description: err.message, variant: "destructive" });
+    } finally {
+      setRowAction(row.user_id, null);
     }
-    setRowAction(row.user_id, null);
   };
 
   const getRoleBadge = (user: UserRow) => {
@@ -423,6 +431,14 @@ const AdminUsers = () => {
                         className="text-xs border-white/10 text-white/60 hover:text-white rounded-xl h-8"
                       >
                         {actionLoading[user.user_id] === "reset" ? <Loader2 className="w-3 h-3 animate-spin" /> : "Reset"}
+                      </Button>
+                      <Button
+                        size="sm" variant="outline"
+                        onClick={() => handleImpersonateUser(user)}
+                        disabled={!!actionLoading[user.user_id]}
+                        className="w-8 h-8 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400 hover:bg-amber-500/20 transition-colors"
+                      >
+                        {actionLoading[user.user_id] === "impersonate" ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Eye className="w-3.5 h-3.5" />}
                       </Button>
                       <Button
                         size="sm" variant="outline"

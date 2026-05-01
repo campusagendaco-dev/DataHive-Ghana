@@ -68,7 +68,10 @@ type AdminUserAction =
   | "bulk_suspend_users"
   | "manage_blacklist"
   | "paystack_payout"
-  | "reject_withdrawal";
+  | "reject_withdrawal"
+  | "impersonate_user"
+  | "get_providers"
+  | "update_provider";
 
 
 
@@ -342,6 +345,36 @@ serve(async (req: Request) => {
 
         if (updateError) throw updateError;
         return new Response(JSON.stringify({ success: true }), {
+          status: 200,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      case "impersonate_user": {
+        if (!isValidUuid(user_id)) throw new Error("Invalid or missing user_id");
+        
+        // Get user email
+        const { data: profile } = await supabaseAdmin.from("profiles").select("email").eq("user_id", user_id).single();
+        if (!profile?.email) throw new Error("User email not found");
+
+        const { data, error } = await supabaseAdmin.auth.admin.generateLink({
+          type: 'magiclink',
+          email: profile.email,
+          options: { redirectTo: `${req.headers.get("origin")}/dashboard` }
+        });
+
+        if (error) throw error;
+
+        return new Response(JSON.stringify({ success: true, magic_link: data.properties.action_link }), {
+          status: 200,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      case "get_providers": {
+        const { data, error } = await supabaseAdmin.from("providers").select("*").order("priority");
+        if (error) throw error;
+        return new Response(JSON.stringify({ providers: data }), {
           status: 200,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });

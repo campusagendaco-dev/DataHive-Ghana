@@ -2,6 +2,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { corsHeaders } from "../_shared/cors.ts";
 import { normalizePhone, sendPaymentSms } from "../_shared/sms.ts";
+import { getActiveProviders, logProviderError } from "../_shared/providers.ts";
 
 declare const Deno: any;
 
@@ -55,29 +56,6 @@ function buildProviderUrls(baseUrl: string, aliases: string[]): string[] {
   return Array.from(urls);
 }
 
-async function getAirtimeCredentials(supabaseAdmin: any): Promise<{ apiKey: string; directUrl: string; baseUrl: string }> {
-  // Try fetching from DB first
-  const { data: dbSettings } = await supabaseAdmin.from("system_settings").select("*").eq("id", 1).maybeSingle();
-
-  const directUrl = getFirstEnvValue(["AIRTIME_PROVIDER_URL", "AIRTIME_API_URL"]).replace(/\/+$/, "");
-  
-  const apiKey = getFirstEnvValue([
-    "AIRTIME_PROVIDER_API_KEY",
-    "PRIMARY_DATA_PROVIDER_API_KEY",
-    "DATA_PROVIDER_API_KEY",
-    "DATA_PROVIDER_PRIMARY_API_KEY",
-  ]) || dbSettings?.airtime_provider_api_key || dbSettings?.data_provider_api_key || "";
-  
-  const baseUrl = getFirstEnvValue([
-    "AIRTIME_PROVIDER_BASE_URL",
-    "PRIMARY_DATA_PROVIDER_BASE_URL",
-    "DATA_PROVIDER_BASE_URL",
-    "DATA_PROVIDER_PRIMARY_BASE_URL",
-  ]) || dbSettings?.airtime_provider_base_url || dbSettings?.data_provider_base_url || "";
-  
-  return { apiKey, directUrl, baseUrl: baseUrl.replace(/\/+$/, "") };
-}
-
 function isHtmlResponse(contentType: string | null, body: string): boolean {
   const preview = body.trim().slice(0, 200).toLowerCase();
   return Boolean(preview.startsWith("<!doctype html") || preview.startsWith("<html") || preview.includes("<title>"));
@@ -99,21 +77,13 @@ function getProviderFailureReason(status: number, body: string, contentType: str
   }
 }
 
-function mapNetworkKey(network: string, variant: number = 0): string {
+function mapNetworkKey(network: string): string {
   const n = network.trim().toUpperCase();
   if (n === "MTN" || n === "YELLO") return "MTN";
   if (n === "VOD" || n === "VODAFONE" || n === "TELECEL") return "VOD";
   if (n === "AT" || n === "AIRTELTIGO" || n === "AIRTEL TIGO") return "AT";
   if (n === "GLO") return "GLO";
   return n;
-}
-
-function getNetworkAliases(network: string): string[] {
-  const normalized = network.trim().toUpperCase();
-  if (normalized === "MTN" || normalized === "YELLO") return ["YELLO", "MTN"];
-  if (normalized === "TELECEL" || normalized === "VODAFONE" || normalized === "VOD") return ["TELECEL", "TELECEL", "VODAFONE"];
-  if (normalized === "AT" || normalized === "AIRTELTIGO" || normalized === "AT_PREMIUM") return ["AT_PREMIUM", "AT", "AIRTELTIGO"];
-  return [network];
 }
 
 function normalizeRecipient(phone: string): string {
@@ -163,7 +133,6 @@ serve(async (req: Request) => {
       return new Response(JSON.stringify({ error: "Missing required fields: network, phone, amount" }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    // ── IDEMPOTENCY CHECK ────────────────────────────────────────────────────
     if (clientReference) {
       const { data: existing } = await supabaseAdmin
         .from("orders")
@@ -182,9 +151,7 @@ serve(async (req: Request) => {
         }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
     }
-    // ─────────────────────────────────────────────────────────────────────────
 
-    // Atomic debit
     const { data: debitResult, error: debitError } = await supabaseAdmin.rpc("debit_wallet", {
       p_agent_id: user.id,
       p_amount: amount,
@@ -205,96 +172,107 @@ serve(async (req: Request) => {
       status: "paid",
     });
 
-    const { apiKey, directUrl, baseUrl } = await getAirtimeCredentials(supabaseAdmin);
-    if (!apiKey || (!directUrl && !baseUrl)) {
-      // No provider configured — mock success
-      await supabaseAdmin.from("orders").update({ status: "fulfilled", failure_reason: "Mock fulfillment (provider not configured)" }).eq("id", orderId);
-      return new Response(JSON.stringify({ success: true, order_id: orderId, status: "fulfilled", message: "Airtime purchase simulated" }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    const activeProviders = await getActiveProviders(supabaseAdmin, "airtime");
+    
+    if (activeProviders.length === 0) {
+      await supabaseAdmin.from("orders").update({ 
+        status: "fulfillment_failed", 
+        failure_reason: "No active airtime providers configured" 
+      }).eq("id", orderId);
+      return new Response(JSON.stringify({ error: "No active airtime providers configured" }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    // Same provider endpoint as data — try all variations for maximum reliability
     const AIRTIME_ALIASES = ["purchase", "order", "airtime", "buy", "topup", "recharge"];
-    const urls = buildProviderUrls(directUrl || baseUrl, AIRTIME_ALIASES);
+    const recipient = normalizeRecipient(phone);
+    const networkKey = mapNetworkKey(network);
+    
+    const airtimePayload = {
+      customerNumber: recipient,
+      amount: amount,
+      networkCode: networkKey,
+      description: `Airtime topup: GHS ${amount} for ${recipient}`
+    };
+
+    let result: any = { ok: false, reason: "No providers tried" };
+    let successfulProviderId: string | null = null;
+    let lastBody = "";
 
     try {
-      const networkKey = mapNetworkKey(network);
-      const recipient = normalizeRecipient(phone);
-      
-      const airtimePayload = {
-        customerNumber: recipient,
-        amount: amount,
-        networkCode: networkKey,
-        description: `Airtime topup: GHS ${amount} for ${recipient}`
-      };
+      for (const provider of activeProviders) {
+        console.log(`[airtime] Trying provider: ${provider.name}`);
+        const providerUrls = buildProviderUrls(provider.base_url, AIRTIME_ALIASES);
+        
+        for (const url of providerUrls) {
+          try {
+            const res = await fetch(url, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                "Accept": "application/json",
+                "X-API-Key": provider.api_key,
+                "Authorization": `Bearer ${provider.api_key}`,
+              },
+              body: JSON.stringify(airtimePayload),
+              signal: AbortSignal.timeout(20000)
+            });
 
-      let lastError = "All provider endpoints failed (404 or connection error). Check AIRTIME_PROVIDER_URL.";
+            const contentType = res.headers.get("content-type");
+            const resText = await res.text();
+            lastBody = resText;
 
-      let lastBody = "";
-      for (const url of urls) {
-        try {
-          const res = await fetch(url, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              "Accept": "application/json",
-              "X-API-Key": apiKey,
-              "Authorization": `Bearer ${apiKey}`,
-            },
-            body: JSON.stringify(airtimePayload),
-          });
-
-          const contentType = res.headers.get("content-type");
-          const resText = await res.text();
-          lastBody = resText;
-
-          if (res.ok && !isHtmlResponse(contentType, resText)) {
-            // Parse response body — provider may return 200 with {"status": false}
-            try {
-              const parsed = JSON.parse(resText);
-              const s = String(parsed?.status ?? "").toLowerCase();
-              const success = parsed?.success === true || parsed?.status === "success" || parsed?.status === true;
-              
-              if (!success && (s === "false" || s === "error" || s === "failed" || s === "failure")) {
-                lastError = parsed?.message || parsed?.reason || "Provider rejected the airtime request.";
-                throw new Error(lastError);
+            if (res.ok && !isHtmlResponse(contentType, resText)) {
+              try {
+                const parsed = JSON.parse(resText);
+                const s = String(parsed?.status ?? "").toLowerCase();
+                const success = parsed?.success === true || parsed?.status === "success" || parsed?.status === true;
+                
+                if (success) {
+                  result = { ok: true, id: parsed?.transaction_id || parsed?.order_id || parsed?.reference };
+                  break;
+                } else if (s === "false" || s === "error" || s === "failed" || s === "failure") {
+                  result = { ok: false, reason: parsed?.message || parsed?.reason || "Provider rejected the request" };
+                }
+              } catch {
+                result = { ok: true };
+                break;
               }
-              
-              // If we have success: true or equivalent, proceed
-              if (success) {
-                const providerOrderId = parsed?.transaction_id || parsed?.order_id || parsed?.reference;
-                await supabaseAdmin.from("orders").update({ 
-                  status: "fulfilled",
-                  provider_order_id: providerOrderId
-                }).eq("id", orderId);
-                await sendPaymentSms(supabaseAdmin, phone, "payment_success", {
-                  service: `${network} Airtime`,
-                  recipient: phone,
-                  order_id: orderId.slice(0, 8).toUpperCase()
-                });
-                return new Response(JSON.stringify({ success: true, order_id: orderId, status: "fulfilled" }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-              }
-            } catch (parseErr: any) {
-              if (parseErr.message === lastError) throw parseErr;
-              // Non-JSON 200 is treated as success if no error was explicitly parsed
+            } else {
+              result = { ok: false, reason: getProviderFailureReason(res.status, resText, contentType) };
             }
-            
-            await supabaseAdmin.from("orders").update({ status: "fulfilled" }).eq("id", orderId);
-            return new Response(JSON.stringify({ success: true, order_id: orderId, status: "fulfilled" }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-          } else {
-            lastError = getProviderFailureReason(res.status, resText, contentType);
-            if (res.status === 404) continue; // Try next URL alias
-            throw new Error(lastError);
+          } catch (err: any) {
+            result = { ok: false, reason: err.message };
           }
-        } catch (err: any) {
-          if (url === urls[urls.length - 1]) throw err;
-          console.warn(`[airtime] Alias failed: ${url}. Error: ${err.message}`);
+          if (result.ok) break;
+        }
+
+        if (result.ok) {
+          successfulProviderId = provider.id;
+          break;
+        } else {
+          console.error(`[airtime] Provider ${provider.name} failed: ${result.reason}`);
+          await logProviderError(supabaseAdmin, provider.id, orderId, result.reason);
         }
       }
 
-      throw new Error(lastError);
+      if (result.ok) {
+        await supabaseAdmin.from("orders").update({ 
+          status: "fulfilled",
+          provider_id: successfulProviderId,
+          provider_order_id: result.id
+        }).eq("id", orderId);
+        
+        await sendPaymentSms(supabaseAdmin, phone, "payment_success", {
+          service: `${network} Airtime`,
+          recipient: phone,
+          order_id: orderId.slice(0, 8).toUpperCase()
+        });
+        
+        return new Response(JSON.stringify({ success: true, order_id: orderId, status: "fulfilled" }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      } else {
+        throw new Error(result.reason || "All providers failed");
+      }
     } catch (err: any) {
-      const attemptedUrls = urls.join(", ");
-      console.error(`[airtime] Fulfillment failed. Attempted URLs: ${attemptedUrls}. Error: ${err.message}`);
+      console.error(`[airtime] Fulfillment failed: ${err.message}`);
       
       await supabaseAdmin.from("orders").update({ 
         status: "fulfillment_failed", 
@@ -303,38 +281,11 @@ serve(async (req: Request) => {
       
       await supabaseAdmin.rpc("credit_wallet", { p_agent_id: user.id, p_amount: amount });
       
-      let finalError = `Fulfillment failed: ${err.message}. Refunded.`;
-      const isInsufficient = err.message.toLowerCase().includes("insufficient") || err.message.toLowerCase().includes("balance");
-      
-      let currentBalance = "Unknown";
-      if (isInsufficient) {
-        // Try to fetch current balance to show in error
-        try {
-          const balanceUrls = buildProviderUrls(directUrl || baseUrl, ["balance"]);
-          for (const bUrl of balanceUrls) {
-            const bRes = await fetch(bUrl, { headers: { "X-API-Key": apiKey, "Authorization": `Bearer ${apiKey}` } });
-            if (bRes.ok) {
-              const bData = await bRes.json();
-              const bal = bData.balance ?? bData.data?.balance ?? bData.wallet_balance;
-              if (bal !== undefined) {
-                currentBalance = `GH₵ ${bal}`;
-                break;
-              }
-            }
-          }
-        } catch { /* ignore balance fetch error */ }
-
-        finalError = `Provider balance is insufficient (Current: ${currentBalance}). Please top up your provider wallet in Admin Settings. Your agent wallet has been refunded.`;
-      }
-
       return new Response(JSON.stringify({ 
-        error: finalError,
+        error: `Fulfillment failed: ${err.message}. Refunded.`,
         diagnostics: {
           provider_error: err.message,
           provider_response: lastBody.length > 200 ? lastBody.slice(0, 197) + "..." : lastBody,
-          attempted_urls: urls,
-          api_key_used: apiKey ? `${apiKey.slice(0, 8)}...` : "missing",
-          network_mapped: mapNetworkKey(network)
         }
       }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }

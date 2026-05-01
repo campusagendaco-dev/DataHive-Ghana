@@ -2,6 +2,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { corsHeaders } from "../_shared/cors.ts";
 import { normalizePhone, getSmsConfig, sendSmsViaTxtConnect, formatTemplate, sendPaymentSms } from "../_shared/sms.ts";
+import { getActiveProviders, logProviderError } from "../_shared/providers.ts";
 
 function getFirstEnvValue(keys: string[]): string {
   for (const key of keys) {
@@ -567,10 +568,10 @@ serve(async (req) => {
       });
     }
 
-    const providerConfig = getProviderCredentials(settings);
+    const activeProviders = await getActiveProviders(supabaseAdmin, "data");
     
-    if (!providerConfig.apiKey || !providerConfig.baseUrl) {
-      return new Response(JSON.stringify({ error: "Primary data provider not configured" }), {
+    if (activeProviders.length === 0) {
+      return new Response(JSON.stringify({ error: "No active data providers configured" }), {
         status: 200,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -677,36 +678,42 @@ serve(async (req) => {
     // Run provider delivery in the background — respond immediately so the
     // client is unblocked. OrderStatusBanner updates via Realtime when done.
     const fulfillmentTask = (async () => {
-      let result = await placeDataOrder(
-        providerConfig.baseUrl,
-        providerConfig.apiKey,
-        network,
-        package_size,
-        customer_phone,
-        DATA_PROVIDER_WEBHOOK_URL,
-        expectedAmount,
-      );
+      let result: any = { ok: false, reason: "No providers tried" };
+      let successfulProviderId: string | null = null;
 
-      if (!result.ok && providerConfig.autoFailover && providerConfig.secondaryApiKey) {
-        console.warn(`Primary failed (${result.reason}). Trying secondary...`);
+      for (const provider of activeProviders) {
+        console.log(`Trying provider: ${provider.name} (Priority: ${provider.priority})`);
+        
         result = await placeDataOrder(
-          providerConfig.secondaryBaseUrl,
-          providerConfig.secondaryApiKey,
+          provider.base_url,
+          provider.api_key,
           network,
           package_size,
           customer_phone,
           DATA_PROVIDER_WEBHOOK_URL,
           expectedAmount,
         );
-        if (result.ok) console.log("Failover succeeded.");
-        else console.error(`Failover also failed: ${result.reason}`);
+
+        if (result.ok) {
+          console.log(`Success with provider: ${provider.name}`);
+          successfulProviderId = provider.id;
+          break;
+        } else {
+          console.error(`Failed with ${provider.name}: ${result.reason}`);
+          await logProviderError(supabaseAdmin, provider.id, orderId, result.reason);
+          // Continue to next provider...
+        }
       }
 
       console.log("Fulfillment:", { orderId, status: result.status, reason: result.reason, url: result.url });
 
       if (result.ok) {
         await Promise.all([
-          supabaseAdmin.from("orders").update({ status: "fulfilled", failure_reason: null }).eq("id", orderId),
+          supabaseAdmin.from("orders").update({ 
+            status: "fulfilled", 
+            failure_reason: null,
+            provider_id: successfulProviderId 
+          }).eq("id", orderId),
           ...((parentProfit ?? 0) > 0 && parentAgentId ? [supabaseAdmin.rpc("credit_order_profits", { p_order_id: orderId })] : []),
           sendPaymentSms(supabaseAdmin, customer_phone, "payment_success"),
         ]);

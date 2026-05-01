@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { corsHeaders } from "../_shared/cors.ts";
+import { getActiveProviders, logProviderError } from "../_shared/providers.ts";
 
 // --- Utilities ---
 
@@ -378,12 +379,12 @@ serve(async (req: Request) => {
 
     } else {
       // Data / default fulfillment
-      const { apiKey, baseUrl } = await getProviderCredentials(supabaseAdmin);
+      const activeProviders = await getActiveProviders(supabaseAdmin, "data");
 
-      if (!apiKey || !baseUrl) {
+      if (activeProviders.length === 0) {
         await supabaseAdmin.from("orders").update({
           status: "fulfillment_failed",
-          failure_reason: "Data provider not configured — set DATA_PROVIDER_BASE_URL and DATA_PROVIDER_API_KEY in Supabase secrets",
+          failure_reason: "No active data providers configured in system settings.",
         }).eq("id", reference);
         return new Response(JSON.stringify({ status: "failed", reason: "Data provider not configured" }), { headers: corsHeaders });
       }
@@ -412,10 +413,28 @@ serve(async (req: Request) => {
 
       console.log("[verify-payment] Provider request:", { baseUrl, network, networkKey: requestBody.networkKey, recipient, packageSize });
 
-      const result = await callProviderApi(baseUrl, apiKey, requestBody);
+      let result: any = { ok: false, reason: "No providers tried" };
+      let successfulProviderId: string | null = null;
+
+      for (const provider of activeProviders) {
+        console.log(`[verify-payment] Trying provider: ${provider.name}`);
+        result = await callProviderApi(provider.base_url, provider.api_key, requestBody);
+
+        if (result.ok) {
+          console.log(`[verify-payment] Success with ${provider.name}`);
+          successfulProviderId = provider.id;
+          break;
+        } else {
+          console.error(`[verify-payment] Failed with ${provider.name}: ${result.reason}`);
+          await logProviderError(supabaseAdmin, provider.id, reference, result.reason);
+        }
+      }
 
       if (result.ok) {
-        const patch: Record<string, any> = { failure_reason: null };
+        const patch: Record<string, any> = { 
+          failure_reason: null,
+          provider_id: successfulProviderId 
+        };
         if (result.id) patch.provider_order_id = result.id;
         
         // If the provider specifically says it's already delivered or doesn't return a status (meaning it's immediate)

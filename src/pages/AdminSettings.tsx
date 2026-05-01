@@ -267,6 +267,60 @@ const AdminSettings = () => {
     }
   };
 
+  const [providers, setProviders] = useState<any[]>([]);
+  const [loadingProviders, setLoadingProviders] = useState(false);
+
+  const fetchProviders = async () => {
+    setLoadingProviders(true);
+    const { data, error } = await supabase
+      .from("providers")
+      .select("*")
+      .order("priority", { ascending: true });
+    
+    if (error) {
+      console.error("Error fetching providers:", error);
+    } else {
+      setProviders(data || []);
+    }
+    setLoadingProviders(false);
+  };
+
+  useEffect(() => {
+    fetchProviders();
+  }, []);
+
+  const handleAddProvider = () => {
+    setProviders([...providers, { id: "new-" + Date.now(), name: "New Provider", is_active: true, priority: providers.length + 1, provider_type: "data", settings: {} }]);
+  };
+
+  const handleUpdateProvider = (id: string, updates: any) => {
+    setProviders(providers.map(p => p.id === id ? { ...p, ...updates } : p));
+  };
+
+  const handleSaveProviders = async () => {
+    setSaving(true);
+    try {
+      const cleanProviders = providers.map(p => {
+        const { id, created_at, updated_at, ...rest } = p;
+        return id.startsWith("new-") ? rest : p;
+      });
+
+      // Simple implementation: delete and re-insert for now (or use upsert if available)
+      const { error } = await supabase.from("providers").upsert(providers.map(p => ({
+        ...p,
+        id: p.id.startsWith("new-") ? undefined : p.id
+      })));
+
+      if (error) throw error;
+      toast({ title: "Providers Updated" });
+      fetchProviders();
+    } catch (err: any) {
+      toast({ title: "Failed to save providers", description: err.message, variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
   if (loading) {
     return <div className="p-8 text-center text-muted-foreground">Loading settings...</div>;
   }
@@ -823,6 +877,89 @@ const AdminSettings = () => {
                     </div>
                   </div>
                 </>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* New Multi-Provider Manager */}
+          <Card className="border-amber-500/20 bg-amber-500/5">
+            <CardHeader className="flex flex-row items-center justify-between">
+              <div>
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <Globe className="w-5 h-5 text-amber-500" />
+                  Provider Smart Routing
+                </CardTitle>
+                <CardDescription>Manage multiple data/airtime providers and set priorities.</CardDescription>
+              </div>
+              <Button size="sm" onClick={handleAddProvider} className="h-8 rounded-lg bg-amber-500 hover:bg-amber-600 text-white font-bold text-[10px]">
+                Add Provider
+              </Button>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {loadingProviders ? (
+                 <div className="flex justify-center p-4"><Loader2 className="w-6 h-6 animate-spin text-amber-500" /></div>
+              ) : providers.length === 0 ? (
+                 <div className="text-center p-8 border-2 border-dashed border-white/5 rounded-2xl">
+                    <p className="text-xs text-white/30">No active providers configured.</p>
+                 </div>
+              ) : (
+                <div className="space-y-3">
+                  {providers.map((provider) => (
+                    <div key={provider.id} className="p-4 rounded-xl bg-white/5 border border-white/10 space-y-4">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <Badge variant="outline" className="bg-amber-500/10 text-amber-500 border-amber-500/20">
+                             Priority {provider.priority}
+                          </Badge>
+                          <Input 
+                            value={provider.name} 
+                            onChange={(e) => handleUpdateProvider(provider.id, { name: e.target.value })}
+                            className="h-8 w-48 bg-transparent border-none font-bold text-sm focus:ring-0"
+                          />
+                        </div>
+                        <Switch 
+                          checked={provider.is_active} 
+                          onCheckedChange={(c) => handleUpdateProvider(provider.id, { is_active: c })}
+                        />
+                      </div>
+                      
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-1">
+                          <Label className="text-[10px] text-white/40">API Key / Secret</Label>
+                          <Input 
+                            type="password" 
+                            value={provider.api_key} 
+                            onChange={(e) => handleUpdateProvider(provider.id, { api_key: e.target.value })}
+                            className="h-8 bg-white/5 border-white/10 text-xs"
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-[10px] text-white/40">Type</Label>
+                          <select 
+                            value={provider.provider_type} 
+                            onChange={(e) => handleUpdateProvider(provider.id, { provider_type: e.target.value })}
+                            className="w-full h-8 bg-white/5 border border-white/10 rounded-md px-2 text-xs focus:outline-none"
+                          >
+                            <option value="data">Data Bundles</option>
+                            <option value="airtime">Airtime</option>
+                            <option value="utility">Utility</option>
+                            <option value="sms">SMS</option>
+                          </select>
+                        </div>
+                      </div>
+
+                      {provider.balance > 0 && (
+                        <div className="flex items-center justify-between pt-2 border-t border-white/5">
+                           <p className="text-[10px] text-white/40">Current Balance</p>
+                           <p className="text-xs font-bold text-green-400">₵{Number(provider.balance).toFixed(2)}</p>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                  <Button onClick={handleSaveProviders} disabled={saving} className="w-full bg-amber-500 hover:bg-amber-600 text-white font-bold h-10 rounded-xl">
+                     Save Provider Priorities
+                  </Button>
+                </div>
               )}
             </CardContent>
           </Card>
