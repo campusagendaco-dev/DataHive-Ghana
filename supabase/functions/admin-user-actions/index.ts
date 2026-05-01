@@ -380,6 +380,33 @@ serve(async (req: Request) => {
         });
       }
 
+      case "get_paystack_transactions": {
+        const PAYSTACK_SECRET_KEY = Deno.env.get("PAYSTACK_SECRET_KEY") || "";
+        if (!PAYSTACK_SECRET_KEY) throw new Error("Paystack secret key not configured");
+
+        const { from, to, status, page: pPage } = body;
+        let url = `https://api.paystack.co/transaction?perPage=50&page=${pPage || 1}`;
+        if (from) url += `&from=${from}`;
+        if (to) url += `&to=${to}`;
+        if (status) url += `&status=${status}`;
+
+        const res = await fetch(url, {
+          headers: { Authorization: `Bearer ${PAYSTACK_SECRET_KEY}` },
+        });
+        const data = await res.json();
+
+        if (!data.status) throw new Error(data.message || "Failed to fetch Paystack transactions");
+
+        return new Response(JSON.stringify({ 
+          success: true, 
+          transactions: data.data,
+          meta: data.meta
+        }), {
+          status: 200,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
       case "approve_sub_agent": {
         if (!isValidUuid(user_id)) throw new Error("Invalid or missing user_id");
         const { data: profile } = await supabaseAdmin

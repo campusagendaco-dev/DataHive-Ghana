@@ -63,6 +63,7 @@ import AdminSecurity from "./pages/AdminSecurity";
 import AdminAPIUsers from "./pages/AdminAPIUsers";
 import AdminProfits from "./pages/AdminProfits";
 import AdminEngagement from "./pages/AdminEngagement";
+import AdminReconciliation from "./pages/AdminReconciliation";
 import SubAgentSignup from "./pages/SubAgentSignup";
 import SubAgentPending from "./pages/SubAgentPending";
 import DashboardDeveloperAPI from "./pages/DashboardDeveloperAPI";
@@ -330,6 +331,7 @@ const AppContent = () => {
           <Route path="agents" element={<AdminAgents />} />
           <Route path="orders" element={<AdminOrders />} />
           <Route path="users" element={<AdminUsers />} />
+          <Route path="reconciliation" element={<AdminReconciliation />} />
           <Route path="withdrawals" element={<AdminWithdrawals />} />
           <Route path="notifications" element={<AdminNotificationsPage />} />
           <Route path="packages" element={<AdminPackages />} />

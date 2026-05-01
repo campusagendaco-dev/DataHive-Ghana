@@ -29,6 +29,7 @@ const NAV_SECTIONS = [
       { label: "Promo Codes",  icon: Ticket,       path: "/admin/promotions" },
       { label: "Wallet Top-Up",icon: CreditCard,   path: "/admin/wallet-topup" },
       { label: "Withdrawals",  icon: Wallet,        path: "/admin/withdrawals" },
+      { label: "Reconciliation", icon: CreditCard,   path: "/admin/reconciliation" },
       { label: "Profits",      icon: TrendingUp,   path: "/admin/profits" },
     ],
   },
