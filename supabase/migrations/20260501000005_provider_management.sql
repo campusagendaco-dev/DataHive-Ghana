@@ -22,6 +22,7 @@ CREATE TABLE IF NOT EXISTS public.providers (
 ALTER TABLE public.providers ENABLE ROW LEVEL SECURITY;
 
 -- Only admins can manage providers
+DROP POLICY IF EXISTS "Admins can manage providers" ON public.providers;
 CREATE POLICY "Admins can manage providers" 
 ON public.providers FOR ALL 
 USING (EXISTS (SELECT 1 FROM public.user_roles WHERE user_id = auth.uid() AND role = 'admin'));

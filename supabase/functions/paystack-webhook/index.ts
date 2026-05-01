@@ -58,11 +58,22 @@ async function getAirtimeCredentials(supabaseAdmin: any): Promise<{ apiKey: stri
   return { apiKey, baseUrl: (baseUrl || "").replace(/\/+$/, "") };
 }
 
-function mapNetworkKey(network: string): string {
+// Maps network names to the keys the data provider API expects (must match wallet-buy-data)
+function mapDataNetworkKey(network: string): string {
   const n = (network || "").trim().toUpperCase();
   if (n === "AIRTELTIGO" || n === "AIRTEL TIGO" || n === "AIRTEL-TIGO" || n === "AT") return "AT_PREMIUM";
   if (n === "TELECEL" || n === "VODAFONE" || n === "VOD") return "TELECEL";
   if (n === "MTN" || n === "YELLO") return "YELLO";
+  return n;
+}
+
+// Maps network names to the keys the airtime provider API expects (must match wallet-pay-airtime)
+function mapAirtimeNetworkKey(network: string): string {
+  const n = (network || "").trim().toUpperCase();
+  if (n === "MTN" || n === "YELLO") return "MTN";
+  if (n === "VOD" || n === "VODAFONE" || n === "TELECEL") return "VOD";
+  if (n === "AT" || n === "AIRTELTIGO" || n === "AIRTEL TIGO") return "AT";
+  if (n === "GLO") return "GLO";
   return n;
 }
 
@@ -146,8 +157,11 @@ function parseProviderResponse(body: string, contentType: string | null): { ok: 
     const orderId = parsed?.transaction_id || parsed?.order_id || parsed?.reference || parsed?.id;
     const deliveryStatus = String(parsed?.delivery_status || parsed?.status_message || "").toLowerCase();
 
+    // Determine if it's actually delivered
+    const isActuallyDelivered = !deliveryStatus || deliveryStatus === "delivered" || deliveryStatus === "success" || deliveryStatus === "fulfilled" || deliveryStatus === "true";
+
     if (rawStatus === true || status === "true" || status === "success") {
-      return { ok: true, id: orderId, status: deliveryStatus };
+      return { ok: true, id: orderId, status: isActuallyDelivered ? "delivered" : deliveryStatus };
     }
     
     if (rawStatus === false || status === "false" || status === "error" || status === "failed" || status === "failure") {
@@ -159,7 +173,7 @@ function parseProviderResponse(body: string, contentType: string | null): { ok: 
     }
 
     // If it has an ID, it's likely a successful initiation
-    if (orderId) return { ok: true, id: orderId, status: deliveryStatus };
+    if (orderId) return { ok: true, id: orderId, status: isActuallyDelivered ? "delivered" : deliveryStatus };
 
   } catch {
     // Non-JSON responses are handled below.
@@ -923,7 +937,7 @@ serve(async (req) => {
       // Use Airtime-specific credentials and format
       const { apiKey: AIRTIME_KEY, baseUrl: AIRTIME_BASE } = await getAirtimeCredentials(supabaseAdmin);
       
-      const airtimeNetworkKey = mapNetworkKey(network);
+      const airtimeNetworkKey = mapAirtimeNetworkKey(network);
       const airtimeRecipient = normalizeRecipient(customerPhone);
       const airtimeResult = await callProviderApi(
         AIRTIME_BASE,
@@ -982,7 +996,7 @@ serve(async (req) => {
       "purchase",
       {
         networkRaw: network,
-        networkKey: mapNetworkKey(network),
+        networkKey: mapDataNetworkKey(network),
         recipient: normalizeRecipient(customerPhone),
         capacity: parseCapacity(packageSize),
         amount: existingOrder?.amount || verifiedAmount,

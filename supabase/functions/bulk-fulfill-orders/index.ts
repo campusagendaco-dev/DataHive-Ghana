@@ -33,7 +33,7 @@ serve(async (req) => {
   const { data: orders, error: fetchError } = await supabaseAdmin
     .from("orders")
     .select("id, status, order_type")
-    .in("status", ["pending", "paid", "fulfillment_failed"])
+    .in("status", ["pending", "paid", "processing", "fulfillment_failed"])
     .gte("created_at", cutoff)
     .order("created_at", { ascending: true });
 

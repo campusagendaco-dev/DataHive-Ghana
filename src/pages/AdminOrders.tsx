@@ -131,12 +131,17 @@ const AdminOrders = () => {
       setProfiles(profileMap);
     }
 
-    const enriched: OrderRow[] = (data || []).map((o: any) => ({
-      ...o,
-      agent_name: profileMap[o.agent_id]?.full_name || "Unknown",
-      agent_email: profileMap[o.agent_id]?.email || "",
-      is_sub_agent: profileMap[o.agent_id]?.is_sub_agent ?? false,
-    }));
+    const enriched: OrderRow[] = (data || []).map((o: any) => {
+      const profile = profileMap[o.agent_id];
+      const isPlaceholder = o.agent_id === "00000000-0000-0000-0000-000000000000" || !o.agent_id;
+      
+      return {
+        ...o,
+        agent_name: profile?.full_name || (isPlaceholder ? "Guest (Direct Purchase)" : "Unknown Agent"),
+        agent_email: profile?.email || "",
+        is_sub_agent: profile?.is_sub_agent ?? false,
+      };
+    });
 
     setAllOrders(enriched);
     setLoading(false);
@@ -177,7 +182,7 @@ const AdminOrders = () => {
 
   const handleRetryAll = async () => {
     const actionable = allOrders.filter(
-      (o) => o.status === "pending" || o.status === "paid" || o.status === "fulfillment_failed"
+      (o) => o.status === "pending" || o.status === "paid" || o.status === "processing" || o.status === "fulfillment_failed"
     );
     if (actionable.length === 0) {
       toast({ title: "No pending orders", description: "All orders are already fulfilled." });
@@ -263,7 +268,7 @@ const AdminOrders = () => {
             disabled={retryingAll}
           >
             {retryingAll ? <Loader2 className="w-4 h-4 animate-spin" /> : <PlayCircle className="w-4 h-4" />}
-            {retryingAll ? "Retrying…" : `Retry All Pending (${pending + failed})`}
+            {retryingAll ? "Retrying…" : `Retry All Actionable (${pending + failed + allOrders.filter(o => o.status === "processing").length})`}
           </Button>
         </div>
       </div>
@@ -278,7 +283,7 @@ const AdminOrders = () => {
           { label: "Platform Costs", value: `GH₵${totalCosts.toFixed(2)}`, icon: TrendingUp, color: "text-orange-400" },
           { label: "Net Admin Profit", value: `GH₵${totalAdminNetProfit.toFixed(2)}`, icon: TrendingUp, color: "text-sky-400 font-black" },
           { label: "Paystack Verified", value: verifiedCount.toLocaleString(), icon: CheckCircle2, color: "text-green-400" },
-          { label: "Pending / Failed", value: `${pending} / ${failed}`, icon: failed > 0 ? AlertTriangle : Clock, color: failed > 0 ? "text-red-400" : "text-yellow-400" },
+          { label: "Pending / Processing / Failed", value: `${pending} / ${allOrders.filter(o => o.status === "processing").length} / ${failed}`, icon: failed > 0 ? AlertTriangle : Clock, color: failed > 0 ? "text-red-400" : "text-yellow-400" },
         ].map(({ label, value, icon: Icon, color }) => (
           <Card key={label} className="bg-white/3 border-white/8">
             <CardContent className="p-3 flex items-center gap-2">

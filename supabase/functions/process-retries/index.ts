@@ -175,117 +175,35 @@ serve(async (req: Request) => {
 
     for (const order of ordersToRetry || []) {
       const createdAt = new Date(order.created_at).getTime();
-      // Wait at least 2 mins for processing orders
+      // Wait at least 2 mins for processing orders to avoid race conditions
       if (order.status === "processing" && (Date.now() - createdAt) < 120000) continue;
 
-      console.log(`[retry-orders] Processing order ${order.id} (Type: ${order.order_type}, Attempt: ${order.retry_count + 1})`);
+      console.log(`[retry-orders] Delegating order ${order.id} to verify-payment...`);
 
-      await supabaseAdmin
-        .from("orders")
-        .update({
-          retry_count: order.retry_count + 1,
-          last_retry_at: new Date().toISOString(),
-          status: "processing"
-        })
-        .eq("id", order.id);
-
-      let success = false;
-      let failureReason = "";
-
-      if (order.order_type === "agent_activation") {
-        // Special case: just activate them
-        await supabaseAdmin.from("profiles").update({ is_agent: true, agent_approved: true }).eq("user_id", order.agent_id);
-        success = true;
-      } else if (order.order_type === "sub_agent_activation") {
-        await supabaseAdmin.from("profiles").update({ 
-          is_agent: true, 
-          agent_approved: true,
-          sub_agent_approved: true,
-          onboarding_complete: true
-        }).eq("user_id", order.agent_id);
-        success = true;
-      } else if (order.order_type === "wallet_topup") {
-        await supabaseAdmin.rpc("credit_wallet", { p_agent_id: order.agent_id, p_amount: order.amount });
-        success = true;
-      } else if (order.order_type === "afa") {
-        const result = await callProviderApi(DATA_PROVIDER_BASE_URL, DATA_PROVIDER_API_KEY, "afa-registration", {
-          afa_full_name: order.afa_full_name,
-          afa_ghana_card: order.afa_ghana_card,
-          afa_occupation: order.afa_occupation,
-          afa_email: order.afa_email,
-          afa_residence: order.afa_residence,
-          afa_date_of_birth: order.afa_date_of_birth,
+      try {
+        const fulfillRes = await fetch(`${SUPABASE_URL}/functions/v1/verify-payment`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${SUPABASE_ANON_KEY || SUPABASE_SERVICE_ROLE_KEY}`,
+          },
+          body: JSON.stringify({ reference: order.id }),
         });
-        success = result.ok;
-        failureReason = result.reason;
-      } else if (order.order_type === "airtime") {
-        const verification = await verifyPaystack(order.id);
-        const basePrice = Number(verification.metadata?.base_price) || order.amount;
-        const networkKey = mapNetworkKey(order.network);
-        const recipient = normalizeRecipient(order.customer_phone);
-        const airtimeResult = await callProviderApi(DATA_PROVIDER_BASE_URL, DATA_PROVIDER_API_KEY, "purchase", {
-          networkRaw: order.network,
-          networkKey,
-          recipient,
-          capacity: basePrice,
-          amount: basePrice,
-          order_type: "airtime"
-        }, DATA_PROVIDER_WEBHOOK_URL);
-        success = airtimeResult.ok;
-        failureReason = airtimeResult.reason;
-      } else if (order.order_type === "utility") {
-        // Utility fulfillment (ECG, DSTV, etc)
-        const recipient = normalizeRecipient(order.utility_account_number || order.customer_phone || "");
-        const result = await callProviderApi(DATA_PROVIDER_BASE_URL, DATA_PROVIDER_API_KEY, "purchase", {
-          networkRaw: order.utility_provider,
-          networkKey: order.utility_provider,
-          recipient,
-          amount: order.amount,
-          order_type: "utility",
-          utility_type: order.utility_type,
-          account_name: order.utility_account_name
-        }, DATA_PROVIDER_WEBHOOK_URL);
-        success = result.ok;
-        failureReason = result.reason;
-      } else {
-        // Data bundle purchase
-        const networkKey = mapNetworkKey(order.network);
-        const recipient = normalizeRecipient(order.customer_phone);
-        const capacity = parseCapacity(order.package_size);
-        const result = await callProviderApi(DATA_PROVIDER_BASE_URL, DATA_PROVIDER_API_KEY, "purchase", {
-          networkRaw: order.network,
-          networkKey,
-          recipient,
-          capacity,
-          amount: order.amount,
-          order_type: "data"
-        }, DATA_PROVIDER_WEBHOOK_URL);
-        success = result.ok;
-        failureReason = result.reason;
+
+        const fulfillData = await fulfillRes.json();
+        
+        if (fulfillData.status === "fulfilled") {
+          results.push({ id: order.id, status: "fulfilled" });
+        } else {
+          results.push({ id: order.id, status: fulfillData.status || "failed", reason: fulfillData.reason || fulfillData.error });
+        }
+      } catch (e) {
+        console.error(`[retry-orders] Error processing ${order.id}:`, e);
+        results.push({ id: order.id, status: "error", reason: e instanceof Error ? e.message : "Unknown error" });
       }
 
-      if (success) {
-        await supabaseAdmin.from("orders").update({ status: "fulfilled", failure_reason: null }).eq("id", order.id);
-        await supabaseAdmin.rpc("credit_order_profits", { p_order_id: order.id });
-        if (order.customer_phone) await sendPaymentSms(supabaseAdmin, order.customer_phone, "payment_success");
-        
-        // Notify via WhatsApp if it was a WhatsApp order
-        const verification = await verifyPaystack(order.id);
-        if (verification.ok && verification.metadata?.channel === "whatsapp" && verification.metadata?.wa_from) {
-          await sendWhatsAppFulfillmentNotification(
-            String(verification.metadata.wa_from),
-            order.order_type,
-            order.network || "",
-            order.package_size || (order.order_type === "airtime" ? `GH₵${order.amount}` : ""),
-            order.customer_phone || ""
-          );
-        }
-        
-        results.push({ id: order.id, status: "fulfilled" });
-      } else {
-        await supabaseAdmin.from("orders").update({ status: "fulfillment_failed", failure_reason: failureReason }).eq("id", order.id);
-        results.push({ id: order.id, status: "failed", reason: failureReason });
-      }
+      // Small delay between calls
+      await new Promise((r) => setTimeout(r, 200));
     }
 
     return new Response(JSON.stringify({ processed: results.length, results }), {
