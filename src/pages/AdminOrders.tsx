@@ -73,10 +73,11 @@ const AdminOrders = () => {
   const [typeFilter, setTypeFilter] = useState<FilterType>("all");
   const [statusFilter, setStatusFilter] = useState("all");
   const [networkFilter, setNetworkFilter] = useState("all");
+  const [orderTypeFilter, setOrderTypeFilter] = useState("all");
   const [page, setPage] = useState(1);
 
   // Reset to page 1 when any filter changes
-  useEffect(() => { setPage(1); }, [search, typeFilter, statusFilter, networkFilter]);
+  useEffect(() => { setPage(1); }, [search, typeFilter, statusFilter, networkFilter, orderTypeFilter]);
 
   const fetchOrders = useCallback(async () => {
     setLoading(true);
@@ -101,6 +102,7 @@ const AdminOrders = () => {
 
     if (statusFilter !== "all") q = q.eq("status", statusFilter);
     if (networkFilter !== "all") q = q.eq("network", networkFilter);
+    if (orderTypeFilter !== "all") q = q.eq("order_type", orderTypeFilter);
 
     const { data, count, error } = await q;
     
@@ -137,7 +139,7 @@ const AdminOrders = () => {
 
     setAllOrders(enriched);
     setLoading(false);
-  }, [page, search, statusFilter, networkFilter, profiles, toast]);
+  }, [page, search, statusFilter, networkFilter, orderTypeFilter, profiles, toast]);
 
   useEffect(() => { 
     const timer = setTimeout(() => fetchOrders(), 300);
@@ -332,6 +334,22 @@ const AdminOrders = () => {
         >
           <option value="all">All Networks</option>
           {uniqueNetworks.map((n) => <option key={n} value={n}>{n}</option>)}
+        </select>
+
+        <select
+          value={orderTypeFilter}
+          onChange={(e) => setOrderTypeFilter(e.target.value)}
+          className="text-xs bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white/70 outline-none"
+        >
+          <option value="all">All Order Types</option>
+          <option value="data">Data Bundles</option>
+          <option value="api">API Purchases</option>
+          <option value="airtime">Airtime</option>
+          <option value="utility">Utility Bills</option>
+          <option value="agent_activation">Agent Activation</option>
+          <option value="sub_agent_activation">Sub-Agent Activation</option>
+          <option value="afa">AFA Registration</option>
+          <option value="wallet_topup">Wallet Top-up</option>
         </select>
 
         <span className="text-xs text-white/30 ml-auto">

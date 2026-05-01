@@ -353,7 +353,7 @@ serve(async (req: Request) => {
       if (!debitResult?.success) return json({ success: false, error: "Insufficient balance" }, 402);
 
       const orderId = request_id || crypto.randomUUID();
-      await supabase.from("orders").insert({ id: orderId, agent_id: profile.user_id, order_type: "data", network: normalizedNetwork, package_size: finalPackageSize, customer_phone: normalizeRecipient(phone), amount: expectedPrice, status: "paid" });
+      await supabase.from("orders").insert({ id: orderId, agent_id: profile.user_id, order_type: "api", network: normalizedNetwork, package_size: finalPackageSize, customer_phone: normalizeRecipient(phone), amount: expectedPrice, status: "paid" });
 
       const DATA_PROVIDER_API_KEY = getEnv("PRIMARY_DATA_PROVIDER_API_KEY", "DATA_PROVIDER_API_KEY");
       const DATA_PROVIDER_BASE_URL = getEnv("PRIMARY_DATA_PROVIDER_BASE_URL", "DATA_PROVIDER_BASE_URL");

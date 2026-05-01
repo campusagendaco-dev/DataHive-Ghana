@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
@@ -12,7 +13,7 @@ import {
   Key, Search, Shield, ShieldOff, RefreshCw, Loader2,
   Activity, Users, TrendingUp, Ban,
   CheckCircle, XCircle, ChevronDown, ChevronUp, Copy,
-  Globe, Webhook, ListChecks, Clock, BarChart2, Save, BadgePercent,
+  Globe, Webhook, ListChecks, Clock, BarChart2, Save, BadgePercent, ChevronRight,
 } from "lucide-react";
 import { networks, basePackages } from "@/lib/data";
 
@@ -135,7 +136,7 @@ const AdminAPIUsers = () => {
       .select("id, created_at, network, customer_phone, package_size, amount, status")
       .eq("agent_id", userId)
       .order("created_at", { ascending: false })
-      .limit(20);
+      .limit(50);
 
     setUserOrders((prev) => ({ ...prev, [userId]: (data ?? []) as APIOrder[] }));
     setExpandedUser(userId);
@@ -578,6 +579,15 @@ const AdminAPIUsers = () => {
                           </div>
                         </div>
 
+                        <div className="flex items-center justify-between mb-4">
+                          <h3 className="text-sm font-bold text-white/60">Recent Orders (Last 50)</h3>
+                          <Link 
+                            to={`/admin/orders?agent=${user.user_id}`}
+                            className="text-[10px] sm:text-xs text-amber-400 hover:text-amber-300 font-bold flex items-center gap-1 bg-amber-400/5 px-2 py-1 rounded-md border border-amber-400/10 transition-colors"
+                          >
+                            VIEW ALL <ChevronRight className="w-3 h-3" />
+                          </Link>
+                        </div>
                         {orders.length === 0 ? (
                           <p className="text-xs text-white/30 italic py-4 text-center">No orders found for this agent.</p>
                         ) : (

@@ -267,7 +267,10 @@ const DashboardOrders = () => {
       else if (o.status === "fulfillment_failed") acc.failed += 1;
       else if (o.status === "paid" || o.status === "processing") acc.processing += 1;
       
-      acc.totalSales += Number(o.amount);
+      // Exclude pending/activation from total sales volume
+      if (o.status === "fulfilled" && !["agent_activation", "sub_agent_activation"].includes(o.order_type)) {
+        acc.totalSales += Number(o.amount);
+      }
       acc.totalProfit += Number(o.profit) + Number(o.parent_profit || 0);
       
       if (o.order_type === "data") acc.dataOrders += 1;

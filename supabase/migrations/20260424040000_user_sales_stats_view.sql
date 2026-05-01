@@ -10,6 +10,7 @@ SELECT
     SUM(parent_profit) as total_commissions_paid
 FROM public.orders
 WHERE status = 'fulfilled'
+  AND order_type NOT IN ('agent_activation', 'sub_agent_activation')
 GROUP BY agent_id;
 
 -- Grant access to the view for administrators

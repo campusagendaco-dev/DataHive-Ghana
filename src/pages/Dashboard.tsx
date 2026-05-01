@@ -66,11 +66,14 @@ const Dashboard = () => {
       const fulfilledOrders = allOrders.filter((o: any) => o.status === "fulfilled");
       
       const depositedOrders = allOrders.filter((o: any) => o.order_type === "wallet_topup" && o.status === "fulfilled");
-      const dataOrders = allOrders.filter((o: any) => o.order_type === "data" && o.status === "fulfilled");
+      const salesOrders = allOrders.filter((o: any) => 
+        ["data", "api", "airtime", "utility"].includes(o.order_type) && 
+        o.status === "fulfilled"
+      );
       const subAgentActivationOrders = allOrders.filter((o: any) => o.order_type === "sub_agent_activation" && o.status === "fulfilled");
 
       const totalDeposited = depositedOrders.reduce((s: number, o: any) => s + Number(o.amount || 0), 0);
-      const totalSalesAmount = dataOrders.reduce((s: number, o: any) => s + Number(o.amount || 0), 0);
+      const totalSalesAmount = salesOrders.reduce((s: number, o: any) => s + Number(o.amount || 0), 0);
       const subAgentEarnings = subAgentActivationOrders.reduce((s: number, o: any) => s + Number(o.profit || 0), 0);
       const totalProfit = fulfilledOrders.reduce((s: number, o: any) => s + Number(o.profit || 0), 0);
 

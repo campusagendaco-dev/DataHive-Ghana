@@ -1,6 +1,6 @@
 import {
   ArrowRight, ShieldCheck, Zap, Store, TrendingUp, CheckCircle2,
-  ChevronDown, Clock, Wifi, Users, BarChart3,
+  ChevronDown, Clock, Wifi, Users, BarChart3, Volume2, VolumeX,
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useState, useEffect, useRef } from "react";
@@ -193,6 +193,9 @@ const FaqItem = ({ q, a }: { q: string; a: string }) => {
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 const Index = () => {
+  const [isMuted, setIsMuted] = useState(true);
+  const videoRef = useRef<HTMLVideoElement>(null);
+
   const networks = useReveal();
   const steps    = useReveal();
   const features = useReveal();
@@ -207,44 +210,62 @@ const Index = () => {
       <StoreVisitorPopup agentSlug="home" showSubAgentLink={false} />
 
       {/* ── Hero ──────────────────────────────────────────────────────────── */}
-      <section className="relative overflow-hidden pt-36 pb-28 px-4">
+      <section className="relative overflow-hidden pt-36 pb-28 px-4 min-h-[85vh] flex items-center justify-center">
+        {/* Video Background */}
+        <div className="absolute inset-0 z-0 overflow-hidden">
+          <div className="absolute inset-0 bg-black/60 z-10" /> {/* Dark overlay */}
+          <div className="absolute inset-0 bg-gradient-to-b from-black/20 via-transparent to-black/60 z-10" />
+          <video 
+            ref={videoRef}
+            autoPlay 
+            muted={isMuted}
+            loop 
+            playsInline 
+            className="w-full h-full object-cover"
+          >
+            <source src="/assets/videos/ai_video.mp4" type="video/mp4" />
+          </video>
+
+          {/* Mute/Unmute Toggle */}
+          <button
+            onClick={() => setIsMuted(!isMuted)}
+            className="absolute bottom-10 right-10 z-30 w-12 h-12 rounded-full bg-white/10 hover:bg-white/20 border border-white/20 backdrop-blur-md flex items-center justify-center transition-all duration-300 group"
+            title={isMuted ? "Unmute Video" : "Mute Video"}
+          >
+            {isMuted ? (
+              <VolumeX className="w-5 h-5 text-white/70 group-hover:text-white" />
+            ) : (
+              <Volume2 className="w-5 h-5 text-amber-400 group-hover:scale-110" />
+            )}
+          </button>
+        </div>
+
         {/* Background glow mesh — visible in dark mode, subtle in light */}
-        <div className="absolute inset-0 pointer-events-none select-none">
+        <div className="absolute inset-0 pointer-events-none select-none z-[1]">
           {/* Navbar-area glows — these sit directly behind the fixed nav and feed the glass blur */}
           <div className="absolute -top-8 left-1/2 -translate-x-1/2 w-[900px] h-[200px] bg-amber-400/10 dark:bg-amber-400/18 rounded-full blur-[80px]" />
           <div className="absolute -top-4 left-1/4 w-[400px] h-[160px] bg-violet-600/8 dark:bg-violet-600/14 rounded-full blur-[70px]" />
           <div className="absolute -top-4 right-1/4 w-[360px] h-[140px] bg-blue-500/6 dark:bg-blue-500/12 rounded-full blur-[65px]" />
-
-          {/* Hero body glows */}
-          <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[1000px] h-[700px] bg-amber-400/6 dark:bg-amber-400/10 rounded-full blur-[140px]" />
-          <div className="absolute top-24 left-1/4 w-[500px] h-[400px] bg-blue-600/4 dark:bg-blue-600/7 rounded-full blur-[100px]" />
-          <div className="absolute top-32 right-1/4 w-[400px] h-[350px] bg-red-600/3 dark:bg-red-600/5 rounded-full blur-[90px]" />
-          <div className="absolute inset-0 opacity-[0.015]"
-            style={{
-              backgroundImage: "linear-gradient(rgba(0,0,0,0.4) 1px, transparent 1px), linear-gradient(90deg, rgba(0,0,0,0.4) 1px, transparent 1px)",
-              backgroundSize: "60px 60px",
-            }}
-          />
         </div>
 
-        <div className="relative container mx-auto max-w-5xl text-center">
+        <div className="relative container mx-auto max-w-5xl text-center z-20">
           {/* Status badge */}
           <div
-            className="inline-flex items-center gap-2.5 bg-white dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-full px-4 py-2 mb-10 shadow-sm"
+            className="inline-flex items-center gap-2.5 bg-white/10 dark:bg-white/5 border border-white/20 dark:border-white/10 rounded-full px-4 py-2 mb-10 shadow-sm backdrop-blur-md"
             style={{ animation: "fade-in 0.5s cubic-bezier(0.22,1,0.36,1) both" }}
           >
             <span className="flex items-center gap-1.5">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-              <span className="text-emerald-600 dark:text-emerald-400 text-xs font-bold">Live</span>
+              <span className="text-emerald-400 text-xs font-bold">Live</span>
             </span>
-            <span className="w-px h-3 bg-gray-200 dark:bg-white/15" />
+            <span className="w-px h-3 bg-white/15" />
             <img src="/logo.png" alt="SwiftData Ghana" className="w-4 h-4 rounded-full" />
-            <span className="text-gray-500 dark:text-white/50 text-xs font-medium">Ghana's #1 Data Bundle Store</span>
+            <span className="text-white/70 text-xs font-medium">Ghana's #1 Data Bundle Store</span>
           </div>
 
           {/* Headline */}
           <h1
-            className="text-5xl sm:text-6xl md:text-7xl font-black leading-[1.04] tracking-tight mb-6"
+            className="text-5xl sm:text-6xl md:text-7xl font-black leading-[1.04] tracking-tight mb-6 text-white"
             style={{ animation: "fade-in 0.6s cubic-bezier(0.22,1,0.36,1) 0.1s both" }}
           >
             Cheapest Non-Expiry
@@ -255,12 +276,12 @@ const Index = () => {
           </h1>
 
           <p
-            className="text-gray-500 dark:text-white/45 text-base md:text-lg max-w-2xl mx-auto leading-relaxed mb-10"
+            className="text-white/60 text-base md:text-lg max-w-2xl mx-auto leading-relaxed mb-10"
             style={{ animation: "fade-in 0.6s cubic-bezier(0.22,1,0.36,1) 0.2s both" }}
           >
-            Buy <strong className="text-gray-700 dark:text-white/75 font-bold">MTN</strong>,{" "}
-            <strong className="text-gray-700 dark:text-white/75 font-bold">Telecel</strong> and{" "}
-            <strong className="text-gray-700 dark:text-white/75 font-bold">AirtelTigo</strong> data online.
+            Buy <strong className="text-white/90 font-bold">MTN</strong>,{" "}
+            <strong className="text-white/90 font-bold">Telecel</strong> and{" "}
+            <strong className="text-white/90 font-bold">AirtelTigo</strong> data online.
             Instant delivery in under 5 seconds — secured by Paystack. No account needed.
           </p>
 
@@ -274,7 +295,7 @@ const Index = () => {
               </Link>
               <Link
                 to="/agent-program"
-                className="inline-flex items-center justify-center gap-2 rounded-2xl border border-gray-200 dark:border-white/10 hover:border-gray-300 dark:hover:border-white/20 hover:bg-gray-100 dark:hover:bg-white/5 text-gray-600 dark:text-white/60 hover:text-gray-900 dark:hover:text-white font-semibold text-base px-8 py-4 transition-all duration-200"
+                className="inline-flex items-center justify-center gap-2 rounded-2xl border border-white/20 hover:border-white/30 bg-white/5 hover:bg-white/10 text-white/70 hover:text-white font-semibold text-base px-8 py-4 transition-all duration-200 backdrop-blur-sm"
               >
                 Start Selling
               </Link>
@@ -286,14 +307,14 @@ const Index = () => {
             style={{ animation: "fade-in 0.6s cubic-bezier(0.22,1,0.36,1) 0.4s both" }}
           >
             {[
-              { icon: ShieldCheck, text: "Paystack secured", color: "text-emerald-500" },
-              { icon: Zap,         text: "Delivery under 5 s", color: "text-amber-500" },
-              { icon: CheckCircle2,text: "Non-expiry bundles", color: "text-sky-500" },
-              { icon: Clock,       text: "Available 24/7",     color: "text-purple-500" },
+              { icon: ShieldCheck, text: "Paystack secured", color: "text-emerald-400" },
+              { icon: Zap,         text: "Delivery under 5 s", color: "text-amber-400" },
+              { icon: CheckCircle2,text: "Non-expiry bundles", color: "text-sky-400" },
+              { icon: Clock,       text: "Available 24/7",     color: "text-purple-400" },
             ].map(({ icon: Icon, text, color }) => (
               <span
                 key={text}
-                className="inline-flex items-center gap-1.5 bg-white dark:bg-white/[0.04] border border-gray-200 dark:border-white/8 rounded-full px-3.5 py-2 text-xs text-gray-500 dark:text-white/45 shadow-sm"
+                className="inline-flex items-center gap-1.5 bg-white/5 border border-white/10 rounded-full px-3.5 py-2 text-xs text-white/50 shadow-sm backdrop-blur-md"
               >
                 <Icon className={`w-3.5 h-3.5 shrink-0 ${color}`} /> {text}
               </span>
