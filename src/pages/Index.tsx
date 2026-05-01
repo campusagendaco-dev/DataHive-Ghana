@@ -202,12 +202,15 @@ const Index = () => {
     const fetchSettings = async () => {
       const { data } = await supabase
         .from("public_system_settings")
-        .select("home_page_video_url")
+        .select("home_page_video_url, home_page_video_muted")
         .eq("id", 1)
         .maybeSingle();
       
       if (data?.home_page_video_url) {
         setVideoUrl(data.home_page_video_url);
+      }
+      if (data && typeof data.home_page_video_muted === "boolean") {
+        setIsMuted(data.home_page_video_muted);
       }
     };
     fetchSettings();

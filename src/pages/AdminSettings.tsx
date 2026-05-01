@@ -57,6 +57,7 @@ interface SystemSettings {
   free_data_max_claims: string;
   whatsapp_bot_prompt: string;
   home_page_video_url: string;
+  home_page_video_muted: boolean;
 }
 
 const AdminSettings = () => {
@@ -108,6 +109,7 @@ const AdminSettings = () => {
     free_data_max_claims: "100",
     whatsapp_bot_prompt: "",
     home_page_video_url: "",
+    home_page_video_muted: true,
   });
 
   useEffect(() => {
@@ -166,6 +168,7 @@ const AdminSettings = () => {
           free_data_max_claims: String(d.free_data_max_claims || "100"),
           whatsapp_bot_prompt: d.whatsapp_bot_prompt || "",
           home_page_video_url: d.home_page_video_url || "/assets/videos/ai_video.mp4",
+          home_page_video_muted: d.home_page_video_muted !== false, // default true
         });
       }
       setLoading(false);
@@ -206,6 +209,7 @@ const AdminSettings = () => {
       free_data_max_claims: parseInt(settings.free_data_max_claims) || 100,
       whatsapp_bot_prompt: settings.whatsapp_bot_prompt.trim(),
       home_page_video_url: (settings.home_page_video_url || "").trim(),
+      home_page_video_muted: settings.home_page_video_muted,
     };
 
     try {
@@ -442,7 +446,7 @@ const AdminSettings = () => {
                     <video 
                       src={settings.home_page_video_url} 
                       className="w-full h-full object-cover"
-                      muted
+                      muted={settings.home_page_video_muted}
                       autoPlay
                       loop
                     />
@@ -458,6 +462,17 @@ const AdminSettings = () => {
                     </div>
                   </div>
                 )}
+
+                <div className="flex items-center justify-between p-3 rounded-xl bg-white/5 border border-white/10">
+                  <div className="space-y-0.5">
+                    <Label className="text-sm font-bold">Mute Video by Default</Label>
+                    <p className="text-xs text-muted-foreground">If disabled, the video will attempt to play with sound for all users.</p>
+                  </div>
+                  <Switch
+                    checked={settings.home_page_video_muted}
+                    onCheckedChange={(c) => setSettings({ ...settings, home_page_video_muted: c })}
+                  />
+                </div>
                 
                 <div className="flex flex-col gap-3">
                   <Label>Video URL (MP4)</Label>
