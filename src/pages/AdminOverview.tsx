@@ -62,8 +62,13 @@ const DailySalesTooltip = ({ active, payload, label, isDark }: any) => {
         </p>
       ))}
       <p className={`font-bold mt-1.5 border-t pt-1.5 ${isDark ? "text-white/80 border-white/10" : "text-gray-800 border-gray-200"}`}>
-        Total: GH₵{total.toFixed(2)}
+        Total Volume: GH₵{total.toFixed(2)}
       </p>
+      {payload[0]?.payload?.Deposits > 0 && (
+        <p className="text-[10px] text-amber-500 mt-1 font-bold">
+          + GH₵{payload[0].payload.Deposits.toFixed(2)} Deposits
+        </p>
+      )}
     </div>
   );
 };
@@ -127,20 +132,25 @@ const AdminOverview = () => {
     else startDate = new Date(2024, 0, 1); // Earliest possible date
     
     startDate.setHours(0, 0, 0, 0);
+    const todayStr = now.toISOString().slice(0, 10);
+    
+    const DEPOSIT_TYPES = new Set(["wallet_topup", "agent_activation", "sub_agent_activation"]);
+    const SALE_TYPES    = new Set(["data", "airtime", "utility", "afa", "api"]);
 
-    const [ordersRes, profilesRes, maintenanceRes, recentRes, rangeOrdersRes, providerRes, withdrawalsRes, ticketsRes, topupsRes, auditRes, walletsRes, salesStatsRes] = await Promise.all([
-      supabase.from("orders").select("id, amount, status, order_type, profit, parent_profit, cost_price, paystack_fee"),
+    const [ordersRes, profilesRes, maintenanceRes, recentRes, rangeOrdersRes, providerRes, withdrawalsRes, ticketsRes, topupsRes, auditRes, walletsRes, salesStatsRes, rpcStatsRes] = await Promise.all([
+      supabase.from("orders").select("id, amount, status, order_type, profit, parent_profit, cost_price, paystack_fee, paystack_verified_amount"),
       supabase.from("profiles").select("user_id, is_agent, is_sub_agent, agent_approved, sub_agent_approved, onboarding_complete, created_at"),
       supabase.functions.invoke("maintenance-mode", { body: { action: "get" } }),
       supabase.from("orders").select("id, network, package_size, customer_phone, amount, status, created_at").order("created_at", { ascending: false }).limit(8),
-      supabase.from("orders").select("id, amount, agent_id, created_at, status, order_type").gte("created_at", startDate.toISOString()).order("created_at", { ascending: false }).limit(2000),
+      supabase.from("orders").select("id, amount, agent_id, created_at, status, order_type, paystack_verified_amount").gte("created_at", startDate.toISOString()).order("created_at", { ascending: false }).limit(4000),
       supabase.functions.invoke("admin-user-actions", { body: { action: "get_provider_balance" } }).catch(e => ({ data: { success: false, error: e.message }, error: e })),
       supabase.from("withdrawals").select("id", { count: "exact", head: true }).eq("status", "pending"),
       supabase.from("support_tickets").select("id", { count: "exact", head: true }).eq("status", "open"),
-      supabase.from("orders").select("id, amount, network, package_size, customer_phone, order_type, created_at").eq("status", "fulfilled").order("created_at", { ascending: false }).limit(12),
+      supabase.from("orders").select("id, order_type, amount, status, created_at, network, package_size, customer_phone").eq("status", "fulfilled").order("created_at", { ascending: false }).limit(15),
       supabase.from("audit_logs").select("id, action, details, created_at, profiles(full_name)").order("created_at", { ascending: false }).limit(6),
       supabase.from("wallets").select("balance"),
       supabase.from("user_sales_stats").select("total_sales_volume, total_own_profit, total_commissions_paid"),
+      supabase.rpc("get_admin_sales_stats_v2", { p_start_date: startDate.toISOString() }),
     ]);
 
     const orders = ordersRes?.data || [];
@@ -163,10 +173,21 @@ const AdminOverview = () => {
       const parentProf = Number(o.parent_profit) || 0;
       const cost = Number(o.cost_price) || 0;
       
-      // Only include if cost_price is available, otherwise it's 0 (or we don't know the profit yet)
-      if (cost > 0) {
-        return s + (amt - fee - agentProf - parentProf - cost);
+      if (["data", "airtime", "utility", "afa", "api"].includes(o.order_type)) {
+        if (cost > 0) {
+          return s + (amt - fee - agentProf - parentProf - cost);
+        }
+        return s;
+      } 
+      
+      if (["agent_activation", "sub_agent_activation"].includes(o.order_type)) {
+        return s + (amt - fee);
       }
+      
+      if (o.order_type === "wallet_topup") {
+        return s - fee;
+      }
+
       return s;
     }, 0);
     
@@ -177,55 +198,49 @@ const AdminOverview = () => {
     const agentIds = new Set(profiles.filter((p: any) => p?.is_agent && p?.agent_approved).map((p: any) => p?.user_id));
     const subAgentIds = new Set(profiles.filter((p: any) => p?.is_sub_agent && p?.sub_agent_approved).map((p: any) => p?.user_id));
 
-    const chartMap: Record<string, DailySalesPoint> = {};
-    if (isMonthly) {
-      // Monthly grouping
-      for (let i = (timeRange === "1y" ? 11 : 24); i >= 0; i--) {
-        const d = new Date(now);
-        d.setMonth(now.getMonth() - i);
-        const key = d.toISOString().slice(0, 7); // YYYY-MM
-        chartMap[key] = { date: d.toLocaleDateString("en-US", { month: "short", year: "2-digit" }), Customers: 0, Agents: 0, "Sub-Agents": 0, Deposits: 0, Purchases: 0 };
-      }
+    const rpcStats = (rpcStatsRes as any)?.data;
+    let dailySalesData: DailySalesPoint[] = [];
+
+    if (rpcStats && Array.isArray(rpcStats)) {
+      // Use RPC results if available (Perfect accuracy)
+      dailySalesData = rpcStats.map((r: any) => ({
+        date: new Date(r.bucket_date).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" }),
+        Customers: Number(r.customer_sales),
+        Agents: Number(r.agent_sales),
+        "Sub-Agents": Number(r.sub_agent_sales),
+        Deposits: Number(r.deposit_volume),
+        Purchases: Number(r.customer_sales) + Number(r.agent_sales) + Number(r.sub_agent_sales),
+      }));
     } else {
-      // Daily grouping
-      const daysCount = timeRange === "7d" ? 7 : 30;
+      // Fallback to browser-side aggregation if RPC is missing/failed
+      console.warn("Sales stats RPC failed or not found, falling back to local calculation.");
+      const chartMap: Record<string, DailySalesPoint> = {};
+      const daysCount = timeRange === "7d" ? 7 : timeRange === "30d" ? 30 : 90; // Limit fallback range
       for (let i = daysCount - 1; i >= 0; i--) {
         const d = new Date(now);
         d.setDate(now.getDate() - i);
         const key = d.toISOString().slice(0, 10);
         chartMap[key] = { date: d.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" }), Customers: 0, Agents: 0, "Sub-Agents": 0, Deposits: 0, Purchases: 0 };
       }
+
+      rangeOrders.forEach((o: any) => {
+        if (o.status !== "fulfilled") return;
+        const key = (o.created_at as string).slice(0, 10);
+        if (!chartMap[key]) return;
+        const amt = Number(o.paystack_verified_amount || o.amount) || 0;
+        if (DEPOSIT_TYPES.has(o.order_type)) {
+          chartMap[key].Deposits += amt;
+        } else if (SALE_TYPES.has(o.order_type)) {
+          chartMap[key].Purchases += amt;
+          if (agentIds.has(o.agent_id)) chartMap[key].Agents += amt;
+          else if (subAgentIds.has(o.agent_id)) chartMap[key]["Sub-Agents"] += amt;
+          else chartMap[key].Customers += amt;
+        }
+      });
+      dailySalesData = Object.values(chartMap);
     }
 
-    const todayStr = now.toISOString().slice(0, 10);
-
-
-    const DEPOSIT_TYPES = new Set(["wallet_topup", "agent_activation", "sub_agent_activation"]);
-    const SALE_TYPES    = new Set(["data", "airtime", "utility", "afa", "api"]);
-
-    rangeOrders.forEach((o: any) => {
-      if (o.status !== "fulfilled") return;
-
-      const fullKey  = (o.created_at as string).slice(0, 10);
-      const chartKey = isMonthly ? fullKey.slice(0, 7) : fullKey;
-      const amt      = Number(o.amount) || 0;
-      const bucket   = chartMap[chartKey];
-
-      if (!bucket) return;
-
-      if (DEPOSIT_TYPES.has(o.order_type)) {
-        // Deposits/activations go only into the Deposits column
-        bucket.Deposits += amt;
-      } else if (SALE_TYPES.has(o.order_type)) {
-        // Product sales go into Purchases AND the correct segment column
-        bucket.Purchases += amt;
-        if      (agentIds.has(o.agent_id))    bucket.Agents        += amt;
-        else if (subAgentIds.has(o.agent_id)) bucket["Sub-Agents"] += amt;
-        else                                   bucket.Customers     += amt;
-      }
-    });
-
-    setDailySales(Object.values(chartMap));
+    setDailySales(dailySalesData);
     
     const todayOrders = rangeOrders.filter((o: any) => (o.created_at as string).slice(0, 10) === todayStr);
     const todaySuccess = todayOrders.filter((o: any) => o.status === "fulfilled").length;
@@ -236,9 +251,9 @@ const AdminOverview = () => {
     const inflowOrders = orders.filter((o: any) => o.status === "fulfilled" && ["wallet_topup", "agent_activation", "sub_agent_activation"].includes(o.order_type));
     const purchaseOrders = orders.filter((o: any) => o.status === "fulfilled" && ["data", "airtime", "utility", "afa", "api"].includes(o.order_type));
 
-    const totalRevenue = inflowOrders.reduce((s: number, o: any) => s + (Number(o.amount) || 0), 0);
+    const totalRevenue = inflowOrders.reduce((s: number, o: any) => s + (Number(o.paystack_verified_amount || o.amount) || 0), 0);
     const totalPurchases = purchaseOrders.reduce((s: number, o: any) => s + (Number(o.amount) || 0), 0);
-    const displayRevenue = totalRevenue > 0 ? totalRevenue : totalVolumeAllTime;
+    const displayRevenue = totalRevenue; 
 
     const PURCHASE_TYPES = ["data", "airtime", "utility", "afa", "api"];
     const todayFulfilledPurchases = todayOrders.filter((o: any) => o.status === "fulfilled" && PURCHASE_TYPES.includes(o.order_type));
@@ -269,11 +284,11 @@ const AdminOverview = () => {
       pendingWithdrawals: withdrawalsRes.count || 0,
       unreadTickets: ticketsRes.count || 0,
       totalSystemBalance,
-      todaySignups: todayUsers,
-      totalRangePurchase: rangeOrders.filter((o: any) => o.status === "fulfilled" && PURCHASE_TYPES.includes(o.order_type)).reduce((s: number, o: any) => s + (Number(o.amount) || 0), 0),
-      rangeInflow,
-      rangeVerifiedInflow,
-      rangePurchases,
+      todaySignups: todayOrders.filter((p: any) => (p.created_at as string)?.slice(0, 10) === todayStr).length,
+      totalRangePurchase: rangeOrders.filter((o: any) => o.status === "fulfilled" && SALE_TYPES.has(o.order_type)).reduce((s: number, o: any) => s + (Number(o.amount) || 0), 0),
+      rangeInflow: rangeOrders.filter((o: any) => o.status === "fulfilled" && DEPOSIT_TYPES.has(o.order_type)).reduce((s: number, o: any) => s + (Number(o.amount) || 0), 0),
+      rangeVerifiedInflow: rangeOrders.filter((o: any) => o.status === "fulfilled" && DEPOSIT_TYPES.has(o.order_type)).reduce((s: number, o: any) => s + (Number(o.paystack_verified_amount) || Number(o.amount) || 0), 0),
+      rangePurchases: rangeOrders.filter((o: any) => o.status === "fulfilled" && SALE_TYPES.has(o.order_type)).reduce((s: number, o: any) => s + (Number(o.amount) || 0), 0),
       totalNetAdminProfit
     });
     setRecentOrders((recentRes.data || []) as RecentOrder[]);
@@ -383,7 +398,14 @@ const AdminOverview = () => {
     { title: "Data/Airtime Volume",   value: `GH₵ ${(stats.totalPurchases || 0).toFixed(2)}`,                                icon: ShoppingCart, color: "text-blue-500",  bg: "bg-blue-500/10",  border: "border-blue-500/20"  },
     { title: "Agent Profits",   value: `GH₵ ${(stats.totalAgentProfit || 0).toFixed(2)}`, icon: DollarSign, color: "text-amber-500",  bg: "bg-amber-400/10",  border: "border-amber-400/20"  },
     { title: "User Balances",   value: `GH₵ ${(stats.totalSystemBalance || 0).toFixed(2)}`,                        icon: Wallet,     color: "text-red-400",    bg: "bg-red-400/10",    border: "border-red-400/20"    },
-    { title: "Platform Share",  value: `GH₵ ${(stats.swiftDataSubAgentShare || 0).toFixed(2)}`,                      icon: Activity,   color: "text-sky-500",   bg: "bg-sky-400/10",   border: "border-sky-400/20"   },
+    { 
+      title: "Net Admin Profit", 
+      value: `GH₵ ${(stats.totalNetAdminProfit || 0).toFixed(2)}`, 
+      icon: TrendingUp, 
+      color: "text-emerald-500", 
+      bg: "bg-emerald-500/10",
+      description: "Lifetime net profit after all costs."
+    },
     { title: "Active Users",    value: stats.totalUsers.toLocaleString(),                                      icon: Users,      color: "text-purple-500", bg: "bg-purple-500/10", border: "border-purple-500/20" },
     {
       title: "Pending Agents",
@@ -406,7 +428,6 @@ const AdminOverview = () => {
     { title: "Today's New Users", value: todaySales.newUsers,     icon: Users,        color: "text-indigo-500",  bg: "bg-indigo-500/10",  border: "border-indigo-500/20"  },
     { title: "Pending Withdrawals", value: stats.pendingWithdrawals, icon: Wallet,   color: stats.pendingWithdrawals > 0 ? "text-red-500" : "text-emerald-500", bg: stats.pendingWithdrawals > 0 ? "bg-red-500/10" : "bg-emerald-500/10", border: stats.pendingWithdrawals > 0 ? "border-red-500/20" : "border-emerald-500/20" },
     { title: "Open Tickets",      value: stats.unreadTickets,      icon: MessageCircle, color: stats.unreadTickets > 0 ? "text-amber-500" : "text-emerald-500", bg: stats.unreadTickets > 0 ? "bg-amber-500/10" : "bg-emerald-500/10", border: stats.unreadTickets > 0 ? "border-amber-500/20" : "border-emerald-500/20" },
-    { title: "Net Admin Profit", value: `GH₵ ${(stats.totalNetAdminProfit || 0).toFixed(2)}`, icon: TrendingUp, color: "text-sky-400", bg: "bg-sky-400/10", border: "border-sky-400/20" },
     { title: "Total Purchase", value: `GH₵ ${(stats.totalRangePurchase || 0).toFixed(2)}`, icon: ShoppingCart, color: "text-purple-500", bg: "bg-purple-500/10", border: "border-purple-500/20" },
   ];
 
