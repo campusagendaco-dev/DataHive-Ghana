@@ -59,7 +59,7 @@ const AdminReconciliation = () => {
     setLoading(true);
     try {
       // 1. Get transactions from Paystack via Edge Function
-      const { data: psData, error: psError } = await invokePublicFunctionAsUser("admin-user-actions", {
+      const { data: psData, error: psError } = await supabase.functions.invoke("admin-user-actions", {
         body: { 
           action: "get_paystack_transactions", 
           page: isLoadMore ? page + 1 : 1,

@@ -92,7 +92,11 @@ serve(async (req: Request) => {
   }
 
   const authHeader = req.headers.get("Authorization");
-  if (!authHeader) {
+  const userToken = req.headers.get("x-user-access-token");
+  
+  const token = userToken || authHeader?.replace(/^Bearer\s+/i, "").trim();
+
+  if (!token) {
     return new Response(JSON.stringify({ error: "Unauthorized" }), {
       status: 401,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -105,7 +109,7 @@ serve(async (req: Request) => {
     const {
       data: { user: actor },
       error: actorError,
-    } = await supabaseAdmin.auth.getUser(authHeader.replace(/^Bearer\s+/i, "").trim());
+    } = await supabaseAdmin.auth.getUser(token);
 
     if (actorError || !actor) {
       return new Response(JSON.stringify({ error: "Unauthorized" }), {

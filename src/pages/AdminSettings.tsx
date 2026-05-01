@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Save, AlertCircle, Phone, MessageSquare, Percent, MessageCircle, Gift, Sparkles, Video, Upload, Trash2, Loader2 } from "lucide-react";
+import { Save, AlertCircle, Phone, MessageSquare, Percent, MessageCircle, Gift, Sparkles, Video, Upload, Trash2, Loader2, Globe, Database, Plus, ExternalLink } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Textarea } from "@/components/ui/textarea";
 import { logAudit } from "@/utils/auditLogger";
