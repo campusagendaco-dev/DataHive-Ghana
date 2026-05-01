@@ -4,6 +4,7 @@ import {
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useState, useEffect, useRef } from "react";
+import { supabase } from "@/integrations/supabase/client";
 import PhoneOrderTracker from "@/components/PhoneOrderTracker";
 import StoreVisitorPopup from "@/components/StoreVisitorPopup";
 
@@ -194,7 +195,23 @@ const FaqItem = ({ q, a }: { q: string; a: string }) => {
 // ─── Page ─────────────────────────────────────────────────────────────────────
 const Index = () => {
   const [isMuted, setIsMuted] = useState(true);
+  const [videoUrl, setVideoUrl] = useState("/assets/videos/ai_video.mp4");
   const videoRef = useRef<HTMLVideoElement>(null);
+
+  useEffect(() => {
+    const fetchSettings = async () => {
+      const { data } = await supabase
+        .from("public_system_settings")
+        .select("home_page_video_url")
+        .eq("id", 1)
+        .maybeSingle();
+      
+      if (data?.home_page_video_url) {
+        setVideoUrl(data.home_page_video_url);
+      }
+    };
+    fetchSettings();
+  }, []);
 
   const networks = useReveal();
   const steps    = useReveal();
@@ -216,6 +233,7 @@ const Index = () => {
           <div className="absolute inset-0 bg-black/60 z-10" /> {/* Dark overlay */}
           <div className="absolute inset-0 bg-gradient-to-b from-black/20 via-transparent to-black/60 z-10" />
           <video 
+            key={videoUrl}
             ref={videoRef}
             autoPlay 
             muted={isMuted}
@@ -223,7 +241,7 @@ const Index = () => {
             playsInline 
             className="w-full h-full object-cover"
           >
-            <source src="/assets/videos/ai_video.mp4" type="video/mp4" />
+            <source src={videoUrl} type="video/mp4" />
           </video>
 
           {/* Mute/Unmute Toggle */}

@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Save, AlertCircle, Phone, MessageSquare, Percent, MessageCircle, Gift, Sparkles } from "lucide-react";
+import { Save, AlertCircle, Phone, MessageSquare, Percent, MessageCircle, Gift, Sparkles, Video, Upload, Trash2, Loader2 } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Textarea } from "@/components/ui/textarea";
 import { logAudit } from "@/utils/auditLogger";
@@ -56,6 +56,7 @@ interface SystemSettings {
   free_data_package_size: string;
   free_data_max_claims: string;
   whatsapp_bot_prompt: string;
+  home_page_video_url: string;
 }
 
 const AdminSettings = () => {
@@ -106,6 +107,7 @@ const AdminSettings = () => {
     free_data_package_size: "1GB",
     free_data_max_claims: "100",
     whatsapp_bot_prompt: "",
+    home_page_video_url: "",
   });
 
   useEffect(() => {
@@ -163,6 +165,7 @@ const AdminSettings = () => {
           free_data_package_size: d.free_data_package_size || "1GB",
           free_data_max_claims: String(d.free_data_max_claims || "100"),
           whatsapp_bot_prompt: d.whatsapp_bot_prompt || "",
+          home_page_video_url: d.home_page_video_url || "/assets/videos/ai_video.mp4",
         });
       }
       setLoading(false);
@@ -202,6 +205,7 @@ const AdminSettings = () => {
       free_data_package_size: settings.free_data_package_size,
       free_data_max_claims: parseInt(settings.free_data_max_claims) || 100,
       whatsapp_bot_prompt: settings.whatsapp_bot_prompt.trim(),
+      home_page_video_url: (settings.home_page_video_url || "").trim(),
     };
 
     try {
@@ -416,6 +420,107 @@ const AdminSettings = () => {
                 <div className="space-y-2">
                   <Label>AT (%)</Label>
                   <Input type="number" step="0.5" value={settings.at_markup_percentage} onChange={(e) => setSettings({ ...settings, at_markup_percentage: e.target.value })} />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg flex items-center gap-2">
+                <Video className="w-5 h-5 text-amber-500" />
+                Home Page Background Video
+              </CardTitle>
+              <CardDescription>
+                Upload or change the video that appears on the landing page hero section.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-4">
+                {settings.home_page_video_url && (
+                  <div className="relative rounded-xl overflow-hidden border border-white/10 aspect-video bg-black/20">
+                    <video 
+                      src={settings.home_page_video_url} 
+                      className="w-full h-full object-cover"
+                      muted
+                      autoPlay
+                      loop
+                    />
+                    <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity">
+                      <Button 
+                        variant="destructive" 
+                        size="sm" 
+                        className="gap-2"
+                        onClick={() => setSettings({ ...settings, home_page_video_url: "" })}
+                      >
+                        <Trash2 className="w-4 h-4" /> Remove Video
+                      </Button>
+                    </div>
+                  </div>
+                )}
+                
+                <div className="flex flex-col gap-3">
+                  <Label>Video URL (MP4)</Label>
+                  <div className="flex gap-2">
+                    <Input 
+                      value={settings.home_page_video_url} 
+                      onChange={(e) => setSettings({ ...settings, home_page_video_url: e.target.value })}
+                      placeholder="https://...mp4 or /assets/..."
+                    />
+                    <div className="relative">
+                      <Input
+                        type="file"
+                        accept="video/mp4"
+                        className="hidden"
+                        id="video-upload"
+                        onChange={async (e) => {
+                          const file = e.target.files?.[0];
+                          if (!file) return;
+                          
+                          if (file.size > 20 * 1024 * 1024) { // 20MB limit
+                            toast({ title: "File too large", description: "Video must be under 20MB.", variant: "destructive" });
+                            return;
+                          }
+
+                          const { data: { user } } = await supabase.auth.getUser();
+                          if (!user) return;
+
+                          setSaving(true);
+                          try {
+                            const fileName = `home-bg-${Date.now()}.mp4`;
+                            const { data, error } = await supabase.storage
+                              .from('site-assets')
+                              .upload(fileName, file);
+
+                            if (error) throw error;
+
+                            const { data: { publicUrl } } = supabase.storage
+                              .from('site-assets')
+                              .getPublicUrl(fileName);
+
+                            setSettings({ ...settings, home_page_video_url: publicUrl });
+                            toast({ title: "Video uploaded", description: "Remember to save all changes." });
+                          } catch (err: any) {
+                            toast({ title: "Upload failed", description: err.message, variant: "destructive" });
+                          } finally {
+                            setSaving(false);
+                          }
+                        }}
+                      />
+                      <Button 
+                        variant="secondary" 
+                        onClick={() => document.getElementById('video-upload')?.click()}
+                        disabled={saving}
+                        className="gap-2"
+                      >
+                        {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
+                        Upload
+                      </Button>
+                    </div>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Recommended: MP4, 1080p+, under 10MB for fast loading.
+                  </p>
                 </div>
               </div>
             </CardContent>
