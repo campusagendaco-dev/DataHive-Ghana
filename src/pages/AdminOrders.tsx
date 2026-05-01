@@ -48,8 +48,9 @@ interface AgentProfile {
 }
 
 const STATUS_COLORS: Record<string, string> = {
-  pending: "bg-yellow-500/20 text-yellow-400 border-yellow-500/30",
+  pending: "bg-amber-500/20 text-amber-400 border-amber-500/30",
   paid: "bg-blue-500/20 text-blue-400 border-blue-500/30",
+  processing: "bg-sky-500/20 text-sky-400 border-sky-500/30",
   fulfilled: "bg-green-500/20 text-green-400 border-green-500/30",
   fulfillment_failed: "bg-red-500/20 text-red-400 border-red-500/30",
 };
@@ -445,7 +446,7 @@ const AdminOrders = () => {
                   </td>
                   <td className="px-4 py-3 text-center">
                     <Badge className={`text-[10px] border ${STATUS_COLORS[order.status] || "bg-white/10 text-white/40 border-white/10"}`}>
-                      {order.status.replace(/_/g, " ")}
+                      {order.status === "pending" ? "verifying payment" : order.status.replace(/_/g, " ")}
                     </Badge>
                     {order.failure_reason && (
                       <p className="text-[10px] text-red-400 mt-0.5 max-w-[120px] truncate mx-auto" title={order.failure_reason}>
