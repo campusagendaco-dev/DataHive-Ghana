@@ -210,54 +210,21 @@ const OrderStatus = () => {
           </div>
 
           {/* Reference & Copy */}
-          <div className="bg-white/[0.01] px-6 py-4 flex items-center justify-between gap-3 border-t border-white/5">
-            <div className="min-w-0">
-               <p className="text-[8px] font-bold text-white/10 uppercase tracking-widest mb-0.5">Reference</p>
-               <code className="text-[10px] font-mono text-white/20 truncate block">{reference || 'No reference'}</code>
+          {reference && (
+            <div className="bg-white/[0.01] px-6 py-4 flex items-center justify-between gap-3 border-t border-white/5">
+              <div className="min-w-0">
+                 <p className="text-[8px] font-bold text-white/10 uppercase tracking-widest mb-0.5">Reference</p>
+                 <code className="text-[10px] font-mono text-white/20 truncate block">{reference}</code>
+              </div>
+              <button 
+                onClick={copyRef}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 border border-white/5 transition-all"
+              >
+                <Copy className="w-3 h-3 text-white/30" />
+                <span className="text-[9px] font-bold text-white/30 uppercase">Copy</span>
+              </button>
             </div>
-            <button 
-              onClick={copyRef}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 border border-white/5 transition-all"
-            >
-              <Copy className="w-3 h-3 text-white/30" />
-              <span className="text-[9px] font-bold text-white/30 uppercase">Copy</span>
-            </button>
-          </div>
-
-          {/* Secure Guest Search */}
-          <div className="mt-8 pt-6 border-t border-white/5 space-y-4 px-6 pb-6">
-             <div className="relative group">
-                <input 
-                  type="tel"
-                  placeholder="Find another order (phone)..."
-                  className="w-full py-3 px-4 rounded-2xl bg-black/20 border border-white/5 text-[10px] text-white placeholder:text-white/20 focus:outline-none focus:border-amber-500/50 transition-all"
-                  disabled={loading}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      const rawInput = (e.currentTarget as HTMLInputElement).value.trim();
-                      if (!rawInput) return;
-                      const sanitized = rawInput.replace(/\D+/g, "");
-                      if (sanitized.length < 9) {
-                        toast.error("Please enter a valid phone number");
-                        return;
-                      }
-                      
-                      navigate(`/my-orders?phone=${sanitized}`);
-                    }
-                  }}
-                />
-               <div className="absolute right-4 top-1/2 -translate-y-1/2 opacity-20 group-focus-within:opacity-50 transition-all pointer-events-none">
-                 {loading ? <Loader2 className="w-3 h-3 text-white animate-spin" /> : <Search className="w-3 h-3 text-white" />}
-               </div>
-             </div>
-             
-             <button 
-               onClick={() => window.location.href = '/'}
-               className="w-full py-3 rounded-2xl bg-white/5 hover:bg-white/10 text-white/40 text-[10px] font-bold uppercase tracking-widest transition-all border border-white/5"
-             >
-               Back to Shop
-             </button>
-          </div>
+          )}
         </div>
 
         {/* Action Row */}
