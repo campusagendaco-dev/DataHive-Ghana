@@ -479,65 +479,180 @@ const AdminOverview = () => {
         </Button>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
         {statCards.map((c) => {
           const isFlashing = updatedKeys.has(c.title);
           return (
             <div
               key={c.title}
-              className={`relative group p-5 rounded-2xl border overflow-hidden transition-all hover:scale-[1.01] ${card}`}
-              style={isFlashing ? { outline: `1.5px solid ${isDark ? "rgba(251,191,36,0.4)" : "rgba(251,191,36,0.5)"}`, outlineOffset: "2px" } : undefined}
+              className={`relative group p-6 rounded-[2rem] border overflow-hidden transition-all duration-500 hover:scale-[1.02] hover:shadow-2xl ${
+                isDark ? "bg-white/[0.03] border-white/10 hover:bg-white/[0.05]" : "bg-white border-gray-100 shadow-xl shadow-black/[0.02]"
+              }`}
             >
-              <div className={`absolute top-0 right-0 w-24 h-24 ${c.bg} blur-2xl -mr-10 -mt-10 rounded-full transition-transform group-hover:scale-150`} />
-              <div className="relative z-10 flex items-center justify-between mb-3">
-                <p className={`text-xs font-semibold uppercase tracking-wider ${muted}`}>{c.title}</p>
-                <div className={`w-8 h-8 rounded-xl ${c.bg} ${c.border} border flex items-center justify-center`}>
-                  <c.icon className={`w-4 h-4 ${c.color}`} />
+              {/* Animated Background Glow */}
+              <div className={`absolute -top-12 -right-12 w-32 h-32 ${c.bg} blur-[60px] opacity-40 group-hover:scale-150 transition-transform duration-700 rounded-full`} />
+              
+              <div className="relative z-10 flex items-center justify-between mb-5">
+                <div className={`w-12 h-12 rounded-2xl ${c.bg} ${c.border} border-2 flex items-center justify-center shadow-lg`}>
+                  <c.icon className={`w-6 h-6 ${c.color}`} />
+                </div>
+                <div className="text-right">
+                  <p className={`text-[10px] font-black uppercase tracking-[0.2em] ${muted}`}>{c.title}</p>
                 </div>
               </div>
-              <p className={`relative z-10 text-2xl font-black tracking-tight ${head}`}>{c.value}</p>
-              {isFlashing && (
-                <div className="absolute top-2 right-2 w-2 h-2 rounded-full bg-amber-400 animate-ping" />
+              
+              <div className="relative z-10 flex items-baseline gap-2">
+                 <p className={`text-3xl font-black tracking-tighter ${head}`}>{c.value}</p>
+                 {isFlashing && (
+                   <span className="w-2 h-2 rounded-full bg-amber-400 animate-ping" />
+                 )}
+              </div>
+              
+              {c.description && (
+                <p className={`relative z-10 text-[10px] mt-2 font-medium ${sub} italic`}>
+                  {c.description}
+                </p>
               )}
             </div>
           );
         })}
       </div>
 
-      <div className={`p-6 rounded-[2rem] border ${isDark ? "bg-[#0d0d12] border-amber-500/20 shadow-[0_20px_50px_rgba(0,0,0,0.3)]" : "bg-amber-50/50 border-amber-200"}`}>
-        <div className="flex flex-col md:flex-row gap-6 items-start">
-          <div className="w-12 h-12 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center shrink-0">
-            <ShieldCheck className="w-6 h-6 text-amber-500" />
-          </div>
-          <div className="space-y-4 flex-1">
-            <div>
-              <h2 className={`text-xl font-black tracking-tight ${head}`}>Financial Reconciliation</h2>
-              <p className={`text-sm mt-1 leading-relaxed ${sub}`}>
-                Understanding the discrepancy between Paystack inflows and dashboard purchases.
+      {/* --- Action Center --- */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className={`lg:col-span-2 p-8 rounded-[2.5rem] border relative overflow-hidden ${
+          isDark ? "bg-indigo-600/5 border-indigo-500/20" : "bg-indigo-50 border-indigo-100"
+        }`}>
+          <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-500/10 blur-[100px] rounded-full" />
+          
+          <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-8">
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                 <div className="w-8 h-8 rounded-xl bg-indigo-500 flex items-center justify-center shadow-lg shadow-indigo-500/40">
+                    <Activity className="w-4 h-4 text-white" />
+                 </div>
+                 <h2 className={`text-2xl font-black tracking-tight ${head}`}>Global Management</h2>
+              </div>
+              <p className={`text-sm ${sub} max-w-md`}>
+                One-click administrative tools to audit accounts, sync provider records, and approve waiting agents.
               </p>
             </div>
             
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <div className={`p-4 rounded-2xl border ${isDark ? "bg-black/40 border-white/5 shadow-inner" : "bg-white border-gray-100 shadow-sm"}`}>
-                <p className={`text-[10px] uppercase font-black tracking-widest mb-1 text-emerald-500`}>Verified Inflow ({timeRange})</p>
-                <p className={`text-lg font-black text-white`}>GH₵ {(stats.rangeVerifiedInflow || 0).toFixed(2)}</p>
-                <p className="text-[9px] text-white/20 mt-1">Confirmed Paystack settlements.</p>
+            <div className="flex flex-wrap gap-3">
+              <Button 
+                onClick={async () => {
+                  toast({ title: "Global Sync Started", description: "Audit in progress..." });
+                  try {
+                    await supabase.functions.invoke("datamart-sync");
+                    toast({ title: "Sync Complete", description: "All orders recovered and fulfilled." });
+                    fetchData();
+                  } catch (e) {
+                    toast({ title: "Sync Failed", variant: "destructive" });
+                  }
+                }}
+                className="h-12 px-6 rounded-2xl bg-amber-400 hover:bg-amber-300 text-black font-black uppercase tracking-widest text-[10px] shadow-lg shadow-amber-400/20 border-none group"
+              >
+                <RefreshCw className="w-4 h-4 mr-2 group-hover:rotate-180 transition-transform duration-700" />
+                Global Audit Sync
+              </Button>
+              
+              <Button 
+                onClick={approveAllPending}
+                disabled={approvingPending || stats.pendingAgents === 0}
+                className="h-12 px-6 rounded-2xl bg-emerald-500 hover:bg-emerald-400 text-white font-black uppercase tracking-widest text-[10px] shadow-lg shadow-emerald-500/20 border-none"
+              >
+                {approvingPending ? <RefreshCw className="w-4 h-4 animate-spin mr-2" /> : <ShieldCheck className="w-4 h-4 mr-2" />}
+                Approve {stats.pendingAgents} Agents
+              </Button>
+            </div>
+          </div>
+        </div>
+
+        <div className={`p-8 rounded-[2.5rem] border relative overflow-hidden ${
+          isDark ? "bg-white/[0.02] border-white/5" : "bg-white border-gray-200"
+        }`}>
+           <div className="relative z-10 space-y-4">
+              <div className="flex items-center justify-between">
+                 <p className={`text-[10px] font-black uppercase tracking-[0.2em] ${muted}`}>Maintenance</p>
+                 <Switch 
+                   checked={maintenanceEnabled} 
+                   onCheckedChange={setMaintenanceEnabled}
+                   className="data-[state=checked]:bg-red-500"
+                 />
               </div>
-              <div className={`p-4 rounded-2xl border ${isDark ? "bg-black/40 border-white/5" : "bg-white border-gray-100"}`}>
-                <p className={`text-[10px] uppercase font-black tracking-widest mb-1 ${muted}`}>Held in Wallets</p>
-                <p className={`text-lg font-black text-red-400`}>GH₵ {(stats.totalSystemBalance || 0).toFixed(2)}</p>
-                <p className="text-[9px] text-white/20 mt-1">Snapshot of unspent funds right now.</p>
+              <h3 className={`text-lg font-black ${head}`}>Safe Mode</h3>
+              <p className={`text-[11px] ${sub} leading-relaxed`}>
+                Instantly disable all checkout paths. Use this during provider outages or upgrades.
+              </p>
+              <Button 
+                onClick={saveMaintenance}
+                disabled={savingMaintenance}
+                variant="outline"
+                className="w-full h-10 rounded-xl font-bold uppercase tracking-widest text-[10px] border-dashed border-2"
+              >
+                {savingMaintenance ? "Applying..." : "Save Config"}
+              </Button>
+           </div>
+        </div>
+      </div>
+
+      <div className={`p-8 rounded-[3rem] border ${isDark ? "bg-[#0d0d12] border-amber-500/10 shadow-2xl" : "bg-amber-50/30 border-amber-100 shadow-sm"}`}>
+        <div className="flex flex-col md:flex-row gap-8 items-start">
+          <div className="w-16 h-16 rounded-[1.5rem] bg-amber-500/10 border border-amber-500/20 flex items-center justify-center shrink-0 shadow-lg">
+            <DollarSign className="w-8 h-8 text-amber-500" />
+          </div>
+          <div className="space-y-6 flex-1">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div>
+                <h2 className={`text-2xl font-black tracking-tight ${head}`}>Financial Reconciliation</h2>
+                <p className={`text-sm mt-1 leading-relaxed ${sub}`}>
+                  Real-time liquidity analysis and Paystack settlement auditing.
+                </p>
               </div>
-              <div className={`p-4 rounded-2xl border ${isDark ? "bg-black/40 border-white/5" : "bg-white border-gray-100"}`}>
-                <p className={`text-[10px] uppercase font-black tracking-widest mb-1 ${muted}`}>Product Sales ({timeRange})</p>
-                <p className={`text-lg font-black text-blue-400`}>GH₵ {(stats.rangePurchases || 0).toFixed(2)}</p>
-                <p className="text-[9px] text-white/20 mt-1">Total consumption in this period.</p>
+              <div className={`px-4 py-2 rounded-2xl bg-white/5 border border-white/5 flex items-center gap-2`}>
+                 <Clock className={`w-3 h-3 ${muted}`} />
+                 <span className={`text-[10px] font-black uppercase tracking-widest ${muted}`}>Range: {timeRange.toUpperCase()}</span>
+              </div>
+            </div>
+            
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
+              <div className={`p-6 rounded-[2rem] border ${isDark ? "bg-black/40 border-white/5 shadow-inner" : "bg-white border-gray-100 shadow-sm"}`}>
+                <p className={`text-[10px] uppercase font-black tracking-widest mb-2 text-emerald-500`}>Settled Inflow</p>
+                <div className="flex items-baseline gap-1">
+                   <p className={`text-2xl font-black text-white`}>GH₵ {(stats.rangeVerifiedInflow || 0).toFixed(2)}</p>
+                   <ArrowUpRight className="w-4 h-4 text-emerald-500" />
+                </div>
+                <p className="text-[10px] text-white/20 mt-2 font-medium">Paystack confirmed settlements.</p>
+              </div>
+              
+              <div className={`p-6 rounded-[2rem] border ${isDark ? "bg-black/40 border-white/5 shadow-inner" : "bg-white border-gray-100 shadow-sm"}`}>
+                <p className={`text-[10px] uppercase font-black tracking-widest mb-2 text-red-400`}>Wallet Liability</p>
+                <div className="flex items-baseline gap-1">
+                   <p className={`text-2xl font-black text-white`}>GH₵ {(stats.totalSystemBalance || 0).toFixed(2)}</p>
+                   <Wallet className="w-4 h-4 text-red-400" />
+                </div>
+                <p className="text-[10px] text-white/20 mt-2 font-medium">Total unspent funds in user wallets.</p>
+              </div>
+              
+              <div className={`p-6 rounded-[2rem] border ${isDark ? "bg-black/40 border-white/5 shadow-inner" : "bg-white border-gray-100 shadow-sm"}`}>
+                <p className={`text-[10px] uppercase font-black tracking-widest mb-2 text-blue-400`}>Consumed Volume</p>
+                <div className="flex items-baseline gap-1">
+                   <p className={`text-2xl font-black text-white`}>GH₵ {(stats.rangePurchases || 0).toFixed(2)}</p>
+                   <ShoppingCart className="w-4 h-4 text-blue-400" />
+                </div>
+                <p className="text-[10px] text-white/20 mt-2 font-medium">Gross data and airtime consumption.</p>
               </div>
             </div>
 
-            <div className={`text-xs p-4 rounded-xl border italic ${isDark ? "bg-white/5 border-white/10 text-white/60" : "bg-amber-50 border-amber-200 text-amber-800"}`}>
-              💡 <strong>Note:</strong> If your Paystack total is higher than "Total Purchase", it means users have topped up their wallets but 
-              <strong> haven't spent the money yet</strong>. That money is sitting safely in their account balances (Liability) and will show up in revenue once they buy data.
+            <div className={`text-[11px] p-5 rounded-2xl border flex items-start gap-4 ${isDark ? "bg-white/[0.03] border-white/10 text-white/50" : "bg-white border-amber-200 text-amber-900 shadow-sm"}`}>
+              <div className="w-10 h-10 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center shrink-0 mt-1">
+                 <ShieldCheck className="w-5 h-5 text-amber-500" />
+              </div>
+              <p className="leading-relaxed">
+                <strong className="text-amber-500 block mb-0.5">Admin Insight</strong>
+                If settled inflow exceeds consumed volume, it indicates a high volume of unspent wallet balances (liabilities). 
+                Ideally, consumption should track closely to inflow over a 30-day window.
+              </p>
             </div>
           </div>
         </div>

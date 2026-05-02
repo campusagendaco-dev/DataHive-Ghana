@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Wallet, Loader2, CreditCard, X, RefreshCw, ArrowRight, Tag, CheckCircle2, Gift, Users2 } from "lucide-react";
+import { Wallet, Loader2, CreditCard, X, RefreshCw, ArrowRight, Tag, CheckCircle2, Gift, Users2, ShieldCheck } from "lucide-react";
 import { basePackages, getPublicPrice } from "@/lib/data";
 import { getNetworkCardColors, detectNetwork } from "@/lib/utils";
 import OrderStatusBanner from "@/components/OrderStatusBanner";
@@ -107,6 +107,8 @@ const DashboardBuyDataNetwork = ({ network }: DashboardBuyDataNetworkProps) => {
   const [claimingFree, setClaimingFree] = useState(false);
   const [savedCustomers, setSavedCustomers] = useState<any[]>([]);
   const [showCustomers, setShowCustomers] = useState(false);
+  const [resolvedName, setResolvedName] = useState<string | null>(null);
+  const [resolvingName, setResolvingName] = useState(false);
 
   const isPaidAgent = Boolean(profile?.agent_approved || profile?.sub_agent_approved);
 
@@ -217,7 +219,6 @@ const DashboardBuyDataNetwork = ({ network }: DashboardBuyDataNetworkProps) => {
 
   useEffect(() => { void refreshBalance(); }, [user]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Clear selection when network changes (via prop)
   useEffect(() => { 
     setSelectedSize(""); 
     setPhone(""); 
@@ -225,7 +226,41 @@ const DashboardBuyDataNetwork = ({ network }: DashboardBuyDataNetworkProps) => {
     setPromoResult(null); 
     setPromoCode(""); 
     setPromoOpen(false); 
+    setResolvedName(null);
   }, [network]);
+
+  // Reset resolved name when phone changes
+  useEffect(() => {
+    setResolvedName(null);
+  }, [phone]);
+
+  // Auto-resolve recipient name
+  useEffect(() => {
+    if (!isPhoneValid || resolvedName || resolvingName) return;
+
+    const timer = setTimeout(async () => {
+      setResolvingName(true);
+      try {
+        let bankCode = "MTN";
+        const net = network.toUpperCase();
+        if (net.includes("VODA") || net.includes("TELECEL")) bankCode = "VOD";
+        if (net.includes("AIRTEL") || net.includes("TIGO") || net.includes("AT")) bankCode = "ATL";
+
+        const { data, error } = await supabase.functions.invoke("paystack-resolve", {
+          body: { account_number: normalizedPhone, bank_code: bankCode }
+        });
+        if (!error && data?.success) {
+          setResolvedName(data.account_name);
+        }
+      } catch (e) {
+        console.error("Auto-resolution failed:", e);
+      } finally {
+        setResolvingName(false);
+      }
+    }, 500); // 500ms debounce
+
+    return () => clearTimeout(timer);
+  }, [phone, network, isPhoneValid, resolvedName, resolvingName, normalizedPhone]);
 
   const selectedPackage = packages.find((item) => item.size === selectedSize);
   const cardColors = getNetworkCardColors(network);
@@ -541,10 +576,44 @@ const DashboardBuyDataNetwork = ({ network }: DashboardBuyDataNetworkProps) => {
                 inputMode="numeric"
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
-                className="bg-secondary/30 border-border/50 focus:border-primary/50 transition-all h-11 text-base"
+                className={`bg-secondary/30 border-border/50 focus:border-primary/50 transition-all h-11 text-base ${resolvedName ? "border-emerald-500/50 bg-emerald-500/5" : ""}`}
                 placeholder="0241234567"
                 maxLength={12}
               />
+              {isPhoneValid && !resolvedName && (
+                <button
+                  onClick={async () => {
+                    setResolvingName(true);
+                    try {
+                      let bankCode = "MTN";
+                      const net = network.toUpperCase();
+                      if (net.includes("VODA") || net.includes("TELECEL")) bankCode = "VOD";
+                      if (net.includes("AIRTEL") || net.includes("TIGO") || net.includes("AT")) bankCode = "ATL";
+
+                      const { data, error } = await supabase.functions.invoke("paystack-resolve", {
+                        body: { account_number: normalizedPhone, bank_code: bankCode }
+                      });
+                      if (error || !data?.success) throw new Error(data?.error || "Could not resolve name");
+                      setResolvedName(data.account_name);
+                    } catch (e: any) {
+                      toast({ title: "Verification Failed", description: e.message, variant: "destructive" });
+                    } finally {
+                      setResolvingName(false);
+                    }
+                  }}
+                  disabled={resolvingName}
+                  className="mt-1.5 flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest text-primary hover:text-primary/80 transition-colors"
+                >
+                  {resolvingName ? <Loader2 className="w-3 h-3 animate-spin" /> : <ShieldCheck className="w-3 h-3" />}
+                  Verify Recipient Name
+                </button>
+              )}
+              {resolvedName && (
+                <div className="mt-1.5 flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-500 text-[10px] font-black uppercase tracking-widest animate-in fade-in slide-in-from-top-1">
+                  <CheckCircle2 className="w-3.5 h-3.5" />
+                  Account: {resolvedName}
+                </div>
+              )}
               {phone.length > 0 && !isPhoneValid && (
                 <p className="text-[10px] font-bold text-destructive mt-1.5 uppercase tracking-tight">Invalid Ghana number format</p>
               )}

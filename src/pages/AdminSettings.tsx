@@ -300,18 +300,30 @@ const AdminSettings = () => {
   const handleSaveProviders = async () => {
     setSaving(true);
     try {
-      const cleanProviders = providers.map(p => {
-        const { id, created_at, updated_at, ...rest } = p;
-        return id.startsWith("new-") ? rest : p;
+      const toUpsert = providers.map(p => {
+        // Strip out calculated fields and IDs for new items
+        const { created_at, updated_at, balance, last_synced_at, ...item } = p;
+        
+        if (typeof item.id === 'string' && item.id.startsWith("new-")) {
+          const { id, ...newItem } = item;
+          return newItem;
+        }
+        return item;
       });
 
-      // Simple implementation: delete and re-insert for now (or use upsert if available)
-      const { error } = await supabase.from("providers").upsert(providers.map(p => ({
-        ...p,
-        id: p.id.startsWith("new-") ? undefined : p.id
-      })));
+      const existing = toUpsert.filter(p => !!p.id);
+      const newItems = toUpsert.filter(p => !p.id);
 
-      if (error) throw error;
+      if (existing.length > 0) {
+        const { error } = await supabase.from("providers").upsert(existing, { onConflict: 'name' });
+        if (error) throw error;
+      }
+      
+      if (newItems.length > 0) {
+        const { error } = await supabase.from("providers").upsert(newItems, { onConflict: 'name' });
+        if (error) throw error;
+      }
+
       toast({ title: "Providers Updated" });
       fetchProviders();
     } catch (err: any) {
@@ -908,19 +920,63 @@ const AdminSettings = () => {
                     <div key={provider.id} className="p-4 rounded-xl bg-white/5 border border-white/10 space-y-4">
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-3">
-                          <Badge variant="outline" className="bg-amber-500/10 text-amber-500 border-amber-500/20">
-                             Priority {provider.priority}
-                          </Badge>
+                          <div className="flex items-center gap-1">
+                            <Label className="text-[10px] text-white/40">Priority</Label>
+                            <Input 
+                              type="number"
+                              value={provider.priority} 
+                              onChange={(e) => handleUpdateProvider(provider.id, { priority: parseInt(e.target.value) || 1 })}
+                              className="h-7 w-12 bg-white/5 border-white/10 text-[10px] p-1 text-center"
+                            />
+                          </div>
                           <Input 
-                            value={provider.name} 
+                            value={provider.name || ""} 
                             onChange={(e) => handleUpdateProvider(provider.id, { name: e.target.value })}
                             className="h-8 w-48 bg-transparent border-none font-bold text-sm focus:ring-0"
                           />
                         </div>
-                        <Switch 
-                          checked={provider.is_active} 
-                          onCheckedChange={(c) => handleUpdateProvider(provider.id, { is_active: c })}
-                        />
+                        <div className="flex items-center gap-2">
+                          <Button 
+                            size="sm" 
+                            variant="outline" 
+                            className="h-8 rounded-lg bg-amber-500/10 border-amber-500/20 text-amber-500 hover:bg-amber-500/20 font-bold text-[10px] gap-2"
+                            onClick={async () => {
+                              if (provider.id.startsWith("new-")) {
+                                toast({ 
+                                  title: "Save Required", 
+                                  description: "Please save the provider before attempting to sync data.", 
+                                  variant: "destructive" 
+                                });
+                                return;
+                              }
+                              try {
+                                const { data, error } = await supabase.functions.invoke("sync-provider-data", {
+                                  body: { provider_id: provider.id },
+                                });
+                                
+                                if (error) {
+                                  const errorBody = await error.context?.json();
+                                  throw new Error(errorBody?.error || error.message);
+                                }
+                                
+                                toast({ 
+                                  title: "Sync Successful", 
+                                  description: `Synced ${data.packages_synced} packages and balance GHS ${data.balance.toFixed(2)}.` 
+                                });
+                                fetchProviders();
+                              } catch (err: any) {
+                                toast({ title: "Sync Failed", description: err.message, variant: "destructive" });
+                              }
+                            }}
+                          >
+                            <Database className="w-3 h-3" />
+                            Sync Data
+                          </Button>
+                          <Switch 
+                            checked={provider.is_active} 
+                            onCheckedChange={(c) => handleUpdateProvider(provider.id, { is_active: c })}
+                          />
+                        </div>
                       </div>
                       
                       <div className="grid grid-cols-2 gap-4">
@@ -928,15 +984,27 @@ const AdminSettings = () => {
                           <Label className="text-[10px] text-white/40">API Key / Secret</Label>
                           <Input 
                             type="password" 
-                            value={provider.api_key} 
+                            value={provider.api_key || ""} 
                             onChange={(e) => handleUpdateProvider(provider.id, { api_key: e.target.value })}
                             className="h-8 bg-white/5 border-white/10 text-xs"
                           />
                         </div>
                         <div className="space-y-1">
+                          <Label className="text-[10px] text-white/40">API Base URL</Label>
+                          <Input 
+                            value={provider.base_url || ""} 
+                            onChange={(e) => handleUpdateProvider(provider.id, { base_url: e.target.value })}
+                            placeholder="https://api.provider.com"
+                            className="h-8 bg-white/5 border-white/10 text-xs"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-1">
                           <Label className="text-[10px] text-white/40">Type</Label>
                           <select 
-                            value={provider.provider_type} 
+                            value={provider.provider_type || "data"} 
                             onChange={(e) => handleUpdateProvider(provider.id, { provider_type: e.target.value })}
                             className="w-full h-8 bg-white/5 border border-white/10 rounded-md px-2 text-xs focus:outline-none"
                           >
@@ -946,12 +1014,42 @@ const AdminSettings = () => {
                             <option value="sms">SMS</option>
                           </select>
                         </div>
+                        <div className="space-y-1">
+                          <Label className="text-[10px] text-white/40">API Logic (Handler)</Label>
+                          <select 
+                            value={provider.handler_type || "standard"} 
+                            onChange={(e) => handleUpdateProvider(provider.id, { handler_type: e.target.value })}
+                            className="w-full h-8 bg-white/5 border border-white/10 rounded-md px-2 text-xs focus:outline-none"
+                          >
+                            <option value="standard">Standard</option>
+                            <option value="datamart">DataMart GH</option>
+                          </select>
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-[10px] text-white/40">Webhook Secret (Optional)</Label>
+                          <Input 
+                            type="password"
+                            value={provider.settings?.webhook_secret || ""} 
+                            onChange={(e) => handleUpdateProvider(provider.id, { 
+                              settings: { ...provider.settings, webhook_secret: e.target.value } 
+                            })}
+                            placeholder="DataMart Webhook Key"
+                            className="h-8 bg-white/5 border-white/10 text-xs"
+                          />
+                        </div>
                       </div>
 
                       {provider.balance > 0 && (
                         <div className="flex items-center justify-between pt-2 border-t border-white/5">
                            <p className="text-[10px] text-white/40">Current Balance</p>
                            <p className="text-xs font-bold text-green-400">₵{Number(provider.balance).toFixed(2)}</p>
+                        </div>
+                      )}
+
+                      {provider.last_synced_at && (
+                        <div className="flex items-center justify-between pt-2">
+                           <p className="text-[10px] text-white/40">Last Synced</p>
+                           <p className="text-[10px] text-white/60">{new Date(provider.last_synced_at).toLocaleString()}</p>
                         </div>
                       )}
                     </div>
@@ -966,8 +1064,8 @@ const AdminSettings = () => {
 
           <Card>
             <CardHeader>
-              <CardTitle className="text-lg">Payment & Provider APIs</CardTitle>
-              <CardDescription>Manage credentials for your upstream providers.</CardDescription>
+              <CardTitle className="text-lg">Payment Gateway (Paystack)</CardTitle>
+              <CardDescription>Securely manage your Paystack credentials for customer payments.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2">
@@ -976,89 +1074,11 @@ const AdminSettings = () => {
                   type="password" 
                   value={settings.paystack_secret_key || ""} 
                   onChange={(e) => setSettings({ ...settings, paystack_secret_key: e.target.value })} 
-                  placeholder="Configured in Secrets (sk_live_...)" 
+                  placeholder="sk_live_..." 
                 />
                 <p className="text-[10px] text-emerald-500 font-bold uppercase tracking-widest">
                   Securely managed via Supabase Secrets
                 </p>
-              </div>
-              <div className="pt-4 border-t border-white/5 space-y-4">
-                <div className="space-y-2">
-                  <Label>Hubtel Client ID</Label>
-                  <Input type="password" value={settings.hubtel_client_id} onChange={(e) => setSettings({ ...settings, hubtel_client_id: e.target.value })} placeholder="Your Hubtel ID" />
-                </div>
-                <div className="space-y-2">
-                  <Label>Hubtel Client Secret</Label>
-                  <Input type="password" value={settings.hubtel_client_secret} onChange={(e) => setSettings({ ...settings, hubtel_client_secret: e.target.value })} placeholder="Your Hubtel Secret" />
-                </div>
-              </div>
-
-              <div className="pt-4 border-t border-white/5 space-y-4">
-                <div className="flex items-center justify-between gap-2">
-                  <div className="flex items-center gap-2">
-                    <Badge variant="outline" className="bg-sky-500/10 text-sky-400 border-sky-500/20">DataHive</Badge>
-                    <h3 className="text-sm font-bold">Data & Airtime Provider</h3>
-                  </div>
-                  <a 
-                    href={settings.data_provider_base_url || "#"}
-                    target="_blank" 
-                    rel="noopener noreferrer"
-                    className="text-[10px] font-black uppercase text-sky-400 hover:text-sky-300 transition-colors underline underline-offset-4"
-                  >
-                    Top Up Wallet
-                  </a>
-                </div>
-                
-                <div className="space-y-4 pt-4">
-                  <div className="space-y-2">
-                    <Label>API Base URL</Label>
-                    <Input value={settings.data_provider_base_url} onChange={(e) => setSettings({ ...settings, data_provider_base_url: e.target.value })} placeholder="https://your-provider-base-url.com" />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Main API Key (Data)</Label>
-                    <Input type="password" value={settings.data_provider_api_key} onChange={(e) => setSettings({ ...settings, data_provider_api_key: e.target.value })} placeholder="api_..." />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Airtime API Base URL (Optional)</Label>
-                    <Input value={settings.airtime_provider_base_url} onChange={(e) => setSettings({ ...settings, airtime_provider_base_url: e.target.value })} placeholder="Defaults to Main URL if empty" />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Airtime API Key (Optional)</Label>
-                    <Input type="password" value={settings.airtime_provider_api_key} onChange={(e) => setSettings({ ...settings, airtime_provider_api_key: e.target.value })} placeholder="Defaults to Main Key if empty" />
-                  </div>
-                </div>
-              </div>
-
-              <div className="pt-6 border-t border-white/5 space-y-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Badge variant="outline" className="bg-amber-500/10 text-amber-400 border-amber-500/20">Smart Failover</Badge>
-                    <h3 className="text-sm font-bold">Secondary Provider (Backup)</h3>
-                  </div>
-                  <Switch
-                    checked={settings.auto_failover_enabled}
-                    onCheckedChange={(c) => setSettings({ ...settings, auto_failover_enabled: c })}
-                  />
-                </div>
-                
-                {settings.auto_failover_enabled && (
-                  <div className="space-y-4 animate-in fade-in slide-in-from-top-2">
-                    <div className="space-y-2">
-                      <Label>Backup API Base URL</Label>
-                      <Input value={settings.secondary_data_provider_base_url} onChange={(e) => setSettings({ ...settings, secondary_data_provider_base_url: e.target.value })} placeholder="https://backup-provider.com" />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Backup API Key</Label>
-                      <Input type="password" value={settings.secondary_data_provider_api_key} onChange={(e) => setSettings({ ...settings, secondary_data_provider_api_key: e.target.value })} placeholder="api_..." />
-                    </div>
-                    <Alert className="bg-amber-500/5 border-amber-500/20">
-                      <AlertCircle className="h-4 w-4 text-amber-500" />
-                      <AlertDescription className="text-[10px] text-amber-500/80">
-                        When enabled, the system will automatically switch to this backup if the primary provider fails.
-                      </AlertDescription>
-                    </Alert>
-                  </div>
-                )}
               </div>
             </CardContent>
           </Card>

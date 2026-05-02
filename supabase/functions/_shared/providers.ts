@@ -8,6 +8,7 @@ export interface Provider {
   provider_type: "data" | "airtime" | "utility" | "sms";
   priority: number;
   is_active: boolean;
+  handler_type?: string;
 }
 
 export async function getActiveProviders(supabaseAdmin: any, type: string): Promise<Provider[]> {
@@ -16,7 +17,8 @@ export async function getActiveProviders(supabaseAdmin: any, type: string): Prom
     .select("*")
     .eq("provider_type", type)
     .eq("is_active", true)
-    .order("priority", { ascending: true });
+    .order("priority", { ascending: true })
+    .order("handler_type", { ascending: true }); // Prioritize 'datamart' (d) over 'standard' (s)
 
   if (error) {
     console.error("Error fetching providers:", error);

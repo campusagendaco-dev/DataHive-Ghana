@@ -30,3 +30,7 @@ dist-ssr
 # Supabase CLI
 supabase.exe
 supabase/.temp/
+
+# AI Metadata & Scratchpad
+brain/
+scratch/

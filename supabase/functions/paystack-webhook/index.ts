@@ -403,20 +403,43 @@ function amountMatches(expected: number, actual: number, tolerance = 0.01): bool
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
-    return new Response(null, { headers: corsHeaders });
+    return new Response("ok", { 
+      headers: corsHeaders,
+      status: 200
+    });
   }
 
-  const PAYSTACK_SECRET_KEY = Deno.env.get("PAYSTACK_SECRET_KEY");
+  const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
+  const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+
+  if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
+    return new Response(JSON.stringify({ error: "Server misconfigured" }), {
+      status: 500,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+
+  const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+
+  let PAYSTACK_SECRET_KEY = Deno.env.get("PAYSTACK_SECRET_KEY");
+  
+  if (!PAYSTACK_SECRET_KEY) {
+    const { data: settings } = await supabaseAdmin
+      .from("system_settings")
+      .select("paystack_secret_key")
+      .eq("id", 1)
+      .maybeSingle();
+    PAYSTACK_SECRET_KEY = settings?.paystack_secret_key || "";
+  }
+
   const DATA_PROVIDER_WEBHOOK_URL = getFirstEnvValue([
     "DATA_PROVIDER_WEBHOOK_URL",
     "PRIMARY_DATA_PROVIDER_WEBHOOK_URL",
     "SECONDARY_DATA_PROVIDER_WEBHOOK_URL",
   ]);
-  const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
-  const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
 
   if (!PAYSTACK_SECRET_KEY || !SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
-    console.error("Missing required secrets");
+    console.error("Missing required secrets (Paystack key, Supabase URL or Role Key)");
     return new Response(JSON.stringify({ error: "Server misconfigured" }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -477,11 +500,62 @@ serve(async (req) => {
       });
     }
 
+    // Capture Customer and Authorization for Saved Cards
+    const paystackCustomerCode = verifyData?.data?.customer?.customer_code;
+    const paystackAuth = verifyData?.data?.authorization;
+    
     const verifiedMetadata = (verifyData?.data?.metadata || {}) as Record<string, unknown>;
     const metadata = {
       ...(webhookMetadata as Record<string, unknown>),
       ...verifiedMetadata,
     };
+
+    const agentIdForSavedCards = typeof metadata?.agent_id === "string" ? metadata.agent_id : null;
+    if (agentIdForSavedCards && paystackCustomerCode) {
+      try {
+        const { data: profile } = await supabaseAdmin
+          .from("profiles")
+          .select("paystack_saved_authorizations")
+          .eq("user_id", agentIdForSavedCards)
+          .maybeSingle();
+          
+        const savedAuths = Array.isArray(profile?.paystack_saved_authorizations) 
+          ? profile.paystack_saved_authorizations 
+          : [];
+          
+        if (paystackAuth && paystackAuth.reusable && paystackAuth.signature) {
+          // Prevent duplicates by signature
+          const exists = savedAuths.some((a: any) => a.signature === paystackAuth.signature);
+          if (!exists) {
+            const updatedAuths = [...savedAuths, {
+              authorization_code: paystackAuth.authorization_code,
+              bin: paystackAuth.bin,
+              last4: paystackAuth.last4,
+              exp_month: paystackAuth.exp_month,
+              exp_year: paystackAuth.exp_year,
+              channel: paystackAuth.channel,
+              card_type: paystackAuth.card_type,
+              bank: paystackAuth.bank,
+              brand: paystackAuth.brand,
+              signature: paystackAuth.signature
+            }];
+            
+            await supabaseAdmin.from("profiles").update({
+              paystack_customer_code: paystackCustomerCode,
+              paystack_saved_authorizations: updatedAuths
+            }).eq("user_id", agentIdForSavedCards);
+            
+            console.log("Saved new payment authorization for user:", agentIdForSavedCards);
+          }
+        } else if (paystackCustomerCode) {
+          await supabaseAdmin.from("profiles").update({
+            paystack_customer_code: paystackCustomerCode
+          }).eq("user_id", agentIdForSavedCards);
+        }
+      } catch (e) {
+        console.error("Failed to save customer/auth:", e);
+      }
+    }
 
     const orderId =
       (typeof metadata?.order_id === "string" && metadata.order_id) ||

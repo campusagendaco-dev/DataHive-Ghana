@@ -81,6 +81,8 @@ const BuyData = () => {
   const [promoValidating, setPromoValidating] = useState(false);
   const [promoResult, setPromoResult] = useState<PromoResult | null>(null);
   const [claiming, setClaiming] = useState(false);
+  const [resolvedName, setResolvedName] = useState<string | null>(null);
+  const [resolvingName, setResolvingName] = useState(false);
 
   const phoneDigits = phone.replace(/\D+/g, "");
   const isPhoneValid = phoneDigits.length === 10 || phoneDigits.length === 12 || phoneDigits.length === 9;
@@ -107,7 +109,44 @@ const BuyData = () => {
     load();
   }, []);
 
-  useEffect(() => { setSelectedPkg(null); setPhone(""); setEmail(""); }, [selectedNetwork]);
+  useEffect(() => { 
+    setSelectedPkg(null); 
+    setPhone(""); 
+    setEmail(""); 
+    setResolvedName(null);
+  }, [selectedNetwork]);
+
+  useEffect(() => {
+    setResolvedName(null);
+  }, [phone]);
+
+  // Auto-resolve recipient name
+  useEffect(() => {
+    if (!isPhoneValid || resolvedName || resolvingName) return;
+
+    const timer = setTimeout(async () => {
+      setResolvingName(true);
+      try {
+        let bankCode = "MTN";
+        const net = selectedNetwork.toUpperCase();
+        if (net.includes("VODA") || net.includes("TELECEL")) bankCode = "VOD";
+        if (net.includes("AIRTEL") || net.includes("TIGO") || net.includes("AT")) bankCode = "ATL";
+
+        const { data, error } = await supabase.functions.invoke("paystack-resolve", {
+          body: { account_number: phoneDigits, bank_code: bankCode }
+        });
+        if (!error && data?.success) {
+          setResolvedName(data.account_name);
+        }
+      } catch (e) {
+        console.error("Auto-resolution failed:", e);
+      } finally {
+        setResolvingName(false);
+      }
+    }, 500); // 500ms debounce
+
+    return () => clearTimeout(timer);
+  }, [phone, selectedNetwork, isPhoneValid, resolvedName, resolvingName, phoneDigits]);
 
   const packages = (basePackages[selectedNetwork] || [])
     .map((pkg) => {
@@ -431,8 +470,36 @@ const BuyData = () => {
                 value={phone} onChange={(e) => setPhone(e.target.value)}
                 maxLength={12}
                 className="flex-1 min-w-0 border border-white/15 rounded-xl px-4 py-3 text-white placeholder-white/30 text-sm focus:outline-none focus:border-white/45 transition-colors"
-                style={{ background: "rgba(255,255,255,0.07)" }}
+                style={{ background: resolvedName ? "rgba(16,185,129,0.1)" : "rgba(255,255,255,0.07)", borderColor: resolvedName ? "rgba(16,185,129,0.3)" : "rgba(255,255,255,0.15)" }}
               />
+              {isPhoneValid && !resolvedName && (
+                <button
+                  onClick={async () => {
+                    setResolvingName(true);
+                    try {
+                      let bankCode = "MTN";
+                      const net = selectedNetwork.toUpperCase();
+                      if (net.includes("VODA") || net.includes("TELECEL")) bankCode = "VOD";
+                      if (net.includes("AIRTEL") || net.includes("TIGO") || net.includes("AT")) bankCode = "ATL";
+
+                      const { data, error } = await supabase.functions.invoke("paystack-resolve", {
+                        body: { account_number: phoneDigits, bank_code: bankCode }
+                      });
+                      if (error || !data?.success) throw new Error(data?.error || "Could not resolve name");
+                      setResolvedName(data.account_name);
+                    } catch (e: any) {
+                      toast({ title: "Verification Failed", description: e.message, variant: "destructive" });
+                    } finally {
+                      setResolvingName(false);
+                    }
+                  }}
+                  disabled={resolvingName}
+                  className="shrink-0 px-3 flex items-center justify-center rounded-xl bg-white/5 border border-white/10 text-white/50 hover:text-white hover:bg-white/10 transition-all"
+                  title="Verify Name"
+                >
+                  {resolvingName ? <Loader2 className="w-4 h-4 animate-spin" /> : <ShieldCheck className="w-4 h-4" />}
+                </button>
+              )}
               {isFreePromo ? (
                 <button onClick={handleClaimFree} disabled={claiming || !isPhoneValid}
                   className="shrink-0 font-black px-5 py-3 rounded-xl text-sm bg-green-500 hover:bg-green-400 text-black transition-all hover:scale-105 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5 whitespace-nowrap">
@@ -447,12 +514,17 @@ const BuyData = () => {
               )}
             </div>
 
-            {/* Validation hint */}
-            {phone.length > 0 && !isPhoneValid
-              ? <p className="text-xs text-red-400">Enter a valid 10-digit Ghana number</p>
-              : phone.length === 0
-              ? <p className="text-[11px] text-white/35">Enter the recipient's phone number then tap {isFreePromo ? "Claim" : "Pay"}</p>
-              : null}
+            {/* Validation hint / Resolved name */}
+            {resolvedName ? (
+              <p className="text-[11px] font-bold text-emerald-400 flex items-center gap-1 uppercase tracking-wider animate-in fade-in slide-in-from-top-1">
+                <CheckCircle2 className="w-3 h-3" />
+                Verified: {resolvedName}
+              </p>
+            ) : phone.length > 0 && !isPhoneValid ? (
+              <p className="text-xs text-red-400">Enter a valid 10-digit Ghana number</p>
+            ) : phone.length === 0 ? (
+              <p className="text-[11px] text-white/35">Enter the recipient's phone number then tap {isFreePromo ? "Claim" : "Pay"}</p>
+            ) : null}
 
             {/* Optional email for receipt */}
             {isPhoneValid && !isFreePromo && (

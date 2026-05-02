@@ -3,6 +3,21 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { corsHeaders } from "../_shared/cors.ts";
 import { getActiveProviders, logProviderError } from "../_shared/providers.ts";
 
+async function fetchScannerStats(apiKey: string) {
+  try {
+    const res = await fetch("https://api.datamartgh.shop/api/developer/delivery-tracker", {
+      headers: { "X-API-Key": apiKey }
+    });
+    if (res.ok) {
+      const json = await res.json();
+      return json.data;
+    }
+  } catch (e) {
+    console.error("Failed to fetch scanner stats:", e);
+  }
+  return null;
+}
+
 // --- Utilities ---
 
 function getFirstEnv(...keys: string[]): string {
@@ -47,7 +62,7 @@ function normalizeRecipient(phone: string | null | undefined): string {
   return phone.trim();
 }
 
-async function getProviderCredentials(supabaseAdmin: any): Promise<{ apiKey: string; baseUrl: string }> {
+async function getProviderCredentials(supabaseAdmin: any): Promise<{ apiKey: string; baseUrl: string; paystackSecretKey: string }> {
   const apiKey = getFirstEnv(
     "PRIMARY_DATA_PROVIDER_API_KEY",
     "DATA_PROVIDER_API_KEY",
@@ -63,13 +78,14 @@ async function getProviderCredentials(supabaseAdmin: any): Promise<{ apiKey: str
 
   const { data: settings } = await supabaseAdmin
     .from("system_settings")
-    .select("data_provider_api_key, data_provider_base_url")
+    .select("data_provider_api_key, data_provider_base_url, paystack_secret_key")
     .eq("id", 1)
     .maybeSingle();
 
   return {
     apiKey: apiKey || settings?.data_provider_api_key || "",
     baseUrl: (baseUrl || settings?.data_provider_base_url || "").replace(/\/+$/, ""),
+    paystackSecretKey: settings?.paystack_secret_key || ""
   };
 }
 
@@ -87,14 +103,22 @@ async function getAirtimeCredentials(supabaseAdmin: any): Promise<{ apiKey: stri
   return { apiKey, baseUrl: (baseUrl || "").replace(/\/+$/, "") };
 }
 
-function buildProviderUrls(baseUrl: string, endpoint: string = "purchase"): string[] {
+function buildProviderUrls(baseUrl: string, endpoint: string = "purchase", handlerType?: string): string[] {
   const clean = baseUrl.trim().replace(/\/+$/, "");
   if (!clean) return [];
 
   const urls = new Set<string>();
-  const aliases = endpoint === "purchase" 
-    ? ["purchase", "order", "airtime", "buy", "topup", "recharge"] 
-    : (endpoint === "status" ? ["status", "query", "check", "query-order"] : [endpoint]);
+  
+  let aliases: string[] = [];
+  if (handlerType === "datamart") {
+    if (endpoint === "status") aliases = ["order-status"];
+    else if (endpoint === "purchase") aliases = ["purchase"];
+    else aliases = [endpoint];
+  } else {
+    aliases = endpoint === "purchase" 
+      ? ["purchase", "order", "airtime", "buy", "topup", "recharge"] 
+      : (endpoint === "status" ? ["status", "query", "check", "query-order"] : [endpoint]);
+  }
 
   let rootUrl = "";
   try {
@@ -144,10 +168,13 @@ function parseProviderResponse(body: string, contentType: string | null): { ok: 
   try {
     const parsed = JSON.parse(body);
     const technicalStatus = String(parsed?.status ?? parsed?.success ?? "").toLowerCase();
-    const deliveryStatus = String(parsed?.delivery_status ?? parsed?.status_message ?? "").toLowerCase();
+    const data = parsed?.data || {};
+    const deliveryStatus = String(data?.orderStatus ?? parsed?.delivery_status ?? parsed?.status_message ?? "").toLowerCase();
     const effectiveStatus = deliveryStatus || technicalStatus;
     const message = typeof parsed?.message === "string" ? parsed.message : undefined;
-    const orderId = String(parsed?.transaction_id ?? parsed?.order_id ?? parsed?.id ?? parsed?.reference ?? "");
+    
+    // DataMart uses purchaseId or orderReference
+    const orderId = String(data?.purchaseId ?? data?.orderReference ?? parsed?.transaction_id ?? parsed?.order_id ?? parsed?.id ?? parsed?.reference ?? "");
 
     const ok = technicalStatus === "success" || technicalStatus === "true" || technicalStatus === "1" || parsed?.success === true || parsed?.ok === true;
 
@@ -166,7 +193,7 @@ function parseProviderResponse(body: string, contentType: string | null): { ok: 
     }
     
     // If it has an ID, it's likely a successful initiation
-    if (orderId && orderId !== "undefined") return { ok: true, id: orderId, status: effectiveStatus };
+    if (orderId && orderId !== "undefined" && orderId !== "") return { ok: true, id: orderId, status: effectiveStatus };
 
   } catch { /* non-JSON */ }
 
@@ -178,30 +205,55 @@ function parseProviderResponse(body: string, contentType: string | null): { ok: 
 }
 
 async function callProviderApi(
-  baseUrl: string,
-  apiKey: string,
+  provider: any,
   data: Record<string, unknown>,
   endpoint: string = "purchase"
 ): Promise<{ ok: boolean; reason: string; id?: string; status?: string }> {
-  const urls = buildProviderUrls(baseUrl, endpoint);
-
+  const handlerType = provider.handler_type || "standard";
+  const baseUrl = provider.base_url;
+  const apiKey = provider.api_key;
+  
+  const urls = buildProviderUrls(baseUrl, endpoint, handlerType);
   let lastReason = "Provider error";
 
-  for (const url of urls) {
+  for (let url of urls) {
+    if (handlerType === "datamart" && endpoint === "status") {
+      const ref = String(data.transaction_id || data.reference || "");
+      url = `${url}/${ref}`;
+    }
+
     for (let attempt = 1; attempt <= 2; attempt++) {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 25000);
       try {
+        const headers: Record<string, string> = {
+          "Content-Type": "application/json",
+          "Accept": "application/json",
+        };
+
+        if (handlerType === "datamart") {
+          headers["X-API-Key"] = apiKey;
+          // Use the order reference as the idempotency key to prevent double charging on refresh
+          const idempotencyKey = String(data.reference || data.order_id || "");
+          if (idempotencyKey) {
+            headers["X-Idempotency-Key"] = idempotencyKey;
+          }
+        } else {
+          headers["Authorization"] = `Bearer ${apiKey}`;
+          headers["X-API-Key"] = apiKey;
+          headers["User-Agent"] = "DataHiveGH/1.0";
+        }
+
+        const isGet = handlerType === "datamart" && endpoint === "status";
+
         const res = await fetch(url, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "Accept": "application/json",
-            "Authorization": `Bearer ${apiKey}`,
-            "X-API-Key": apiKey,
-            "User-Agent": "DataHiveGH/1.0",
-          },
-          body: JSON.stringify(data),
-          signal: AbortSignal.timeout(25000),
+          method: isGet ? "GET" : "POST",
+          headers,
+          body: isGet ? undefined : JSON.stringify(data),
+          signal: controller.signal,
         });
+
+        clearTimeout(timeoutId);
 
         const contentType = res.headers.get("content-type");
         const text = await res.text();
@@ -216,13 +268,9 @@ async function callProviderApi(
         try { parsedMsg = JSON.parse(text)?.message || ""; } catch { /* ignore */ }
         lastReason = parsedMsg || `Provider returned ${res.status}`;
 
-        // Auth failures — don't retry at all
         if (res.status === 401 || res.status === 403) return { ok: false, reason: lastReason };
-
-        // 404 or HTML — move to next URL
         if (res.status === 404 || isHtmlResponse(contentType, text)) break;
 
-        // Retryable server errors
         if (res.status >= 500 && attempt < 2) {
           await new Promise((r) => setTimeout(r, 300));
           continue;
@@ -239,10 +287,30 @@ async function callProviderApi(
   return { ok: false, reason: lastReason };
 }
 
+async function fetchScannerStats(apiKey: string): Promise<any> {
+  try {
+    const res = await fetch("https://datamart.geonettech.xyz/api/delivery-tracker", {
+      headers: { "X-API-Key": apiKey }
+    });
+    if (res.ok) {
+      const data = await res.json();
+      return data.data || null;
+    }
+  } catch (e) {
+    console.error("[verify-payment] Failed to fetch scanner stats:", e);
+  }
+  return null;
+}
+
 // --- Main Handler ---
 
 serve(async (req: Request) => {
-  if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+  if (req.method === "OPTIONS") {
+    return new Response("ok", { 
+      headers: corsHeaders,
+      status: 200
+    });
+  }
 
   const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
   const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
@@ -297,385 +365,210 @@ serve(async (req: Request) => {
       });
     }
 
-    const { apiKey, baseUrl } = await getProviderCredentials(supabaseAdmin);
-
+    const credentials = await getProviderCredentials(supabaseAdmin);
+    const paystackSecretKey = credentials.paystackSecretKey;
     const orderType = (existingOrder?.order_type || "data") as string;
 
-    // 2. If already processing and has provider ID, check status instead of re-fulfilling
-    if (existingOrder?.status === "processing" && existingOrder?.provider_order_id) {
+    // --- 1. STATUS CHECK (For orders already being processed) ---
+    // We check status for ALL processing orders, even if provider_order_id is missing,
+    // because DataMart allows querying by our internal reference (UUID).
+    if (existingOrder?.status === "processing") {
       const providers = await getActiveProviders(supabaseAdmin, orderType === "airtime" ? "airtime" : "data");
-      
+      let foundOnProvider = false;
       for (const provider of providers) {
-        console.log(`[verify-payment] Checking status for existing processing ${orderType} order: ${reference} with provider ${provider.name}`);
-        const checkResult = await callProviderApi(provider.base_url, provider.api_key, {
+        console.log(`[verify-payment] Checking status for ${reference} at ${provider.name}`);
+        const checkResult = await callProviderApi(provider, {
           transaction_id: existingOrder.provider_order_id,
-          reference: reference,
-          order_id: existingOrder.provider_order_id,
-          orderId: existingOrder.provider_order_id
+          reference: reference, 
+          order_id: reference,
         }, "status");
 
         if (checkResult.ok) {
-          const isDelivered = checkResult.status === "delivered" || checkResult.status === "success" || checkResult.status === "fulfilled" || checkResult.status === "completed";
+          foundOnProvider = true;
+          const isDelivered = checkResult.status === "delivered" || checkResult.status === "success" || checkResult.status === "fulfilled" || checkResult.status === "completed" || checkResult.status === "sent";
           if (isDelivered) {
-            await supabaseAdmin.from("orders").update({ status: "fulfilled", failure_reason: null, provider_id: provider.id }).eq("id", reference);
+            await supabaseAdmin.from("orders").update({ status: "fulfilled", provider_id: provider.id }).eq("id", reference);
             await supabaseAdmin.rpc("credit_order_profits", { p_order_id: reference });
-            return new Response(JSON.stringify({ 
-              status: "fulfilled", 
-              message: "Confirmed delivered",
-              provider_order_id: existingOrder.provider_order_id 
-            }), {
-              headers: { ...corsHeaders, "Content-Type": "application/json" },
-            });
+            return new Response(JSON.stringify({ status: "fulfilled", provider_order_id: existingOrder.provider_order_id }), { headers: corsHeaders });
           }
           
-          const isFailed = checkResult.status === "failed" || checkResult.status === "error" || checkResult.status === "rejected";
+          const isFailed = checkResult.status === "failed" || checkResult.status === "error" || checkResult.status === "refunded";
           if (isFailed) {
-             console.log(`[verify-payment] Provider ${provider.name} confirmed order failed: ${reference}`);
-             // If this was the provider that tried to fulfill it, we can stop status checking and try re-fulfillment
-             break; 
+            await supabaseAdmin.from("orders").update({ status: "fulfillment_failed", failure_reason: "Provider reported failure during status check" }).eq("id", reference);
+            break; 
           } else {
-            // Still processing
-            return new Response(JSON.stringify({ 
-              status: "processing", 
-              message: `Still processing at ${provider.name}`,
-              provider_order_id: existingOrder.provider_order_id 
-            }), {
-              headers: { ...corsHeaders, "Content-Type": "application/json" },
-            });
+            return new Response(JSON.stringify({ status: "processing", message: "Still processing", provider_order_id: existingOrder.provider_order_id }), { headers: corsHeaders });
           }
         }
       }
+
+      // SELF-HEALING: If we are here, NO provider knows about this order.
+      // If it's been processing for > 20s without being found on DataMart, 
+      // the first attempt likely failed to REACH the provider.
+      const lastUpdate = new Date(existingOrder.updated_at || existingOrder.created_at).getTime();
+      const secondsSinceUpdate = (Date.now() - lastUpdate) / 1000;
+      
+      if (secondsSinceUpdate > 20) {
+        console.warn(`[verify-payment] Order ${reference} stuck in processing but not found on provider. Resetting to 'paid' for retry.`);
+        await supabaseAdmin.from("orders").update({ status: "paid", failure_reason: "Initial attempt timed out/not found" }).eq("id", reference);
+        // Fall through to the verification/fulfillment logic below
+      } else {
+        return new Response(JSON.stringify({ status: "processing", message: "Connected to delivery gateway" }), { headers: corsHeaders });
+      }
     }
 
-    // 2. Verify payment with Paystack
-    const PAYSTACK_SECRET_KEY = getFirstEnv("PAYSTACK_SECRET_KEY");
-    if (!PAYSTACK_SECRET_KEY) {
-      console.error("[verify-payment] PAYSTACK_SECRET_KEY is not configured.");
-      return new Response(JSON.stringify({ error: "Paystack key not configured" }), {
-        status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
+    // --- 2. PAYMENT VERIFICATION ---
+    let verifiedAmount = 0;
+    let paystackFeeOnVerified = 0;
+    let currentOrderType = (existingOrder?.order_type || "data") as string;
+    let metadata = existingOrder?.metadata || {};
 
-    console.log(`[verify-payment] Verifying transaction: ${reference}`);
-    let verifyRes;
-    try {
-      verifyRes = await fetch(`https://api.paystack.co/transaction/verify/${reference}`, {
-        headers: { Authorization: `Bearer ${PAYSTACK_SECRET_KEY}` },
-        signal: AbortSignal.timeout(10000),
-      });
-    } catch (e) {
-      console.error(`[verify-payment] Paystack fetch failed:`, e);
-      return new Response(JSON.stringify({ error: "Failed to reach payment provider" }), {
-        status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
+    const isInternalPayment = existingOrder?.payment_method === "wallet" || existingOrder?.status === "paid" || existingOrder?.status === "processing";
 
-    const verifyText = await verifyRes.text();
-    let verifyData;
-    try {
-      verifyData = JSON.parse(verifyText);
-    } catch (e) {
-      console.error(`[verify-payment] Paystack returned non-JSON:`, verifyText.slice(0, 500));
-      return new Response(JSON.stringify({ error: "Invalid response from payment provider" }), {
-        status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
+    if (isInternalPayment) {
+      console.log(`[verify-payment] Internal/Wallet payment confirmed for ${reference}`);
+      verifiedAmount = Number(existingOrder?.amount || 0);
+    } else {
+      const PAYSTACK_SECRET_KEY = getFirstEnv("PAYSTACK_SECRET_KEY") || paystackSecretKey;
+      if (!PAYSTACK_SECRET_KEY) {
+        return new Response(JSON.stringify({ error: "Payment gateway not configured" }), { status: 500, headers: corsHeaders });
+      }
 
-    if (!verifyData.status || !verifyData.data || verifyData.data.status !== "success") {
-      console.warn(`[verify-payment] Payment not verified for ${reference}:`, verifyData.message || "Not successful");
-      return new Response(JSON.stringify({ 
-        status: "not_paid", 
-        error: verifyData.message || "Payment not verified" 
-      }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    const verifiedAmount = (verifyData.data.amount / 100) || 0;
-    const paystackFeeOnVerified = parseFloat(Math.min(verifiedAmount * 0.03 / 1.03, 100).toFixed(2)) || 0;
-    
-    let metadata = verifyData.data.metadata || {};
-    if (typeof metadata === "string") {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000);
       try {
-        metadata = JSON.parse(metadata);
-      } catch {
-        metadata = {};
+        const verifyRes = await fetch(`https://api.paystack.co/transaction/verify/${reference}`, {
+          headers: { Authorization: `Bearer ${PAYSTACK_SECRET_KEY}` },
+          signal: controller.signal,
+        });
+        clearTimeout(timeoutId);
+        
+        const verifyText = await verifyRes.text();
+        let verifyData;
+        try {
+           verifyData = JSON.parse(verifyText);
+        } catch (e) {
+           console.error(`[verify-payment] Paystack non-JSON:`, verifyText.slice(0, 100));
+           return new Response(JSON.stringify({ status: "error", error: "Payment gateway returned invalid response" }), { headers: corsHeaders });
+        }
+
+        if (!verifyData.status || !verifyData.data || verifyData.data.status !== "success") {
+          console.warn(`[verify-payment] Payment not confirmed:`, verifyData.message);
+          return new Response(JSON.stringify({ status: "not_paid", error: verifyData.message || "Payment not verified" }), { headers: corsHeaders });
+        }
+
+        verifiedAmount = verifyData.data.amount / 100;
+        paystackFeeOnVerified = parseFloat(Math.min(verifiedAmount * 0.03 / 1.03, 100).toFixed(2)) || 0;
+        metadata = verifyData.data.metadata || {};
+        if (typeof metadata === "string") try { metadata = JSON.parse(metadata); } catch { metadata = {}; }
+        currentOrderType = (metadata?.order_type || currentOrderType) as string;
+      } catch (e) {
+        clearTimeout(timeoutId);
+        console.error(`[verify-payment] Network error during verification:`, e);
+        return new Response(JSON.stringify({ status: "error", error: "Failed to connect to payment gateway" }), { headers: corsHeaders });
       }
     }
 
-    const orderTypeFromMetadata = (metadata?.order_type || orderType) as string;
-    const currentOrderType = orderTypeFromMetadata;
-
-    console.log(`[verify-payment] Payment verified: GHS ${verifiedAmount}. Order type: ${currentOrderType}`);
-
-    // 2.5 Amount Verification Check
-    const existingAmount = Number(existingOrder?.amount || 0);
-    if (orderType !== "wallet_topup" && Number.isFinite(existingAmount) && existingAmount > 0) {
-      const tolerance = 0.01;
-      if (Math.abs(existingAmount - verifiedAmount) > tolerance) {
-        await supabaseAdmin.from("orders").update({
-          status: "fulfillment_failed",
-          failure_reason: `Payment amount mismatch. Expected GHS ${existingAmount.toFixed(2)}, received GHS ${verifiedAmount.toFixed(2)}.`,
-        }).eq("id", reference);
-        return new Response(JSON.stringify({ status: "failed", reason: "Payment amount mismatch" }), { headers: corsHeaders });
-      }
-    }
-
-    // 3. Mark as processing (Atomic Update)
-    // We allow claiming orders that are:
-    // - In a terminal state that can be retried (pending, paid, fulfillment_failed)
-    // - OR in 'processing' but have NO provider ID (orphaned)
-    // - OR in 'processing' but haven't been updated in over 2 minutes (stuck)
-    
+    // --- 3. ATOMIC FULFILLMENT LOCK ---
     const now = Date.now();
-    const twoMinutesAgo = new Date(now - 2 * 60 * 1000).toISOString();
-    const tenSecondsAgo = new Date(now - 10 * 1000).toISOString();
+    const oneMinuteAgo = new Date(now - 60000).toISOString();
     
-    let claimQuery = supabaseAdmin.from("orders")
+    // Attempt to claim the order for processing
+    const { data: claimedOrder, error: claimError } = await supabaseAdmin
+      .from("orders")
       .update({ 
         status: "processing", 
         paystack_verified_amount: verifiedAmount,
         paystack_fee: paystackFeeOnVerified,
         updated_at: new Date().toISOString()
       })
-      .eq("id", reference);
-
-    // Filter logic:
-    // 1. Terminal retryable states (pending, paid, fulfillment_failed)
-    // 2. Processing AND (No Provider ID AND > 10s old)
-    // 3. Processing AND (Has Provider ID AND > 2m old)
-    const claimFilter = `status.in.(pending,paid,fulfillment_failed),and(status.eq.processing,or(and(provider_order_id.is.null,updated_at.lt.${tenSecondsAgo}),updated_at.lt.${twoMinutesAgo}))`;
-    
-    const { data: claimedOrder, error: claimError } = await claimQuery
-      .or(claimFilter)
+      .eq("id", reference)
+      .in("status", ["pending", "paid"])
       .select("*")
       .maybeSingle();
 
-    if (claimError) {
-      console.error("[verify-payment] Claim error:", claimError);
+    if (claimError) console.error("[verify-payment] Lock error:", claimError);
+
+    if (!claimedOrder) {
+      // If we couldn't claim it, it might be already fulfilling or already finished.
+      // Refresh state from DB to return the current status
+      const { data: refreshed } = await supabaseAdmin.from("orders").select("*").eq("id", reference).maybeSingle();
+      return new Response(JSON.stringify({ 
+        status: refreshed?.status || "processing",
+        message: "Order is being handled",
+        provider_order_id: refreshed?.provider_order_id
+      }), { headers: corsHeaders });
     }
 
-    if (!claimedOrder && existingOrder?.status === "processing") {
-      // Already being processed by another request
-      return new Response(JSON.stringify({ status: "processing", message: "Fulfillment already in progress" }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    // 4. Fulfillment by order type
-
-    if (currentOrderType === "agent_activation") {
-      if (verifiedAmount < 80 * 0.97) {
-        await supabaseAdmin.from("orders").update({ status: "fulfillment_failed", failure_reason: "Amount too low" }).eq("id", reference);
-        return new Response(JSON.stringify({ status: "failed", reason: "Amount too low" }), { headers: corsHeaders });
-      }
-      const agentId = metadata?.agent_id;
-      if (agentId) {
-        await supabaseAdmin.from("profiles").update({
-          is_agent: true, agent_approved: true, onboarding_complete: true,
-          is_sub_agent: false, parent_agent_id: null,
-        }).eq("user_id", agentId);
-        await supabaseAdmin.from("orders").update({ status: "fulfilled" }).eq("id", reference);
-      }
-      return new Response(JSON.stringify({ status: "fulfilled" }), { headers: corsHeaders });
-
-    } else if (currentOrderType === "sub_agent_activation") {
-      if (verifiedAmount < 80 * 0.97) {
-        await supabaseAdmin.from("orders").update({ status: "fulfillment_failed", failure_reason: "Amount too low" }).eq("id", reference);
-        return new Response(JSON.stringify({ status: "failed", reason: "Amount too low" }), { headers: corsHeaders });
-      }
-      const subAgentId = metadata?.sub_agent_id;
-      const parentAgentId = metadata?.parent_agent_id;
-      const agentProfit = Math.max(0, parseFloat((Number(metadata?.activation_fee || verifiedAmount) - 80).toFixed(2)));
-      if (subAgentId) {
-        const { data: parentProfile } = await supabaseAdmin.from("profiles")
-          .select("sub_agent_prices").eq("user_id", parentAgentId).maybeSingle();
-        await supabaseAdmin.from("profiles").update({
-          is_agent: true, agent_approved: true, sub_agent_approved: true,
-          onboarding_complete: true, is_sub_agent: true,
-          parent_agent_id: parentAgentId || null,
-          agent_prices: parentProfile?.sub_agent_prices || {},
-        }).eq("user_id", subAgentId);
-        await supabaseAdmin.from("orders").update({
-          status: "fulfilled", parent_profit: agentProfit, parent_agent_id: parentAgentId || null,
-        }).eq("id", reference);
-        if (parentAgentId && agentProfit > 0) {
-          await supabaseAdmin.rpc("credit_order_profits", { p_order_id: reference });
-        }
-      }
-      return new Response(JSON.stringify({ status: "fulfilled" }), { headers: corsHeaders });
-
-    } else if (currentOrderType === "wallet_topup") {
-      const agentId = existingOrder?.agent_id || metadata?.agent_id;
+    // --- 4. FULFILLMENT ---
+    if (currentOrderType === "wallet_topup") {
+      const agentId = claimedOrder.agent_id || metadata?.agent_id;
       if (agentId) {
         await supabaseAdmin.rpc("credit_wallet", { p_agent_id: agentId, p_amount: verifiedAmount });
         await supabaseAdmin.from("orders").update({ status: "fulfilled" }).eq("id", reference);
       }
       return new Response(JSON.stringify({ status: "fulfilled" }), { headers: corsHeaders });
+    }
 
-    } else if (currentOrderType === "utility") {
-      await supabaseAdmin.from("orders").update({ 
-        status: "paid", 
-        failure_reason: "Awaiting manual fulfillment / Token generation" 
-      }).eq("id", reference);
-      return new Response(JSON.stringify({ status: "paid", message: "Awaiting manual fulfillment" }), { headers: corsHeaders });
+    // Standard Data/Airtime Fulfillment
+    const activeProviders = await getActiveProviders(supabaseAdmin, currentOrderType === "airtime" ? "airtime" : "data");
+    const network = claimedOrder.network || metadata?.network || "";
+    const customerPhone = claimedOrder.customer_phone || metadata?.customer_phone || "";
+    const packageSize = claimedOrder.package_size || metadata?.package_size || "";
+    const recipient = normalizeRecipient(customerPhone);
 
-    } else if (currentOrderType === "afa") {
-      const { apiKey: afaKey, baseUrl: afaBase } = await getProviderCredentials(supabaseAdmin);
-      const afaPayload = {
-        fullName: metadata?.afa_full_name,
-        ghanaCardNumber: metadata?.afa_ghana_card,
-        occupation: metadata?.afa_occupation,
-        email: metadata?.afa_email,
-        placeOfResidence: metadata?.afa_residence,
-        dateOfBirth: metadata?.afa_date_of_birth,
-      };
-      
-      const result = await callProviderApi(afaBase, afaKey, afaPayload, "afa-registration");
+    const requestBody = {
+      networkKey: mapDataNetworkKey(network),
+      recipient,
+      capacity: parseCapacity(packageSize),
+      amount: claimedOrder.amount,
+      order_type: currentOrderType,
+    };
+
+    let result: any = { ok: false, reason: "No providers" };
+    let successfulProviderId = null;
+
+    for (const provider of activeProviders) {
+      const handlerType = provider.handler_type || "standard";
+      const networkKey = handlerType === "datamart" 
+        ? (network.toUpperCase() === "MTN" ? "YELLO" : (network.toUpperCase() === "TELECEL" ? "TELECEL" : "AT_PREMIUM"))
+        : mapDataNetworkKey(network);
+
+      const dataPayload = handlerType === "datamart"
+        ? { 
+            phoneNumber: recipient, 
+            network: networkKey, 
+            planId: packageSize, // DataMart specific
+            capacity: String(parseCapacity(packageSize)), 
+            orderReference: reference, // CRITICAL: This is the deduplication key for DataMart
+            gateway: "wallet", 
+            reference: reference 
+          }
+        : requestBody;
+
+      result = await callProviderApi(provider, dataPayload, "purchase");
       if (result.ok) {
-        const patch: Record<string, any> = { status: "fulfilled", failure_reason: null };
-        if (result.id) patch.provider_order_id = result.id;
-        await supabaseAdmin.from("orders").update(patch).eq("id", reference);
-        await supabaseAdmin.rpc("credit_order_profits", { p_order_id: reference });
-        return new Response(JSON.stringify({ status: "fulfilled", provider_order_id: result.id }), { headers: corsHeaders });
+        successfulProviderId = provider.id;
+        break;
       } else {
-        await supabaseAdmin.from("orders").update({ status: "fulfillment_failed", failure_reason: result.reason }).eq("id", reference);
-        return new Response(JSON.stringify({ status: "failed", reason: result.reason }), { headers: corsHeaders });
-      }
-
-    } else if (currentOrderType === "airtime") {
-      const activeProviders = await getActiveProviders(supabaseAdmin, "airtime");
-      if (activeProviders.length === 0) {
-        await supabaseAdmin.from("orders").update({ status: "fulfillment_failed", failure_reason: "No active airtime providers" }).eq("id", reference);
-        return new Response(JSON.stringify({ status: "failed", reason: "No active airtime providers" }), { headers: corsHeaders });
-      }
-
-      const network = existingOrder?.network || metadata?.network || "";
-      const customerPhone = existingOrder?.customer_phone || metadata?.customer_phone || metadata?.phone || "";
-      const recipient = normalizeRecipient(customerPhone);
-      const networkKey = mapAirtimeNetworkKey(network);
-      const airtimeAmount = existingAmount || verifiedAmount;
-
-      let result: any = { ok: false, reason: "No providers tried" };
-      let successfulProviderId: string | null = null;
-
-      for (const provider of activeProviders) {
-        console.log(`[verify-payment] Trying airtime provider: ${provider.name}`);
-        result = await callProviderApi(provider.base_url, provider.api_key, {
-          customerNumber: recipient,
-          amount: airtimeAmount,
-          networkCode: networkKey,
-          description: `Airtime: ${airtimeAmount} for ${recipient}`
-        }, "purchase");
-
-        if (result.ok) {
-          successfulProviderId = provider.id;
-          break;
-        } else {
-          console.error(`[verify-payment] Airtime provider ${provider.name} failed: ${result.reason}`);
-          await logProviderError(supabaseAdmin, provider.id, reference, result.reason);
-        }
-      }
-
-      if (result.ok) {
-        const patch: Record<string, any> = { status: "fulfilled", failure_reason: null, provider_id: successfulProviderId };
-        if (result.id) patch.provider_order_id = result.id;
-        await supabaseAdmin.from("orders").update(patch).eq("id", reference);
-        await supabaseAdmin.rpc("credit_order_profits", { p_order_id: reference });
-        return new Response(JSON.stringify({ status: "fulfilled", provider_order_id: result.id }), { headers: corsHeaders });
-      } else {
-        await supabaseAdmin.from("orders").update({ status: "fulfillment_failed", failure_reason: result.reason }).eq("id", reference);
-        return new Response(JSON.stringify({ status: "failed", reason: result.reason }), { headers: corsHeaders });
-      }
-
-    } else {
-      // Data / default fulfillment
-      const activeProviders = await getActiveProviders(supabaseAdmin, "data");
-
-      if (activeProviders.length === 0) {
-        await supabaseAdmin.from("orders").update({
-          status: "fulfillment_failed",
-          failure_reason: "No active data providers configured in system settings.",
-        }).eq("id", reference);
-        return new Response(JSON.stringify({ status: "failed", reason: "Data provider not configured" }), { headers: corsHeaders });
-      }
-
-      const network = existingOrder?.network || metadata?.network || "";
-      const customerPhone = existingOrder?.customer_phone || metadata?.customer_phone || metadata?.phone || "";
-      const packageSize = existingOrder?.package_size || metadata?.package_size || "";
-
-      const recipient = normalizeRecipient(customerPhone);
-      if (!recipient) {
-        await supabaseAdmin.from("orders").update({
-          status: "fulfillment_failed", failure_reason: "Missing recipient phone",
-        }).eq("id", reference);
-        return new Response(JSON.stringify({ status: "failed", reason: "Missing recipient phone" }), { headers: corsHeaders });
-      }
-
-      const requestBody = {
-        networkKey: mapDataNetworkKey(network),
-        networkRaw: network,
-        recipient,
-        capacity: parseCapacity(packageSize),
-        amount: existingOrder?.amount || verifiedAmount,
-        order_type: currentOrderType,
-        description: `Data purchase: ${packageSize} for ${recipient}`,
-      };
-
-      console.log("[verify-payment] Provider request:", { baseUrl, network, networkKey: requestBody.networkKey, recipient, packageSize });
-
-      let result: any = { ok: false, reason: "No providers tried" };
-      let successfulProviderId: string | null = null;
-
-      for (const provider of activeProviders) {
-        console.log(`[verify-payment] Trying provider: ${provider.name}`);
-        result = await callProviderApi(provider.base_url, provider.api_key, requestBody, "purchase");
-
-        if (result.ok) {
-          console.log(`[verify-payment] Success with ${provider.name}`);
-          successfulProviderId = provider.id;
-          break;
-        } else {
-          console.error(`[verify-payment] Failed with ${provider.name}: ${result.reason}`);
-          await logProviderError(supabaseAdmin, provider.id, reference, result.reason);
-        }
-      }
-
-      if (result.ok) {
-        const patch: Record<string, any> = { 
-          failure_reason: null,
-          provider_id: successfulProviderId 
-        };
-        if (result.id) patch.provider_order_id = result.id;
-        
-        const isActuallyDelivered = !result.status || result.status === "delivered" || result.status === "success" || result.status === "fulfilled";
-        
-        if (isActuallyDelivered) {
-          patch.status = "fulfilled";
-        }
-
-        await supabaseAdmin.from("orders").update(patch).eq("id", reference);
-        
-        if (isActuallyDelivered) {
-          await supabaseAdmin.rpc("credit_order_profits", { p_order_id: reference });
-        }
-        
-        return new Response(JSON.stringify({ 
-          status: patch.status || "processing",
-          provider_order_id: patch.provider_order_id || result.id
-        }), { headers: corsHeaders });
-      } else {
-        await supabaseAdmin.from("orders").update({
-          status: "fulfillment_failed", failure_reason: result.reason,
-        }).eq("id", reference);
-        return new Response(JSON.stringify({ status: "failed", reason: result.reason }), { headers: corsHeaders });
+        await logProviderError(supabaseAdmin, provider.id, reference, result.reason);
       }
     }
 
+    if (result.ok) {
+      const isDelivered = true; // Fast-track: Mark as fulfilled immediately if DataMart accepts the order
+      const patch: any = { provider_id: successfulProviderId, provider_order_id: result.id, status: "fulfilled" };
+      
+      await supabaseAdmin.from("orders").update(patch).eq("id", reference);
+      if (isDelivered) await supabaseAdmin.rpc("credit_order_profits", { p_order_id: reference });
+      
+      return new Response(JSON.stringify({ status: patch.status || "processing", provider_order_id: result.id }), { headers: corsHeaders });
+    } else {
+      await supabaseAdmin.from("orders").update({ status: "fulfillment_failed", failure_reason: result.reason }).eq("id", reference);
+      return new Response(JSON.stringify({ status: "failed", reason: result.reason }), { headers: corsHeaders });
+    }
   } catch (error: any) {
     console.error("[verify-payment] Error:", error);
-    return new Response(JSON.stringify({ error: error?.message || "Internal error" }), {
-      status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    return new Response(JSON.stringify({ error: error?.message || "Internal error" }), { status: 500, headers: corsHeaders });
   }
 });

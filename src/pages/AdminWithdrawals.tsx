@@ -8,7 +8,7 @@ import {
   RefreshCw, ChevronLeft, ChevronRight, Wallet, TrendingUp,
   AlertCircle, Banknote, CheckSquare, Square, Clock,
 } from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "sonner";
 import { useAuth } from "@/hooks/useAuth";
 import { logAudit } from "@/utils/auditLogger";
 
@@ -85,7 +85,6 @@ function exportCsv(rows: WithdrawalRow[]) {
 }
 
 const AdminWithdrawals = () => {
-  const { toast } = useToast();
   const { user: currentUser, session } = useAuth();
 
   const [withdrawals, setWithdrawals] = useState<WithdrawalRow[]>([]);
@@ -238,7 +237,7 @@ const AdminWithdrawals = () => {
     });
 
     if (error || data?.error) {
-      toast({ title: "Failed to confirm", description: data?.error || error?.message || "Unknown error", variant: "destructive" });
+      toast.error("Failed to confirm", { description: data?.error || error?.message || "Unknown error" });
     } else {
       if (currentUser && withdrawal) {
         await logAudit(currentUser.id, "confirm_withdrawal", {
@@ -248,7 +247,7 @@ const AdminWithdrawals = () => {
           amount: withdrawal.amount,
         });
       }
-      toast({ title: "Withdrawal confirmed as sent!" });
+      toast.success("Withdrawal confirmed as sent!");
       setSelectedIds(prev => { const n = new Set(prev); n.delete(withdrawalId); return n; });
       await fetchWithdrawals(true);
     }
@@ -266,9 +265,9 @@ const AdminWithdrawals = () => {
     });
 
     if (error || data?.error) {
-      toast({ title: "Payout Failed", description: data?.error || error?.message || "Transfer could not be initiated.", variant: "destructive" });
+      toast.error("Payout Failed", { description: data?.error || error?.message || "Transfer could not be initiated." });
     } else {
-      toast({ title: "Payout Successful!", description: `Ref: ${data?.transfer_reference || "N/A"}` });
+      toast.success("Payout Successful!", { description: `Ref: ${data?.transfer_reference || "N/A"}` });
       if (currentUser && withdrawal) {
         await logAudit(currentUser.id, "paystack_payout", {
           withdrawal_id: withdrawalId,
@@ -284,7 +283,7 @@ const AdminWithdrawals = () => {
 
   const handleReject = async (withdrawalId: string) => {
     if (!rejectReason.trim()) {
-      toast({ title: "Enter a reason for rejection", variant: "destructive" });
+      toast.error("Enter a reason for rejection");
       return;
     }
     setRejecting(true);
@@ -295,7 +294,7 @@ const AdminWithdrawals = () => {
     });
 
     if (error || data?.error) {
-      toast({ title: "Failed to reject", description: data?.error || error?.message, variant: "destructive" });
+      toast.error("Failed to reject", { description: data?.error || error?.message });
     } else {
       const withdrawal = withdrawals.find(w => w.id === withdrawalId);
       if (currentUser && withdrawal) {
@@ -305,7 +304,7 @@ const AdminWithdrawals = () => {
           reason: rejectReason.trim(),
         });
       }
-      toast({ title: "Withdrawal rejected" });
+      toast.success("Withdrawal rejected");
       setRejectingId(null);
       setRejectReason("");
       await fetchWithdrawals(true);
@@ -327,14 +326,14 @@ const AdminWithdrawals = () => {
       if (error || data?.error) failed++; else success++;
     }
 
-    toast({ title: `Bulk confirm: ${success} confirmed${failed ? `, ${failed} failed` : ""}` });
+    toast.info(`Bulk confirm: ${success} confirmed${failed ? `, ${failed} failed` : ""}`);
     setSelectedIds(new Set());
     setBulkConfirming(false);
     await fetchWithdrawals(true);
   };
 
   const copyMomo = (number: string) => {
-    navigator.clipboard.writeText(number).then(() => toast({ title: "MoMo number copied" }));
+    navigator.clipboard.writeText(number).then(() => toast.success("MoMo number copied"));
   };
 
   if (loading) return <div className="text-muted-foreground p-4">Loading withdrawals…</div>;
@@ -610,6 +609,36 @@ const AdminWithdrawals = () => {
                     <td className="p-4">
                       {w.status === "pending" && !isRejectingThis && (
                         <div className="flex flex-col gap-1.5">
+                          <Button
+                            size="sm" variant="outline" className="text-xs gap-1.5 h-8 bg-indigo-500/10 text-indigo-400 border-indigo-500/20 hover:bg-indigo-500/20"
+                            disabled={busy || missingMomo}
+                            onClick={async () => {
+                               const toastId = toast.loading("Verifying account...");
+                               try {
+                                 const net = (w.momo_network || "").toUpperCase();
+                                 let bankCode = "MTN";
+                                 if (net.includes("VODA") || net.includes("TELECEL")) bankCode = "VOD";
+                                 if (net.includes("AIRTEL") || net.includes("TIGO") || net.includes("AT")) bankCode = "ATL";
+ 
+                                 const { data, error } = await supabase.functions.invoke("paystack-resolve", {
+                                   body: { account_number: w.momo_number, bank_code: bankCode }
+                                 });
+ 
+                                 if (error || !data?.success) throw new Error(data?.error || "Resolution failed");
+ 
+                                 // Update DB
+                                 await supabase.from("profiles").update({ momo_account_name: data?.account_name }).eq("user_id", w.agent_id);
+                                 
+                                 toast.success("Identity Verified", { description: `Resolved to: ${data?.account_name}`, id: toastId });
+                                 fetchWithdrawals(true);
+                               } catch (e: any) {
+                                 toast.error("Verification Failed", { description: e.message, id: toastId });
+                               }
+                             }}
+                          >
+                            <RefreshCw className="w-3 h-3" />
+                            Verify Identity
+                          </Button>
                           <Button
                             size="sm" variant="outline" className="text-xs gap-1.5 h-8"
                             disabled={busy}

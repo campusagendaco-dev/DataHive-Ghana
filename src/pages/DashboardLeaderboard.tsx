@@ -203,7 +203,7 @@ const DashboardLeaderboard = () => {
               const { entry, medal } = item;
               const isFirst = medal.rank === 1;
               return (
-                <div key={entry.agent_name} className="flex flex-col items-center">
+                <div key={medal.rank} className="flex flex-col items-center">
                   {/* Card */}
                   <div className={`w-full relative rounded-2xl border p-4 md:p-6 text-center transition-all hover:scale-[1.02] ${
                     isFirst
@@ -307,13 +307,13 @@ const DashboardLeaderboard = () => {
                 </tr>
               </thead>
               <tbody className={`divide-y ${divider}`}>
-                {data.map((row) => {
+                {data.map((row, idx) => {
                   const isTop3 = row.rank_position <= 3;
                   const medal  = MEDALS[row.rank_position - 1];
                   const barW   = relWidth(row.week_orders, maxWeekly);
                   return (
                     <tr
-                      key={`${row.agent_name}-${row.rank_position}`}
+                      key={`row-${idx}-${row.rank_position}`}
                       className={`group transition-colors ${
                         row.is_current_user
                           ? isDark ? "bg-indigo-500/8 hover:bg-indigo-500/12" : "bg-indigo-50 hover:bg-indigo-50"

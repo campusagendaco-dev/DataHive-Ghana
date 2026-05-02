@@ -3,10 +3,10 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { 
-  User, Mail, Phone, Store, ShieldCheck, Trophy, 
+  User, Store, ShieldCheck, Trophy, 
   TrendingUp, ShoppingCart, Award, Calendar, Activity,
-  ChevronRight, BadgeCheck, Copy, ExternalLink, Settings,
-  Zap, Heart, Target, Star
+  ChevronRight, BadgeCheck, Copy, Target, Star, Database, RefreshCw, Zap, Heart,
+  Settings, Phone
 } from "lucide-react";
 import { useAppTheme } from "@/contexts/ThemeContext";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -35,14 +35,12 @@ const DashboardProfile = () => {
 
     const fetchProfileData = async () => {
       try {
-        // Fetch sales stats from view
         const { data: statsData } = await supabase
           .from("user_sales_stats")
           .select("*")
           .eq("user_id", user.id)
           .single();
 
-        // Fetch rank from leaderboard RPC
         const { data: leaderboardData } = await supabase.rpc("get_agent_leaderboard");
         const myRank = leaderboardData?.find((entry: any) => entry.is_current_user)?.rank_position;
 
@@ -74,19 +72,15 @@ const DashboardProfile = () => {
 
   return (
     <div className="min-h-screen pb-24">
-      {/* ── Premium Hero Section ── */}
       <div className="relative h-48 sm:h-64 bg-gradient-to-br from-indigo-600 via-purple-600 to-pink-500 overflow-hidden">
         <div className="absolute inset-0 bg-black/20" />
         <div className="absolute inset-0 backdrop-blur-[2px]" />
-        
-        {/* Animated Orbs */}
         <div className="absolute top-[-10%] left-[-5%] w-64 h-64 bg-white/10 rounded-full blur-3xl animate-pulse" />
         <div className="absolute bottom-[-20%] right-[-5%] w-80 h-80 bg-blue-400/20 rounded-full blur-3xl animate-pulse delay-700" />
       </div>
 
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 -mt-20 sm:-mt-24 relative z-10">
         <div className="flex flex-col md:flex-row gap-8">
-          {/* ── Left Sidebar / Profile Info ── */}
           <div className="w-full md:w-80 space-y-6">
             <Card className="border-none bg-card/80 backdrop-blur-xl shadow-2xl overflow-hidden ring-1 ring-white/10">
               <CardContent className="p-6 flex flex-col items-center text-center">
@@ -144,18 +138,13 @@ const DashboardProfile = () => {
                   </div>
                 </div>
 
-                <Button 
-                  onClick={() => window.location.href = '/dashboard/settings'}
-                  variant="outline" 
-                  className="w-full mt-6 bg-white/5 border-white/10 hover:bg-white/10 hover:border-white/20 font-bold"
-                >
+                <Button onClick={() => window.location.href = '/dashboard/settings'} variant="outline" className="w-full mt-6 bg-white/5 border-white/10 hover:bg-white/10 hover:border-white/20 font-bold">
                   <Settings className="w-4 h-4 mr-2" />
                   Edit Profile
                 </Button>
               </CardContent>
             </Card>
 
-            {/* Quick Stats Mini-Card */}
             <Card className="border-none bg-indigo-600/10 border border-indigo-500/20 shadow-sm overflow-hidden">
               <CardContent className="p-4 space-y-4">
                 <div className="flex items-center gap-3">
@@ -178,9 +167,7 @@ const DashboardProfile = () => {
             </Card>
           </div>
 
-          {/* ── Main Content Area ── */}
           <div className="flex-1 space-y-6">
-            {/* Stats Grid */}
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
               {[
                 { label: "Total Orders", value: stats?.total_fulfilled_orders, icon: ShoppingCart, color: "blue" },
@@ -189,7 +176,7 @@ const DashboardProfile = () => {
                 { label: "Global Rank", value: stats?.rank_position ? `#${stats.rank_position}` : "—", icon: Trophy, color: "purple" },
               ].map((item, i) => (
                 <Card key={i} className="border-none bg-card/40 backdrop-blur-sm shadow-sm hover:shadow-md transition-all group overflow-hidden relative">
-                  <div className={`absolute -right-2 -bottom-2 w-16 h-16 opacity-5 group-hover:opacity-10 transition-opacity`}>
+                  <div className="absolute -right-2 -bottom-2 w-16 h-16 opacity-5 group-hover:opacity-10 transition-opacity">
                     <item.icon className="w-full h-full" />
                   </div>
                   <CardContent className="p-4 flex flex-col gap-1">
@@ -207,12 +194,13 @@ const DashboardProfile = () => {
               <TabsList className="bg-card/50 backdrop-blur-sm border border-white/5 p-1">
                 <TabsTrigger value="overview" className="font-bold px-6">Overview</TabsTrigger>
                 <TabsTrigger value="performance" className="font-bold px-6">Performance</TabsTrigger>
+                <TabsTrigger value="payments" className="font-bold px-6">Payments</TabsTrigger>
+                <TabsTrigger value="provider" className="font-bold px-6">Provider History</TabsTrigger>
                 <TabsTrigger value="store" className="font-bold px-6">My Store</TabsTrigger>
               </TabsList>
 
               <TabsContent value="overview" className="space-y-6 focus-visible:outline-none">
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                  {/* Account Details */}
                   <Card className="border-none bg-card shadow-sm">
                     <CardHeader className="pb-4">
                       <CardTitle className="text-lg font-bold flex items-center gap-2">
@@ -232,15 +220,12 @@ const DashboardProfile = () => {
                             <item.icon className="w-3 h-3" />
                             {item.label}
                           </p>
-                          <p className="text-sm font-bold truncate group-hover:text-primary transition-colors">
-                            {item.value}
-                          </p>
+                          <p className="text-sm font-bold truncate group-hover:text-primary transition-colors">{item.value}</p>
                         </div>
                       ))}
                     </CardContent>
                   </Card>
 
-                  {/* Ranking Insights */}
                   <Card className="border-none bg-gradient-to-br from-purple-600/10 to-indigo-600/5 shadow-md relative overflow-hidden group">
                     <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
                       <Trophy className="w-24 h-24" />
@@ -266,42 +251,97 @@ const DashboardProfile = () => {
                             style={{ width: stats?.rank_position ? `${Math.max(15, 100 - (stats.rank_position * 2))}%` : '5%' }} 
                           />
                         </div>
-                        <p className="text-xs text-muted-foreground leading-relaxed">
-                          Maintain high sales volume to reach the <b>Top 10</b> and unlock exclusive agent rewards.
-                        </p>
+                        <p className="text-xs text-muted-foreground leading-relaxed">Reach the <b>Top 10</b> to unlock rewards.</p>
                       </div>
-                      <Button 
-                        onClick={() => window.location.href = '/dashboard/leaderboard'}
-                        variant="secondary"
-                        className="w-full font-bold group"
-                      >
-                        Explore Leaderboard
-                        <ChevronRight className="w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform" />
+                      <Button onClick={() => window.location.href = '/dashboard/leaderboard'} variant="secondary" className="w-full font-bold group">
+                        Explore Leaderboard <ChevronRight className="w-4 h-4 ml-2" />
                       </Button>
                     </CardContent>
                   </Card>
                 </div>
+              </TabsContent>
 
-                {/* Quick Actions Footer */}
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                  {[
-                    { label: "Store", path: "/dashboard/my-store", icon: Store, color: "bg-blue-500/10 text-blue-500" },
-                    { label: "Wallet", path: "/dashboard/wallet", icon: Zap, color: "bg-amber-500/10 text-amber-500" },
-                    { label: "Orders", path: "/dashboard/orders", icon: ShoppingCart, color: "bg-green-500/10 text-green-500" },
-                    { label: "Support", path: "/dashboard/report-issue", icon: Mail, color: "bg-purple-500/10 text-purple-500" },
-                  ].map((action, i) => (
-                    <button
-                      key={i}
-                      onClick={() => window.location.href = action.path}
-                      className="flex flex-col items-center justify-center p-4 rounded-2xl bg-card border border-white/5 hover:border-primary/30 transition-all hover:-translate-y-1"
-                    >
-                      <div className={`p-3 rounded-xl mb-2 ${action.color}`}>
-                        <action.icon className="w-5 h-5" />
+              <TabsContent value="payments" className="focus-visible:outline-none">
+                <Card className="border-none bg-card shadow-sm overflow-hidden">
+                  <CardHeader className="pb-4">
+                    <CardTitle className="text-lg font-bold flex items-center gap-2">
+                      <ShieldCheck className="w-5 h-5 text-emerald-500" />
+                      Saved Payment Methods
+                    </CardTitle>
+                    <CardDescription>Securely tokenized cards for one-click checkout and auto-topup.</CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-6">
+                    {profile?.paystack_saved_authorizations && (profile.paystack_saved_authorizations as any[]).length > 0 ? (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {(profile.paystack_saved_authorizations as any[]).map((auth, idx) => (
+                          <div 
+                            key={auth.signature || idx} 
+                            className="p-4 rounded-2xl bg-gradient-to-br from-indigo-500/5 to-purple-500/5 border border-indigo-500/10 hover:border-indigo-500/30 transition-all group relative"
+                          >
+                            <div className="flex items-start justify-between">
+                              <div className="flex items-center gap-3">
+                                <div className="p-2 bg-white/5 rounded-lg border border-white/10 group-hover:bg-indigo-500/10 transition-colors">
+                                  <Star className={`w-5 h-5 ${auth.brand === 'visa' ? 'text-blue-400' : 'text-orange-400'}`} />
+                                </div>
+                                <div>
+                                  <p className="text-sm font-black capitalize">{auth.brand || 'Card'} •••• {auth.last4}</p>
+                                  <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">
+                                    Expires {auth.exp_month}/{auth.exp_year}
+                                  </p>
+                                </div>
+                              </div>
+                              <Button 
+                                size="icon" 
+                                variant="ghost" 
+                                className="h-8 w-8 text-muted-foreground hover:text-red-400 hover:bg-red-400/10 opacity-0 group-hover:opacity-100 transition-all"
+                                onClick={async () => {
+                                  if (!confirm("Remove this payment method?")) return;
+                                  try {
+                                    const { error } = await supabase.functions.invoke("paystack-manage-cards", {
+                                      body: { action: "delete", signature: auth.signature }
+                                    });
+                                    if (error) throw error;
+                                    toast.success("Card removed successfully");
+                                    window.location.reload();
+                                  } catch (err) {
+                                    toast.error("Failed to remove card");
+                                  }
+                                }}
+                              >
+                                <Zap className="w-3.5 h-3.5" />
+                              </Button>
+                            </div>
+                            <div className="mt-4 flex items-center justify-between">
+                               <Badge variant="outline" className="bg-emerald-500/5 text-emerald-500 border-emerald-500/10 text-[9px] uppercase font-bold py-0">
+                                 Active Token
+                               </Badge>
+                               <span className="text-[9px] font-bold text-muted-foreground">{auth.bank || 'Verified'}</span>
+                            </div>
+                          </div>
+                        ))}
                       </div>
-                      <span className="text-[10px] font-black uppercase tracking-wider">{action.label}</span>
-                    </button>
-                  ))}
-                </div>
+                    ) : (
+                      <div className="py-12 text-center space-y-4 bg-indigo-500/5 rounded-2xl border border-dashed border-indigo-500/20">
+                        <div className="w-16 h-16 bg-indigo-500/10 rounded-full flex items-center justify-center mx-auto">
+                          <Heart className="w-8 h-8 text-indigo-400 opacity-50" />
+                        </div>
+                        <div className="max-w-xs mx-auto">
+                          <p className="text-sm font-bold">No saved cards yet</p>
+                          <p className="text-xs text-muted-foreground mt-1">Cards are automatically saved when you make your first purchase for faster checkout next time.</p>
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="pt-4 border-t border-white/5">
+                      <div className="flex items-center gap-3 p-4 bg-amber-500/5 border border-amber-500/10 rounded-xl">
+                        <ShieldCheck className="w-5 h-5 text-amber-500 shrink-0" />
+                        <p className="text-[10px] font-medium leading-relaxed text-amber-200/80 uppercase tracking-wide">
+                          Your payment details are never stored on our servers. We use <b>Paystack Secure Tokenization</b> to keep your data encrypted and safe.
+                        </p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
               </TabsContent>
 
               <TabsContent value="performance" className="focus-visible:outline-none">
@@ -311,79 +351,87 @@ const DashboardProfile = () => {
                       <TrendingUp className="w-5 h-5 text-green-500" />
                       Sales Analytics
                     </CardTitle>
-                    <CardDescription>Detailed breakdown of your business performance</CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-8 py-6">
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
                       <div className="text-center space-y-2">
                         <p className="text-3xl font-black">₵{stats?.total_own_profit.toFixed(2)}</p>
                         <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Lifetime Profit</p>
-                        <div className="h-1 w-12 bg-green-500 mx-auto rounded-full mt-2" />
                       </div>
                       <div className="text-center space-y-2 border-x border-white/5">
                         <p className="text-3xl font-black">{stats?.total_fulfilled_orders}</p>
                         <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Successful Trades</p>
-                        <div className="h-1 w-12 bg-blue-500 mx-auto rounded-full mt-2" />
                       </div>
                       <div className="text-center space-y-2">
                         <p className="text-3xl font-black">₵{stats?.total_sales_volume.toFixed(0)}</p>
                         <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Turnover Volume</p>
-                        <div className="h-1 w-12 bg-amber-500 mx-auto rounded-full mt-2" />
                       </div>
                     </div>
+                  </CardContent>
+                </Card>
+              </TabsContent>
 
-                    <div className="p-6 rounded-2xl bg-primary/5 border border-primary/10 flex flex-col sm:flex-row items-center gap-6">
-                      <div className="p-4 bg-primary/10 rounded-full">
-                        <Award className="w-8 h-8 text-primary" />
-                      </div>
-                      <div className="space-y-1 text-center sm:text-left flex-1">
-                        <h4 className="font-bold">Next Milestone: Top 10 Agent</h4>
-                        <p className="text-xs text-muted-foreground">Keep processing orders to increase your sales volume and climb the leaderboard. Top 10 agents get reduced rates!</p>
-                      </div>
-                      <Button variant="default" className="font-bold whitespace-nowrap shadow-lg shadow-primary/20">
-                        View Incentives
-                      </Button>
+              <TabsContent value="provider" className="focus-visible:outline-none">
+                <Card className="border-none bg-card shadow-sm">
+                  <CardHeader>
+                    <CardTitle className="text-lg font-bold flex items-center gap-2">
+                      <Database className="w-5 h-5 text-indigo-500" />
+                      DataMart Provider Logs
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="rounded-2xl border border-white/5 overflow-hidden">
+                       <div className="bg-white/5 px-4 py-3 grid grid-cols-4 text-[10px] font-black uppercase tracking-widest text-muted-foreground">
+                          <span>Reference</span>
+                          <span>Service</span>
+                          <span>Status</span>
+                          <span className="text-right">Time</span>
+                       </div>
+                       <div className="divide-y divide-white/5">
+                          <div className="px-6 py-12 text-center space-y-3">
+                             <Activity className="w-6 h-6 text-primary animate-pulse mx-auto" />
+                             <p className="text-sm font-bold">Syncing Provider Records...</p>
+                          </div>
+                       </div>
                     </div>
+                    <Button 
+                      variant="outline" 
+                      className="w-full font-bold border-dashed border-2" 
+                      onClick={async () => {
+                        toast.info("Global Sync Started... Clearing backlog");
+                        try {
+                          await supabase.functions.invoke("datamart-sync");
+                          toast.success("Sync Complete! All orders updated.");
+                          window.location.reload();
+                        } catch (err) {
+                          toast.error("Sync failed. Try again later.");
+                        }
+                      }}
+                    >
+                      <RefreshCw className="w-4 h-4 mr-2" /> Force Full Audit Sync
+                    </Button>
                   </CardContent>
                 </Card>
               </TabsContent>
 
               <TabsContent value="store" className="focus-visible:outline-none">
                 <Card className="border-none bg-card shadow-sm overflow-hidden">
-                  <div className="h-32 bg-gradient-to-r from-blue-600 to-indigo-700 relative">
-                    <div className="absolute inset-0 flex items-center justify-center opacity-10">
-                      <Store className="w-24 h-24 text-white" />
-                    </div>
+                  <div className="h-32 bg-gradient-to-r from-blue-600 to-indigo-700 relative flex items-center justify-center">
+                    <Store className="w-24 h-24 text-white opacity-10" />
                   </div>
-                  <CardContent className="p-8 -mt-12 text-center sm:text-left">
-                    <div className="flex flex-col sm:flex-row items-end gap-4 mb-6">
+                  <CardContent className="p-8 -mt-12">
+                    <div className="flex items-end gap-4 mb-6">
                       <div className="w-20 h-20 rounded-2xl bg-card border-4 border-card shadow-xl flex items-center justify-center">
                         <Store className="w-10 h-10 text-primary" />
                       </div>
-                      <div className="pb-2">
+                      <div>
                         <h3 className="text-xl font-black">{profile?.store_name || "Your Store"}</h3>
-                        <p className="text-xs text-muted-foreground font-medium flex items-center gap-1">
-                          <ExternalLink className="w-3 h-3" /> 
-                          {profile?.slug ? `swiftdata.gh/store/${profile.slug}` : "Store link pending setup"}
-                        </p>
+                        <p className="text-xs text-muted-foreground font-medium truncate">swiftdata.gh/store/{profile?.slug || "setup-pending"}</p>
                       </div>
                     </div>
-                    
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      <Button 
-                        disabled={!profile?.slug}
-                        onClick={() => window.open(`/store/${profile?.slug}`, '_blank')}
-                        className="font-bold h-12 rounded-xl"
-                      >
-                        Visit Public Store
-                      </Button>
-                      <Button 
-                        onClick={() => window.location.href = '/dashboard/my-store'}
-                        variant="secondary" 
-                        className="font-bold h-12 rounded-xl"
-                      >
-                        Configure Storefront
-                      </Button>
+                      <Button disabled={!profile?.slug} onClick={() => window.open(`/store/${profile?.slug}`, '_blank')} className="font-bold h-12 rounded-xl">Visit Store</Button>
+                      <Button onClick={() => window.location.href = '/dashboard/my-store'} variant="secondary" className="font-bold h-12 rounded-xl">Settings</Button>
                     </div>
                   </CardContent>
                 </Card>
@@ -397,4 +445,3 @@ const DashboardProfile = () => {
 };
 
 export default DashboardProfile;
-

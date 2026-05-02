@@ -168,8 +168,17 @@ async function getPricingContext(_supabaseAdmin: any): Promise<{ source: "primar
   return { source: "primary", multiplier: 1 };
 }
 
-function mapNetworkKey(network: string): string {
+function mapNetworkKey(network: string, handlerType?: string): string {
   const normalized = network.trim().toUpperCase();
+  
+  if (handlerType === "datamart") {
+    if (normalized === "MTN" || normalized === "YELLO") return "YELLO";
+    if (normalized === "TELECEL" || normalized === "VODAFONE") return "TELECEL";
+    if (normalized === "AIRTELTIGO" || normalized === "AT" || normalized === "AIRTEL TIGO") return "AT_PREMIUM";
+    return normalized;
+  }
+
+  // Standard (DataHive) Mapping
   if (
     normalized === "AIRTELTIGO" ||
     normalized === "AIRTEL TIGO" ||
@@ -223,59 +232,53 @@ function buildProviderUrls(baseUrl: string, endpoint: string): string[] {
   }
 
   for (const alias of endpointAliases) {
-    if (clean.endsWith(`/${alias}`) || clean.endsWith(`/api/${alias}`)) {
-      urls.add(clean);
+    // Direct append
+    urls.add(`${clean}/${alias}`);
+    
+    // Conditional append based on what's missing
+    if (!clean.includes("/developer")) {
+      urls.add(`${clean}/developer/${alias}`);
     }
-  }
-
-  for (const alias of endpointAliases) {
-    if (clean.endsWith("/api")) {
-      urls.add(`${clean}/${alias}`);
-      urls.add(`${clean.replace(/\/api$/, "")}/api/${alias}`);
-    } else {
+    if (!clean.includes("/api")) {
       urls.add(`${clean}/api/${alias}`);
-      urls.add(`${clean}/${alias}`);
+    }
+    if (!clean.includes("/api/developer")) {
+      urls.add(`${clean}/api/developer/${alias}`);
     }
   }
 
-  const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
-  let projectUrl = "";
-  try {
-    if (supabaseUrl) projectUrl = new URL(supabaseUrl).origin;
-  } catch { /* ignore */ }
-
-  // Also try host-root endpoints in case the configured base URL contains an extra path segment.
-  if (rootUrl) {
+  if (rootUrl && rootUrl !== clean) {
     for (const alias of endpointAliases) {
+      urls.add(`${rootUrl}/api/developer/${alias}`);
+      urls.add(`${rootUrl}/developer/${alias}`);
       urls.add(`${rootUrl}/api/${alias}`);
       urls.add(`${rootUrl}/${alias}`);
-      urls.add(`${rootUrl}/functions/v1/developer-api/${alias}`);
-    }
-  }
-  
-  if (projectUrl) {
-    for (const alias of endpointAliases) {
-      urls.add(`${projectUrl}/functions/v1/developer-api/${alias}`);
     }
   }
 
   return Array.from(urls);
 }
 
-function parseProviderResponse(body: string, contentType: string | null): { ok: boolean; reason?: string } {
+function parseProviderResponse(body: string, contentType: string | null): { ok: boolean; reason?: string; id?: string; status?: string } {
   try {
     const parsed = JSON.parse(body);
     const rawStatus = parsed?.status;
     const status = String(rawStatus || "").toLowerCase();
+    const data = parsed?.data || {};
+    const deliveryStatus = String(data?.orderStatus ?? parsed?.delivery_status ?? parsed?.status_message ?? "").toLowerCase();
+    const effectiveStatus = deliveryStatus || status;
     const statusCode = Number(parsed?.statusCode);
     const message = typeof parsed?.message === "string" ? parsed.message : undefined;
+    
+    // DataMart uses purchaseId or orderReference
+    const orderId = String(data?.purchaseId ?? data?.orderReference ?? parsed?.transaction_id ?? parsed?.order_id ?? parsed?.id ?? parsed?.reference ?? "");
 
-    if (rawStatus === true || status === "true") return { ok: true };
+    if (rawStatus === true || status === "true") return { ok: true, id: orderId, status: effectiveStatus };
     if (rawStatus === false || status === "false") {
       return { ok: false, reason: message || "Provider rejected this order." };
     }
 
-    if (status === "success") return { ok: true };
+    if (status === "success") return { ok: true, id: orderId, status: effectiveStatus };
     if (status === "error" || status === "failed" || status === "failure") {
       return { ok: false, reason: message || "Provider rejected this order." };
     }
@@ -283,6 +286,9 @@ function parseProviderResponse(body: string, contentType: string | null): { ok: 
     if (Number.isFinite(statusCode) && statusCode >= 400) {
       return { ok: false, reason: message || "Provider rejected this order." };
     }
+    
+    if (orderId && orderId !== "undefined" && orderId !== "") return { ok: true, id: orderId, status: effectiveStatus };
+
   } catch {
     // Non-JSON responses are handled below.
   }
@@ -291,7 +297,6 @@ function parseProviderResponse(body: string, contentType: string | null): { ok: 
     return { ok: false, reason: "Provider returned an HTML response. Check API URL configuration." };
   }
 
-  // If provider doesn't include a status field but responded with 2xx JSON/text, treat as success.
   return { ok: true };
 }
 
@@ -360,33 +365,65 @@ type ProviderResult = {
   status: number;
   body: string;
   reason: string;
+  id?: string;
+  deliveryStatus?: string;
   url: string | null;
   attemptedUrls: string[];
 };
 
 async function placeDataOrder(
-  baseUrl: string,
-  apiKey: string,
+  provider: any,
   network: string,
   packageSize: string,
   customerPhone: string,
   providerWebhookUrl: string,
   amount: number,
 ): Promise<ProviderResult> {
-  const urls = buildProviderUrls(baseUrl, "purchase");
-  const networkKey = mapNetworkKey(network);
+  const handlerType = provider.handler_type || "standard";
+  const baseUrl = provider.base_url;
+  const apiKey = provider.api_key;
+  
+  const urls = buildProviderUrls(baseUrl, handlerType === "datamart" ? "purchase" : "purchase");
+  const networkKey = mapNetworkKey(network, handlerType);
   const capacity = parseCapacity(packageSize);
-  const requestBody: Record<string, unknown> = {
-    networkRaw: network,
-    networkKey: networkKey,
-    recipient: normalizeRecipient(customerPhone),
-    capacity: capacity,
-    amount: amount,
-    order_type: "data",
-    description: `Data purchase: ${packageSize} for ${customerPhone}`
-  };
-  if (providerWebhookUrl) {
-    requestBody.webhook_url = providerWebhookUrl;
+
+  let requestBody: Record<string, unknown>;
+  let headers: Record<string, string>;
+
+  if (handlerType === "datamart") {
+    requestBody = {
+      phoneNumber: normalizeRecipient(customerPhone),
+      network: networkKey,
+      capacity: String(capacity),
+      gateway: "wallet"
+    };
+    headers = {
+      "Content-Type": "application/json",
+      "Accept": "application/json",
+      "X-API-Key": apiKey,
+      "X-Idempotency-Key": orderId,
+    };
+  } else {
+    // Standard / DataHive Handler
+    requestBody = {
+      networkRaw: network,
+      networkKey: networkKey,
+      recipient: normalizeRecipient(customerPhone),
+      capacity: capacity,
+      amount: amount,
+      order_type: "data",
+      description: `Data purchase: ${packageSize} for ${customerPhone}`
+    };
+    if (providerWebhookUrl) {
+      requestBody.webhook_url = providerWebhookUrl;
+    }
+    headers = {
+      "Content-Type": "application/json",
+      "Accept": "application/json",
+      "X-API-Key": apiKey,
+      "Authorization": `Bearer ${apiKey}`,
+      "User-Agent": "DataHiveGH/1.0",
+    };
   }
 
   let lastFailure: ProviderResult = {
@@ -398,23 +435,17 @@ async function placeDataOrder(
     attemptedUrls: urls,
   };
 
-  console.log("Provider request body:", requestBody);
+  console.log(`[${handlerType}] Provider request:`, { url: urls[0], body: requestBody });
 
   for (const url of urls) {
     for (let attempt = 1; attempt <= 2; attempt++) {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 10000);
+      const timeoutId = setTimeout(() => controller.abort(), 20000); // 20s timeout
 
       try {
         const response = await fetch(url, {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "Accept": "application/json",
-            "X-API-Key": apiKey,
-            "Authorization": `Bearer ${apiKey}`,
-            "User-Agent": "DataHiveGH/1.0",
-          },
+          headers,
           body: JSON.stringify(requestBody),
           signal: controller.signal,
         });
@@ -426,7 +457,7 @@ async function placeDataOrder(
         if (response.ok) {
           const semantic = parseProviderResponse(body, contentType);
           if (semantic.ok) {
-            return { ok: true, status: response.status, body, reason: "", url, attemptedUrls: urls };
+            return { ok: true, status: response.status, body, reason: "", id: semantic.id, deliveryStatus: semantic.status, url, attemptedUrls: urls };
           }
 
           const reason = semantic.reason || "Provider rejected this order.";
@@ -631,6 +662,31 @@ serve(async (req) => {
 
     const { cost: expectedAmount, costPrice: resolvedCostPrice, parentAgentId, parentProfit } = orderDetails;
 
+    // --- IDEMPOTENCY CHECK ---
+    // Prevent duplicate orders and double-debits if the user double-clicks or refreshes.
+    const oneMinuteAgo = new Date(Date.now() - 60000).toISOString();
+    const { data: duplicateOrder } = await supabaseAdmin
+      .from("orders")
+      .select("id, status")
+      .eq("agent_id", user.id)
+      .eq("customer_phone", normalizePhone(customer_phone))
+      .eq("package_size", package_size)
+      .eq("amount", expectedAmount)
+      .gte("created_at", oneMinuteAgo)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (duplicateOrder && (duplicateOrder.status === "paid" || duplicateOrder.status === "processing" || duplicateOrder.status === "fulfilled")) {
+      console.log(`[wallet-buy] Reusing duplicate order to prevent double-debit: ${duplicateOrder.id}`);
+      return new Response(JSON.stringify({ 
+        success: true, 
+        orderId: duplicateOrder.id, 
+        status: duplicateOrder.status,
+        reused: true 
+      }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
     // Ensure wallet row exists before attempting atomic debit
     const { data: existingWallet } = await supabaseAdmin.from("wallets").select("id").eq("agent_id", user.id).maybeSingle();
     if (!existingWallet) {
@@ -669,7 +725,7 @@ serve(async (req) => {
       profit: 0,
       parent_agent_id: parentAgentId || null,
       parent_profit: parentProfit || 0,
-      status: "paid",
+      status: "processing",
       failure_reason: null,
     });
 
@@ -685,8 +741,7 @@ serve(async (req) => {
         console.log(`Trying provider: ${provider.name} (Priority: ${provider.priority})`);
         
         result = await placeDataOrder(
-          provider.base_url,
-          provider.api_key,
+          provider,
           network,
           package_size,
           customer_phone,
@@ -708,12 +763,15 @@ serve(async (req) => {
       console.log("Fulfillment:", { orderId, status: result.status, reason: result.reason, url: result.url });
 
       if (result.ok) {
+        const patch: Record<string, any> = { 
+          status: "fulfilled", 
+          failure_reason: null,
+          provider_id: successfulProviderId 
+        };
+        if (result.id) patch.provider_order_id = result.id;
+        
         await Promise.all([
-          supabaseAdmin.from("orders").update({ 
-            status: "fulfilled", 
-            failure_reason: null,
-            provider_id: successfulProviderId 
-          }).eq("id", orderId),
+          supabaseAdmin.from("orders").update(patch).eq("id", orderId),
           ...((parentProfit ?? 0) > 0 && parentAgentId ? [supabaseAdmin.rpc("credit_order_profits", { p_order_id: orderId })] : []),
           sendPaymentSms(supabaseAdmin, customer_phone, "payment_success"),
         ]);

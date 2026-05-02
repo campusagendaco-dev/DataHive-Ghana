@@ -95,7 +95,12 @@ function normalizeRecipient(phone: string): string {
 }
 
 serve(async (req: Request) => {
-  if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+  if (req.method === "OPTIONS") {
+    return new Response("ok", { 
+      headers: corsHeaders,
+      status: 200
+    });
+  }
 
   const SUPABASE_URL = (Deno as any).env.get("SUPABASE_URL");
   const SUPABASE_SERVICE_ROLE_KEY = (Deno as any).env.get("SUPABASE_SERVICE_ROLE_KEY");
@@ -152,6 +157,30 @@ serve(async (req: Request) => {
       }
     }
 
+    // --- IDEMPOTENCY CHECK ---
+    const oneMinuteAgo = new Date(Date.now() - 60000).toISOString();
+    const { data: duplicateOrder } = await supabaseAdmin
+      .from("orders")
+      .select("id, status")
+      .eq("agent_id", user.id)
+      .eq("customer_phone", normalizePhone(phone))
+      .eq("order_type", "airtime")
+      .eq("amount", amount)
+      .gte("created_at", oneMinuteAgo)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (duplicateOrder && (duplicateOrder.status === "paid" || duplicateOrder.status === "processing" || duplicateOrder.status === "fulfilled")) {
+       console.log(`[airtime] Reusing duplicate order: ${duplicateOrder.id}`);
+       return new Response(JSON.stringify({ 
+         success: true, 
+         order_id: duplicateOrder.id, 
+         status: duplicateOrder.status,
+         reused: true 
+       }), { headers: corsHeaders });
+    }
+
     const { data: debitResult, error: debitError } = await supabaseAdmin.rpc("debit_wallet", {
       p_agent_id: user.id,
       p_amount: amount,
@@ -188,8 +217,11 @@ serve(async (req: Request) => {
     
     const airtimePayload = {
       customerNumber: recipient,
+      phoneNumber: recipient, // DataMart support
       amount: amount,
       networkCode: networkKey,
+      orderReference: orderId, // CRITICAL: Deduplication key
+      reference: orderId,
       description: `Airtime topup: GHS ${amount} for ${recipient}`
     };
 
@@ -204,6 +236,8 @@ serve(async (req: Request) => {
         
         for (const url of providerUrls) {
           try {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 20000);
             const res = await fetch(url, {
               method: "POST",
               headers: {
@@ -213,8 +247,9 @@ serve(async (req: Request) => {
                 "Authorization": `Bearer ${provider.api_key}`,
               },
               body: JSON.stringify(airtimePayload),
-              signal: AbortSignal.timeout(20000)
+              signal: controller.signal
             });
+            clearTimeout(timeoutId);
 
             const contentType = res.headers.get("content-type");
             const resText = await res.text();

@@ -1,12 +1,15 @@
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "sonner";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Wallet, ArrowDownToLine, Loader2, CheckCircle, XCircle, Clock, TrendingUp } from "lucide-react";
+import { 
+  Wallet, ArrowDownToLine, Loader2, CheckCircle, XCircle, Clock, TrendingUp, 
+  ShieldCheck, User, Phone, Activity, RefreshCw 
+} from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -40,7 +43,6 @@ const statusConfig: Record<string, { icon: typeof CheckCircle; color: string; la
 
 const DashboardWithdraw = () => {
   const { user, profile } = useAuth();
-  const { toast } = useToast();
   const [totalProfit, setTotalProfit] = useState(0);
   const [completedWithdrawals, setCompletedWithdrawals] = useState(0);
   const [pendingWithdrawals, setPendingWithdrawals] = useState(0);
@@ -92,7 +94,7 @@ const DashboardWithdraw = () => {
 
     const numAmount = parseFloat(amount);
     if (isNaN(numAmount) || numAmount < MIN_WITHDRAWAL) {
-      toast({ title: `Minimum withdrawal is GHS ${MIN_WITHDRAWAL.toFixed(2)}`, variant: "destructive" });
+      toast.error(`Minimum withdrawal is GHS ${MIN_WITHDRAWAL.toFixed(2)}`);
       setWithdrawing(false);
       return;
     }
@@ -105,9 +107,9 @@ const DashboardWithdraw = () => {
     });
 
     if (error || data?.error) {
-      toast({ title: "Withdrawal failed", description: data?.error || error?.message, variant: "destructive" });
+      toast.error("Withdrawal failed", { description: data?.error || error?.message });
     } else {
-      toast({ title: "Withdrawal request placed!", description: "You will receive your funds within 24 hours." });
+      toast.success("Withdrawal request placed!", { description: "You will receive your funds within 24 hours." });
       setAmount("");
     }
 
@@ -164,14 +166,76 @@ const DashboardWithdraw = () => {
       </div>
 
       {profile && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">Your MoMo Details</CardTitle>
+        <Card className="overflow-hidden border-indigo-500/10">
+          <CardHeader className="bg-indigo-500/5 border-b border-indigo-500/10 py-4">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-base font-black flex items-center gap-2">
+                <ShieldCheck className="w-5 h-5 text-indigo-500" />
+                Verified Recipient Details
+              </CardTitle>
+              <Badge variant="outline" className="bg-emerald-500/10 text-emerald-500 border-emerald-500/20 text-[9px] uppercase font-bold px-2">
+                Active Destination
+              </Badge>
+            </div>
           </CardHeader>
-          <CardContent className="space-y-2 text-sm">
-            <div className="flex justify-between"><span className="text-muted-foreground">Name</span><span className="font-medium">{profile.momo_account_name || "Not set"}</span></div>
-            <div className="flex justify-between"><span className="text-muted-foreground">Number</span><span className="font-medium">{profile.momo_number || "Not set"}</span></div>
-            <div className="flex justify-between"><span className="text-muted-foreground">Network</span><span className="font-medium">{profile.momo_network || "Not set"}</span></div>
+          <CardContent className="p-6 space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div className="space-y-1">
+                <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground flex items-center gap-1.5">
+                  <User className="w-3 h-3" /> Account Holder
+                </p>
+                <p className="text-sm font-black text-foreground">{profile.momo_account_name || "Verification Pending"}</p>
+              </div>
+              <div className="space-y-1">
+                <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground flex items-center gap-1.5">
+                  <Phone className="w-3 h-3" /> MoMo Number
+                </p>
+                <p className="text-sm font-black text-foreground">{profile.momo_number || "Not Set"}</p>
+              </div>
+              <div className="space-y-1">
+                <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground flex items-center gap-1.5">
+                  <Activity className="w-3 h-3" /> Network
+                </p>
+                <p className="text-sm font-black text-emerald-500">{profile.momo_network || "Not Set"}</p>
+              </div>
+            </div>
+            
+            <Button 
+              variant="outline" 
+              size="sm"
+              className="w-full h-11 rounded-xl border-dashed border-2 hover:bg-indigo-500/5 group"
+              onClick={async () => {
+                if (!profile.momo_number || !profile.momo_network) {
+                   toast.error("Details Missing", { description: "Set your MoMo number in Settings first." });
+                   return;
+                }
+                const toastId = toast.loading("Verifying account identity...");
+                try {
+                  // Map Network to Paystack Bank Code
+                  const net = profile.momo_network.toUpperCase();
+                  let bankCode = "MTN";
+                  if (net.includes("VODA") || net.includes("TELECEL")) bankCode = "VOD";
+                  if (net.includes("AIRTEL") || net.includes("TIGO") || net.includes("AT")) bankCode = "ATL";
+
+                  const { data, error } = await supabase.functions.invoke("paystack-resolve", {
+                    body: { account_number: profile.momo_number, bank_code: bankCode }
+                  });
+
+                  if (error || !data?.success) throw new Error(data?.error || "Could not resolve name");
+
+                  // Update profile with resolved name
+                  await supabase.from("profiles").update({ momo_account_name: data.account_name }).eq("user_id", user?.id);
+                  
+                  toast.success("Identity Verified!", { description: `Account resolved to: ${data.account_name}`, id: toastId });
+                  fetchData();
+                } catch (e: any) {
+                  toast.error("Verification Failed", { description: e.message, id: toastId });
+                }
+              }}
+            >
+              <RefreshCw className="w-3.5 h-3.5 mr-2 group-hover:rotate-180 transition-transform duration-700" />
+              Verify & Sync Legal Name
+            </Button>
           </CardContent>
         </Card>
       )}
@@ -198,11 +262,11 @@ const DashboardWithdraw = () => {
               onClick={() => {
                 const n = parseFloat(amount);
                 if (isNaN(n) || n < MIN_WITHDRAWAL) {
-                  toast({ title: `Minimum withdrawal is GHS ${MIN_WITHDRAWAL.toFixed(2)}`, variant: "destructive" });
+                  toast.error(`Minimum withdrawal is GHS ${MIN_WITHDRAWAL.toFixed(2)}`);
                   return;
                 }
                 if (n > availableBalance) {
-                  toast({ title: "Amount exceeds available balance", variant: "destructive" });
+                  toast.error("Amount exceeds available balance");
                   return;
                 }
                 setConfirmOpen(true);

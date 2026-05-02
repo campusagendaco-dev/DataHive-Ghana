@@ -3,56 +3,48 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import {
   CheckCircle2, XCircle, Loader2, ShieldCheck, Zap,
   Activity, Copy, Check, RefreshCw, ArrowLeft,
+  Search, Info, Database, SignalHigh
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { invokePublicFunction, invokePublicFunctionAsUser } from "@/lib/public-function-client";
+import { invokePublicFunction } from "@/lib/public-function-client";
 import PhoneOrderTracker from "@/components/PhoneOrderTracker";
 import { useAuth } from "@/hooks/useAuth";
+import { useAppTheme } from "@/contexts/ThemeContext";
+import { toast } from "sonner";
 
-type OrderStatusType = "pending" | "paid" | "processing" | "fulfilled" | "fulfillment_failed";
+type OrderStatusType = "pending" | "paid" | "processing" | "fulfilled" | "fulfillment_failed" | "error" | "not_paid";
 
 const STEPS = [
-  { key: "confirmed", icon: ShieldCheck },
-  { key: "delivering", icon: Zap },
-  { key: "done", icon: CheckCircle2 },
+  { key: "confirmed", icon: ShieldCheck, color: "#10B981" },
+  { key: "delivering", icon: Zap, color: "#F59E0B" },
+  { key: "done", icon: CheckCircle2, color: "#6366F1" },
 ];
-
-function getStepLabels(index: number, orderType: string) {
-  if (index === 0) return { label: "Payment Confirmed", sub: "Paystack verified your payment" };
-  if (index === 1) {
-    if (orderType === "airtime") return { label: "Sending Airtime", sub: "Topping up your phone number" };
-    if (orderType === "utility") return { label: "Processing Bill", sub: "Paying with utility provider" };
-    return { label: "Delivering Data", sub: "Sending bundle to your number" };
-  }
-  if (orderType === "airtime") return { label: "Airtime Sent", sub: "Transaction completed" };
-  if (orderType === "utility") return { label: "Bill Paid", sub: "Token/Receipt generated" };
-  return { label: "Data Delivered", sub: "Bundle successfully activated" };
-}
-
-function statusToStep(status: OrderStatusType): number {
-  if (status === "fulfilled") return 3;
-  if (status === "paid" || status === "processing") return 1;
-  return 0;
-}
 
 function getStatusMeta(status: OrderStatusType, failed: boolean, message?: string) {
   if (failed || status === "fulfillment_failed") {
-    return { color: "#EF4444", glow: "rgba(239,68,68,0.12)", label: "Delivery Failed", sub: message || "Something went wrong with your order", badge: "Failed" };
+    return { color: "#EF4444", glow: "rgba(239,68,68,0.15)", label: "Delivery Failed", sub: message || "Something went wrong with your order", badge: "Failed" };
   }
   if (status === "fulfilled") {
-    return { color: "#10B981", glow: "rgba(16,185,129,0.10)", label: "Order Delivered!", sub: "Your order has been fulfilled successfully", badge: "Complete" };
+    return { color: "#10B981", glow: "rgba(16,185,129,0.12)", label: "Order Delivered!", sub: "Your bundle has been successfully activated", badge: "Complete" };
   }
   if (status === "processing") {
-    return { color: "#8B5CF6", glow: "rgba(139,92,246,0.10)", label: "Live Tracking", sub: message || "Order accepted by network provider", badge: "Live" };
+    return { color: "#8B5CF6", glow: "rgba(139,92,246,0.12)", label: "Live Delivery", sub: message || "Order is being transmitted to network", badge: "Processing" };
   }
   if (status === "paid") {
-    return { color: "#F59E0B", glow: "rgba(245,158,11,0.10)", label: "Processing Payment", sub: "Preparing to fulfill your order", badge: "Live" };
+    return { color: "#F59E0B", glow: "rgba(245,158,11,0.12)", label: "Payment Verified", sub: "Preparing your order for fulfillment", badge: "Queued" };
   }
-  return { color: "#6366F1", glow: "rgba(99,102,241,0.08)", label: "Awaiting Payment", sub: "Waiting for payment confirmation", badge: "Pending" };
+  if (status === "not_paid") {
+    return { color: "#FBBF24", glow: "rgba(251,191,36,0.10)", label: "Payment Not Found", sub: message || "We couldn't find a successful transaction for this reference.", badge: "Awaiting" };
+  }
+  if (status === "error") {
+    return { color: "#EF4444", glow: "rgba(239,68,68,0.10)", label: "System Error", sub: message || "There was a problem connecting to the payment gateway.", badge: "Retry Needed" };
+  }
+  return { color: "#6366F1", glow: "rgba(99,102,241,0.10)", label: "Verifying Payment", sub: message || "Waiting for Paystack confirmation...", badge: "Pending" };
 }
 
 const OrderStatus = () => {
   const navigate = useNavigate();
+  const { isDark } = useAppTheme();
   const [searchParams] = useSearchParams();
   const reference = searchParams.get("reference") || searchParams.get("trxref") || "";
   const network = searchParams.get("network") || "";
@@ -63,44 +55,35 @@ const OrderStatus = () => {
   const [statusMessage, setStatusMessage] = useState<string>("");
   const [providerId, setProviderId] = useState<string>("");
   const [orderType, setOrderType] = useState<string>("data");
-  const [step, setStep] = useState(0);
   const [failed, setFailed] = useState(false);
   const [copied, setCopied] = useState(false);
   const [initialCheckDone, setInitialCheckDone] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [scannerStats, setScannerStats] = useState<any>(null);
+  const [statusLog, setStatusLog] = useState<{ time: string; msg: string; icon: any }[]>([]);
   const { user } = useAuth();
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   const redirectedRef = useRef(false);
 
-  const copyReceipt = () => {
-    const now = new Date().toLocaleString("en-GH", { dateStyle: "medium", timeStyle: "short" });
-    const statusLabel = failed ? "❌ Failed" : step >= 3 ? "✅ Delivered" : "⏳ Processing";
-    const lines = [
-      "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
-      "    SwiftData Ghana — Receipt",
-      "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
-      `Ref       : ${reference.slice(0, 12).toUpperCase()}`,
-      `Date      : ${now}`,
-      "─────────────────────────────────",
-      ...(network ? [`Network   : ${network}`] : []),
-      ...(packageSize ? [`Package   : ${packageSize}`] : []),
-      ...(phone ? [`Recipient : ${phone}`] : []),
-      `Status    : ${statusLabel}`,
-      "─────────────────────────────────",
-      "  swiftdataghana.com",
-      "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
-    ];
-    navigator.clipboard.writeText(lines.join("\n")).then(() => {
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
+  const addLog = (msg: string, icon: any = Activity) => {
+    setStatusLog(prev => {
+      if (prev.some(l => l.msg === msg)) return prev;
+      return [{ time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }), msg, icon }, ...prev].slice(0, 5);
     });
   };
 
-  const handleStatusUpdate = (status: OrderStatusType, message?: string, pId?: string) => {
+  const handleStatusUpdate = (status: OrderStatusType, message?: string, pId?: string, scanner?: any) => {
     setOrderStatus(status);
-    setStep(statusToStep(status));
     if (message) setStatusMessage(message);
     if (pId) setProviderId(pId);
+    if (scanner) setScannerStats(scanner);
+
+    if (status === "paid") addLog("Payment confirmed & verified", ShieldCheck);
+    if (status === "processing") addLog("Connected to delivery gateway", Zap);
+    if (message?.toLowerCase().includes("waiting")) addLog("In provider queue", Database);
+    if (message?.toLowerCase().includes("processing")) addLog("Transmitting to network", SignalHigh);
+    if (status === "fulfilled") addLog("Bundle activated successfully", CheckCircle2);
+    if (status === "fulfillment_failed") addLog("Delivery retry scheduled", RefreshCw);
 
     if (status === "fulfillment_failed") {
       setFailed(true);
@@ -109,417 +92,283 @@ const OrderStatus = () => {
 
     if (status === "fulfilled" && !redirectedRef.current) {
       redirectedRef.current = true;
+      toast.success("Purchase Successful!", {
+        description: "Your bundle has been delivered instantly.",
+        duration: 5000,
+      });
       const params = new URLSearchParams({ reference, network, package: packageSize, phone, source: "checkout" });
-      setTimeout(() => navigate(`/purchase-success?${params.toString()}`, { replace: true }), 1200);
+      setTimeout(() => navigate(`/purchase-success?${params.toString()}`, { replace: true }), 500);
+    }
+  };
+
+  const pollStatus = async (isManual = false) => {
+    if (!reference) return;
+    try {
+      if (isManual) setIsRefreshing(true);
+      const { data, error } = await invokePublicFunction("verify-payment", { body: { reference } });
+      
+      if (error) {
+         setStatusMessage("Connection unstable. Retrying...");
+         return;
+      }
+
+      if (data?.status) {
+        if (data.order_type) setOrderType(data.order_type);
+        handleStatusUpdate(data.status as OrderStatusType, data.message || data.error, data.provider_order_id, data.scanner_data);
+      } else if (data?.error) {
+        setStatusMessage(data.error);
+      }
+    } catch (err) {
+      console.error("[OrderStatus] Poll error:", err);
+    } finally {
+      setInitialCheckDone(true);
+      if (isManual) setIsRefreshing(false);
     }
   };
 
   useEffect(() => {
     if (!reference) return;
 
+    // Realtime subscription
     const ch = supabase
       .channel(`order-status-${reference}`)
       .on(
         "postgres_changes",
         { event: "UPDATE", schema: "public", table: "orders", filter: `id=eq.${reference}` },
         (payload: any) => {
-          if (payload.new?.status) handleStatusUpdate(payload.new.status as OrderStatusType);
+          if (payload.new?.status) handleStatusUpdate(payload.new.status as OrderStatusType, payload.new.failure_reason, payload.new.provider_order_id);
         }
       )
       .subscribe();
 
     channelRef.current = ch;
-    let cancelled = false;
-    let attempts = 0;
-
-    const poll = async () => {
-      attempts += 1;
-      const { data } = await invokePublicFunction("verify-payment", { body: { reference } });
-      if (cancelled) return;
-
-      if (data?.status) {
-        if (data.order_type) setOrderType(data.order_type);
-        handleStatusUpdate(data.status as OrderStatusType, data.message, data.provider_order_id);
-        setInitialCheckDone(true);
-        if (data.status === "fulfilled" || data.status === "fulfillment_failed") clearInterval(timer);
-      } else {
-        setInitialCheckDone(true);
-      }
-
-      if (attempts >= 20) clearInterval(timer);
-    };
-
-    void poll();
-    const timer = setInterval(poll, 2500);
+    
+    pollStatus();
+    const timer = setInterval(() => pollStatus(), 4000);
 
     return () => {
-      cancelled = true;
       clearInterval(timer);
       if (channelRef.current) supabase.removeChannel(channelRef.current);
     };
-  }, [reference, handleStatusUpdate]);
+  }, [reference]);
 
-  const manualCheck = async () => {
-    if (!reference || isRefreshing) return;
-    setIsRefreshing(true);
-    try {
-      const { data } = await invokePublicFunctionAsUser("verify-payment", { body: { reference } });
-      if (data?.status) {
-        if (data.order_type) setOrderType(data.order_type);
-        handleStatusUpdate(data.status as OrderStatusType, data.message, data.provider_order_id);
-      }
-    } catch { /* ignore */ }
-    finally { setIsRefreshing(false); }
+  const manualCheck = () => pollStatus(true);
+
+  const copyRef = () => {
+    navigator.clipboard.writeText(reference).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
   };
 
-  const hasOrder = Boolean(reference);
   const meta = getStatusMeta(orderStatus, failed, statusMessage);
-  const isLive = !failed && step < 3;
-  const isComplete = !failed && step >= 3;
+  const step = orderStatus === "fulfilled" ? 3 : (orderStatus === "processing" ? 2 : (orderStatus === "paid" ? 1 : 0));
 
   return (
-    <div className="min-h-screen bg-[#030305] pt-24 pb-24 px-4 relative overflow-hidden">
-      {/* Dynamic ambient page glow */}
-      <div
-        className="pointer-events-none fixed inset-0 transition-all duration-[1500ms]"
-        style={{ background: `radial-gradient(ellipse 900px 600px at 50% -5%, ${meta.glow} 0%, transparent 70%)` }}
+    <div className="min-h-screen bg-[#020205] pt-24 pb-20 px-4 relative overflow-hidden font-sans">
+      <div 
+        className="fixed inset-0 pointer-events-none transition-all duration-[2000ms] opacity-40"
+        style={{ 
+          background: `radial-gradient(circle at 50% -20%, ${meta.color}50 0%, transparent 60%), 
+                      radial-gradient(circle at 0% 100%, #6366F120 0%, transparent 40%)` 
+        }}
       />
-
-      <div className="relative container mx-auto max-w-md">
-        {/* Back navigation */}
+      
+      <div className="relative container mx-auto max-w-lg z-10">
         <button
-          onClick={() => navigate(-1)}
-          className="mb-6 flex items-center gap-2 text-white/25 hover:text-white/55 transition-colors text-xs font-bold uppercase tracking-widest"
+          onClick={() => navigate("/")}
+          className="mb-8 flex items-center gap-2 text-white/30 hover:text-white/60 transition-colors text-[10px] font-black uppercase tracking-[0.2em]"
         >
-          <ArrowLeft className="w-3.5 h-3.5" />
-          Back
+          <ArrowLeft className="w-3 h-3" />
+          Return Home
         </button>
 
-        {/* Page header */}
-        <div className="mb-7">
-          <h1 className="text-[1.75rem] font-black text-white tracking-tight leading-none">Track Order</h1>
-          <p className="text-xs text-white/25 font-semibold mt-1.5 tracking-wide">Real-time delivery status</p>
-        </div>
+        <div 
+          className="relative rounded-[2.5rem] overflow-hidden border border-white/10 shadow-[0_32px_80px_rgba(0,0,0,0.8)]"
+          style={{ 
+            background: "rgba(10,10,18,0.8)",
+            backdropFilter: "blur(24px) saturate(1.8)",
+            WebkitBackdropFilter: "blur(24px) saturate(1.8)"
+          }}
+        >
+          <div className="flex items-center justify-between px-8 pt-7 pb-4">
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-xl bg-white/5 flex items-center justify-center border border-white/10">
+                <img src="/logo.png" alt="" className="w-5 h-5 opacity-70" />
+              </div>
+              <div>
+                <p className="text-[10px] font-black text-white/30 uppercase tracking-[0.15em] leading-none">SwiftData GH</p>
+                <div className="flex items-center gap-1.5 mt-1">
+                  <div className={`w-1 h-1 rounded-full ${!failed && step < 3 ? "animate-pulse" : ""}`} style={{ backgroundColor: meta.color }} />
+                  <p className="text-[9px] font-bold text-white/20 uppercase tracking-widest">Secure Link Active</p>
+                </div>
+              </div>
+            </div>
 
-        <div className="space-y-4">
-          {hasOrder && (
-            <div
-              className="relative rounded-[2rem] overflow-hidden shadow-2xl animate-in fade-in slide-in-from-top-4 duration-700"
-              style={{
-                background: "linear-gradient(180deg, #0C0C16 0%, #080810 100%)",
-                border: `1px solid ${meta.color}18`,
-                boxShadow: `0 0 80px ${meta.color}07, 0 28px 56px rgba(0,0,0,0.6)`,
-              }}
+            <div 
+              className="px-4 py-1.5 rounded-full flex items-center gap-2 border"
+              style={{ background: `${meta.color}15`, borderColor: `${meta.color}30` }}
             >
-              {/* Top edge highlight */}
-              <div
-                className="absolute top-0 left-0 right-0 h-px pointer-events-none"
-                style={{ background: `linear-gradient(90deg, transparent 0%, ${meta.color}35 50%, transparent 100%)` }}
+              <span className="text-[10px] font-black uppercase tracking-widest" style={{ color: meta.color }}>
+                {meta.badge}
+              </span>
+            </div>
+          </div>
+
+          <div className="px-8 pt-6 pb-10 flex flex-col items-center text-center">
+            <div className="relative mb-10">
+              <div 
+                className={`absolute inset-0 rounded-full blur-[60px] opacity-20 transition-all duration-1000 scale-[1.5]`}
+                style={{ backgroundColor: meta.color }}
               />
-
-              {/* ── Card Header ── */}
-              <div className="flex items-center justify-between px-6 pt-5 pb-4">
-                <div className="flex items-center gap-2.5">
-                  <img src="/logo.png" alt="" className="w-6 h-6 rounded-lg opacity-55" />
-                  <span className="text-[10px] font-black text-white/25 uppercase tracking-[0.22em]">SwiftData Ghana</span>
-                </div>
-
-                <div
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-full"
-                  style={{ background: `${meta.color}10`, border: `1px solid ${meta.color}22` }}
-                >
-                  {isLive && (
-                    <span
-                      className="w-1.5 h-1.5 rounded-full animate-ping"
-                      style={{ backgroundColor: meta.color }}
-                    />
-                  )}
-                  {isComplete && <CheckCircle2 className="w-3 h-3" style={{ color: meta.color }} />}
-                  {failed && <XCircle className="w-3 h-3" style={{ color: meta.color }} />}
-                  <span className="text-[10px] font-black uppercase tracking-widest" style={{ color: meta.color }}>
-                    {meta.badge}
-                  </span>
-                </div>
-              </div>
-
-              {/* ── Status Hero ── */}
-              <div className="flex flex-col items-center px-6 pt-4 pb-8">
-                {/* Layered glow icon */}
-                <div className="relative mb-6 flex items-center justify-center">
-                  {isLive && (
-                    <div
-                      className="absolute w-32 h-32 rounded-[2.5rem] animate-ping opacity-[0.05]"
-                      style={{ backgroundColor: meta.color, animationDuration: "2.5s" }}
-                    />
-                  )}
-                  <div
-                    className="absolute w-28 h-28 rounded-[2.5rem] blur-2xl opacity-[0.22] transition-all duration-1000"
-                    style={{ backgroundColor: meta.color }}
-                  />
-                  <div
-                    className="relative w-24 h-24 rounded-[1.75rem] flex items-center justify-center transition-all duration-700"
-                    style={{
-                      background: `radial-gradient(circle at 40% 30%, ${meta.color}18 0%, ${meta.color}05 100%)`,
-                      border: `1.5px solid ${meta.color}22`,
-                      boxShadow: `0 0 50px ${meta.color}15, inset 0 1px 0 ${meta.color}12`,
-                    }}
-                  >
-                    {isLive ? (
-                      <Loader2 className="w-12 h-12 animate-spin" style={{ color: meta.color }} />
-                    ) : failed ? (
-                      <XCircle className="w-12 h-12" style={{ color: meta.color }} />
-                    ) : (
-                      <CheckCircle2 className="w-12 h-12" style={{ color: meta.color }} />
-                    )}
-                  </div>
-                </div>
-
-                <h2 className="text-2xl font-black text-white tracking-tight text-center leading-tight">
-                  {meta.label}
-                </h2>
-                <p className="text-sm text-white/30 font-medium mt-2 text-center max-w-[240px]">
-                  {meta.sub}
-                </p>
-
-                {/* Order identity chip */}
-                {(network || phone) && (
-                  <div
-                    className="flex items-center gap-2 mt-5 px-4 py-2.5 rounded-2xl"
-                    style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.055)" }}
-                  >
-                    {network && <span className="text-xs font-black text-white/60">{network}</span>}
-                    {network && packageSize && <span className="text-white/15 text-xs">·</span>}
-                    {packageSize && <span className="text-xs font-semibold text-white/40">{packageSize}</span>}
-                    {(network || packageSize) && phone && <span className="text-white/15 text-xs">·</span>}
-                    {phone && <span className="text-xs font-mono text-white/35">{phone}</span>}
-                  </div>
-                )}
-
-                {providerId && (
-                  <div className="mt-3 flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/[0.02] border border-white/[0.05]">
-                    <Activity className="w-3 h-3 text-purple-400 opacity-60" />
-                    <span className="text-[10px] font-bold text-white/20 uppercase tracking-wider">Network ID:</span>
-                    <span className="text-[10px] font-mono text-purple-300/40">{providerId}</span>
-                  </div>
-                )}
-              </div>
-
-              {/* Divider */}
-              <div className="mx-6 h-px" style={{ background: "rgba(255,255,255,0.04)" }} />
-
-              {/* ── Card Body ── */}
-              <div className="p-6 space-y-4">
-
-                {/* Progress Stepper */}
-                {!failed && (
-                  <div
-                    className="rounded-2xl p-5"
-                    style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.04)" }}
-                  >
-                    {STEPS.map((s, i) => {
-                      const done = step > i;
-                      const active = step === i && initialCheckDone;
-                      const upcoming = step < i;
-                      const { label, sub } = getStepLabels(i, orderType);
-
-                      return (
-                        <div key={s.key} className="flex gap-4">
-                          <div className="flex flex-col items-center">
-                            <div
-                              className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0 transition-all duration-700"
-                              style={
-                                done
-                                  ? { background: "rgba(16,185,129,0.12)", border: "1.5px solid rgba(16,185,129,0.35)", boxShadow: "0 0 14px rgba(16,185,129,0.12)" }
-                                  : active
-                                  ? { background: `${meta.color}12`, border: `1.5px solid ${meta.color}38`, boxShadow: `0 0 14px ${meta.color}12` }
-                                  : { background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.05)" }
-                              }
-                            >
-                              {done ? (
-                                <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-                              ) : active ? (
-                                <Loader2 className="w-4 h-4 animate-spin" style={{ color: meta.color }} />
-                              ) : (
-                                <s.icon className="w-4 h-4 text-white/10" />
-                              )}
-                            </div>
-                            {i < STEPS.length - 1 && (
-                              <div className="w-px my-2 flex-1 min-h-[1.5rem] bg-white/[0.035] relative overflow-hidden">
-                                <div
-                                  className="absolute top-0 left-0 right-0 bg-emerald-500/40 transition-all duration-1000 ease-out"
-                                  style={{ height: done ? "100%" : "0%" }}
-                                />
-                              </div>
-                            )}
-                          </div>
-
-                          <div className={`flex-1 pt-1.5 ${i < STEPS.length - 1 ? "pb-5" : ""}`}>
-                            <p
-                              className="text-sm font-black tracking-tight transition-colors duration-500"
-                              style={
-                                done ? { color: "#10B981" }
-                                  : active ? { color: "#FFFFFF" }
-                                  : { color: "rgba(255,255,255,0.15)" }
-                              }
-                            >
-                              {label}
-                            </p>
-                            <p
-                              className="text-xs mt-0.5 font-medium transition-colors duration-500"
-                              style={{ color: upcoming ? "rgba(255,255,255,0.08)" : "rgba(255,255,255,0.28)" }}
-                            >
-                              {sub}
-                            </p>
-                            {active && (
-                              <div className="mt-2.5 flex items-center gap-1">
-                                {[0, 150, 300].map((delay) => (
-                                  <div
-                                    key={delay}
-                                    className="w-1 h-1 rounded-full animate-bounce"
-                                    style={{ backgroundColor: meta.color, animationDelay: `${delay}ms`, opacity: 0.65 }}
-                                  />
-                                ))}
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-
-                {/* Failed State */}
-                {failed && (
-                  <div
-                    className="rounded-2xl p-5 space-y-4"
-                    style={{ background: "rgba(239,68,68,0.03)", border: "1px solid rgba(239,68,68,0.12)" }}
-                  >
-                    <div>
-                      <p className="text-[9px] font-black uppercase tracking-[0.22em] text-white/20 mb-2">
-                        Transaction Reference
-                      </p>
-                      <div className="relative">
-                        <code
-                          className="block w-full text-xs font-mono px-4 py-3 rounded-xl pr-12 break-all"
-                          style={{ color: "rgba(251,191,36,0.65)", background: "rgba(0,0,0,0.3)", border: "1px solid rgba(255,255,255,0.04)" }}
-                        >
-                          {reference}
-                        </code>
-                        <button
-                          onClick={copyReceipt}
-                          className="absolute right-3 top-1/2 -translate-y-1/2 p-1.5 rounded-lg transition-all hover:bg-white/10"
-                          style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.06)" }}
-                        >
-                          {copied ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3 text-white/25" />}
-                        </button>
-                      </div>
-                    </div>
-
-                    {user ? (
-                      <button
-                        onClick={manualCheck}
-                        disabled={isRefreshing}
-                        className="w-full h-11 rounded-xl text-sm font-black text-white flex items-center justify-center gap-2 transition-all hover:opacity-90 active:scale-[0.98] disabled:opacity-50"
-                        style={{ background: "linear-gradient(135deg, #EF4444 0%, #DC2626 100%)", boxShadow: "0 4px 20px rgba(239,68,68,0.25)" }}
-                      >
-                        {isRefreshing ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
-                        Retry Fulfillment
-                      </button>
-                    ) : (
-                      <a
-                        href="https://wa.me/233540000000"
-                        target="_blank"
-                        rel="noreferrer"
-                        className="w-full h-11 rounded-xl text-sm font-black text-white flex items-center justify-center gap-2 transition-all hover:opacity-80"
-                        style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.08)" }}
-                      >
-                        Contact Support
-                      </a>
-                    )}
-
-                    <p className="text-center text-[9px] font-black uppercase tracking-[0.2em] text-white/15">
-                      Your payment is safe · We'll resolve this
-                    </p>
-                  </div>
-                )}
-
-                {/* Reference + copy (non-failed) */}
-                {!failed && (
-                  <div
-                    className="rounded-2xl px-4 py-3 flex items-center justify-between gap-3"
-                    style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.04)" }}
-                  >
-                    <div className="min-w-0">
-                      <p className="text-[9px] font-black uppercase tracking-[0.2em] text-white/20 mb-0.5">Reference</p>
-                      <code className="text-[11px] font-mono text-white/38 truncate block">{reference.slice(0, 20)}...</code>
-                    </div>
-                    <button
-                      onClick={copyReceipt}
-                      className="flex items-center gap-1.5 px-3 py-2 rounded-xl shrink-0 transition-all text-[10px] font-black uppercase tracking-widest"
-                      style={{
-                        background: copied ? "rgba(16,185,129,0.08)" : "rgba(255,255,255,0.04)",
-                        border: copied ? "1px solid rgba(16,185,129,0.2)" : "1px solid rgba(255,255,255,0.06)",
-                        color: copied ? "#10B981" : "rgba(255,255,255,0.32)",
-                      }}
-                    >
-                      {copied ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
-                      {copied ? "Copied!" : "Copy"}
-                    </button>
-                  </div>
-                )}
-
-                {/* Footer: live status + manual refresh */}
-                {!failed && (
-                  <div className="flex items-center justify-between pt-0.5">
-                    {!initialCheckDone ? (
-                      <div className="flex items-center gap-1.5 text-[9px] font-black uppercase tracking-[0.18em] text-white/18 animate-pulse">
-                        <Activity className="w-3 h-3" />
-                        Connecting...
-                      </div>
-                    ) : isLive ? (
-                      <div className="flex items-center gap-1.5 text-[9px] font-black uppercase tracking-[0.18em] text-white/18">
-                        <Activity className="w-3 h-3" />
-                        Live tracking active
-                      </div>
-                    ) : (
-                      <div
-                        className="flex items-center gap-1.5 text-[9px] font-black uppercase tracking-[0.18em]"
-                        style={{ color: "rgba(16,185,129,0.45)" }}
-                      >
-                        <CheckCircle2 className="w-3 h-3" />
-                        Order complete
-                      </div>
-                    )}
-
-                    {isLive && (
-                      <button
-                        onClick={manualCheck}
-                        disabled={isRefreshing}
-                        className="flex items-center gap-1.5 text-[9px] font-black uppercase tracking-widest transition-all disabled:opacity-30 hover:opacity-75"
-                        style={{ color: meta.color }}
-                      >
-                        {isRefreshing ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
-                        Check Now
-                      </button>
-                    )}
+              
+              <div className="relative w-32 h-32 rounded-[2.5rem] flex items-center justify-center border-2 overflow-hidden"
+                style={{ 
+                  background: `linear-gradient(135deg, ${meta.color}20 0%, transparent 100%)`,
+                  borderColor: `${meta.color}40`
+                }}
+              >
+                {!initialCheckDone ? (
+                  <Loader2 className="w-14 h-14 animate-spin text-white/20" />
+                ) : orderStatus === "fulfilled" ? (
+                  <CheckCircle2 className="w-16 h-16 text-emerald-400 drop-shadow-[0_0_15px_rgba(52,211,153,0.5)]" />
+                ) : failed ? (
+                  <XCircle className="w-16 h-16 text-red-400" />
+                ) : (
+                  <div className="relative flex items-center justify-center">
+                     <Activity className="w-16 h-16 opacity-10 animate-pulse" style={{ color: meta.color }} />
+                     <div className="absolute inset-0 flex items-center justify-center">
+                        <SignalHigh className="w-10 h-10 animate-bounce" style={{ color: meta.color, animationDuration: "2s" }} />
+                     </div>
                   </div>
                 )}
               </div>
             </div>
-          )}
 
-          {/* Phone Order Tracker */}
-          <div className="animate-in fade-in slide-in-from-bottom-4 duration-700 delay-150">
-            <PhoneOrderTracker
-              title={hasOrder ? "Related History" : "Find Your Order"}
-              subtitle={
-                hasOrder
-                  ? "Full delivery history for this number."
-                  : "Enter your phone number to check all recent data bundles."
-              }
-              defaultPhone={phone || undefined}
-            />
+            <h2 className="text-3xl font-black text-white tracking-tight leading-tight mb-2">
+              {meta.label}
+            </h2>
+            <p className="text-sm text-white/40 font-medium max-w-[280px]">
+              {meta.sub}
+            </p>
+
+            {(network || phone) && (
+              <div className="mt-8 flex items-center gap-1 p-1 pr-3 rounded-full bg-white/[0.03] border border-white/5">
+                <div className="px-3 py-1 rounded-full bg-white/5 text-[10px] font-black text-white/80 uppercase tracking-widest border border-white/5">
+                  {network}
+                </div>
+                <span className="text-xs text-white/40 font-bold ml-1">{packageSize}</span>
+                <span className="text-white/10 text-xs mx-1">·</span>
+                <span className="text-xs font-mono text-white/30">{phone}</span>
+              </div>
+            )}
           </div>
+
+          <div className="px-8 pb-8 space-y-6">
+             <div className="relative flex justify-between">
+                <div className="absolute top-[18px] left-[15%] right-[15%] h-[2px] bg-white/5">
+                  <div 
+                    className="h-full transition-all duration-[2000ms] ease-out"
+                    style={{ 
+                      width: `${(step / 3) * 100}%`,
+                      background: `linear-gradient(90deg, transparent 0%, ${meta.color} 50%, ${meta.color} 100%)`,
+                      boxShadow: `0 0 10px ${meta.color}80`
+                    }}
+                  />
+                </div>
+
+                {STEPS.map((s, i) => {
+                  const isActive = step >= i + 1;
+                  return (
+                    <div key={s.key} className="relative z-10 flex flex-col items-center gap-3">
+                      <div 
+                        className={`w-9 h-9 rounded-2xl flex items-center justify-center border-2 transition-all duration-700 ${isActive ? "scale-110 shadow-lg" : "opacity-30"}`}
+                        style={{ 
+                          background: isActive ? `${s.color}20` : "transparent",
+                          borderColor: isActive ? s.color : "rgba(255,255,255,0.1)"
+                        }}
+                      >
+                        <s.icon className="w-4 h-4" style={{ color: isActive ? s.color : "white" }} />
+                      </div>
+                      <span className={`text-[9px] font-black uppercase tracking-widest transition-colors duration-700 ${isActive ? "text-white" : "text-white/20"}`}>
+                        {s.key}
+                      </span>
+                    </div>
+                  );
+                })}
+             </div>
+          </div>
+
+
+          <div className="mx-8 mb-8 space-y-3">
+             <div className="flex items-center gap-2 mb-1">
+                <Search className="w-3 h-3 text-white/20" />
+                <span className="text-[9px] font-black text-white/20 uppercase tracking-[0.2em]">Live Activity</span>
+             </div>
+             
+             <div className="space-y-2">
+                {statusLog.length > 0 ? (
+                  statusLog.map((log, i) => (
+                    <div key={i} className="flex items-center gap-3 animate-in fade-in slide-in-from-left-2 duration-500" style={{ opacity: 1 - (i * 0.15) }}>
+                       <div className="w-6 h-6 rounded-lg bg-white/[0.03] border border-white/5 flex items-center justify-center shrink-0">
+                          <log.icon className="w-3 h-3 text-white/40" />
+                       </div>
+                       <div className="flex-1 min-w-0">
+                          <p className="text-[11px] font-bold text-white/60 truncate">{log.msg}</p>
+                       </div>
+                       <span className="text-[9px] font-mono text-white/15 shrink-0">{log.time}</span>
+                    </div>
+                  ))
+                ) : (
+                  <div className="py-2 flex items-center gap-3 opacity-20">
+                     <div className="w-6 h-6 rounded-lg border border-dashed border-white/20 flex items-center justify-center">
+                        <Loader2 className="w-3 h-3 animate-spin" />
+                     </div>
+                     <p className="text-[11px] font-medium">Initializing secure connection...</p>
+                  </div>
+                )}
+             </div>
+          </div>
+
+          <div className="bg-white/[0.02] px-8 py-5 flex items-center justify-between gap-4 border-t border-white/5">
+            <div className="min-w-0">
+               <p className="text-[9px] font-black text-white/20 uppercase tracking-[0.2em] mb-1">Order Reference</p>
+               <code className="text-[11px] font-mono text-white/40 truncate block">{reference}</code>
+            </div>
+            <button 
+              onClick={copyRef}
+              className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/5 transition-all"
+            >
+              {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5 text-white/40" />}
+              <span className="text-[10px] font-black text-white/40 uppercase tracking-widest">{copied ? "Copied" : "Copy"}</span>
+            </button>
+          </div>
+        </div>
+
+        <div className="mt-8 flex gap-3">
+           <button 
+             onClick={manualCheck}
+             disabled={isRefreshing || orderStatus === "fulfilled"}
+             className="flex-1 h-14 rounded-[1.5rem] bg-white/5 hover:bg-white/10 border border-white/10 flex items-center justify-center gap-3 transition-all active:scale-95 disabled:opacity-30"
+           >
+             {isRefreshing ? <Loader2 className="w-4 h-4 animate-spin text-white/40" /> : <RefreshCw className="w-4 h-4 text-white/40" />}
+             <span className="text-xs font-black text-white/70 uppercase tracking-widest">Manual Refresh</span>
+           </button>
+           
+           <button 
+             onClick={() => window.open("https://wa.me/233540000000", "_blank")}
+             className="w-14 h-14 rounded-[1.5rem] bg-white/5 hover:bg-white/10 border border-white/10 flex items-center justify-center transition-all active:scale-95"
+           >
+             <Info className="w-5 h-5 text-white/40" />
+           </button>
+        </div>
+
+        <div className="mt-12 opacity-80">
+          <PhoneOrderTracker 
+            title="Search History"
+            subtitle="Track any number's recent bundles"
+            defaultPhone={phone || undefined}
+          />
         </div>
       </div>
     </div>
