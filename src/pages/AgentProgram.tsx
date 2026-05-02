@@ -60,7 +60,7 @@ const AgentProgram = () => {
             type: "link" as const,
             to: "/agent/pending",
             title: "Complete Activation",
-            description: "Pay GHS 80 to activate your reseller account instantly.",
+            description: "Pay GHS 50 to activate your reseller account instantly.",
             label: "Pay & Request Approval",
           }
       : {

@@ -34,9 +34,9 @@ const SubAgentPending = () => {
       setActivationFee(Number.isFinite(configuredFee) && configuredFee > 0 ? configuredFee : 0);
 
       // Fetch platform base fee
-      const { data: settings } = await supabase.from("system_settings").select("agent_activation_fee").eq("id", 1).maybeSingle();
-      if (settings?.agent_activation_fee) {
-        setPlatformBaseFee(Number(settings.agent_activation_fee));
+      const { data: settings } = await supabase.from("system_settings").select("sub_agent_base_fee").eq("id", 1).maybeSingle();
+      if (settings?.sub_agent_base_fee) {
+        setPlatformBaseFee(Number(settings.sub_agent_base_fee));
       }
 
       setLoadingData(false);

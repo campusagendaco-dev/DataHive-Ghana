@@ -8,12 +8,6 @@ import { getAppBaseUrl } from "@/lib/app-base-url";
 import { invokePublicFunction, invokePublicFunctionAsUser } from "@/lib/public-function-client";
 import { supabase } from "@/integrations/supabase/client";
 
-const ACTIVATION_FEE = 80;
-const PAYSTACK_FEE_RATE = 0.03;
-const PAYSTACK_FEE_CAP = 100;
-const paystackFee = Math.min(ACTIVATION_FEE * PAYSTACK_FEE_RATE, PAYSTACK_FEE_CAP);
-const ACTIVATION_TOTAL = parseFloat((ACTIVATION_FEE + paystackFee).toFixed(2));
-
 const AgentPending = () => {
   const { user, profile, signOut, refreshProfile } = useAuth();
   const navigate = useNavigate();
@@ -21,12 +15,20 @@ const AgentPending = () => {
   const [paying, setPaying] = useState(false);
   const [verifying, setVerifying] = useState(false);
   const [hasPaid, setHasPaid] = useState(false);
+  const [activationFee, setActivationFee] = useState(50);
+  
+  const PAYSTACK_FEE_RATE = 0.03;
+  const PAYSTACK_FEE_CAP = 100;
+  const paystackFee = Math.min(activationFee * PAYSTACK_FEE_RATE, PAYSTACK_FEE_CAP);
+  const activationTotal = parseFloat((activationFee + paystackFee).toFixed(2));
+
   const approvedButSetupIncomplete = Boolean(profile?.agent_approved && !profile?.onboarding_complete);
 
   useEffect(() => {
     if (!user) return;
-    const checkPaid = async () => {
-      const { data } = await supabase
+    const fetchData = async () => {
+      // 1. Check if paid
+      const { data: orderData } = await supabase
         .from("orders")
         .select("status")
         .eq("agent_id", user.id)
@@ -34,9 +36,19 @@ const AgentPending = () => {
         .in("status", ["paid", "fulfilled"])
         .maybeSingle();
       
-      if (data) setHasPaid(true);
+      if (orderData) setHasPaid(true);
+
+      // 2. Fetch dynamic fee
+      try {
+        const { data: settings } = await supabase.from("system_settings").select("agent_activation_fee").eq("id", 1).maybeSingle();
+        if (settings?.agent_activation_fee) {
+          setActivationFee(Number(settings.agent_activation_fee));
+        }
+      } catch (e) {
+        console.error("Error fetching fee:", e);
+      }
     };
-    checkPaid();
+    fetchData();
   }, [user]);
 
   // Auto-verify on return from Paystack
@@ -79,14 +91,14 @@ const AgentPending = () => {
     const { data: paymentData, error: paymentError } = await invokePublicFunction("initialize-payment", {
       body: {
         email: profile.email || `${user.id}@agent.swiftdata.gh`,
-        amount: ACTIVATION_TOTAL,
+        amount: activationTotal,
         reference: orderId,
         callback_url: `${getAppBaseUrl()}/agent/pending?reference=${orderId}`,
         metadata: {
           order_id: orderId,
           order_type: "agent_activation",
           agent_id: user.id,
-          base_amount: ACTIVATION_FEE,
+          base_amount: activationFee,
           paystack_fee: paystackFee,
         },
       },
@@ -117,7 +129,7 @@ const AgentPending = () => {
             ? "Your reseller request is approved. Click check status to continue with setup."
             : hasPaid 
               ? "Your activation payment has been received! We are now reviewing your store details. You will be notified once approved."
-              : `Pay a one-time activation fee of GHS ${ACTIVATION_FEE} + GHS ${paystackFee.toFixed(2)} transaction fee (Total: GHS ${ACTIVATION_TOTAL.toFixed(2)}) to activate your reseller account instantly.`}
+              : `Pay a one-time activation fee of GHS ${activationFee} + GHS ${paystackFee.toFixed(2)} transaction fee (Total: GHS ${activationTotal.toFixed(2)}) to activate your reseller account instantly.`}
         </p>
 
         {!approvedButSetupIncomplete && (
@@ -141,8 +153,8 @@ const AgentPending = () => {
                   <div className="flex items-center gap-3 p-3 rounded-xl bg-primary/5 border border-primary/10">
                     <CreditCard className="w-5 h-5 text-primary flex-shrink-0" />
                     <div>
-                      <p className="font-semibold text-foreground">Activation Fee: GHS {ACTIVATION_FEE}</p>
-                      <p className="text-xs text-muted-foreground">+ GHS {paystackFee.toFixed(2)} Paystack fee = GHS {ACTIVATION_TOTAL.toFixed(2)} total</p>
+                      <p className="font-semibold text-foreground">Activation Fee: GHS {activationFee}</p>
+                      <p className="text-xs text-muted-foreground">+ GHS {paystackFee.toFixed(2)} Paystack fee = GHS {activationTotal.toFixed(2)} total</p>
                       <p className="text-xs text-muted-foreground">One-time payment via Paystack (MoMo or Card)</p>
                     </div>
                   </div>
@@ -161,7 +173,7 @@ const AgentPending = () => {
                   ) : verifying ? (
                     <><Loader2 className="w-5 h-5 mr-2 animate-spin" /> Verifying...</>
                   ) : (
-                    <><CreditCard className="w-5 h-5 mr-2" /> Pay GHS {ACTIVATION_TOTAL.toFixed(2)} to Activate</>
+                    <><CreditCard className="w-5 h-5 mr-2" /> Pay GHS {activationTotal.toFixed(2)} to Activate</>
                   )}
                 </Button>
               </>
