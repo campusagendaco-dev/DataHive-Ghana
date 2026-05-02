@@ -44,17 +44,21 @@ serve(async (req: Request) => {
 
     // 3. Sync with Database
     
-    // --- 2. FORCE COMPLETE STUCK ORDERS ---
-    // User requested to push ALL processing orders to done/fulfilled NOW.
+    // --- 2. FORCE COMPLETE STUCK ORDERS (> 20 mins) ---
+    const twentyMinsAgo = new Date(Date.now() - 20 * 60 * 1000).toISOString();
     const { data: stuckOrders } = await supabaseAdmin
       .from("orders")
       .select("id")
-      .eq("status", "processing");
+      .eq("status", "processing")
+      .lt("created_at", twentyMinsAgo);
 
     if (stuckOrders && stuckOrders.length > 0) {
-      console.log(`Force completing ${stuckOrders.length} stuck orders...`);
+      console.log(`Force completing ${stuckOrders.length} orders older than 20 mins...`);
       for (const order of stuckOrders) {
-        await supabaseAdmin.from("orders").update({ status: "fulfilled" }).eq("id", order.id);
+        await supabaseAdmin.from("orders").update({ 
+          status: "fulfilled",
+          failure_reason: "Auto-fulfilled (Timeline threshold met)"
+        }).eq("id", order.id);
         await supabaseAdmin.rpc("credit_order_profits", { p_order_id: order.id });
       }
     }

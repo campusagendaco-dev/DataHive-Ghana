@@ -15,7 +15,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { 
   Wallet, Loader2, Send, CreditCard, Gift, 
   ArrowRightLeft, History, RefreshCw, PlusCircle, 
-  ChevronRight, ArrowUpRight, Zap, ShieldCheck 
+  ChevronRight, ArrowUpRight, Zap, ShieldCheck, CheckCircle2, X 
 } from "lucide-react";
 import { basePackages, networks, getPublicPrice } from "@/lib/data";
 
@@ -92,6 +92,7 @@ const DashboardWallet = () => {
   const [recentTopups, setRecentTopups] = useState<WalletTopupRow[]>([]);
   const [topupAmount, setTopupAmount] = useState("");
   const [toppingUp, setToppingUp] = useState(false);
+  const [showSuccessOverlay, setShowSuccessOverlay] = useState(false);
 
   // Fetch global package settings
   useEffect(() => {
@@ -280,20 +281,17 @@ const DashboardWallet = () => {
     if (error || data?.error) {
       const description = data?.error || await getFunctionErrorMessage(error, "Could not complete wallet purchase.");
       toast({ title: "Purchase failed", description, variant: "destructive" });
-    } else if (data?.status === "fulfilled") {
-      toast({ title: "Data delivered successfully!" });
-      const successParams = new URLSearchParams({
-        source: "wallet",
-        network: selectedNetwork,
-        package: selectedPackage,
-        phone: customerPhone,
-      });
-      if (typeof data?.order_id === "string" && data.order_id) {
-        successParams.set("reference", data.order_id);
+    } else if (data?.success || data?.status === "paid" || data?.status === "fulfilled") {
+      // Fast-track fulfillment if the order is 'paid'
+      if (data?.order_id) {
+        console.log("[FastTrack] Triggering fulfillment for:", data.order_id);
+        invokePublicFunction("verify-payment", { body: { reference: data.order_id } }).catch(e => console.error("[FastTrack-Error]", e));
       }
-      navigate(`/purchase-success?${successParams.toString()}`);
+      
+      setShowSuccessOverlay(true);
       setCustomerPhone("");
       setSelectedPackage("");
+      toast({ title: "Success", description: "Order processed successfully." });
     } else {
       toast({ title: "Order placed", description: data?.failure_reason || "Fulfillment pending", variant: "destructive" });
     }
@@ -627,6 +625,36 @@ const DashboardWallet = () => {
           </div>
         </div>
       </div>
+      {/* ── Success Overlay ── */}
+      {showSuccessOverlay && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-6 animate-in fade-in duration-500">
+          <div className="absolute inset-0 bg-black/90 backdrop-blur-3xl" />
+          <div className="relative max-w-sm w-full bg-[#0A0A0C] border border-white/10 rounded-[3rem] p-10 text-center space-y-8 animate-in zoom-in-95 duration-300 shadow-3xl">
+            <div className="relative mx-auto w-24 h-24">
+              <div className="absolute inset-0 bg-emerald-500 rounded-full blur-2xl opacity-20 animate-pulse" />
+              <div className="relative w-full h-full rounded-full bg-emerald-500 flex items-center justify-center shadow-[0_0_50px_rgba(16,185,129,0.3)]">
+                <CheckCircle2 className="w-12 h-12 text-white" />
+              </div>
+            </div>
+            
+            <div className="space-y-3">
+              <h2 className="text-4xl font-black tracking-tighter text-white uppercase">Delivered!</h2>
+              <p className="text-white/40 text-sm font-medium leading-relaxed">
+                Your bundle has been processed successfully. Your balance has been updated.
+              </p>
+            </div>
+
+            <div className="pt-4">
+              <button 
+                onClick={() => setShowSuccessOverlay(false)}
+                className="w-full bg-white/5 border border-white/10 hover:bg-white/10 text-white font-black py-4 rounded-2xl transition-all uppercase tracking-widest text-xs"
+              >
+                Continue
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

@@ -104,20 +104,27 @@ const FreeDataButton = () => {
 
   useEffect(() => {
     const fetchCampaign = async () => {
-      const { data } = await supabase
-        .from("public_system_settings")
-        .select("free_data_enabled, free_data_network, free_data_package_size")
-        .eq("id", 1)
-        .maybeSingle();
+      // Silently skip if offline to avoid console errors
+      if (!window.navigator.onLine) return;
 
-      if (data && data.free_data_enabled) {
-        setCampaign({
-          enabled: true,
-          network: data.free_data_network || "MTN",
-          packageSize: data.free_data_package_size || "1GB",
-        });
-      } else {
-        setCampaign(null);
+      try {
+        const { data } = await supabase
+          .from("public_system_settings")
+          .select("free_data_enabled, free_data_network, free_data_package_size")
+          .eq("id", 1)
+          .maybeSingle();
+
+        if (data && data.free_data_enabled) {
+          setCampaign({
+            enabled: true,
+            network: data.free_data_network || "MTN",
+            packageSize: data.free_data_package_size || "1GB",
+          });
+        } else {
+          setCampaign(null);
+        }
+      } catch (e) {
+        // Fail silently during network flickers
       }
     };
     fetchCampaign();

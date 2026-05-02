@@ -24,6 +24,7 @@ export async function invokePublicFunctionAsUser(functionName: string, options?:
   const headers = { ...(options?.headers || {}) };
 
   if (accessToken) {
+    headers["Authorization"] = `Bearer ${accessToken}`;
     headers["x-user-access-token"] = accessToken;
   }
 

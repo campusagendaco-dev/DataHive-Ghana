@@ -85,6 +85,7 @@ import { OfflineAlert } from "@/components/OfflineAlert";
 import { useRegisterSW } from "virtual:pwa-register/react";
 import DashboardBulk from "./pages/DashboardBulk";
 import DashboardWhatsAppBot from "./pages/DashboardWhatsAppBot";
+import DeliveryTracker from "./pages/DeliveryTracker";
 
 
 const queryClient = new QueryClient();
@@ -180,13 +181,16 @@ const AppContent = () => {
     let mounted = true;
 
     const loadMaintenance = async () => {
+      // Prevent polling errors when offline
+      if (!window.navigator.onLine) return;
+
       try {
         const maintenanceResult = await Promise.race([
           supabase.functions.invoke("maintenance-mode", {
             body: { action: "get" },
           }),
           new Promise<never>((_, reject) => {
-            window.setTimeout(() => reject(new Error("maintenance-timeout")), 6000);
+            window.setTimeout(() => reject(new Error("maintenance-timeout")), 8000);
           }),
         ]);
         const { data, error } = maintenanceResult as { data: any; error: any };
@@ -259,6 +263,7 @@ const AppContent = () => {
         <Route path="/agent-program" element={<AgentProgram />} />
         <Route path="/store/:slug" element={<AgentStore />} />
         <Route path="/order-status" element={<OrderStatus />} />
+        <Route path="/delivery-tracker" element={<DeliveryTracker />} />
         <Route path="/purchase-success" element={<PurchaseSuccess />} />
         <Route path="/api-docs" element={<APIDocumentation />} />
         <Route path="/developers" element={<DeveloperPortal />} />

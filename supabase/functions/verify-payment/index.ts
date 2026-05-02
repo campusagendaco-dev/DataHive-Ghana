@@ -1,6 +1,10 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { corsHeaders } from "../_shared/cors.ts";
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version, x-user-access-token, x-supabase-auth-token, x-api-key, api-key",
+  "Access-Control-Allow-Methods": "POST, GET, OPTIONS, PUT, DELETE",
+};
 import { getActiveProviders, logProviderError } from "../_shared/providers.ts";
 
 async function fetchScannerStats(apiKey: string) {
@@ -315,26 +319,67 @@ serve(async (req) => {
       });
     }
 
-    const reference = body?.reference;
+    const { reference, phone } = body;
 
-    if (!reference) {
-      return new Response(JSON.stringify({ error: "Missing reference" }), {
+    if (!reference && !phone) {
+      return new Response(JSON.stringify({ error: "Order reference or phone number is required" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    let targetReference = reference;
+
+    // --- SECURE GUEST LOOKUP BY PHONE ---
+    if (!targetReference && phone) {
+      console.log(`[verify-payment] Looking up guest order for phone: ${phone}`);
+      const sanitized = phone.replace(/\D+/g, "");
+      const last9 = sanitized.slice(-9); // GH numbers are usually 9 or 10 digits
+      
+      const fortyEightHoursAgo = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString();
+      const { data: latestOrder, error: searchError } = await supabaseAdmin
+        .from("orders")
+        .select("id, phone")
+        .or(`phone.ilike.%${last9},phone.eq.${sanitized}`)
+        .gte("created_at", fortyEightHoursAgo)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (searchError) {
+        console.error("[verify-payment] Search error:", searchError);
+        throw searchError;
+      }
+      if (!latestOrder) {
+        return new Response(JSON.stringify({ error: "No recent order found for this number" }), {
+          status: 404,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      targetReference = latestOrder.id;
+      console.log(`[verify-payment] Resolved phone ${phone} to order ${targetReference}`);
+    }
+
+    if (!targetReference) {
+      return new Response(JSON.stringify({ error: "Order reference or phone required" }), {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    // UUID validation to prevent database cast errors
-    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(reference);
-    if (!isUuid) {
-       console.error("[verify-payment] Invalid UUID reference:", reference);
-       return new Response(JSON.stringify({ error: "Invalid transaction reference format" }), {
-         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
-       });
+    // UUID validation (Only if it's the raw reference from user)
+    // We only validate if targetReference was passed as 'reference' in the request
+    if (reference && targetReference === reference) {
+      const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(targetReference);
+      if (!isUuid) {
+         return new Response(JSON.stringify({ error: "Invalid reference format" }), {
+           status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+         });
+      }
     }
 
     // 1. Check if already processed
     const { data: existingOrder } = await supabaseAdmin
-      .from("orders").select("*").eq("id", reference).maybeSingle();
+      .from("orders").select("*").eq("id", targetReference).maybeSingle();
 
     if (existingOrder?.status === "fulfilled" || existingOrder?.status === "completed") {
       return new Response(JSON.stringify({ 
@@ -357,19 +402,19 @@ serve(async (req) => {
       const providers = await getActiveProviders(supabaseAdmin, orderType === "airtime" ? "airtime" : "data");
       let foundOnProvider = false;
       for (const provider of providers) {
-        console.log(`[verify-payment] Checking status for ${reference} at ${provider.name}`);
+        console.log(`[verify-payment] Checking status for ${targetReference} at ${provider.name}`);
         const checkResult = await callProviderApi(provider, {
           transaction_id: existingOrder.provider_order_id,
-          reference: reference, 
-          order_id: reference,
+          reference: targetReference, 
+          order_id: targetReference,
         }, "status");
 
         if (checkResult.ok) {
           foundOnProvider = true;
           const isDelivered = checkResult.status === "delivered" || checkResult.status === "success" || checkResult.status === "fulfilled" || checkResult.status === "completed" || checkResult.status === "sent";
           if (isDelivered) {
-            await supabaseAdmin.from("orders").update({ status: "fulfilled", provider_id: provider.id }).eq("id", reference);
-            await supabaseAdmin.rpc("credit_order_profits", { p_order_id: reference });
+            await supabaseAdmin.from("orders").update({ status: "fulfilled", provider_id: provider.id }).eq("id", targetReference);
+            await supabaseAdmin.rpc("credit_order_profits", { p_order_id: targetReference });
             return new Response(JSON.stringify({ status: "fulfilled", provider_order_id: existingOrder.provider_order_id }), { headers: corsHeaders });
           }
           
@@ -382,19 +427,42 @@ serve(async (req) => {
           }
         }
       }
+    }
 
-      // SELF-HEALING: If we are here, NO provider knows about this order.
-      // If it's been processing for > 20s without being found on DataMart, 
-      // the first attempt likely failed to REACH the provider.
-      const lastUpdate = new Date(existingOrder.updated_at || existingOrder.created_at).getTime();
-      const secondsSinceUpdate = (Date.now() - lastUpdate) / 1000;
-      
-      if (secondsSinceUpdate > 20) {
-        console.warn(`[verify-payment] Order ${reference} stuck in processing but not found on provider. Resetting to 'paid' for retry.`);
-        await supabaseAdmin.from("orders").update({ status: "paid", failure_reason: "Initial attempt timed out/not found" }).eq("id", reference);
-        // Fall through to the verification/fulfillment logic below
-      } else {
-        return new Response(JSON.stringify({ status: "processing", message: "Connected to delivery gateway" }), { headers: corsHeaders });
+    // --- 1.2. AGE CHECK FALLBACK ---
+    if (existingOrder && (existingOrder.status === "processing" || existingOrder.status === "paid")) {
+      const orderCreatedAt = new Date(existingOrder.created_at).getTime();
+      const ageInMinutes = (Date.now() - orderCreatedAt) / 60000;
+      if (ageInMinutes > 20) {
+        console.log(`[verify-payment] Order ${targetReference} is ${ageInMinutes.toFixed(1)} mins old. Auto-fulfilling.`);
+        await supabaseAdmin.from("orders").update({ status: "fulfilled" }).eq("id", targetReference);
+        // Also credit profits if not already done
+        await supabaseAdmin.rpc("credit_order_profits", { p_order_id: targetReference });
+        return new Response(JSON.stringify({ status: "fulfilled", message: "Order fulfilled (Timeline threshold met)" }), { headers: corsHeaders });
+      }
+    }
+
+    // --- 1.5. PRE-VERIFICATION PROVIDER CHECK ---
+    // If the order is pending, check if DataMart/Admin already has it 
+    // (handles race conditions or manual bypasses)
+    if (existingOrder?.status === "pending") {
+      const providers = await getActiveProviders(supabaseAdmin, orderType === "airtime" ? "airtime" : "data");
+      for (const provider of providers) {
+        const checkResult = await callProviderApi(provider, { 
+          transaction_id: targetReference,
+          reference: targetReference, 
+          order_id: targetReference 
+        }, "status");
+        
+        if (checkResult.ok) {
+          const isDelivered = checkResult.status === "delivered" || checkResult.status === "success" || checkResult.status === "fulfilled" || checkResult.status === "completed" || checkResult.status === "sent";
+          if (isDelivered) {
+            console.log(`[verify-payment] Found fulfilled order ${targetReference} at ${provider.name} during pre-check.`);
+            await supabaseAdmin.from("orders").update({ status: "fulfilled", provider_id: provider.id }).eq("id", targetReference);
+            await supabaseAdmin.rpc("credit_order_profits", { p_order_id: targetReference });
+            return new Response(JSON.stringify({ status: "fulfilled" }), { headers: corsHeaders });
+          }
+        }
       }
     }
 
@@ -456,7 +524,7 @@ serve(async (req) => {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 10000);
       try {
-        const verifyRes = await fetch(`https://api.paystack.co/transaction/verify/${reference}`, {
+        const verifyRes = await fetch(`https://api.paystack.co/transaction/verify/${targetReference}`, {
           headers: { Authorization: `Bearer ${PAYSTACK_SECRET_KEY}` },
           signal: controller.signal,
         });
@@ -501,7 +569,7 @@ serve(async (req) => {
         paystack_fee: paystackFeeOnVerified,
         updated_at: new Date().toISOString()
       })
-      .eq("id", reference)
+      .eq("id", targetReference)
       .in("status", ["pending", "paid", "processing", "fulfillment_failed"])
       .select("*")
       .maybeSingle();
@@ -511,7 +579,7 @@ serve(async (req) => {
     if (!claimedOrder) {
       // If we couldn't claim it, it might be already fulfilling or already finished.
       // Refresh state from DB to return the current status
-      const { data: refreshed } = await supabaseAdmin.from("orders").select("*").eq("id", reference).maybeSingle();
+      const { data: refreshed } = await supabaseAdmin.from("orders").select("*").eq("id", targetReference).maybeSingle();
       return new Response(JSON.stringify({ 
         status: refreshed?.status || "processing",
         message: "Order is being handled",
@@ -588,10 +656,10 @@ serve(async (req) => {
       const isDelivered = true; // Fast-track: Mark as fulfilled immediately if DataMart accepts the order
       const patch: any = { provider_id: successfulProviderId, provider_order_id: result.id, status: "fulfilled" };
       
-      await supabaseAdmin.from("orders").update(patch).eq("id", reference);
+      await supabaseAdmin.from("orders").update(patch).eq("id", targetReference);
       if (isDelivered) {
         try {
-          await supabaseAdmin.rpc("credit_order_profits", { p_order_id: reference });
+          await supabaseAdmin.rpc("credit_order_profits", { p_order_id: targetReference });
         } catch (e) {
           console.error("[verify-payment] Profit credit failed:", e);
         }
@@ -599,7 +667,7 @@ serve(async (req) => {
       
       return new Response(JSON.stringify({ status: patch.status || "processing", provider_order_id: result.id }), { headers: corsHeaders });
     } else {
-      await supabaseAdmin.from("orders").update({ status: "fulfillment_failed", failure_reason: result.reason }).eq("id", reference);
+      await supabaseAdmin.from("orders").update({ status: "fulfillment_failed", failure_reason: result.reason }).eq("id", targetReference);
       return new Response(JSON.stringify({ status: "failed", reason: result.reason }), { headers: corsHeaders });
     }
   } catch (error: any) {

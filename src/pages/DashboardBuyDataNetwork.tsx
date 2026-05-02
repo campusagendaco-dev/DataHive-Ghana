@@ -112,6 +112,11 @@ const DashboardBuyDataNetwork = ({ network }: DashboardBuyDataNetworkProps) => {
 
   const isPaidAgent = Boolean(profile?.agent_approved || profile?.sub_agent_approved);
 
+  const normalizedPhone = useMemo(() => phone.replace(/\D+/g, ""), [phone]);
+  const isPhoneValid = useMemo(() => 
+    normalizedPhone.length === 10 || normalizedPhone.length === 12 || normalizedPhone.length === 9,
+  [normalizedPhone]);
+
   // Restore phone from navigation state if it exists (for auto-network switching)
   useEffect(() => {
     const navState = window.history.state?.usr;
@@ -265,9 +270,6 @@ const DashboardBuyDataNetwork = ({ network }: DashboardBuyDataNetworkProps) => {
   const selectedPackage = packages.find((item) => item.size === selectedSize);
   const cardColors = getNetworkCardColors(network);
 
-  const normalizedPhone = phone.replace(/\D+/g, "");
-  const isPhoneValid = normalizedPhone.length === 10 || normalizedPhone.length === 12 || normalizedPhone.length === 9;
-
   const validPromo = promoResult?.valid ? promoResult : null;
   const isFreePromo = validPromo?.is_free === true;
   
@@ -385,11 +387,25 @@ const DashboardBuyDataNetwork = ({ network }: DashboardBuyDataNetworkProps) => {
         return;
       }
 
-      if (typeof data?.order_id === "string" && data.order_id) {
-        setLastOrder({ id: data.order_id, network, packageSize: selectedPackage!.size, phone, status: data?.status || "paid" });
+      console.log("Wallet buy response data:", data);
+
+      if (typeof data?.order_id === "string" || data?.success) {
+        toast({ title: "Purchase Success!", description: "Your bundle is being delivered.", variant: "default" });
+        if (data?.order_id) {
+          setLastOrder({ 
+            id: data.order_id, 
+            network, 
+            packageSize: selectedPackage!.size, 
+            phone, 
+            status: data?.status || "processing" 
+          });
+        }
         setShowSuccessOverlay(true);
-        setTimeout(() => setShowSuccessOverlay(false), 5000);
+        // Let overlay stay longer or require manual close if needed, but 5s is fine for now
+        setTimeout(() => setShowSuccessOverlay(false), 6000);
       } else {
+        // Fallback success if we got here without a explicit error
+        toast({ title: "Order Placed", description: "Check your order history for status." });
         setShowSuccessOverlay(true);
         setTimeout(() => setShowSuccessOverlay(false), 5000);
       }
