@@ -71,6 +71,7 @@ const AdminOrders = () => {
   const [search, setSearch] = useState(initialSearch);
   const [retrying, setRetrying] = useState<string | null>(null);
   const [retryingAll, setRetryingAll] = useState(false);
+  const [forcingFulfill, setForcingFulfill] = useState(false);
   const [typeFilter, setTypeFilter] = useState<FilterType>("all");
   const [statusFilter, setStatusFilter] = useState("all");
   const [networkFilter, setNetworkFilter] = useState("all");
@@ -211,6 +212,48 @@ const AdminOrders = () => {
     await fetchOrders();
   };
 
+  const handleForceFulfillApiOrders = async () => {
+    const actionableApi = allOrders.filter(
+      (o) => o.order_type === "api" && (o.status === "paid" || o.status === "processing" || o.status === "fulfillment_failed")
+    );
+    
+    if (actionableApi.length === 0) {
+      toast({ title: "No actionable API orders", description: "All API orders are already fulfilled." });
+      return;
+    }
+
+    if (!confirm(`Are you sure you want to FORCE fulfill ${actionableApi.length} API orders? This will mark them as successful and credit profits without checking the provider.`)) {
+      return;
+    }
+
+    setForcingFulfill(true);
+    toast({ title: "Forcing fulfillment…", description: `Processing ${actionableApi.length} API orders…` });
+
+    try {
+      const { data, error } = await supabase.functions.invoke("admin-user-actions", {
+        body: { action: "bulk_fulfill_api_orders" },
+      });
+
+      if (error) {
+        const description = await getFunctionErrorMessage(error, "The action could not be completed. Check if the Edge Function is deployed.");
+        toast({ title: "Action failed", description, variant: "destructive" });
+      } else {
+        toast({ 
+          title: "Done", 
+          description: data?.message || `Successfully fulfilled ${data?.fulfilled || 0} API orders.` 
+        });
+        if (currentUser) {
+          await logAudit(currentUser.id, "force_fulfill_api_orders", { attempted: actionableApi.length, fulfilled: data?.fulfilled || 0 });
+        }
+      }
+    } catch (e) {
+      toast({ title: "Error", description: "An unexpected error occurred.", variant: "destructive" });
+    }
+
+    setForcingFulfill(false);
+    await fetchOrders();
+  };
+
   // Client-side filtering
   const filtered = allOrders;
   const paginated = allOrders;
@@ -269,6 +312,16 @@ const AdminOrders = () => {
           >
             {retryingAll ? <Loader2 className="w-4 h-4 animate-spin" /> : <PlayCircle className="w-4 h-4" />}
             {retryingAll ? "Retrying…" : `Retry All Actionable (${pending + failed + allOrders.filter(o => o.status === "processing").length})`}
+          </Button>
+          <Button
+            size="sm"
+            variant="destructive"
+            className="gap-2"
+            onClick={handleForceFulfillApiOrders}
+            disabled={forcingFulfill}
+          >
+            {forcingFulfill ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
+            {forcingFulfill ? "Forcing…" : "Force Fulfill API Orders"}
           </Button>
         </div>
       </div>

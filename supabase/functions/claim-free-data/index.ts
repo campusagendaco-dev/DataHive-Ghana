@@ -247,6 +247,7 @@ serve(async (req) => {
     await supabase.from("orders").insert({
       id: orderId,
       order_type: "free_data_claim",
+      payment_method: "promo",
       network,
       package_size: packageSize,
       customer_phone: phone,

@@ -719,6 +719,7 @@ serve(async (req) => {
       id: orderId,
       agent_id: user.id,
       order_type: "data",
+      payment_method: "wallet",
       network,
       package_size,
       customer_phone,

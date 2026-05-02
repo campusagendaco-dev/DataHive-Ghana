@@ -52,16 +52,20 @@ serve(async (req) => {
 
   for (const order of orders) {
     try {
-      // Verify payment with Paystack
-      const verifyRes = await fetch(`https://api.paystack.co/transaction/verify/${order.id}`, {
-        headers: { Authorization: `Bearer ${PAYSTACK_SECRET_KEY}` },
-      });
-      const verifyData = await verifyRes.json();
+      // Verify payment with Paystack ONLY if not already marked as paid/processing or is an API order
+      const isInternal = order.order_type === "api" || order.status === "paid" || order.status === "processing";
+      
+      if (!isInternal) {
+        const verifyRes = await fetch(`https://api.paystack.co/transaction/verify/${order.id}`, {
+          headers: { Authorization: `Bearer ${PAYSTACK_SECRET_KEY}` },
+        });
+        const verifyData = await verifyRes.json();
 
-      if (!verifyData.status || !verifyData.data || verifyData.data.status !== "success") {
-        // Payment not confirmed — skip (don't mark as failed, might be genuinely unpaid)
-        skipped++;
-        continue;
+        if (!verifyData.status || !verifyData.data || verifyData.data.status !== "success") {
+          // Payment not confirmed — skip (don't mark as failed, might be genuinely unpaid)
+          skipped++;
+          continue;
+        }
       }
 
       // Payment is confirmed — delegate to verify-payment function for full fulfillment logic

@@ -71,7 +71,9 @@ type AdminUserAction =
   | "reject_withdrawal"
   | "impersonate_user"
   | "get_providers"
-  | "update_provider";
+  | "update_provider"
+  | "get_paystack_transactions"
+  | "bulk_fulfill_api_orders";
 
 
 
@@ -136,10 +138,11 @@ serve(async (req: Request) => {
 
     const body = await req.json();
     console.log("ADMIN_ACTION_REQUEST", { body });
-    const { action, user_id, email, redirect_path, new_password } = body;
+    const { action: rawAction, user_id, email, redirect_path, new_password } = body;
+    const action = (rawAction as string)?.trim();
 
     if (!action) {
-      return new Response(JSON.stringify({ error: "Missing required fields" }), {
+      return new Response(JSON.stringify({ error: `Missing action. Received body: ${JSON.stringify(body)}` }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -1061,8 +1064,49 @@ serve(async (req: Request) => {
         });
       }
 
+      case "bulk_fulfill_api_orders": {
+        // Atomic bulk update for efficiency
+        const { data: updatedOrders, error: updateError } = await supabaseAdmin
+          .from("orders")
+          .update({ status: "fulfilled", failure_reason: null })
+          .eq("order_type", "api")
+          .in("status", ["paid", "processing", "fulfillment_failed"])
+          .select("id");
+        
+        if (updateError) throw updateError;
+        
+        const count = updatedOrders?.length || 0;
+        
+        // Credit profits for all updated orders
+        let profitsFailed = 0;
+        if (count > 0) {
+          for (const order of updatedOrders!) {
+            try {
+              const { error: rpcError } = await supabaseAdmin.rpc("credit_order_profits", { p_order_id: order.id });
+              if (rpcError) {
+                console.error(`Profit credit failed for ${order.id}:`, rpcError);
+                profitsFailed++;
+              }
+            } catch (e) {
+              console.error(`Profit credit exception for ${order.id}:`, e);
+              profitsFailed++;
+            }
+          }
+        }
+
+        return new Response(JSON.stringify({ 
+          success: true, 
+          message: `Successfully fulfilled ${count} API orders.${profitsFailed > 0 ? ` Note: ${profitsFailed} profit calculations skipped/failed.` : ""}`, 
+          fulfilled: count,
+          profits_failed: profitsFailed
+        }), {
+          status: 200,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
       default:
-        return new Response(JSON.stringify({ error: "Invalid action" }), {
+        return new Response(JSON.stringify({ error: `Invalid action: ${action}. Check if function is deployed with latest code.` }), {
           status: 400,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });

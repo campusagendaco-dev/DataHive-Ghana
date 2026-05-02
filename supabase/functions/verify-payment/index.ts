@@ -231,17 +231,16 @@ async function callProviderApi(
           "Accept": "application/json",
         };
 
-        if (handlerType === "datamart") {
-          headers["X-API-Key"] = apiKey;
-          // Use the order reference as the idempotency key to prevent double charging on refresh
-          const idempotencyKey = String(data.reference || data.order_id || "");
-          if (idempotencyKey) {
-            headers["X-Idempotency-Key"] = idempotencyKey;
-          }
-        } else {
+        headers["X-API-Key"] = apiKey;
+        // Global idempotency key to prevent double charging on provider retries
+        const idempotencyKey = String(data.orderReference || data.reference || data.order_id || "");
+        if (idempotencyKey) {
+          headers["X-Idempotency-Key"] = idempotencyKey;
+        }
+
+        if (handlerType !== "datamart") {
           headers["Authorization"] = `Bearer ${apiKey}`;
-          headers["X-API-Key"] = apiKey;
-          headers["User-Agent"] = "DataHiveGH/1.0";
+          headers["User-Agent"] = "SwiftDataGH/2.0";
         }
 
         const isGet = handlerType === "datamart" && endpoint === "status";
@@ -287,29 +286,11 @@ async function callProviderApi(
   return { ok: false, reason: lastReason };
 }
 
-async function fetchScannerStats(apiKey: string): Promise<any> {
-  try {
-    const res = await fetch("https://datamart.geonettech.xyz/api/delivery-tracker", {
-      headers: { "X-API-Key": apiKey }
-    });
-    if (res.ok) {
-      const data = await res.json();
-      return data.data || null;
-    }
-  } catch (e) {
-    console.error("[verify-payment] Failed to fetch scanner stats:", e);
-  }
-  return null;
-}
-
 // --- Main Handler ---
 
-serve(async (req: Request) => {
+serve(async (req) => {
   if (req.method === "OPTIONS") {
-    return new Response("ok", { 
-      headers: corsHeaders,
-      status: 200
-    });
+    return new Response("ok", { headers: corsHeaders });
   }
 
   const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
@@ -423,10 +404,48 @@ serve(async (req: Request) => {
     let currentOrderType = (existingOrder?.order_type || "data") as string;
     let metadata = existingOrder?.metadata || {};
 
-    const isInternalPayment = existingOrder?.payment_method === "wallet" || existingOrder?.status === "paid" || existingOrder?.status === "processing";
+    const status = (existingOrder?.status || "").toLowerCase();
+    const paymentMethod = (existingOrder?.payment_method || "").toLowerCase();
 
-    if (isInternalPayment) {
-      console.log(`[verify-payment] Internal/Wallet payment confirmed for ${reference}`);
+    const isInternalPayment = 
+      ["wallet", "promo", "balance", "api"].includes(paymentMethod) || 
+      ["api", "agent_activation", "sub_agent_activation", "utility"].includes(orderType.toLowerCase()) ||
+      ["paid", "processing", "fulfilled", "fulfillment_failed", "completed", "failed"].includes(status) ||
+      (orderType.toLowerCase() === "data" && !paymentMethod && ["processing", "fulfillment_failed"].includes(status));
+
+    // Special validation for free data claims to prevent spamming
+    if (orderType.toLowerCase() === "free_data_claim") {
+      const { data: settings } = await supabaseAdmin
+        .from("system_settings")
+        .select("free_data_enabled, free_data_max_claims, free_data_claims_count")
+        .eq("id", 1)
+        .maybeSingle();
+
+      if (!settings?.free_data_enabled) {
+        return new Response(JSON.stringify({ error: "Free data campaign is not active" }), { status: 403, headers: corsHeaders });
+      }
+
+      if ((settings.free_data_claims_count || 0) >= (settings.free_data_max_claims || 0)) {
+        return new Response(JSON.stringify({ error: "Free data claim limit reached" }), { status: 403, headers: corsHeaders });
+      }
+
+      // Check if this specific agent already has a fulfilled claim
+      if (existingOrder?.agent_id) {
+        const { count } = await supabaseAdmin
+          .from("orders")
+          .select("id", { count: "exact", head: true })
+          .eq("agent_id", existingOrder.agent_id)
+          .eq("order_type", "free_data_claim")
+          .eq("status", "fulfilled");
+        
+        if ((count || 0) > 0) {
+          return new Response(JSON.stringify({ error: "You have already claimed your free data" }), { status: 403, headers: corsHeaders });
+        }
+      }
+    }
+
+    if (isInternalPayment || orderType.toLowerCase() === "free_data_claim") {
+      console.log(`[verify-payment] Internal/Free payment confirmed for ${reference}`);
       verifiedAmount = Number(existingOrder?.amount || 0);
     } else {
       const PAYSTACK_SECRET_KEY = getFirstEnv("PAYSTACK_SECRET_KEY") || paystackSecretKey;
@@ -483,7 +502,7 @@ serve(async (req: Request) => {
         updated_at: new Date().toISOString()
       })
       .eq("id", reference)
-      .in("status", ["pending", "paid"])
+      .in("status", ["pending", "paid", "processing", "fulfillment_failed"])
       .select("*")
       .maybeSingle();
 
@@ -518,11 +537,19 @@ serve(async (req: Request) => {
     const recipient = normalizeRecipient(customerPhone);
 
     const requestBody = {
+      networkRaw: network,
       networkKey: mapDataNetworkKey(network),
       recipient,
+      customerNumber: recipient, // Alias
+      phoneNumber: recipient,    // Alias
       capacity: parseCapacity(packageSize),
+      plan: packageSize,         // Required by standard providers
+      bundle: packageSize,       // Alias
+      package_size: packageSize, // Alias
       amount: claimedOrder.amount,
       order_type: currentOrderType,
+      orderReference: reference,
+      reference: reference,      // Alias
     };
 
     let result: any = { ok: false, reason: "No providers" };
@@ -538,9 +565,11 @@ serve(async (req: Request) => {
         ? { 
             phoneNumber: recipient, 
             network: networkKey, 
-            planId: packageSize, // DataMart specific
+            planId: packageSize, // DataMart legacy
+            plan: packageSize,   // DataMart standard
+            bundle: packageSize, // Alias
             capacity: String(parseCapacity(packageSize)), 
-            orderReference: reference, // CRITICAL: This is the deduplication key for DataMart
+            orderReference: reference, 
             gateway: "wallet", 
             reference: reference 
           }
@@ -560,7 +589,13 @@ serve(async (req: Request) => {
       const patch: any = { provider_id: successfulProviderId, provider_order_id: result.id, status: "fulfilled" };
       
       await supabaseAdmin.from("orders").update(patch).eq("id", reference);
-      if (isDelivered) await supabaseAdmin.rpc("credit_order_profits", { p_order_id: reference });
+      if (isDelivered) {
+        try {
+          await supabaseAdmin.rpc("credit_order_profits", { p_order_id: reference });
+        } catch (e) {
+          console.error("[verify-payment] Profit credit failed:", e);
+        }
+      }
       
       return new Response(JSON.stringify({ status: patch.status || "processing", provider_order_id: result.id }), { headers: corsHeaders });
     } else {

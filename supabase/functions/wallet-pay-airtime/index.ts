@@ -199,6 +199,7 @@ serve(async (req: Request) => {
       id: orderId,
       agent_id: user.id,
       order_type: "airtime",
+      payment_method: "wallet",
       network,
       customer_phone: normalizePhone(phone),
       amount,

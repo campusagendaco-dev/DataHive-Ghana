@@ -40,30 +40,53 @@ function isHtmlBody(ct: string | null, body: string): boolean {
 async function callProvider(
   baseUrl: string, apiKey: string,
   network: string, packageSize: string, phone: string, webhookUrl: string,
-  amount: number, orderType: "airtime" | "data"
-): Promise<{ ok: boolean; reason: string }> {
+  amount: number, orderType: "airtime" | "data", orderId: string
+): Promise<{ ok: boolean; reason: string; body?: string }> {
   const clean = baseUrl.replace(/\/+$/, "");
   const urls: string[] = [];
   try {
     const { origin } = new URL(clean);
-    urls.push(`${clean}/api/purchase`, `${clean}/purchase`, `${origin}/api/purchase`);
-  } catch { urls.push(`${clean}/api/purchase`, `${clean}/purchase`); }
+    urls.push(
+      `${clean}/api/purchase`,
+      `${clean}/purchase`,
+      `${clean}/developer/purchase`,
+      `${clean}/api/developer/purchase`,
+      `${origin}/api/purchase`,
+      `${origin}/purchase`
+    );
+  } catch {
+    urls.push(`${clean}/api/purchase`, `${clean}/purchase`);
+  }
 
+  const recipient = normalizeRecipient(phone);
+  const networkKey = mapNetworkKey(network);
+  
   const body: Record<string, unknown> = {
     networkRaw: network,
-    networkKey: mapNetworkKey(network),
-    recipient: normalizeRecipient(phone),
+    networkKey: networkKey,
+    recipient: recipient,
+    customerNumber: recipient, // DataMart/DataHive alias
+    phoneNumber: recipient,    // DataMart/DataHive alias
     capacity: orderType === "airtime" ? amount : parseCapacity(packageSize),
+    plan: packageSize,         // Standard data plan (e.g. "5GB")
+    bundle: packageSize,       // Alias for plan
+    package_size: packageSize, // Alias for plan
     amount: amount,
+    orderReference: orderId,   // Deduplication key
+    reference: orderId,        // Alias for orderReference
     description: `${orderType} purchase via API: ${packageSize || amount} for ${phone}`,
     order_type: orderType,
   };
   if (webhookUrl) body.webhook_url = webhookUrl;
 
+  let lastError = "";
+  let lastBody = "";
+
   for (const url of [...new Set(urls)]) {
     const ctrl = new AbortController();
     const tid = setTimeout(() => ctrl.abort(), 25000);
     try {
+      console.log(`[developer-api] Calling provider: ${url}`);
       const res = await fetch(url, {
         method: "POST",
         headers: { 
@@ -71,31 +94,46 @@ async function callProvider(
           "Accept": "application/json", 
           "X-API-Key": apiKey,
           "Authorization": `Bearer ${apiKey}`,
-          "User-Agent": "DataHiveGH/1.0"
+          "X-Idempotency-Key": orderId,
+          "User-Agent": "SwiftDataGH/2.0"
         },
         body: JSON.stringify(body),
         signal: ctrl.signal,
       });
       clearTimeout(tid);
+      
+      const contentType = res.headers.get("content-type");
       const text = await res.text();
-      if (res.ok && !isHtmlBody(res.headers.get("content-type"), text)) {
+      lastBody = text;
+
+      if (res.ok && !isHtmlBody(contentType, text)) {
         try {
           const p = JSON.parse(text);
           const s = String(p?.status ?? "").toLowerCase();
-          if (s === "false" || s === "error" || s === "failed")
-            return { ok: false, reason: p?.message || "Provider rejected the order" };
-        } catch { /* non-JSON 2xx = ok */ }
-        return { ok: true, reason: "" };
+          const isSuccess = p?.success === true || s === "success" || s === "true" || p?.status === true;
+          
+          if (isSuccess) return { ok: true, reason: "" };
+          
+          if (s === "false" || s === "error" || s === "failed") {
+            return { ok: false, reason: p?.message || p?.error || "Provider rejected the order", body: text };
+          }
+        } catch { 
+          // If it's 2xx but not JSON, treat as success if not HTML
+          return { ok: true, reason: "" };
+        }
       }
-      if (res.status === 404 || isHtmlBody(res.headers.get("content-type"), text)) continue;
-      return { ok: false, reason: `Provider error ${res.status}` };
+      
+      if (res.status === 404 || isHtmlBody(contentType, text)) continue;
+      
+      return { ok: false, reason: `Provider error ${res.status}: ${text.slice(0, 100)}`, body: text };
     } catch (e) {
       clearTimeout(tid);
+      lastError = e instanceof Error ? e.message : "Provider unreachable";
       if (url === [...new Set(urls)].at(-1))
-        return { ok: false, reason: e instanceof Error ? e.message : "Provider unreachable" };
+        return { ok: false, reason: lastError, body: lastBody };
     }
   }
-  return { ok: false, reason: "All provider endpoints failed" };
+  return { ok: false, reason: "All provider endpoints failed", body: lastBody };
 }
 
 // Timing-safe string comparison
@@ -322,8 +360,8 @@ serve(async (req: Request) => {
       if (amount !== undefined && (isNaN(amount) || amount <= 0 || amount > MAX_PURCHASE_AMOUNT))
         return json({ success: false, error: `amount must be a positive number no greater than ${MAX_PURCHASE_AMOUNT} GHS` }, 400);
 
-      if (request_id !== undefined && (typeof request_id !== "string" || !isValidUUID(request_id)))
-        return json({ success: false, error: "request_id must be a valid UUID v4 string" }, 400);
+      if (request_id !== undefined && (typeof request_id !== "string" || request_id.length < 4))
+        return json({ success: false, error: "request_id must be a string of at least 4 characters" }, 400);
 
       const n = String(network).toUpperCase();
       let normalizedNetwork = network;
@@ -332,19 +370,42 @@ serve(async (req: Request) => {
       else if (n === "MTN") normalizedNetwork = "MTN";
       else if (n === "GLO") normalizedNetwork = "GLO";
 
-      const finalPackageSize = package_size || `${amount} GHS Airtime`;
       let expectedPrice: number = amount ?? 0;
+      let parentAgentId: string | null = null;
+      let parentProfit: number = 0;
+      let costPrice: number = 0;
 
-      if (!amount && package_size) {
+      if (!isAirtime && package_size) {
         const normalizedPkg = package_size.replace(/\s+/g, "").toUpperCase();
-        const { data: pkgRow } = await supabase.from("global_package_settings").select("agent_price, public_price, api_price, is_unavailable").eq("network", normalizedNetwork).eq("package_size", normalizedPkg).maybeSingle();
+        const { data: pkgRow } = await supabase.from("global_package_settings").select("agent_price, cost_price, api_price, is_unavailable").eq("network", normalizedNetwork).eq("package_size", normalizedPkg).maybeSingle();
+        
         if (pkgRow?.is_unavailable) return json({ success: false, error: "Package is unavailable" }, 400);
         if (!pkgRow) return json({ success: false, error: `Package '${package_size}' not found for network '${normalizedNetwork}'` }, 400);
-        const customOverride = profile.api_custom_prices?.[normalizedNetwork]?.[package_size];
-        if (Number(customOverride) > 0) expectedPrice = Number(customOverride);
-        else if (Number(pkgRow.api_price) > 0) expectedPrice = Number(pkgRow.api_price);
-        else if (Number(pkgRow.agent_price) > 0) expectedPrice = Number(pkgRow.agent_price);
-        else expectedPrice = Number(pkgRow.public_price);
+        
+        costPrice = Number(pkgRow.cost_price || pkgRow.agent_price);
+        const adminBase = Number(pkgRow.agent_price);
+
+        // 1. Resolve agent's purchase price
+        const customOverride = profile.api_custom_prices?.[normalizedNetwork]?.[normalizedPkg] || profile.api_custom_prices?.[normalizedNetwork]?.[package_size];
+        
+        if (Number(customOverride) > 0) {
+          expectedPrice = Number(customOverride);
+        } else if (profile.is_sub_agent && profile.parent_agent_id) {
+          // Sub-agent pricing from parent
+          const { data: parent } = await supabase.from("profiles").select("sub_agent_prices").eq("user_id", profile.parent_agent_id).maybeSingle();
+          const pMap = (parent?.sub_agent_prices || {}) as any;
+          const pPrice = Number(pMap[normalizedNetwork]?.[normalizedPkg] || pMap[normalizedNetwork]?.[package_size] || 0);
+          if (pPrice > 0) expectedPrice = pPrice;
+          else expectedPrice = Number(pkgRow.api_price || pkgRow.agent_price);
+        } else {
+          expectedPrice = Number(pkgRow.api_price || pkgRow.agent_price);
+        }
+
+        // 2. Resolve parent profit if applicable
+        if (profile.is_sub_agent && profile.parent_agent_id) {
+          parentAgentId = profile.parent_agent_id;
+          parentProfit = Math.max(0, Number((expectedPrice - adminBase).toFixed(2)));
+        }
       }
 
       if (expectedPrice <= 0) return json({ success: false, error: "Could not determine price for this purchase" }, 400);
@@ -352,8 +413,41 @@ serve(async (req: Request) => {
       const { data: debitResult } = await supabase.rpc("debit_wallet", { p_agent_id: profile.user_id, p_amount: expectedPrice });
       if (!debitResult?.success) return json({ success: false, error: "Insufficient balance" }, 402);
 
-      const orderId = request_id || crypto.randomUUID();
-      await supabase.from("orders").insert({ id: orderId, agent_id: profile.user_id, order_type: "api", network: normalizedNetwork, package_size: finalPackageSize, customer_phone: normalizeRecipient(phone), amount: expectedPrice, status: "paid" });
+      const orderId = crypto.randomUUID();
+      const insertData: any = { 
+        id: orderId, 
+        agent_id: profile.user_id, 
+        order_type: "api", 
+        payment_method: "wallet",
+        network: normalizedNetwork, 
+        package_size: finalPackageSize, 
+        customer_phone: normalizeRecipient(phone), 
+        amount: expectedPrice, 
+        cost_price: costPrice,
+        parent_agent_id: parentAgentId,
+        parent_profit: parentProfit,
+        status: "paid"
+      };
+
+      // Safe metadata handling: put in provider_response if metadata column is missing
+      if (request_id) {
+        insertData.metadata = { client_reference: request_id };
+        insertData.provider_response = { client_reference: request_id };
+      }
+      
+      const { error: insertError } = await supabase.from("orders").insert(insertData);
+      
+      if (insertError) {
+        console.error("Insert error:", insertError);
+        // Fallback: try without metadata column
+        if (insertError.message?.includes("metadata") || insertError.code === "42703") {
+          delete insertData.metadata;
+          const { error: fallbackError } = await supabase.from("orders").insert(insertData);
+          if (fallbackError) return json({ success: false, error: "Database error during order creation" }, 500);
+        } else {
+          return json({ success: false, error: "Database error during order creation" }, 500);
+        }
+      }
 
       const DATA_PROVIDER_API_KEY = getEnv("PRIMARY_DATA_PROVIDER_API_KEY", "DATA_PROVIDER_API_KEY");
       const DATA_PROVIDER_BASE_URL = getEnv("PRIMARY_DATA_PROVIDER_BASE_URL", "DATA_PROVIDER_BASE_URL");
@@ -364,26 +458,37 @@ serve(async (req: Request) => {
       if (!DATA_PROVIDER_API_KEY || !DATA_PROVIDER_BASE_URL) {
         await supabase.from("orders").update({ status: "fulfilled", failure_reason: "Mock fulfillment (Provider not configured)" }).eq("id", orderId);
         const { data: w } = await supabase.from("wallets").select("balance").eq("agent_id", profile.user_id).maybeSingle();
-        return json({ success: true, order_id: orderId, status: "fulfilled", message: "Purchase simulated successfully", balance: Number(w?.balance ?? 0) });
+        return json({ success: true, order_id: orderId, client_reference: request_id, status: "fulfilled", message: "Purchase simulated successfully", balance: Number(w?.balance ?? 0) });
       }
 
       const isAirtime = !package_size && !!amount;
       const orderType = isAirtime ? "airtime" : "data";
-      const result = await callProvider(DATA_PROVIDER_BASE_URL, DATA_PROVIDER_API_KEY, normalizedNetwork, finalPackageSize, phone, WEBHOOK_URL, expectedPrice, orderType);
+      
+      const result = await callProvider(DATA_PROVIDER_BASE_URL, DATA_PROVIDER_API_KEY, normalizedNetwork, finalPackageSize, phone, WEBHOOK_URL, expectedPrice, orderType, orderId);
+      
       if (result.ok) {
         await supabase.from("orders").update({ status: "fulfilled", failure_reason: null }).eq("id", orderId);
         const { data: w } = await supabase.from("wallets").select("balance").eq("agent_id", profile.user_id).maybeSingle();
-        return json({ success: true, order_id: orderId, status: "fulfilled", balance: Number(w?.balance ?? 0) });
+        return json({ success: true, order_id: orderId, client_reference: request_id, status: "fulfilled", balance: Number(w?.balance ?? 0) });
       }
 
       // If initial attempt fails, mark as fulfillment_failed so the background job picks it up
-      // and return a "processing" status to the API user instead of a hard error.
-      await supabase.from("orders").update({ status: "fulfillment_failed", failure_reason: result.reason }).eq("id", orderId);
+      await supabase.from("orders").update({ 
+        status: "fulfillment_failed", 
+        failure_reason: result.reason,
+        provider_response: { 
+          client_reference: request_id,
+          provider_error: result.reason,
+          provider_body: result.body?.slice(0, 1000) 
+        }
+      }).eq("id", orderId);
+      
       const { data: w2 } = await supabase.from("wallets").select("balance").eq("agent_id", profile.user_id).maybeSingle();
       
       return json({ 
         success: true, 
         order_id: orderId, 
+        client_reference: request_id,
         status: "processing", 
         message: "Order received and is being processed/retried.",
         error_info: result.reason,
