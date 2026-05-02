@@ -67,10 +67,23 @@ const PurchaseSuccess = () => {
       "  swiftdataghana.com",
       "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
     ];
-    navigator.clipboard.writeText(lines.join("\n")).then(() => {
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    });
+    const text = lines.join("\n");
+    
+    if (navigator.share) {
+      navigator.share({
+        title: 'SwiftData Receipt',
+        text: text,
+      }).catch(() => {
+        navigator.clipboard.writeText(text);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+      });
+    } else {
+      navigator.clipboard.writeText(text).then(() => {
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+      });
+    }
   };
 
   const confetti = useMemo<ConfettiPiece[]>(

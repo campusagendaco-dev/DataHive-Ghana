@@ -420,7 +420,7 @@ serve(async (req: Request) => {
         order_type: "api", 
         payment_method: "wallet",
         network: normalizedNetwork, 
-        package_size: finalPackageSize, 
+        package_size: package_size, 
         customer_phone: normalizeRecipient(phone), 
         amount: expectedPrice, 
         cost_price: costPrice,
@@ -464,7 +464,7 @@ serve(async (req: Request) => {
       const isAirtime = !package_size && !!amount;
       const orderType = isAirtime ? "airtime" : "data";
       
-      const result = await callProvider(DATA_PROVIDER_BASE_URL, DATA_PROVIDER_API_KEY, normalizedNetwork, finalPackageSize, phone, WEBHOOK_URL, expectedPrice, orderType, orderId);
+      const result = await callProvider(DATA_PROVIDER_BASE_URL, DATA_PROVIDER_API_KEY, normalizedNetwork, package_size || "", phone, WEBHOOK_URL, expectedPrice, orderType, orderId);
       
       if (result.ok) {
         await supabase.from("orders").update({ status: "fulfilled", failure_reason: null }).eq("id", orderId);

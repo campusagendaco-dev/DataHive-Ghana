@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
+import { motion, AnimatePresence } from "framer-motion";
 import { 
   Search, Package, Clock, CheckCircle2, 
   XCircle, Loader2, ArrowLeft, RefreshCw,
-  Activity, ExternalLink, ShieldCheck, Zap, ArrowRight
+  Activity, ExternalLink, ShieldCheck, Zap, ArrowRight, ReceiptText
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
@@ -29,6 +30,7 @@ const MyOrders = () => {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [showReceipt, setShowReceipt] = useState<Order | null>(null);
 
   const fetchOrders = async (targetPhone: string) => {
     if (!targetPhone) return;
@@ -46,6 +48,39 @@ const MyOrders = () => {
     } finally {
       setLoading(false);
       setIsRefreshing(false);
+    }
+  };
+
+  const copyReceipt = (order: Order) => {
+    const now = new Date(order.created_at).toLocaleString("en-GH", { dateStyle: "medium", timeStyle: "short" });
+    const lines = [
+      "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
+      "    SwiftData Ghana — Receipt",
+      "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
+      `Ref       : ${order.id.slice(0, 12).toUpperCase()}`,
+      `Date      : ${now}`,
+      "─────────────────────────────────",
+      `Network   : ${order.network}`,
+      `Package   : ${order.package_size}`,
+      `Recipient : ${order.customer_phone}`,
+      `Status    : ✅ ${order.status.toUpperCase()}`,
+      "─────────────────────────────────",
+      "  swiftdataghana.com",
+      "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
+    ];
+    const text = lines.join("\n");
+    
+    if (navigator.share) {
+      navigator.share({
+        title: 'SwiftData Receipt',
+        text: text,
+      }).catch(() => {
+        navigator.clipboard.writeText(text);
+        toast.success("Receipt copied to clipboard!");
+      });
+    } else {
+      navigator.clipboard.writeText(text);
+      toast.success("Receipt copied to clipboard!");
     }
   };
 
@@ -147,6 +182,22 @@ const MyOrders = () => {
                     <ArrowRight className="w-3 h-3" />
                   </div>
                 </div>
+
+                <div className="mt-4 flex gap-2">
+                   <button 
+                    onClick={(e) => { e.stopPropagation(); setShowReceipt(order); }}
+                    className="flex-1 h-9 rounded-xl bg-white/5 border border-white/5 hover:bg-white/10 text-[9px] font-black uppercase tracking-widest text-white/40 flex items-center justify-center gap-2 transition-all"
+                   >
+                     <ReceiptText className="w-3 h-3" />
+                     Receipt
+                   </button>
+                   <button 
+                    onClick={(e) => { e.stopPropagation(); navigate(`/order-status?reference=${order.id}`); }}
+                    className="w-9 h-9 rounded-xl bg-white/5 border border-white/5 hover:bg-white/10 flex items-center justify-center text-white/40 transition-all"
+                   >
+                     <ExternalLink className="w-3 h-3" />
+                   </button>
+                </div>
               </div>
             ))
           ) : phoneParam ? (
@@ -176,6 +227,100 @@ const MyOrders = () => {
             <span className="text-[10px] font-black uppercase tracking-[0.2em] text-white/40">Refresh Status</span>
           </button>
         )}
+
+        {/* Receipt Modal */}
+        <AnimatePresence>
+          {showReceipt && (
+            <div className="fixed inset-0 z-[100] flex items-center justify-center p-6">
+              <motion.div 
+                initial={{ opacity: 0 }} 
+                animate={{ opacity: 1 }} 
+                exit={{ opacity: 0 }}
+                onClick={() => setShowReceipt(null)}
+                className="absolute inset-0 bg-black/80 backdrop-blur-sm" 
+              />
+              <motion.div 
+                initial={{ opacity: 0, scale: 0.9, y: 20 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.9, y: 20 }}
+                className="relative w-full max-w-sm bg-[#0F0F12] border border-white/10 rounded-[2.5rem] overflow-hidden shadow-3xl"
+              >
+                <div className="p-8 space-y-6">
+                  <div className="flex justify-between items-center">
+                    <div className="flex items-center gap-2">
+                      <div className="w-8 h-8 rounded-full bg-amber-500 flex items-center justify-center">
+                        <CheckCircle2 className="w-5 h-5 text-black" />
+                      </div>
+                      <span className="text-xs font-black uppercase tracking-widest text-white/90">E-Receipt</span>
+                    </div>
+                    <button onClick={() => setShowReceipt(null)} className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center text-white/40 hover:text-white transition-colors">
+                      <XCircle className="w-5 h-5" />
+                    </button>
+                  </div>
+
+                  <div className="bg-white/[0.02] border border-white/5 rounded-3xl p-6 space-y-4 font-mono">
+                    <div className="text-center pb-4 border-b border-dashed border-white/10">
+                      <p className="text-sm font-black text-white mb-1 uppercase tracking-widest">SwiftData Ghana</p>
+                      <p className="text-[10px] text-white/30">{new Date(showReceipt.created_at).toLocaleString()}</p>
+                    </div>
+                    
+                    <div className="space-y-3">
+                      <div className="flex justify-between text-[11px]">
+                        <span className="text-white/20 uppercase">Reference</span>
+                        <span className="text-white/60 truncate max-w-[120px]">{showReceipt.id.toUpperCase()}</span>
+                      </div>
+                      <div className="flex justify-between text-[11px]">
+                        <span className="text-white/20 uppercase">Service</span>
+                        <span className="text-white/60">{showReceipt.order_type || 'Data Bundle'}</span>
+                      </div>
+                      <div className="flex justify-between text-[11px]">
+                        <span className="text-white/20 uppercase">Network</span>
+                        <span className="text-white/60">{showReceipt.network}</span>
+                      </div>
+                      <div className="flex justify-between text-[11px]">
+                        <span className="text-white/20 uppercase">Plan</span>
+                        <span className="text-white/60">{showReceipt.package_size || "—"}</span>
+                      </div>
+                      <div className="flex justify-between text-[11px]">
+                        <span className="text-white/20 uppercase">Recipient</span>
+                        <span className="text-white/60">{showReceipt.customer_phone}</span>
+                      </div>
+                    </div>
+
+                    <div className="pt-4 border-t border-dashed border-white/10 flex justify-between items-center">
+                      <span className="text-[10px] font-black text-white/40 uppercase">Status</span>
+                      <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-500 text-[10px] font-black uppercase">
+                        <ShieldCheck className="w-3 h-3" />
+                        {showReceipt.status}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <button 
+                      onClick={() => copyReceipt(showReceipt)}
+                      className="h-12 rounded-2xl bg-white/5 border border-white/10 hover:bg-white/10 text-white/60 font-bold text-xs flex items-center justify-center gap-2 transition-all active:scale-95"
+                    >
+                      <Copy className="w-4 h-4" />
+                      Copy Text
+                    </button>
+                    <button 
+                      onClick={() => window.print()}
+                      className="h-12 rounded-2xl bg-white/5 border border-white/10 hover:bg-white/10 text-white/60 font-bold text-xs flex items-center justify-center gap-2 transition-all active:scale-95"
+                    >
+                      <RefreshCw className="w-4 h-4" />
+                      Save PDF
+                    </button>
+                  </div>
+                </div>
+                
+                <div className="bg-amber-500/10 border-t border-white/5 py-3 text-center">
+                  <p className="text-[8px] font-black text-amber-500 uppercase tracking-[0.3em]">Verified Transaction</p>
+                </div>
+              </motion.div>
+            </div>
+          )}
+        </AnimatePresence>
       </div>
     </div>
   );

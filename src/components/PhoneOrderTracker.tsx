@@ -42,13 +42,8 @@ const PhoneOrderTracker = ({
         return;
       }
 
-      const reference = data.id || data.reference || data.orderId;
-      if (reference) {
-        // Instant redirect to the cute tracking page
-        window.location.href = `/order-status?reference=${reference}`;
-      } else {
-        setError("Could not resolve order details.");
-      }
+      // Redirect to the multi-order tracking portal
+      window.location.href = `/my-orders?phone=${sanitizedPhone}`;
     } catch (err) {
       setError("Unable to sync with network. Try again.");
     } finally {
