@@ -257,7 +257,7 @@ const DashboardBuyDataNetwork = ({ network }: DashboardBuyDataNetworkProps) => {
       } finally {
         setResolvingName(false);
       }
-    }, 500); // 500ms debounce
+    }, 300); // Faster debounce
 
     return () => clearTimeout(timer);
   }, [phone, network, isPhoneValid, resolvedName, resolvingName, normalizedPhone]);
@@ -285,6 +285,10 @@ const DashboardBuyDataNetwork = ({ network }: DashboardBuyDataNetworkProps) => {
     }
     if (!phone.trim() || !isPhoneValid) {
       toast({ title: "Invalid phone number", description: "Use a valid Ghana number.", variant: "destructive" });
+      return false;
+    }
+    if (!resolvedName) {
+      toast({ title: "Recipient not verified", description: "Please wait for the recipient name to be verified.", variant: "destructive" });
       return false;
     }
     return true;
@@ -735,9 +739,9 @@ const DashboardBuyDataNetwork = ({ network }: DashboardBuyDataNetworkProps) => {
             <div className="pt-2">
               {isFreePromo ? (
                 <Button
-                  className="w-full gap-2 font-black text-xs py-6 uppercase tracking-[0.2em] bg-green-500 hover:bg-green-600 text-white shadow-lg shadow-green-500/20 rounded-2xl"
+                  className="w-full gap-2 font-black text-xs py-6 uppercase tracking-[0.2em] bg-green-500 hover:bg-green-600 text-white shadow-lg shadow-green-500/20 rounded-2xl disabled:opacity-40 disabled:grayscale disabled:cursor-not-allowed"
                   onClick={handleClaimFree}
-                  disabled={claimingFree || !selectedPackage}
+                  disabled={claimingFree || !resolvedName || !selectedPackage}
                 >
                   {claimingFree ? (
                     <><Loader2 className="w-4 h-4 animate-spin" /> Processing Claim...</>
@@ -747,13 +751,13 @@ const DashboardBuyDataNetwork = ({ network }: DashboardBuyDataNetworkProps) => {
                 </Button>
               ) : (
                 <Button
-                  className={`w-full gap-2 font-black text-xs py-6 uppercase tracking-[0.2em] shadow-xl transition-all rounded-2xl ${
+                  className={`w-full gap-2 font-black text-xs py-6 uppercase tracking-[0.2em] shadow-xl transition-all rounded-2xl disabled:opacity-40 disabled:grayscale disabled:cursor-not-allowed ${
                     payMethod === "wallet" 
                       ? "bg-primary hover:bg-primary/90 text-primary-foreground shadow-primary/20" 
                       : "bg-white text-black hover:bg-white/90 shadow-white/10"
                   }`}
                   onClick={payMethod === "wallet" ? handleWalletBuy : handlePaystackBuy}
-                  disabled={buying || !selectedPackage}
+                  disabled={buying || !resolvedName || !selectedPackage}
                 >
                   {buying ? (
                     <><Loader2 className="w-4 h-4 animate-spin" /> Placing order...</>

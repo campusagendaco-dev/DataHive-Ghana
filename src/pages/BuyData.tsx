@@ -143,7 +143,7 @@ const BuyData = () => {
       } finally {
         setResolvingName(false);
       }
-    }, 500); // 500ms debounce
+    }, 300); // 300ms debounce for faster response
 
     return () => clearTimeout(timer);
   }, [phone, selectedNetwork, isPhoneValid, resolvedName, resolvingName, phoneDigits]);
@@ -501,13 +501,13 @@ const BuyData = () => {
                 </button>
               )}
               {isFreePromo ? (
-                <button onClick={handleClaimFree} disabled={claiming || !isPhoneValid}
-                  className="shrink-0 font-black px-5 py-3 rounded-xl text-sm bg-green-500 hover:bg-green-400 text-black transition-all hover:scale-105 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5 whitespace-nowrap">
+                <button onClick={handleClaimFree} disabled={claiming || !isPhoneValid || !resolvedName}
+                  className="shrink-0 font-black px-5 py-3 rounded-xl text-sm bg-green-500 hover:bg-green-400 text-black transition-all hover:scale-105 active:scale-95 disabled:opacity-40 disabled:grayscale disabled:cursor-not-allowed flex items-center gap-1.5 whitespace-nowrap">
                   {claiming ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Claiming...</> : <><Gift className="w-3.5 h-3.5" /> Claim Free Data</>}
                 </button>
               ) : (
-                <button onClick={handlePay} disabled={buying}
-                  className="shrink-0 font-black px-5 py-3 rounded-xl text-sm transition-all hover:scale-105 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5 whitespace-nowrap"
+                <button onClick={handlePay} disabled={buying || !resolvedName}
+                  className="shrink-0 font-black px-5 py-3 rounded-xl text-sm transition-all hover:scale-105 active:scale-95 disabled:opacity-40 disabled:grayscale disabled:cursor-not-allowed flex items-center gap-1.5 whitespace-nowrap"
                   style={{ background: `hsl(${theme.primary})`, color: "#000" }}>
                   {buying ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Processing...</> : <><CreditCard className="w-3.5 h-3.5" /> Pay GH₵{total.toFixed(2)}</>}
                 </button>
