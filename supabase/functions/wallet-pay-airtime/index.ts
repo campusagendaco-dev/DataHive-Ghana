@@ -131,6 +131,10 @@ serve(async (req: Request) => {
     const { data: { user }, error: userError } = await supabaseUser.auth.getUser();
     if (userError || !user) return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
+    // Check if user is an API User
+    const { data: profile } = await supabaseAdmin.from("profiles").select("api_access_enabled").eq("user_id", user.id).maybeSingle();
+    const isApiUser = profile?.api_access_enabled || false;
+
     const { network, phone, amount } = payload || {};
     const clientReference = typeof payload?.reference === "string" ? payload.reference.trim() : "";
 
@@ -314,15 +318,25 @@ serve(async (req: Request) => {
         failure_reason: err.message
       }).eq("id", orderId);
       
-      await supabaseAdmin.rpc("credit_wallet", { p_agent_id: user.id, p_amount: amount });
-      
-      return new Response(JSON.stringify({ 
-        error: `Fulfillment failed: ${err.message}. Refunded.`,
-        diagnostics: {
-          provider_error: err.message,
-          provider_response: lastBody.length > 200 ? lastBody.slice(0, 197) + "..." : lastBody,
-        }
-      }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      if (!isApiUser) {
+        await supabaseAdmin.rpc("credit_wallet", { p_agent_id: user.id, p_amount: amount });
+        
+        return new Response(JSON.stringify({ 
+          error: `Fulfillment failed: ${err.message}. Refunded.`,
+          diagnostics: {
+            provider_error: err.message,
+            provider_response: lastBody.length > 200 ? lastBody.slice(0, 197) + "..." : lastBody,
+          }
+        }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      } else {
+        console.log(`[airtime] API User order ${orderId} failed but NO refund issued (will retry).`);
+        return new Response(JSON.stringify({ 
+          success: true,
+          status: "processing",
+          message: `Fulfillment failed: ${err.message}. Order will be retried.`,
+          order_id: orderId
+        }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
     }
   } catch (error: any) {
     console.error(`[airtime] Global Error: ${error.message}`);

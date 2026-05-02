@@ -111,7 +111,7 @@ async function resolveOrderDetails(
 
   // Run profile + global pricing lookups in parallel
   const [{ data: profile }, { data: globalRow }] = await Promise.all([
-    supabaseAdmin.from("profiles").select("is_sub_agent, parent_agent_id, agent_prices").eq("user_id", userId).maybeSingle(),
+    supabaseAdmin.from("profiles").select("is_sub_agent, parent_agent_id, agent_prices, api_access_enabled").eq("user_id", userId).maybeSingle(),
     supabaseAdmin.from("global_package_settings").select("cost_price, agent_price").eq("network", normalizedNetwork).eq("package_size", normalizedPackage).maybeSingle(),
   ]);
 
@@ -151,7 +151,8 @@ async function resolveOrderDetails(
       costPrice: platformCost,
       parentAgentId: profile.parent_agent_id, 
       parentProfit: parentProfit,
-      profit: 0 // In wallet orders, agent markup is cash in hand, not wallet credit
+      profit: 0, // In wallet orders, agent markup is cash in hand, not wallet credit
+      isApiUser: profile?.api_access_enabled || false
     };
   }
 
@@ -159,7 +160,8 @@ async function resolveOrderDetails(
   return { 
     cost: adminCost, 
     costPrice: platformCost,
-    profit: 0 // Regular agent markup is cash in hand
+    profit: 0, // Regular agent markup is cash in hand
+    isApiUser: profile?.api_access_enabled || false
   };
 }
 
@@ -660,7 +662,7 @@ serve(async (req) => {
     }
     // ─────────────────────────────────────────────────────────────────────────
 
-    const { cost: expectedAmount, costPrice: resolvedCostPrice, parentAgentId, parentProfit } = orderDetails;
+    const { cost: expectedAmount, costPrice: resolvedCostPrice, parentAgentId, parentProfit, isApiUser } = orderDetails;
 
     // --- IDEMPOTENCY CHECK ---
     // Prevent duplicate orders and double-debits if the user double-clicks or refreshes.
@@ -781,15 +783,19 @@ serve(async (req) => {
           failure_reason: result.reason,
         }).eq("id", orderId);
 
-        const { error: refundError } = await supabaseAdmin.rpc("credit_wallet", {
-          p_agent_id: user.id,
-          p_amount: expectedAmount,
-        });
-        if (!refundError) {
-          console.log(`Refunded GHS ${expectedAmount} to ${user.id}`);
-          void sendPaymentSms(supabaseAdmin, customer_phone, "order_failed", {
-            package: package_size, phone: customer_phone, amount: expectedAmount.toFixed(2),
+        if (!isApiUser) {
+          const { error: refundError } = await supabaseAdmin.rpc("credit_wallet", {
+            p_agent_id: user.id,
+            p_amount: expectedAmount,
           });
+          if (!refundError) {
+            console.log(`Refunded GHS ${expectedAmount} to ${user.id}`);
+            void sendPaymentSms(supabaseAdmin, customer_phone, "order_failed", {
+              package: package_size, phone: customer_phone, amount: expectedAmount.toFixed(2),
+            });
+          }
+        } else {
+          console.log(`[wallet-buy] API User order ${orderId} failed but NO refund issued (will retry).`);
         }
       }
     })();

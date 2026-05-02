@@ -165,20 +165,35 @@ serve(async (req: Request) => {
     const twoMinutesAgo = new Date(Date.now() - 2 * 60 * 1000).toISOString();
     const { data: ordersToRetry, error: fetchError } = await supabaseAdmin
       .from("orders")
-      .select("*")
+      .select("*, profiles:agent_id(api_access_enabled)")
       .in("status", ["fulfillment_failed", "processing", "paid"])
-      .lt("retry_count", 3)
+      .lt("retry_count", 50) // High limit for everyone, we'll filter in JS
       .or(`last_retry_at.is.null,last_retry_at.lt.${twoMinutesAgo}`)
-      .limit(15);
+      .order("created_at", { ascending: true })
+      .limit(20);
 
     if (fetchError) throw fetchError;
 
     for (const order of ordersToRetry || []) {
+      const isApiUser = (order as any).profiles?.api_access_enabled === true;
+      const maxRetries = isApiUser ? 50 : 3;
+
+      if (order.retry_count >= maxRetries) {
+        console.log(`[retry-orders] Skipping order ${order.id} (max retries reached: ${order.retry_count}/${maxRetries})`);
+        continue;
+      }
+
       const createdAt = new Date(order.created_at).getTime();
       // Wait at least 2 mins for processing orders to avoid race conditions
       if (order.status === "processing" && (Date.now() - createdAt) < 120000) continue;
 
-      console.log(`[retry-orders] Delegating order ${order.id} to verify-payment...`);
+      console.log(`[retry-orders] Delegating order ${order.id} (Retry ${order.retry_count + 1}/${maxRetries}) to verify-payment...`);
+      
+      // Increment retry count immediately to avoid double-processing
+      await supabaseAdmin.from("orders").update({
+        retry_count: (order.retry_count || 0) + 1,
+        last_retry_at: new Date().toISOString()
+      }).eq("id", order.id);
 
       try {
         const fulfillRes = await fetch(`${SUPABASE_URL}/functions/v1/verify-payment`, {
