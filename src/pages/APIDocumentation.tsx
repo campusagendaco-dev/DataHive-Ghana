@@ -18,13 +18,19 @@ const LANG_LABELS: Record<Lang, string> = { curl: "cURL", node: "Node.js", pytho
 
 // ─── Code Snippets ────────────────────────────────────────────────────────────
 const makeSnippets = (key: string): Record<string, Record<Lang, string>> => {
-  const K = key || "swft_live_xxxxxxxxxxxxxxxxxxxx";
+  const K = key || "swft_live_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx";
   return {
     balance: {
       curl: `curl -X GET "${BASE_URL}/balance" \\\n  -H "X-API-Key: ${K}"`,
       node: `const res = await fetch("${BASE_URL}/balance", {\n  headers: { "X-API-Key": "${K}" },\n});\nconst { balance } = await res.json();\nconsole.log("Balance:", balance); // 50.00`,
       python: `import requests\n\nres = requests.get(\n    "${BASE_URL}/balance",\n    headers={"X-API-Key": "${K}"},\n)\nprint(res.json())`,
       php: `<?php\n$ch = curl_init("${BASE_URL}/balance");\ncurl_setopt_array($ch, [\n    CURLOPT_HTTPHEADER    => ["X-API-Key: ${K}"],\n    CURLOPT_RETURNTRANSFER => true,\n]);\n$res = json_decode(curl_exec($ch));\necho $res->balance;`,
+    },
+    account: {
+      curl: `curl -X GET "${BASE_URL}/account" \\\n  -H "X-API-Key: ${K}"`,
+      node: `const res = await fetch("${BASE_URL}/account", {\n  headers: { "X-API-Key": "${K}" },\n});\nconst data = await res.json();\nconsole.log(data.name, data.active);`,
+      python: `import requests\n\nres = requests.get(\n    "${BASE_URL}/account",\n    headers={"X-API-Key": "${K}"},\n)\nprint(res.json())`,
+      php: `<?php\n$ch = curl_init("${BASE_URL}/account");\ncurl_setopt_array($ch, [\n    CURLOPT_HTTPHEADER    => ["X-API-Key: ${K}"],\n    CURLOPT_RETURNTRANSFER => true,\n]);\necho curl_exec($ch);`,
     },
     plans: {
       curl: `curl -X GET "${BASE_URL}/plans" \\\n  -H "X-API-Key: ${K}"`,
@@ -33,16 +39,16 @@ const makeSnippets = (key: string): Record<string, Record<Lang, string>> => {
       php: `<?php\n$ch = curl_init("${BASE_URL}/plans");\ncurl_setopt_array($ch, [\n    CURLOPT_HTTPHEADER    => ["X-API-Key: ${K}"],\n    CURLOPT_RETURNTRANSFER => true,\n]);\n$data = json_decode(curl_exec($ch));\nforeach ($data->plans as $plan) {\n    echo $plan->network . " " . $plan->package_size . " → GH₵" . $plan->api_price . "\\n";\n}`,
     },
     airtime: {
-      curl: `curl -X POST "${BASE_URL}/airtime" \\\n  -H "X-API-Key: ${K}" \\\n  -H "Content-Type: application/json" \\\n  -d '{\n    "network": "MTN",\n    "amount": 5.00,\n    "phone": "0241234567",\n    "request_id": "unique_id_123"\n  }'`,
-      node: `const res = await fetch("${BASE_URL}/airtime", {\n  method: "POST",\n  headers: {\n    "X-API-Key": "${K}",\n    "Content-Type": "application/json",\n  },\n  body: JSON.stringify({\n    network: "MTN",           // MTN | TELECEL | AT | GLO\n    amount: 5.00,             // GHS amount\n    phone: "0241234567",\n    request_id: "unique_id_123",\n  }),\n});\n\nconst data = await res.json();\nconsole.log(data.status); // "fulfilled"`,
-      python: `import requests\n\nres = requests.post(\n    "${BASE_URL}/airtime",\n    headers={\n        "X-API-Key": "${K}",\n        "Content-Type": "application/json",\n    },\n    json={\n        "network": "MTN",        # MTN | TELECEL | AT | GLO\n        "amount": 5.00,\n        "phone": "0241234567",\n        "request_id": "unique_id_123",\n    },\n)\nprint(res.json())`,
-      php: `<?php\n$payload = json_encode([\n    "network"    => "MTN",\n    "amount"     => 5.00,\n    "phone"      => "0241234567",\n    "request_id" => "unique_id_123",\n]);\n$ch = curl_init("${BASE_URL}/airtime");\ncurl_setopt_array($ch, [\n    CURLOPT_POST           => true,\n    CURLOPT_POSTFIELDS     => $payload,\n    CURLOPT_HTTPHEADER     => [\n        "X-API-Key: ${K}",\n        "Content-Type: application/json",\n    ],\n    CURLOPT_RETURNTRANSFER => true,\n]);\necho curl_exec($ch);`,
+      curl: `curl -X POST "${BASE_URL}/airtime" \\\n  -H "X-API-Key: ${K}" \\\n  -H "Content-Type: application/json" \\\n  -d '{\n    "networkCode": "MTN",\n    "amount": 5.00,\n    "customerNumber": "0241234567",\n    "request_id": "unique_id_123"\n  }'`,
+      node: `const res = await fetch("${BASE_URL}/airtime", {\n  method: "POST",\n  headers: {\n    "X-API-Key": "${K}",\n    "Content-Type": "application/json",\n  },\n  body: JSON.stringify({\n    networkCode: "MTN",        // MTN | TELECEL | AT | GLO\n    amount: 5.00,             // GHS amount\n    customerNumber: "0241234567",\n    request_id: "unique_id_123",\n  }),\n});\n\nconst data = await res.json();\nconsole.log(data.status); // "fulfilled"`,
+      python: `import requests\n\nres = requests.post(\n    "${BASE_URL}/airtime",\n    headers={\n        "X-API-Key": "${K}",\n        "Content-Type": "application/json",\n    },\n    json={\n        "networkCode": "MTN",     # MTN | TELECEL | AT | GLO\n        "amount": 5.00,\n        "customerNumber": "0241234567",\n        "request_id": "unique_id_123",\n    },\n)\nprint(res.json())`,
+      php: `<?php\n$payload = json_encode([\n    "networkCode"    => "MTN",\n    "amount"         => 5.00,\n    "customerNumber" => "0241234567",\n    "request_id"     => "unique_id_123",\n]);\n$ch = curl_init("${BASE_URL}/airtime");\ncurl_setopt_array($ch, [\n    CURLOPT_POST           => true,\n    CURLOPT_POSTFIELDS     => $payload,\n    CURLOPT_HTTPHEADER     => [\n        "X-API-Key: ${K}",\n        "Content-Type: application/json",\n    ],\n    CURLOPT_RETURNTRANSFER => true,\n]);\necho curl_exec($ch);`,
     },
     data: {
-      curl: `curl -X POST "${BASE_URL}/airtime" \\\n  -H "X-API-Key: ${K}" \\\n  -H "Content-Type: application/json" \\\n  -d '{\n    "network": "MTN",\n    "plan_id": "5GB",\n    "phone": "0241234567",\n    "request_id": "unique_id_123"\n  }'`,
-      node: `const res = await fetch("${BASE_URL}/airtime", {\n  method: "POST",\n  headers: {\n    "X-API-Key": "${K}",\n    "Content-Type": "application/json",\n  },\n  body: JSON.stringify({\n    network: "MTN",           // MTN | TELECEL | AT | GLO\n    plan_id: "5GB",           // package size from /plans\n    phone: "0241234567",\n    request_id: "unique_id_123",\n  }),\n});\n\nconst data = await res.json();\nconsole.log(data.status); // "fulfilled"`,
-      python: `import requests\n\nres = requests.post(\n    "${BASE_URL}/airtime",\n    headers={\n        "X-API-Key": "${K}",\n        "Content-Type": "application/json",\n    },\n    json={\n        "network": "MTN",        # MTN | TELECEL | AT | GLO\n        "plan_id": "5GB",        # package size from /plans\n        "phone": "0241234567",\n        "request_id": "unique_id_123",\n    },\n)\nprint(res.json())`,
-      php: `<?php\n$payload = json_encode([\n    "network"    => "MTN",\n    "plan_id"    => "5GB",\n    "phone"      => "0241234567",\n    "request_id" => "unique_id_123",\n]);\n$ch = curl_init("${BASE_URL}/airtime");\ncurl_setopt_array($ch, [\n    CURLOPT_POST           => true,\n    CURLOPT_POSTFIELDS     => $payload,\n    CURLOPT_HTTPHEADER     => [\n        "X-API-Key: ${K}",\n        "Content-Type: application/json",\n    ],\n    CURLOPT_RETURNTRANSFER => true,\n]);\necho curl_exec($ch);`,
+      curl: `curl -X POST "${BASE_URL}/airtime" \\\n  -H "X-API-Key: ${K}" \\\n  -H "Content-Type: application/json" \\\n  -d '{\n    "networkCode": "MTN",\n    "package_size": "5GB",\n    "customerNumber": "0241234567",\n    "request_id": "unique_id_123"\n  }'`,
+      node: `const res = await fetch("${BASE_URL}/airtime", {\n  method: "POST",\n  headers: {\n    "X-API-Key": "${K}",\n    "Content-Type": "application/json",\n  },\n  body: JSON.stringify({\n    networkCode: "MTN",        // MTN | TELECEL | AT | GLO\n    package_size: "5GB",      // size from /plans\n    customerNumber: "0241234567",\n    request_id: "unique_id_123",\n  }),\n});\n\nconst data = await res.json();\nconsole.log(data.status); // "fulfilled"`,
+      python: `import requests\n\nres = requests.post(\n    "${BASE_URL}/airtime",\n    headers={\n        "X-API-Key": "${K}",\n        "Content-Type": "application/json",\n    },\n    json={\n        "networkCode": "MTN",     # MTN | TELECEL | AT | GLO\n        "package_size": "5GB",    # size from /plans\n        "customerNumber": "0241234567",\n        "request_id": "unique_id_123",\n    },\n)\nprint(res.json())`,
+      php: `<?php\n$payload = json_encode([\n    "networkCode"    => "MTN",\n    "package_size"   => "5GB",\n    "customerNumber" => "0241234567",\n    "request_id"     => "unique_id_123",\n]);\n$ch = curl_init("${BASE_URL}/airtime");\ncurl_setopt_array($ch, [\n    CURLOPT_POST           => true,\n    CURLOPT_POSTFIELDS     => $payload,\n    CURLOPT_HTTPHEADER     => [\n        "X-API-Key: ${K}",\n        "Content-Type: application/json",\n    ],\n    CURLOPT_RETURNTRANSFER => true,\n]);\necho curl_exec($ch);`,
     },
     validate: {
       curl: `curl -X POST "${BASE_URL}/payment/bills/validate" \\\n  -H "X-API-Key: ${K}" \\\n  -H "Content-Type: application/json" \\\n  -d '{\n    "customerNumber": "8226349986",\n    "billType": "DSTV"\n  }'`,
@@ -51,10 +57,22 @@ const makeSnippets = (key: string): Record<string, Record<Lang, string>> => {
       php: `<?php\n$payload = json_encode([\n    "customerNumber" => "8226349986",\n    "billType"       => "DSTV",\n]);\n$ch = curl_init("${BASE_URL}/payment/bills/validate");\ncurl_setopt_array($ch, [\n    CURLOPT_POST           => true,\n    CURLOPT_POSTFIELDS     => $payload,\n    CURLOPT_HTTPHEADER     => [\n        "X-API-Key: ${K}",\n        "Content-Type: application/json",\n    ],\n    CURLOPT_RETURNTRANSFER => true,\n]);\necho curl_exec($ch);`,
     },
     ecg: {
-      curl: `curl -X POST "${BASE_URL}/ecg" \\\n  -H "X-API-Key: ${K}" \\\n  -H "Content-Type: application/json" \\\n  -d '{\n    "customerNumber": "8226349986",\n    "billType": "DSTV",\n    "amount": 41.00,\n    "senderName": "JOHN DOE"\n  }'`,
-      node: `const res = await fetch("${BASE_URL}/ecg", {\n  method: "POST",\n  headers: {\n    "X-API-Key": "${K}",\n    "Content-Type": "application/json",\n  },\n  body: JSON.stringify({\n    customerNumber: "8226349986",\n    billType: "DSTV",\n    amount: 41.00,\n    senderName: "JOHN DOE"\n  }),\n});\n\nconst data = await res.json();\nconsole.log(data.transaction_id); // "SWFT_BILL_..."`,
-      python: `import requests\n\nres = requests.post(\n    "${BASE_URL}/ecg",\n    headers={\n        "X-API-Key": "${K}",\n        "Content-Type": "application/json",\n    },\n    json={\n        "customerNumber": "8226349986",\n        "billType": "DSTV",\n        "amount": 41.00,\n        "senderName": "JOHN DOE"\n    },\n)\nprint(res.json())`,
-      php: `<?php\n$payload = json_encode([\n    "customerNumber" => "8226349986",\n    "billType"       => "DSTV",\n    "amount"         => 41.00,\n    "senderName"     => "JOHN DOE",\n]);\n$ch = curl_init("${BASE_URL}/ecg");\ncurl_setopt_array($ch, [\n    CURLOPT_POST           => true,\n    CURLOPT_POSTFIELDS     => $payload,\n    CURLOPT_HTTPHEADER     => [\n        "X-API-Key: ${K}",\n        "Content-Type: application/json",\n    ],\n    CURLOPT_RETURNTRANSFER => true,\n]);\necho curl_exec($ch);`,
+      curl: `curl -X POST "${BASE_URL}/ecg" \\\n  -H "X-API-Key: ${K}" \\\n  -H "Content-Type: application/json" \\\n  -d '{\n    "customerNumber": "0123456789",\n    "billType": "ECG",\n    "amount": 50.00,\n    "senderName": "JOHN DOE",\n    "phoneNumber": "0241234567"\n  }'`,
+      node: `const res = await fetch("${BASE_URL}/ecg", {\n  method: "POST",\n  headers: {\n    "X-API-Key": "${K}",\n    "Content-Type": "application/json",\n  },\n  body: JSON.stringify({\n    customerNumber: "0123456789",\n    billType: "ECG",\n    amount: 50.00,\n    senderName: "JOHN DOE",\n    phoneNumber: "0241234567"\n  }),\n});\n\nconst data = await res.json();\nconsole.log(data.transaction_id); // "SWFT_BILL_..."`,
+      python: `import requests\n\nres = requests.post(\n    "${BASE_URL}/ecg",\n    headers={\n        "X-API-Key": "${K}",\n        "Content-Type": "application/json",\n    },\n    json={\n        "customerNumber": "0123456789",\n        "billType": "ECG",\n        "amount": 50.00,\n        "senderName": "JOHN DOE",\n        "phoneNumber": "0241234567"\n    },\n)\nprint(res.json())`,
+      php: `<?php\n$payload = json_encode([\n    "customerNumber" => "0123456789",\n    "billType"       => "ECG",\n    "amount"         => 50.00,\n    "senderName"     => "JOHN DOE",\n    "phoneNumber"    => "0241234567",\n]);\n$ch = curl_init("${BASE_URL}/ecg");\ncurl_setopt_array($ch, [\n    CURLOPT_POST           => true,\n    CURLOPT_POSTFIELDS     => $payload,\n    CURLOPT_HTTPHEADER     => [\n        "X-API-Key: ${K}",\n        "Content-Type: application/json",\n    ],\n    CURLOPT_RETURNTRANSFER => true,\n]);\necho curl_exec($ch);`,
+    },
+    sms: {
+      curl: `curl -X POST "${BASE_URL}/sms" \\\n  -H "X-API-Key: ${K}" \\\n  -H "Content-Type: application/json" \\\n  -d '{\n    "to": "0241234567",\n    "message": "Hello from SwiftData API",\n    "senderId": "SwiftData"\n  }'`,
+      node: `const res = await fetch("${BASE_URL}/sms", {\n  method: "POST",\n  headers: {\n    "X-API-Key": "${K}",\n    "Content-Type": "application/json",\n  },\n  body: JSON.stringify({\n    to: "0241234567",\n    message: "Hello from SwiftData API",\n    senderId: "SwiftData"\n  }),\n});\nconst data = await res.json();`,
+      python: `import requests\n\nres = requests.post(\n    "${BASE_URL}/sms",\n    headers={"X-API-Key": "${K}"},\n    json={"to": "0241234567", "message": "Hello"},\n)\nprint(res.json())`,
+      php: `<?php\n$payload = json_encode(["to" => "0241234567", "message" => "Hello"]);\n$ch = curl_init("${BASE_URL}/sms");\ncurl_setopt_array($ch, [\n    CURLOPT_POST => true,\n    CURLOPT_POSTFIELDS => $payload,\n    CURLOPT_HTTPHEADER => ["X-API-Key: ${K}", "Content-Type: application/json"],\n    CURLOPT_RETURNTRANSFER => true,\n]);\necho curl_exec($ch);`,
+    },
+    orders: {
+      curl: `curl -X GET "${BASE_URL}/orders?limit=10" \\\n  -H "X-API-Key: ${K}"`,
+      node: `const res = await fetch("${BASE_URL}/orders?limit=10", {\n  headers: { "X-API-Key": "${K}" },\n});\nconst { orders } = await res.json();`,
+      python: `import requests\n\nres = requests.get(\n    "${BASE_URL}/orders",\n    params={"limit": 10},\n    headers={"X-API-Key": "${K}"},\n)\nprint(res.json()["orders"])`,
+      php: `<?php\n$ch = curl_init("${BASE_URL}/orders?limit=10");\ncurl_setopt_array($ch, [\n    CURLOPT_HTTPHEADER    => ["X-API-Key: ${K}"],\n    CURLOPT_RETURNTRANSFER => true,\n]);\necho curl_exec($ch);`,
     }
   };
 };
@@ -62,14 +80,17 @@ const makeSnippets = (key: string): Record<string, Record<Lang, string>> => {
 // ─── Responses ────────────────────────────────────────────────────────────────
 const RESPONSES: Record<string, string> = {
   balance: `{\n  "success": true,\n  "balance": 50.00,\n  "currency": "GHS"\n}`,
-  account: `{\n  "success": true,\n  "name": "Your Name",\n  "balance": 50.00,\n  "apiKey": "swft_live_...",\n  "active": true\n}`,
+  account: `{\n  "success": true,\n  "name": "John Doe",\n  "balance": 50.00,\n  "active": true\n}`,
   plans: `{\n  "success": true,\n  "plans": [\n    {\n      "network": "MTN",\n      "package_size": "5GB",\n      "api_price": 22.00,\n      "is_unavailable": false\n    },\n    {\n      "network": "TELECEL",\n      "package_size": "6GB",\n      "api_price": 20.00,\n      "is_unavailable": false\n    }\n  ]\n}`,
   buy_ok: `{\n  "success": true,\n  "order_id": "a3f2b1c0-...",\n  "status": "fulfilled",\n  "balance": 45.00\n}`,
   validate_ok: `{\n  "success": true,\n  "customerName": "JOHN DOE",\n  "validatedAmount": 41.00\n}`,
   bill_ok: `{\n  "success": true,\n  "transaction_id": "SWFT_BILL_1234567890",\n  "cost": 41.00,\n  "balance": 9.00\n}`,
+  sms_ok: `{\n  "success": true,\n  "message": "SMS sent successfully"\n}`,
+  orders_ok: `{\n  "success": true,\n  "orders": [\n    {\n      "id": "...",\n      "created_at": "...",\n      "network": "MTN",\n      "package_size": "5GB",\n      "customer_phone": "...",\n      "amount": 22.00,\n      "status": "fulfilled"\n    }\n  ]\n}`,
   error_401: `{\n  "success": false,\n  "error": "Invalid API key"\n}`,
   error_402: `{\n  "success": false,\n  "error": "Insufficient balance"\n}`,
 };
+
 
 // ─── Reusable components ──────────────────────────────────────────────────────
 function CopyButton({ text, className = "" }: { text: string; className?: string }) {
@@ -157,14 +178,18 @@ function SectionAnchor({ id }: { id: string }) {
 const NAV_ITEMS = [
   { id: "overview",        label: "Overview",           icon: BookOpen },
   { id: "authentication",  label: "Authentication",      icon: Key },
+  { id: "account",         label: "Account Details",     icon: Activity },
   { id: "balance",         label: "Check Balance",       icon: Activity },
   { id: "plans",           label: "List Plans",          icon: List },
   { id: "buy",             label: "Airtime & Data",      icon: ShoppingCart },
   { id: "bills-validate",  label: "Validate Bills",      icon: Search },
   { id: "bills-pay",       label: "Pay Bills",           icon: CreditCard },
+  { id: "sms",             label: "Send SMS",            icon: Zap },
+  { id: "orders",          label: "Order History",       icon: List },
   { id: "errors",          label: "Error Reference",     icon: AlertTriangle },
   { id: "best-practices",  label: "Best Practices",      icon: Shield },
 ];
+
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
 const APIDocumentation = () => {
@@ -333,12 +358,27 @@ const APIDocumentation = () => {
               <h2 className="text-2xl font-black">Authentication</h2>
             </div>
             <p className="text-white/45 text-sm mb-6 md:ml-11 max-w-xl">
-              Include your Developer API Key in the <code className="text-sky-400 bg-white/5 px-1.5 py-0.5 rounded-md font-mono">X-API-Key</code> header on every request.
+              Authenticating with the SwiftData API is done via API Keys. You can provide your key using any of the following headers:
             </p>
 
             <div className="grid lg:grid-cols-2 gap-6 md:ml-11">
               <div className="space-y-4">
-                <CodeBlock code={`X-API-Key: ${userApiKey}`} label="Required Header" />
+                <div className="space-y-2">
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-white/20">Supported Headers</p>
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between p-3 rounded-lg bg-white/5 border border-white/8">
+                      <code className="text-sky-400 text-xs">X-API-Key: {userApiKey || "swft_live_..."}</code>
+                      <span className="text-[9px] text-white/20 font-bold uppercase">Recommended</span>
+                    </div>
+                    <div className="flex items-center justify-between p-3 rounded-lg bg-white/5 border border-white/8">
+                      <code className="text-white/60 text-xs">Authorization: Bearer {userApiKey || "swft_live_..."}</code>
+                    </div>
+                    <div className="flex items-center justify-between p-3 rounded-lg bg-white/5 border border-white/8">
+                      <code className="text-white/60 text-xs">api-key: {userApiKey || "swft_live_..."}</code>
+                    </div>
+                  </div>
+                </div>
+
                 <div className="rounded-xl border border-sky-500/20 bg-sky-500/5 p-4 flex gap-3">
                   <Shield className="w-4 h-4 text-sky-400 shrink-0 mt-0.5" />
                   <div>
@@ -349,6 +389,26 @@ const APIDocumentation = () => {
               </div>
             </div>
           </section>
+
+          {/* ── Account Details ────────────────────────────────────────── */}
+          <section>
+            <SectionAnchor id="account" />
+            <div className="flex items-center gap-3 mb-2">
+              <div className="w-8 h-8 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center shrink-0">
+                <Activity className="w-4 h-4 text-white/40" />
+              </div>
+              <h2 className="text-2xl font-black">Account Details</h2>
+            </div>
+            <div className="ml-11 flex flex-wrap items-center gap-3 mb-6">
+              <MethodBadge method="GET" />
+              <code className="text-white/55 text-sm font-mono bg-white/5 px-3 py-1 rounded-lg border border-white/8">/account</code>
+            </div>
+            <div className="grid lg:grid-cols-2 gap-6 ml-11">
+              <CodeBlock code={snippets.account[activeLang]} label="Request" />
+              <ResponseBlock code={RESPONSES.account} label="Response · 200 OK" />
+            </div>
+          </section>
+
 
           {/* ── Check Balance ────────────────────────────────────────── */}
           <section>
@@ -513,16 +573,17 @@ const APIDocumentation = () => {
               <MethodBadge method="POST" />
               <code className="text-white/55 text-sm font-mono bg-white/5 px-3 py-1 rounded-lg border border-white/8">/ecg</code>
             </div>
-            <p className="text-white/45 text-sm mb-6 ml-11 max-w-xl italic">Note: Use /ecg for electricity and /dstv, /gotv, /startimes for TV subscriptions.</p>
+            <p className="text-white/45 text-sm mb-6 ml-11 max-w-xl">Note: Use <code className="text-sky-400">/ecg</code> for electricity and <code className="text-sky-400">/dstv</code>, <code className="text-sky-400">/gotv</code>, <code className="text-sky-400">/startimes</code> for TV subscriptions.</p>
             <div className="ml-11 space-y-6">
               <div className="rounded-xl border border-white/8 overflow-hidden">
                 <div className="px-4 py-2.5 bg-white/[0.03] border-b border-white/5">
                   <span className="text-[10px] font-bold uppercase tracking-widest text-white/25">Body Parameters</span>
                 </div>
                 <ParamRow name="customerNumber" type="string" required desc="Account/Meter number" />
-                <ParamRow name="billType" type="string" required desc="e.g. DSTV" />
+                <ParamRow name="billType" type="string" required desc="e.g. ECG, DSTV, GOTV" />
                 <ParamRow name="amount" type="number" required desc="Amount to pay in GHS" />
                 <ParamRow name="senderName" type="string" required desc="Customer name from validation lookup" />
+                <ParamRow name="phoneNumber" type="string" required desc="Required for ECG to receive token via SMS" />
               </div>
               <div className="grid lg:grid-cols-2 gap-6">
                 <CodeBlock code={snippets.ecg[activeLang]} label="Request" />
@@ -530,6 +591,64 @@ const APIDocumentation = () => {
               </div>
             </div>
           </section>
+
+          {/* ── Send SMS ────────────────────────────────────────── */}
+          <section>
+            <SectionAnchor id="sms" />
+            <div className="flex items-center gap-3 mb-2">
+              <div className="w-8 h-8 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center shrink-0">
+                <Zap className="w-4 h-4 text-white/40" />
+              </div>
+              <h2 className="text-2xl font-black">Send SMS</h2>
+            </div>
+            <div className="ml-11 flex flex-wrap items-center gap-3 mb-6">
+              <MethodBadge method="POST" />
+              <code className="text-white/55 text-sm font-mono bg-white/5 px-3 py-1 rounded-lg border border-white/8">/sms</code>
+            </div>
+            <p className="text-white/45 text-sm mb-6 ml-11 max-w-xl">Send transactional SMS to any number. Charge: <code className="text-amber-400">0.05 GHS</code> per message.</p>
+            <div className="ml-11 space-y-6">
+              <div className="rounded-xl border border-white/8 overflow-hidden">
+                <div className="px-4 py-2.5 bg-white/[0.03] border-b border-white/5">
+                  <span className="text-[10px] font-bold uppercase tracking-widest text-white/25">Body Parameters</span>
+                </div>
+                <ParamRow name="to" type="string" required desc="Recipient phone number" />
+                <ParamRow name="message" type="string" required desc="Message content" />
+                <ParamRow name="senderId" type="string" required={false} desc="Optional Sender ID (default: SwiftData)" />
+              </div>
+              <div className="grid lg:grid-cols-2 gap-6">
+                <CodeBlock code={snippets.sms[activeLang]} label="Request" />
+                <ResponseBlock code={RESPONSES.sms_ok} label="Response · 200 OK" />
+              </div>
+            </div>
+          </section>
+
+          {/* ── Order History ────────────────────────────────────────── */}
+          <section>
+            <SectionAnchor id="orders" />
+            <div className="flex items-center gap-3 mb-2">
+              <div className="w-8 h-8 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center shrink-0">
+                <List className="w-4 h-4 text-white/40" />
+              </div>
+              <h2 className="text-2xl font-black">Order History</h2>
+            </div>
+            <div className="ml-11 flex flex-wrap items-center gap-3 mb-6">
+              <MethodBadge method="GET" />
+              <code className="text-white/55 text-sm font-mono bg-white/5 px-3 py-1 rounded-lg border border-white/8">/orders</code>
+            </div>
+            <div className="ml-11 space-y-6">
+              <div className="rounded-xl border border-white/8 overflow-hidden">
+                <div className="px-4 py-2.5 bg-white/[0.03] border-b border-white/5">
+                  <span className="text-[10px] font-bold uppercase tracking-widest text-white/25">Query Parameters</span>
+                </div>
+                <ParamRow name="limit" type="number" required={false} desc="Max orders to return (default: 20, max: 100)" />
+              </div>
+              <div className="grid lg:grid-cols-2 gap-6">
+                <CodeBlock code={snippets.orders[activeLang]} label="Request" />
+                <ResponseBlock code={RESPONSES.orders_ok} label="Response · 200 OK" />
+              </div>
+            </div>
+          </section>
+
 
           {/* ── Error Reference ──────────────────────────────────────── */}
           <section>

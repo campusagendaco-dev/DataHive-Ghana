@@ -98,18 +98,19 @@ const DeveloperPortal = () => {
                 <span className="ml-2 text-[10px] font-bold uppercase tracking-widest text-white/30">Node.js Integration</span>
               </div>
               <pre className="p-6 text-xs md:text-sm font-mono text-emerald-400/90 leading-relaxed overflow-x-auto">
-{`const response = await fetch('https://lsocdjpflecduumopijn.supabase.co/functions/v1/developer-api/buy', {
+{`const response = await fetch('https://lsocdjpflecduumopijn.supabase.co/functions/v1/developer-api/airtime', {
   method: 'POST',
   headers: {
-    'x-api-key': 'sdg_live_XXXXXXXXXX',
+    'X-API-Key': 'swft_live_XXXXXXXXXX',
     'Content-Type': 'application/json'
   },
   body: JSON.stringify({
-    network: 'MTN',
-    plan_id: 'mtn-1gb-30days',
-    phone: '054XXXXXXX'
+    networkCode: 'MTN',
+    package_size: '5GB',
+    customerNumber: '054XXXXXXX'
   })
 });`}
+
               </pre>
             </div>
           </div>
