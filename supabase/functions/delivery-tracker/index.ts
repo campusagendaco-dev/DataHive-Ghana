@@ -21,7 +21,7 @@ serve(async (req) => {
     const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
     const { data: recentOrders, error: statsError } = await supabaseAdmin
       .from("orders")
-      .select("status, created_at, phone, network, capacity")
+      .select("status, created_at, customer_phone, network, package_size")
       .gte("created_at", oneHourAgo)
       .order("created_at", { ascending: false });
 
@@ -42,7 +42,7 @@ serve(async (req) => {
       const placedAt = new Date(lastDeliveredOrder.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
       lastDelivered = {
         trackingId: Math.floor(Math.random() * 900000 + 1000000).toString(), // Mocked tracking batch ID
-        summary: `Tracking #${lastDeliveredOrder.phone.slice(-4)} — placed recently, delivered at ${placedAt}`
+        summary: `Tracking #${lastDeliveredOrder.customer_phone.slice(-4)} — placed recently, delivered at ${placedAt}`
       };
     }
 
@@ -57,9 +57,9 @@ serve(async (req) => {
       ?.filter(o => o.status === 'paid' || o.status === 'processing')
       .slice(0, 5)
       .map(o => ({
-        phone: maskPhone(o.phone),
+        phone: maskPhone(o.customer_phone),
         network: o.network || "YELLO",
-        capacity: o.capacity || 1,
+        capacity: o.package_size || "1GB",
         deliveryStatus: o.status === 'processing' ? 'Processing' : 'In Queue'
       })) || [];
 
@@ -67,9 +67,9 @@ serve(async (req) => {
       ?.filter(o => o.status === 'fulfilled')
       .slice(0, 5)
       .map(o => ({
-        phone: maskPhone(o.phone),
+        phone: maskPhone(o.customer_phone),
         network: o.network || "YELLO",
-        capacity: o.capacity || 1,
+        capacity: o.package_size || "1GB",
         deliveryStatus: "Sent"
       })) || [];
 

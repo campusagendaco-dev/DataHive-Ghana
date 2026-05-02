@@ -232,7 +232,7 @@ const OrderStatus = () => {
                   placeholder="Find another order (phone)..."
                   className="w-full py-3 px-4 rounded-2xl bg-black/20 border border-white/5 text-[10px] text-white placeholder:text-white/20 focus:outline-none focus:border-amber-500/50 transition-all"
                   disabled={loading}
-                  onKeyDown={async (e) => {
+                  onKeyDown={(e) => {
                     if (e.key === 'Enter') {
                       const rawInput = (e.currentTarget as HTMLInputElement).value.trim();
                       if (!rawInput) return;
@@ -242,28 +242,7 @@ const OrderStatus = () => {
                         return;
                       }
                       
-                      setLoading(true);
-                      try {
-                        const { data, error: invError } = await supabase.functions.invoke("verify-payment", {
-                          body: { phone: sanitized },
-                        });
-                        
-                        if (invError || !data || data.error) {
-                          toast.error(data?.error || "No recent orders found for this number.");
-                          return;
-                        }
-                        
-                        const newRef = data.id || data.reference || data.orderId;
-                        if (newRef) {
-                          window.location.href = `/order-status?reference=${newRef}`;
-                        } else {
-                          toast.error("Order found, but details are unavailable.");
-                        }
-                      } catch (err) {
-                        toast.error("Search failed. Check your connection.");
-                      } finally {
-                        setLoading(false);
-                      }
+                      navigate(`/my-orders?phone=${sanitized}`);
                     }
                   }}
                 />

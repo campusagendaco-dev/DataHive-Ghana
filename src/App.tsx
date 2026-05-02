@@ -86,6 +86,7 @@ import { useRegisterSW } from "virtual:pwa-register/react";
 import DashboardBulk from "./pages/DashboardBulk";
 import DashboardWhatsAppBot from "./pages/DashboardWhatsAppBot";
 import DeliveryTracker from "./pages/DeliveryTracker";
+import MyOrders from "./pages/MyOrders";
 
 
 const queryClient = new QueryClient();
@@ -263,6 +264,7 @@ const AppContent = () => {
         <Route path="/agent-program" element={<AgentProgram />} />
         <Route path="/store/:slug" element={<AgentStore />} />
         <Route path="/order-status" element={<OrderStatus />} />
+        <Route path="/my-orders" element={<MyOrders />} />
         <Route path="/delivery-tracker" element={<DeliveryTracker />} />
         <Route path="/purchase-success" element={<PurchaseSuccess />} />
         <Route path="/api-docs" element={<APIDocumentation />} />
