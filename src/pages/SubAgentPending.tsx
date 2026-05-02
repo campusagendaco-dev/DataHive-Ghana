@@ -14,9 +14,9 @@ const SubAgentPending = () => {
 
   const [activationFee, setActivationFee] = useState(0);
   const [parentId, setParentId] = useState<string | null>(null);
-  const [paying, setPaying] = useState(false);
   const [verifying, setVerifying] = useState(false);
   const [loadingData, setLoadingData] = useState(true);
+  const [platformBaseFee, setPlatformBaseFee] = useState(50);
 
   // Load fees + auto-verify on return from Paystack
   useEffect(() => {
@@ -32,6 +32,13 @@ const SubAgentPending = () => {
 
       const configuredFee = Number(parentRes?.sub_agent_activation_markup || 0);
       setActivationFee(Number.isFinite(configuredFee) && configuredFee > 0 ? configuredFee : 0);
+
+      // Fetch platform base fee
+      const { data: settings } = await supabase.from("system_settings").select("agent_activation_fee").eq("id", 1).maybeSingle();
+      if (settings?.agent_activation_fee) {
+        setPlatformBaseFee(Number(settings.agent_activation_fee));
+      }
+
       setLoadingData(false);
     };
     load();
@@ -74,7 +81,7 @@ const SubAgentPending = () => {
     setPaying(true);
 
     const orderId = crypto.randomUUID();
-    const agentProfitShare = Math.max(0, parseFloat((totalFee - 80).toFixed(2)));
+    const agentProfitShare = Math.max(0, parseFloat((totalFee - platformBaseFee).toFixed(2)));
     const swiftDataShare = parseFloat((totalFee - agentProfitShare).toFixed(2));
 
     const { data: paymentData, error: paymentError } = await invokePublicFunction("initialize-payment", {
@@ -178,8 +185,8 @@ const SubAgentPending = () => {
               </div>
               <div className="space-y-2.5">
                 {[
-                  { label: "Platform Base Fee", price: Math.min(totalFee, 80) },
-                  { label: "Agent Commission", price: Math.max(0, totalFee - 80) },
+                  { label: "Platform Base Fee", price: Math.min(totalFee, platformBaseFee) },
+                  { label: "Agent Commission", price: Math.max(0, totalFee - platformBaseFee) },
                   { label: "Processing Fee", price: paystackFee },
                 ].map((item) => (
                   <div key={item.label} className="flex justify-between text-sm">

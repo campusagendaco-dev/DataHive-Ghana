@@ -11,14 +11,14 @@ import { invokePublicFunction } from "@/lib/public-function-client";
 const benefits = [
   { icon: TrendingUp, title: "Set Your Own Profit", desc: "Set your reseller prices above our wholesale base and keep the margin." },
   { icon: Globe, title: "Your Own Website", desc: "Get a branded reseller website to sell data under your name." },
-  { icon: Users, title: "Manual Approval", desc: "Pay GHS 80 and get approved by our team — usually within 1-2 hours." },
+  { icon: Users, title: "Manual Approval", desc: "Pay GHS 50 and get approved by our team — usually within 1-2 hours." },
   { icon: Layers, title: "Full Dashboard", desc: "Track orders, profits, and manage your reseller business in one place." },
 ];
 
 const steps = [
   "Create or sign in to your SwiftData account",
   "Click Request Approval below",
-  "Pay GHS 80 activation fee via Paystack (MoMo or Card)",
+  "Pay GHS 50 activation fee via Paystack (MoMo or Card)",
   "Your account is reviewed and approved after payment",
   "Complete your reseller store setup",
   "Set your prices and share your store link",
@@ -66,7 +66,7 @@ const AgentProgram = () => {
       : {
           type: "action" as const,
           title: "Become a Reseller",
-          description: "Submit your request and pay GHS 80 to activate your reseller account.",
+          description: "Submit your request and pay GHS 50 to activate your reseller account.",
           label: "Request Approval",
         };
 
@@ -90,12 +90,21 @@ const AgentProgram = () => {
 
     await refreshProfile();
     
-    // Initialize payment immediately
-    const ACTIVATION_FEE = 80;
+    // Fetch dynamic activation fee from system_settings
+    let activationFee = 50;
+    try {
+      const { data: settings } = await supabase.from("system_settings").select("agent_activation_fee").eq("id", 1).maybeSingle();
+      if (settings?.agent_activation_fee) {
+        activationFee = Number(settings.agent_activation_fee);
+      }
+    } catch (e) {
+      console.error("Error fetching fee:", e);
+    }
+
     const PAYSTACK_FEE_RATE = 0.03;
     const PAYSTACK_FEE_CAP = 100;
-    const paystackFee = Math.min(ACTIVATION_FEE * PAYSTACK_FEE_RATE, PAYSTACK_FEE_CAP);
-    const ACTIVATION_TOTAL = parseFloat((ACTIVATION_FEE + paystackFee).toFixed(2));
+    const paystackFee = Math.min(activationFee * PAYSTACK_FEE_RATE, PAYSTACK_FEE_CAP);
+    const ACTIVATION_TOTAL = parseFloat((activationFee + paystackFee).toFixed(2));
     const orderId = crypto.randomUUID();
 
     const { data: paymentData, error: paymentError } = await invokePublicFunction("initialize-payment", {
@@ -108,7 +117,7 @@ const AgentProgram = () => {
           order_id: orderId,
           order_type: "agent_activation",
           agent_id: user.id,
-          base_amount: ACTIVATION_FEE,
+          base_amount: activationFee,
           paystack_fee: paystackFee,
         },
       },
@@ -135,7 +144,7 @@ const AgentProgram = () => {
             Become a <span className="text-gradient">SwiftData Reseller</span>
           </h1>
           <p className="text-lg text-muted-foreground max-w-xl mx-auto">
-            Start your own data reselling business. Pay GHS 80 for activation, set your own prices, run a branded store, and earn from each order after a quick manual review.
+            Start your own data reselling business. Pay GHS 50 for activation, set your own prices, run a branded store, and earn from each order after a quick manual review.
           </p>
         </div>
 

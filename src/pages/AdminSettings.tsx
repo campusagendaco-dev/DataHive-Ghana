@@ -58,6 +58,7 @@ interface SystemSettings {
   whatsapp_bot_prompt: string;
   home_page_video_url: string;
   home_page_video_muted: boolean;
+  agent_activation_fee: string;
 }
 
 const AdminSettings = () => {
@@ -110,6 +111,7 @@ const AdminSettings = () => {
     whatsapp_bot_prompt: "",
     home_page_video_url: "",
     home_page_video_muted: true,
+    agent_activation_fee: "50.00",
   });
 
   useEffect(() => {
@@ -169,6 +171,7 @@ const AdminSettings = () => {
           whatsapp_bot_prompt: d.whatsapp_bot_prompt || "",
           home_page_video_url: d.home_page_video_url || "/assets/videos/ai_video.mp4",
           home_page_video_muted: d.home_page_video_muted !== false, // default true
+          agent_activation_fee: String(d.agent_activation_fee || "50.00"),
         });
       }
       setLoading(false);
@@ -210,6 +213,7 @@ const AdminSettings = () => {
       whatsapp_bot_prompt: settings.whatsapp_bot_prompt.trim(),
       home_page_video_url: (settings.home_page_video_url || "").trim(),
       home_page_video_muted: settings.home_page_video_muted,
+      agent_activation_fee: parseFloat(settings.agent_activation_fee) || 50.00,
     };
 
     try {
@@ -449,16 +453,32 @@ const AdminSettings = () => {
           <Card>
             <CardHeader>
               <CardTitle className="text-lg flex items-center gap-2">
-                <Percent className="w-5 h-5 text-amber-500" />
-                Sub-Agent Commission Base
+                <Sparkles className="w-5 h-5 text-amber-500" />
+                Reseller Activation
               </CardTitle>
               <CardDescription>
-                Set the default base price for sub-agent packages (what standard agents pay).
+                Set the fee for users to become agents/resellers.
               </CardDescription>
             </CardHeader>
-            <CardContent>
+            <CardContent className="space-y-4">
               <div className="space-y-2">
-                <Label>Base Fee (GH₵)</Label>
+                <Label>Agent Activation Fee (GH₵)</Label>
+                <Input
+                  type="number"
+                  step="1"
+                  value={settings.agent_activation_fee}
+                  onChange={(e) => setSettings({ ...settings, agent_activation_fee: e.target.value })}
+                />
+                <p className="text-xs text-muted-foreground mt-1">
+                  Users pay this amount once to unlock the agent dashboard and cheaper prices.
+                </p>
+              </div>
+
+              <div className="pt-4 border-t border-white/5 space-y-2">
+                <Label className="flex items-center gap-2">
+                  <Percent className="w-4 h-4 text-amber-500" />
+                  Sub-Agent Commission Base (GH₵)
+                </Label>
                 <Input
                   type="number"
                   step="0.1"
@@ -466,7 +486,7 @@ const AdminSettings = () => {
                   onChange={(e) => setSettings({ ...settings, sub_agent_base_fee: e.target.value })}
                 />
                 <p className="text-xs text-muted-foreground mt-1">
-                  When a sub-agent activates a package, this is the amount deducted from the parent agent's wallet. The remaining amount goes to the parent agent as profit.
+                  When a sub-agent activates, this amount is deducted from the parent agent.
                 </p>
               </div>
             </CardContent>

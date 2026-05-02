@@ -508,7 +508,7 @@ const DashboardBuyDataNetwork = ({ network }: DashboardBuyDataNetworkProps) => {
       {!isPaidAgent && (
         <div className="rounded-xl border border-primary/25 bg-primary/5 p-4 flex flex-col sm:flex-row sm:items-center gap-3">
           <div className="flex-1 text-sm">
-            Activate your agent access for <span className="font-bold">GHS 80</span> to unlock cheaper prices &amp; your own store.
+            Activate your agent access for <span className="font-bold">GHS 50</span> to unlock cheaper prices &amp; your own store.
           </div>
           <Button size="sm" onClick={() => navigate("/agent-program")} className="shrink-0 gap-1.5">
             Become an Agent <ArrowRight className="w-3.5 h-3.5" />

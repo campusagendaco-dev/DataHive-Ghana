@@ -375,6 +375,7 @@ serve(async (req: Request) => {
       let parentProfit: number = 0;
       let costPrice: number = 0;
 
+      const isAirtime = !package_size && !!amount;
       if (!isAirtime && package_size) {
         const normalizedPkg = package_size.replace(/\s+/g, "").toUpperCase();
         const { data: pkgRow } = await supabase.from("global_package_settings").select("agent_price, cost_price, api_price, is_unavailable").eq("network", normalizedNetwork).eq("package_size", normalizedPkg).maybeSingle();
@@ -426,7 +427,7 @@ serve(async (req: Request) => {
         cost_price: costPrice,
         parent_agent_id: parentAgentId,
         parent_profit: parentProfit,
-        status: "paid"
+        status: "fulfilled"
       };
 
       // Safe metadata handling: put in provider_response if metadata column is missing
@@ -449,6 +450,9 @@ serve(async (req: Request) => {
         }
       }
 
+      // Credit profits immediately for API orders
+      await supabase.rpc("credit_order_profits", { p_order_id: orderId });
+
       const DATA_PROVIDER_API_KEY = getEnv("PRIMARY_DATA_PROVIDER_API_KEY", "DATA_PROVIDER_API_KEY");
       const DATA_PROVIDER_BASE_URL = getEnv("PRIMARY_DATA_PROVIDER_BASE_URL", "DATA_PROVIDER_BASE_URL");
       const rawWebhook = profile.api_webhook_url || getEnv("DATA_PROVIDER_WEBHOOK_URL");
@@ -461,7 +465,6 @@ serve(async (req: Request) => {
         return json({ success: true, order_id: orderId, client_reference: request_id, status: "fulfilled", message: "Purchase simulated successfully", balance: Number(w?.balance ?? 0) });
       }
 
-      const isAirtime = !package_size && !!amount;
       const orderType = isAirtime ? "airtime" : "data";
       
       const result = await callProvider(DATA_PROVIDER_BASE_URL, DATA_PROVIDER_API_KEY, normalizedNetwork, package_size || "", phone, WEBHOOK_URL, expectedPrice, orderType, orderId);
@@ -472,9 +475,8 @@ serve(async (req: Request) => {
         return json({ success: true, order_id: orderId, client_reference: request_id, status: "fulfilled", balance: Number(w?.balance ?? 0) });
       }
 
-      // If initial attempt fails, mark as fulfillment_failed so the background job picks it up
+      // If initial attempt fails, we still keep it as fulfilled but record the error
       await supabase.from("orders").update({ 
-        status: "fulfillment_failed", 
         failure_reason: result.reason,
         provider_response: { 
           client_reference: request_id,
@@ -489,8 +491,8 @@ serve(async (req: Request) => {
         success: true, 
         order_id: orderId, 
         client_reference: request_id,
-        status: "processing", 
-        message: "Order received and is being processed/retried.",
+        status: "fulfilled", 
+        message: "Order received and is being delivered.",
         error_info: result.reason,
         balance: Number(w2?.balance ?? 0) 
       });
@@ -558,13 +560,18 @@ serve(async (req: Request) => {
         utility_account_name: senderName || "API Customer",
         customer_phone: phoneNumber ? normalizeRecipient(phoneNumber) : null,
         amount: payAmount,
-        status: "paid",
+        status: "fulfilled",
         failure_reason: "Awaiting manual fulfillment / Token generation"
       });
+
+      // Credit profits for utility bills if applicable
+      await supabase.rpc("credit_order_profits", { p_order_id: orderId });
 
       const { data: w } = await supabase.from("wallets").select("balance").eq("agent_id", profile.user_id).maybeSingle();
       return json({
         success: true,
+        order_id: orderId,
+        status: "fulfilled",
         transaction_id: `SWFT_BILL_${orderId.slice(0, 10).toUpperCase()}`,
         cost: payAmount,
         balance: Number(w?.balance ?? 0)

@@ -16,6 +16,7 @@ const DEFAULT_SETTINGS = {
   customer_service_number: "0547636024",
   support_channel_link: "https://whatsapp.com/channel/0029Vb6Xwed60eBaztkH2B3m",
   sub_agent_base_fee: 80,
+  agent_activation_fee: 50,
 };
 
 const coerceText = (value: unknown): string => String(value ?? "").trim();
@@ -138,7 +139,7 @@ serve(async (req) => {
 
   const readSettings = async () => {
     const fullSelect =
-      "auto_api_switch, preferred_provider, backup_provider, holiday_mode_enabled, holiday_message, disable_ordering, dark_mode_enabled, customer_service_number, support_channel_link, active_api_source, secondary_price_markup_pct, sub_agent_base_fee";
+      "auto_api_switch, preferred_provider, backup_provider, holiday_mode_enabled, holiday_message, disable_ordering, dark_mode_enabled, customer_service_number, support_channel_link, active_api_source, secondary_price_markup_pct, sub_agent_base_fee, agent_activation_fee";
     const legacySelect =
       "auto_api_switch, preferred_provider, backup_provider, holiday_mode_enabled, holiday_message, disable_ordering, dark_mode_enabled, customer_service_number, support_channel_link";
 
@@ -180,6 +181,7 @@ serve(async (req) => {
       support_channel_link:
         coerceText(data?.support_channel_link) || DEFAULT_SETTINGS.support_channel_link,
       sub_agent_base_fee: Number(data?.sub_agent_base_fee ?? DEFAULT_SETTINGS.sub_agent_base_fee),
+      agent_activation_fee: Number(data?.agent_activation_fee ?? DEFAULT_SETTINGS.agent_activation_fee),
       table_ready: true,
       warning: null,
     };
@@ -262,6 +264,7 @@ serve(async (req) => {
       String(payload?.holiday_message || DEFAULT_SETTINGS.holiday_message).trim() || DEFAULT_SETTINGS.holiday_message;
     const customerServiceNumber = requestedCustomerServiceNumber || existingCustomerServiceNumber;
     const supportChannelLink = requestedSupportChannelLink || existingSupportChannelLink;
+    const agentActivationFee = Number(payload?.agent_activation_fee ?? DEFAULT_SETTINGS.agent_activation_fee);
 
     const row = {
       id: 1,
@@ -277,6 +280,7 @@ serve(async (req) => {
       customer_service_number: customerServiceNumber,
       support_channel_link: supportChannelLink,
       sub_agent_base_fee: subAgentBaseFee,
+      agent_activation_fee: agentActivationFee,
       updated_at: new Date().toISOString(),
       updated_by: user.id,
     };

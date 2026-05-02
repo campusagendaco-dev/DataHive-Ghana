@@ -105,7 +105,19 @@ const SubAgentSignup = () => {
     // Initialize payment immediately
     const totalFee = Math.max(0, Number(agent!.sub_agent_activation_markup || 0));
     const orderId = crypto.randomUUID();
-    const agentProfitShare = Math.max(0, parseFloat((totalFee - 80).toFixed(2)));
+    
+    // Fetch dynamic activation fee from system_settings
+    let platformBaseFee = 50;
+    try {
+      const { data: settings } = await supabase.from("system_settings").select("agent_activation_fee").eq("id", 1).maybeSingle();
+      if (settings?.agent_activation_fee) {
+        platformBaseFee = Number(settings.agent_activation_fee);
+      }
+    } catch (e) {
+      console.error("Error fetching platform fee:", e);
+    }
+
+    const agentProfitShare = Math.max(0, parseFloat((totalFee - platformBaseFee).toFixed(2)));
     const swiftDataShare = parseFloat((totalFee - agentProfitShare).toFixed(2));
 
     if (totalFee > 0) {

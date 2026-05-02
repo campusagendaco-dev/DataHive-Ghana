@@ -200,7 +200,7 @@ const DashboardSubAgents = () => {
   };
 
   const totalFee = activationFee;
-  const agentShare = Math.max(0, parseFloat((totalFee - 80).toFixed(2)));
+  const agentShare = Math.max(0, parseFloat((totalFee - 50).toFixed(2)));
   const swiftDataShare = parseFloat((totalFee - agentShare).toFixed(2));
 
   const TABS: { id: Tab; label: string; icon: typeof Users2 }[] = [
@@ -326,7 +326,7 @@ const DashboardSubAgents = () => {
             <div className="rounded-lg bg-amber-400/10 border border-amber-400/30 p-3 text-sm">
               <p className="font-medium mb-1">How it works</p>
               <p className="text-muted-foreground text-xs">
-                Set the full activation price your sub agents will pay. SwiftData keeps a base fee of GH₵ 80 and you receive the remainder on your profit dashboard.
+                Set the full activation price your sub agents will pay. SwiftData keeps a base fee of GH₵ 50 and you receive the remainder on your profit dashboard.
               </p>
             </div>
 
