@@ -1,9 +1,11 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
+import { motion, AnimatePresence } from "framer-motion";
 import {
   CheckCircle2, XCircle, Loader2, ShieldCheck, Zap,
   Activity, Copy, Check, RefreshCw, ArrowLeft,
-  Search, Info, Database, SignalHigh
+  Search, Info, Database, SignalHigh, Server,
+  Clock, ArrowRight, Package
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -18,6 +20,21 @@ const STEPS = [
   { key: "delivering", icon: Zap, color: "#F59E0B" },
   { key: "done", icon: CheckCircle2, color: "#6366F1" },
 ];
+
+interface TrackerData {
+  status: string;
+  data: {
+    message: string;
+    scanner: { active: boolean; waiting: boolean; waitSeconds: number };
+    stats: { checked: number; delivered: number; partial: number; pending: number; failed: number };
+    lastDelivered: { trackingId: string; summary: string } | null;
+    checkingNow: { summary: string };
+    yourOrders: {
+      inCurrentBatch: Array<{ phone: string; network: string; capacity: string; deliveryStatus: string }>;
+      inLastDeliveredBatch: Array<{ phone: string; network: string; capacity: string; deliveryStatus: string }>;
+    }
+  }
+}
 
 function getStatusMeta(status: OrderStatusType, failed: boolean, message?: string) {
   if (failed || status === "fulfillment_failed") {
@@ -43,23 +60,30 @@ function getStatusMeta(status: OrderStatusType, failed: boolean, message?: strin
 
 const OrderStatus = () => {
   const navigate = useNavigate();
-  const { isDark } = useAppTheme();
   const [searchParams] = useSearchParams();
   const reference = searchParams.get("reference") || searchParams.get("trxref") || "";
   const network = searchParams.get("network") || "";
   const packageSize = searchParams.get("package") || "";
-  const phone = searchParams.get("phone") || "";
+  const phoneParam = searchParams.get("phone") || "";
 
+  // State for single order tracking
   const [orderStatus, setOrderStatus] = useState<OrderStatusType>("pending");
   const [statusMessage, setStatusMessage] = useState<string>("");
   const [failed, setFailed] = useState(false);
-  const [loading, setLoading] = useState(false);
+  const [loadingOrder, setLoadingOrder] = useState(false);
   const [copied, setCopied] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const redirectedRef = useRef(false);
 
+  // State for global system tracking (from DeliveryTracker)
+  const [trackerData, setTrackerData] = useState<TrackerData | null>(null);
+  const [loadingTracker, setLoadingTracker] = useState(true);
+  const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
+  const [searchPhone, setSearchPhone] = useState("");
+
   const meta = getStatusMeta(orderStatus, failed, statusMessage);
 
+  // --- SINGLE ORDER LOGIC ---
   const pollStatus = async () => {
     if (!reference) return;
     setIsRefreshing(true);
@@ -67,11 +91,9 @@ const OrderStatus = () => {
       const { data, error } = await supabase.functions.invoke("verify-payment", {
         body: { reference },
       });
-
       if (error || !data) throw error || new Error("Failed to fetch status");
-
       handleStatusUpdate(data.status, data.message || data.error);
-    } catch (err: any) {
+    } catch (err) {
       console.error("Polling error:", err);
     } finally {
       setIsRefreshing(false);
@@ -81,169 +103,271 @@ const OrderStatus = () => {
   const handleStatusUpdate = (status: OrderStatusType, message?: string) => {
     setOrderStatus(status);
     if (message) setStatusMessage(message);
-
     if (status === "fulfillment_failed") {
       setFailed(true);
       return;
     }
-
     if (status === "fulfilled" && !redirectedRef.current) {
       redirectedRef.current = true;
-      setTimeout(() => {
-        navigate(`/purchase-success?reference=${reference}`);
-      }, 3000);
+      setTimeout(() => navigate(`/purchase-success?reference=${reference}`), 3000);
     }
   };
 
   useEffect(() => {
     if (!reference) return;
-
     pollStatus();
-
-    const channel = supabase
-      .channel(`order_status_${reference}`)
-      .on(
-        "postgres_changes",
-        { event: "UPDATE", schema: "public", table: "orders", filter: `id=eq.${reference}` },
-        (payload) => {
-          if (payload.new.status) {
-            handleStatusUpdate(payload.new.status as OrderStatusType, payload.new.message || payload.new.failure_reason);
-          }
-        }
-      )
-      .subscribe();
-
+    const channel = supabase.channel(`order_status_${reference}`)
+      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "orders", filter: `id=eq.${reference}` }, (payload) => {
+        if (payload.new.status) handleStatusUpdate(payload.new.status as OrderStatusType, payload.new.message || payload.new.failure_reason);
+      }).subscribe();
     const interval = setInterval(pollStatus, 15000);
-
-    return () => {
-      supabase.removeChannel(channel);
-      clearInterval(interval);
-    };
+    return () => { supabase.removeChannel(channel); clearInterval(interval); };
   }, [reference]);
 
-  const copyRef = () => {
-    navigator.clipboard.writeText(reference);
-    setCopied(true);
-    toast.success("Reference Copied");
-    setTimeout(() => setCopied(false), 2000);
+  // --- GLOBAL TRACKER LOGIC ---
+  const fetchTrackerData = async () => {
+    try {
+      const { data: res, error } = await supabase.functions.invoke("delivery-tracker");
+      if (error) throw error;
+      setTrackerData(res);
+      setLastUpdate(new Date());
+    } catch (err) {
+      console.error("Tracker fetch error:", err);
+    } finally {
+      setLoadingTracker(false);
+    }
+  };
+
+  useEffect(() => {
+    if (reference) return;
+    fetchTrackerData();
+    const interval = setInterval(fetchTrackerData, 10000);
+    return () => clearInterval(interval);
+  }, [reference]);
+
+  const handleSearch = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!searchPhone) return;
+    const sanitized = searchPhone.replace(/\D+/g, "");
+    if (sanitized.length < 9) {
+      toast.error("Please enter a valid phone number");
+      return;
+    }
+    navigate(`/my-orders?phone=${sanitized}`);
   };
 
   const step = orderStatus === "fulfilled" ? 3 : (orderStatus === "processing" || orderStatus === "paid" ? 2 : 1);
 
-  return (
-    <div className="min-h-screen bg-black flex flex-col items-center justify-center p-6 font-sans antialiased">
-      <div className="w-full max-w-[340px]">
-        {/* Cute Minimalist Card */}
-        <div className="relative overflow-hidden rounded-[2.5rem] bg-white/[0.03] border border-white/10 backdrop-blur-3xl shadow-2xl">
-          <div className="absolute inset-0 bg-gradient-to-br from-white/[0.02] to-transparent pointer-events-none" />
-          
-          {/* Top Badge */}
-          <div className="px-8 pt-8 flex justify-center">
-            <div className="px-3 py-1 rounded-full bg-white/[0.05] border border-white/5 flex items-center gap-2">
-              <div className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ backgroundColor: meta.color }} />
-              <span className="text-[9px] font-black uppercase tracking-widest text-white/40">
-                {meta.badge}
-              </span>
-            </div>
-          </div>
-
-          <div className="px-8 pt-8 pb-10 flex flex-col items-center text-center">
-            <div className="relative mb-6">
-               <div className="absolute inset-0 blur-xl opacity-20 animate-pulse" style={{ backgroundColor: meta.color }} />
-               <div className="relative w-10 h-10 rounded-2xl border border-white/5 flex items-center justify-center bg-white/[0.03]">
-                  {orderStatus === "fulfilled" ? (
-                    <CheckCircle2 className="w-5 h-5 text-emerald-400" />
-                  ) : failed ? (
-                    <XCircle className="w-5 h-5 text-red-400" />
-                  ) : (
-                    <div className="w-4 h-4 rounded-full border-2 border-white/10 border-t-white/40 animate-spin" />
-                  )}
-               </div>
-            </div>
-
-            <h2 className="text-lg font-bold text-white tracking-tight mb-1">
-               {meta.label}
-            </h2>
-            <p className="text-[10px] text-white/30 font-medium max-w-[200px]">
-              {meta.sub}
-            </p>
-
-            {(network || phone) && (
-              <div className="mt-6 flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white/[0.02] border border-white/5">
-                <span className="text-[9px] font-bold text-white/40 uppercase tracking-tighter">{network}</span>
-                <span className="text-[9px] font-bold text-white/20">{packageSize}</span>
-                <span className="text-[9px] font-mono text-white/20">{phone}</span>
+  // --- RENDER SPECIFIC ORDER ---
+  if (reference) {
+    return (
+      <div className="min-h-screen bg-black flex flex-col items-center justify-center p-6 font-sans antialiased">
+        <div className="w-full max-w-[340px]">
+          <div className="relative overflow-hidden rounded-[2.5rem] bg-white/[0.03] border border-white/10 backdrop-blur-3xl shadow-2xl">
+            <div className="absolute inset-0 bg-gradient-to-br from-white/[0.02] to-transparent pointer-events-none" />
+            <div className="px-8 pt-8 flex justify-center">
+              <div className="px-3 py-1 rounded-full bg-white/[0.05] border border-white/5 flex items-center gap-2">
+                <div className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ backgroundColor: meta.color }} />
+                <span className="text-[9px] font-black uppercase tracking-widest text-white/40">{meta.badge}</span>
               </div>
-            )}
-          </div>
-
-          {/* Minimalist Progress Line */}
-          <div className="px-10 pb-8">
-             <div className="relative h-[1.5px] bg-white/5 rounded-full overflow-hidden">
-                <div 
-                  className="absolute inset-y-0 left-0 transition-all duration-1000 ease-out"
-                  style={{ 
-                    width: `${Math.max(15, (step / 3) * 100)}%`,
-                    backgroundColor: meta.color
-                  }}
-                />
-             </div>
-             <div className="flex justify-between mt-3">
+            </div>
+            <div className="px-8 pt-8 pb-10 flex flex-col items-center text-center">
+              <div className="relative mb-6">
+                <div className="absolute inset-0 blur-xl opacity-20 animate-pulse" style={{ backgroundColor: meta.color }} />
+                <div className="relative w-10 h-10 rounded-2xl border border-white/5 flex items-center justify-center bg-white/[0.03]">
+                  {orderStatus === "fulfilled" ? <CheckCircle2 className="w-5 h-5 text-emerald-400" /> : failed ? <XCircle className="w-5 h-5 text-red-400" /> : <div className="w-4 h-4 rounded-full border-2 border-white/10 border-t-white/40 animate-spin" />}
+                </div>
+              </div>
+              <h2 className="text-lg font-bold text-white tracking-tight mb-1">{meta.label}</h2>
+              <p className="text-[10px] text-white/30 font-medium max-w-[200px]">{meta.sub}</p>
+              {(network || phoneParam) && (
+                <div className="mt-6 flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white/[0.02] border border-white/5">
+                  <span className="text-[9px] font-bold text-white/40 uppercase tracking-tighter">{network}</span>
+                  <span className="text-[9px] font-bold text-white/20">{packageSize}</span>
+                  <span className="text-[9px] font-mono text-white/20">{phoneParam}</span>
+                </div>
+              )}
+            </div>
+            <div className="px-10 pb-8">
+              <div className="relative h-[1.5px] bg-white/5 rounded-full overflow-hidden">
+                <div className="absolute inset-y-0 left-0 transition-all duration-1000 ease-out" style={{ width: `${Math.max(15, (step / 3) * 100)}%`, backgroundColor: meta.color }} />
+              </div>
+              <div className="flex justify-between mt-3">
                 {STEPS.map((s, i) => {
                   const isActive = step >= i + 1;
                   return (
                     <div key={s.key} className="flex flex-col items-center gap-1.5">
-                      <div className={cn(
-                        "w-1.5 h-1.5 rounded-full transition-all duration-700",
-                        isActive ? "scale-110 shadow-[0_0_8px_rgba(255,255,255,0.2)]" : "bg-white/5"
-                      )} style={{ backgroundColor: isActive ? s.color : undefined }} />
-                      <span className={cn(
-                        "text-[7px] font-bold uppercase tracking-tighter",
-                        isActive ? "text-white/40" : "text-white/10"
-                      )}>
-                        {s.key}
-                      </span>
+                      <div className={cn("w-1.5 h-1.5 rounded-full transition-all duration-700", isActive ? "scale-110 shadow-[0_0_8px_rgba(255,255,255,0.2)]" : "bg-white/5")} style={{ backgroundColor: isActive ? s.color : undefined }} />
+                      <span className={cn("text-[7px] font-bold uppercase tracking-tighter", isActive ? "text-white/40" : "text-white/10")}>{s.key}</span>
                     </div>
                   );
                 })}
-             </div>
-          </div>
-
-          {/* Reference & Copy */}
-          {reference && (
-            <div className="bg-white/[0.01] px-6 py-4 flex items-center justify-between gap-3 border-t border-white/5">
-              <div className="min-w-0">
-                 <p className="text-[8px] font-bold text-white/10 uppercase tracking-widest mb-0.5">Reference</p>
-                 <code className="text-[10px] font-mono text-white/20 truncate block">{reference}</code>
               </div>
-              <button 
-                onClick={copyRef}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 border border-white/5 transition-all"
-              >
-                <Copy className="w-3 h-3 text-white/30" />
-                <span className="text-[9px] font-bold text-white/30 uppercase">Copy</span>
-              </button>
             </div>
-          )}
+            {reference && (
+              <div className="bg-white/[0.01] px-6 py-4 flex items-center justify-between gap-3 border-t border-white/5">
+                <div className="min-w-0">
+                   <p className="text-[8px] font-bold text-white/10 uppercase tracking-widest mb-0.5">Reference</p>
+                   <code className="text-[10px] font-mono text-white/20 truncate block">{reference}</code>
+                </div>
+                <button onClick={() => { navigator.clipboard.writeText(reference); toast.success("Copied"); }} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 border border-white/5 transition-all">
+                  <Copy className="w-3 h-3 text-white/30" />
+                  <span className="text-[9px] font-bold text-white/30 uppercase">Copy</span>
+                </button>
+              </div>
+            )}
+          </div>
+          <div className="mt-6 flex gap-2">
+            <button onClick={pollStatus} disabled={isRefreshing || orderStatus === "fulfilled"} className="flex-1 h-12 rounded-[1.2rem] bg-white/5 border border-white/5 flex items-center justify-center gap-2 transition-all active:scale-95 disabled:opacity-20">
+              <RefreshCw className={cn("w-3.5 h-3.5 text-white/20", isRefreshing && "animate-spin")} />
+              <span className="text-[10px] font-bold text-white/40 uppercase tracking-widest">Refresh</span>
+            </button>
+            <button onClick={() => navigate('/order-status')} className="w-12 h-12 rounded-[1.2rem] bg-white/5 border border-white/5 flex items-center justify-center">
+              <ArrowLeft className="w-4 h-4 text-white/20" />
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // --- RENDER GLOBAL SYSTEM TRACKER ---
+  return (
+    <div className="min-h-screen bg-[#050505] text-white selection:bg-amber-500/30 font-sans antialiased">
+      <div className="fixed inset-0 pointer-events-none overflow-hidden">
+        <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-amber-500/5 rounded-full blur-[120px]" />
+        <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-blue-500/5 rounded-full blur-[120px]" />
+      </div>
+
+      <div className="relative max-w-lg mx-auto px-6 pt-24 pb-20">
+        <div className="flex items-center justify-between mb-10">
+          <div>
+            <h1 className="text-2xl font-black tracking-tight mb-1">Live Scanner</h1>
+            <p className="text-[10px] font-medium text-white/30 uppercase tracking-widest flex items-center gap-2">
+              <Server className="w-3 h-3" /> System Node 01 • Ghana
+            </p>
+          </div>
+          <div className="flex items-center gap-3 px-4 py-2 rounded-2xl bg-white/[0.03] border border-white/10">
+            <div className="relative">
+              <div className="w-2 h-2 rounded-full bg-emerald-500 animate-ping absolute inset-0" />
+              <div className="w-2 h-2 rounded-full bg-emerald-500 relative" />
+            </div>
+            <span className="text-[10px] font-black uppercase tracking-widest text-emerald-400">Live Status</span>
+          </div>
         </div>
 
-        {/* Action Row */}
-        <div className="mt-6 flex gap-2">
-           <button 
-             onClick={pollStatus}
-             disabled={isRefreshing || orderStatus === "fulfilled"}
-             className="flex-1 h-12 rounded-[1.2rem] bg-white/5 border border-white/5 flex items-center justify-center gap-2 transition-all active:scale-95 disabled:opacity-20"
-           >
-             <RefreshCw className={cn("w-3.5 h-3.5 text-white/20", isRefreshing && "animate-spin")} />
-             <span className="text-[10px] font-bold text-white/40 uppercase tracking-widest">Refresh</span>
-           </button>
-           
-           <button 
-             onClick={() => window.open("https://wa.me/233540000000", "_blank")}
-             className="w-12 h-12 rounded-[1.2rem] bg-white/5 border border-white/5 flex items-center justify-center"
-           >
-             <Info className="w-4 h-4 text-white/20" />
-           </button>
+        {/* Global Search Bar */}
+        <form onSubmit={handleSearch} className="relative group mb-10">
+          <input 
+            type="tel"
+            value={searchPhone}
+            onChange={(e) => setSearchPhone(e.target.value)}
+            placeholder="Track your orders by phone number..."
+            className="w-full py-4 px-6 rounded-[2rem] bg-white/[0.03] border border-white/10 text-xs text-white placeholder:text-white/20 focus:outline-none focus:border-amber-500/50 transition-all shadow-2xl"
+          />
+          <button type="submit" className="absolute right-3 top-1/2 -translate-y-1/2 w-10 h-10 rounded-xl bg-amber-500 flex items-center justify-center shadow-lg shadow-amber-500/20 active:scale-95 transition-all">
+            <Search className="w-4 h-4 text-black" />
+          </button>
+        </form>
+
+        {loadingTracker && !trackerData ? (
+          <div className="py-20 flex flex-col items-center gap-4">
+             <Loader2 className="w-8 h-8 text-amber-500 animate-spin" />
+             <p className="text-[10px] font-black uppercase tracking-widest text-white/20">Syncing with Node...</p>
+          </div>
+        ) : (
+          <div className="space-y-8">
+            {/* Scanner Card */}
+            <div className="relative rounded-[2.5rem] border border-white/10 bg-[#0A0A0C]/80 backdrop-blur-3xl overflow-hidden shadow-2xl">
+              <div className="p-8 pb-4">
+                <div className="flex items-center justify-between mb-8">
+                   <div className="flex items-center gap-4">
+                      <div className="w-12 h-12 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center">
+                         <Activity className={cn("w-6 h-6 text-amber-500", trackerData?.data.scanner.active && "animate-pulse")} />
+                      </div>
+                      <div>
+                         <h3 className="font-bold text-base">Network Scanner</h3>
+                         <p className="text-[10px] text-white/40 font-medium">Verifying global delivery states</p>
+                      </div>
+                   </div>
+                   <div className="text-right">
+                      <p className="text-[10px] font-bold text-white/20 uppercase tracking-tighter">Last Sync</p>
+                      <p className="text-[10px] font-mono text-white/40">{lastUpdate.toLocaleTimeString([], { hour12: false })}</p>
+                   </div>
+                </div>
+
+                <div className="relative h-20 flex items-center justify-center mb-8">
+                   <AnimatePresence mode="wait">
+                      <motion.div key={trackerData?.data.checkingNow.summary} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="relative z-10 px-6 py-3 rounded-2xl bg-white/[0.03] border border-white/10 text-center">
+                         <p className="text-xs font-bold text-amber-400/80 mb-1">{trackerData?.data.checkingNow.summary}</p>
+                         <p className="text-[8px] font-black uppercase tracking-[0.2em] text-white/20">Encryption Protocol Active</p>
+                      </motion.div>
+                   </AnimatePresence>
+                </div>
+
+                <div className="grid grid-cols-4 gap-2">
+                   {[
+                     { label: "Check", val: trackerData?.data.stats.checked, color: "text-white/40" },
+                     { label: "Sent", val: trackerData?.data.stats.delivered, color: "text-emerald-400" },
+                     { label: "Wait", val: trackerData?.data.stats.pending, color: "text-amber-400" },
+                     { label: "Fail", val: trackerData?.data.stats.failed, color: "text-red-400" },
+                   ].map(s => (
+                     <div key={s.label} className="p-3 rounded-2xl bg-white/[0.02] border border-white/5 text-center">
+                        <p className="text-[8px] font-black uppercase tracking-widest text-white/20 mb-1">{s.label}</p>
+                        <p className={cn("text-sm font-black tracking-tight", s.color)}>{s.val}</p>
+                     </div>
+                   ))}
+                </div>
+              </div>
+              <div className="px-8 py-4 bg-white/[0.02] flex items-center justify-between border-t border-white/5">
+                 <div className="flex items-center gap-2">
+                    <ShieldCheck className="w-3.5 h-3.5 text-emerald-500" />
+                    <p className="text-[9px] font-medium text-white/40 italic">{trackerData?.data.lastDelivered?.summary || "Scanner warming up..."}</p>
+                 </div>
+              </div>
+            </div>
+
+            {/* Live Feed */}
+            <div className="space-y-6">
+              <div className="flex items-center gap-2 px-2">
+                 <Clock className="w-4 h-4 text-amber-500" />
+                 <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-white/40">Realtime Dispatch Feed</h4>
+              </div>
+              <div className="space-y-2">
+                {trackerData?.data.yourOrders.inCurrentBatch.map((o, i) => (
+                  <div key={i} className="flex items-center justify-between p-4 rounded-3xl bg-white/[0.02] border border-white/5">
+                    <div className="flex items-center gap-4">
+                       <div className="w-9 h-9 rounded-xl bg-white/[0.03] border border-white/5 flex items-center justify-center font-mono text-[9px] text-white/40">{o.network.slice(0, 3)}</div>
+                       <div>
+                          <p className="text-[11px] font-mono font-bold text-white tracking-widest">{o.phone}</p>
+                          <p className="text-[8px] font-medium text-white/20">{o.capacity} • {o.deliveryStatus}</p>
+                       </div>
+                    </div>
+                    <div className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
+                  </div>
+                ))}
+                {trackerData?.data.yourOrders.inLastDeliveredBatch.map((o, i) => (
+                  <div key={`del-${i}`} className="flex items-center justify-between p-4 rounded-3xl bg-white/[0.01] border border-white/5">
+                    <div className="flex items-center gap-4">
+                       <div className="w-9 h-9 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center font-mono text-[9px] text-emerald-500/60">{o.network.slice(0, 3)}</div>
+                       <div>
+                          <p className="text-[11px] font-mono font-bold text-white/40 tracking-widest">{o.phone}</p>
+                          <p className="text-[8px] font-medium text-white/10">{o.capacity} • Verified</p>
+                       </div>
+                    </div>
+                    <CheckCircle2 className="w-4 h-4 text-emerald-500/40" />
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
+        <div className="mt-16 text-center">
+           <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/[0.03] border border-white/5">
+              <SignalHigh className="w-3 h-3 text-white/20" />
+              <p className="text-[9px] font-medium text-white/20 tracking-wider">Secure Realtime Delivery Network</p>
+           </div>
         </div>
       </div>
     </div>

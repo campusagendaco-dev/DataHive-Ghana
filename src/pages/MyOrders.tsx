@@ -3,7 +3,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { 
   Search, Package, Clock, CheckCircle2, 
   XCircle, Loader2, ArrowLeft, RefreshCw,
-  Activity, ExternalLink, ShieldCheck, Zap
+  Activity, ExternalLink, ShieldCheck, Zap, ArrowRight
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
