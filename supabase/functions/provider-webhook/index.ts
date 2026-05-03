@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { corsHeaders } from "../_shared/cors.ts";
+import { notifyApiClient } from "../_shared/webhooks.ts";
 
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
@@ -10,7 +11,6 @@ serve(async (req) => {
   const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
   try {
-    // Handle GET requests (often used for pings/verification)
     if (req.method === "GET") {
       return new Response(JSON.stringify({ status: "online" }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" }
@@ -19,61 +19,39 @@ serve(async (req) => {
 
     const body = await req.text();
     if (!body || body.trim() === "") {
-      return new Response(JSON.stringify({ message: "Empty body, ping successful" }), {
+      return new Response(JSON.stringify({ message: "Empty body" }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" }
       });
     }
 
     const payload = JSON.parse(body);
-    console.log("[provider-webhook] Received payload:", JSON.stringify(payload));
-
-    // Standard / Event format
-    const event = payload?.event || "";
-    const data = payload?.data || {};
+    const reference = payload?.data?.reference || payload?.reference || payload?.order_id;
+    const rawStatus = (payload?.data?.status || payload?.status || "").toLowerCase();
     
-    // DataMart / Direct format support
-    const reference = data?.reference || data?.orderReference || payload?.reference || payload?.order_id;
-    const rawStatus = (data?.status || data?.orderStatus || payload?.status || "").toLowerCase();
-    
-    // Map status
     let systemStatus = "processing";
-    if (rawStatus === "completed" || rawStatus === "success" || rawStatus === "delivered") {
-      systemStatus = "fulfilled";
-    } else if (rawStatus === "failed" || rawStatus === "rejected" || rawStatus === "error") {
-      systemStatus = "fulfillment_failed";
-    }
-
-    console.log(`[provider-webhook] Updating order ${reference} to ${systemStatus}`);
+    if (["completed", "success", "delivered", "fulfilled"].includes(rawStatus)) systemStatus = "fulfilled";
+    else if (["failed", "rejected", "error"].includes(rawStatus)) systemStatus = "fulfillment_failed";
 
     const { data: order, error: fetchError } = await supabaseAdmin
       .from("orders")
-      .select("id, status")
+      .select("id, status, agent_id, order_type")
       .or(`id.eq.${reference},provider_order_id.eq.${reference}`)
       .maybeSingle();
 
-    if (fetchError || !order) {
-      console.error("[provider-webhook] Order not found for reference:", reference);
-      return new Response(JSON.stringify({ error: "Order not found" }), { status: 404 });
-    }
+    if (fetchError || !order) return new Response(JSON.stringify({ error: "Order not found" }), { status: 404 });
+    if (order.status === "fulfilled" && systemStatus === "fulfilled") return new Response(JSON.stringify({ message: "Already fulfilled" }));
 
-    if (order.status === "fulfilled") {
-      return new Response(JSON.stringify({ message: "Already fulfilled" }), { status: 200 });
-    }
+    await supabaseAdmin.from("orders").update({ 
+      status: systemStatus,
+      updated_at: new Date().toISOString()
+    }).eq("id", order.id);
 
-    const { error: updateError } = await supabaseAdmin
-      .from("orders")
-      .update({ 
-        status: systemStatus,
-        updated_at: new Date().toISOString()
-      })
-      .eq("id", order.id);
-
-    if (updateError) throw updateError;
-
-    // If fulfilled, trigger profit credit
     if (systemStatus === "fulfilled") {
       await supabaseAdmin.rpc("credit_order_profits", { p_order_id: order.id });
     }
+
+    // ── Notify API Client ─────────────────────────────────────────────────────
+    await notifyApiClient(supabaseAdmin, order.id, systemStatus);
 
     return new Response(JSON.stringify({ success: true }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" }
@@ -81,9 +59,6 @@ serve(async (req) => {
 
   } catch (error: any) {
     console.error("[provider-webhook] Error:", error.message);
-    return new Response(JSON.stringify({ error: error.message }), {
-      status: 500,
-      headers: { ...corsHeaders, "Content-Type": "application/json" }
-    });
+    return new Response(JSON.stringify({ error: "Internal Error" }), { status: 500 });
   }
 });

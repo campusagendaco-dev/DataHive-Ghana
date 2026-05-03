@@ -2,6 +2,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { createHmac } from "node:crypto";
 import { corsHeaders } from "../_shared/cors.ts";
+import { notifyApiClient } from "../_shared/webhooks.ts";
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -59,56 +60,37 @@ serve(async (req) => {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
-    } else {
-      console.warn("[DataMart Webhook] No secret found in Env or DB, skipping verification (Insecure!)");
     }
 
     const payload = JSON.parse(rawBody);
     const { event, data } = payload;
-    
-    // Extract reference - adjust based on DataMart's actual payload structure
     const reference = data?.orderReference || data?.reference || data?.orderId;
     const status = (data?.status || "").toLowerCase();
 
-    console.log(`[DataMart Webhook] Event: ${event}, Ref: ${reference}, Status: ${status}`);
-
     if (!reference) {
-      return new Response(JSON.stringify({ error: "No reference found in payload" }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return new Response(JSON.stringify({ error: "No reference found" }), { status: 400 });
     }
 
-    // Handle Fulfillment
-    const isSuccess = status === "completed" || status === "success" || status === "delivered" || status === "fulfilled";
-    const isFailed = status === "failed" || status === "rejected" || status === "refunded";
+    const isSuccess = ["completed", "success", "delivered", "fulfilled"].includes(status);
+    const isFailed = ["failed", "rejected", "refunded"].includes(status);
 
     if (isSuccess) {
-      const { data: order, error: fetchError } = await supabaseAdmin
-        .from("orders")
-        .select("status")
-        .eq("id", reference)
-        .maybeSingle();
-
-      if (fetchError) throw fetchError;
-
+      const { data: order } = await supabaseAdmin.from("orders").select("status").eq("id", reference).maybeSingle();
       if (order && order.status !== "fulfilled") {
-        console.log(`[DataMart Webhook] Marking order ${reference} as fulfilled`);
         await supabaseAdmin.from("orders").update({ 
           status: "fulfilled",
           updated_at: new Date().toISOString()
         }).eq("id", reference);
-
-        // Credit profits
         await supabaseAdmin.rpc("credit_order_profits", { p_order_id: reference });
+        await notifyApiClient(supabaseAdmin, reference, "fulfilled");
       }
     } else if (isFailed) {
-      console.log(`[DataMart Webhook] Marking order ${reference} as failed`);
       await supabaseAdmin.from("orders").update({ 
         status: "fulfillment_failed",
         failure_reason: `Provider reported failure: ${status}`,
         updated_at: new Date().toISOString()
       }).eq("id", reference);
+      await notifyApiClient(supabaseAdmin, reference, "fulfillment_failed");
     }
 
     return new Response(JSON.stringify({ received: true }), {
@@ -118,9 +100,6 @@ serve(async (req) => {
 
   } catch (err) {
     console.error("[DataMart Webhook] Internal Error:", err);
-    return new Response(JSON.stringify({ error: err.message }), {
-      status: 500,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    return new Response(JSON.stringify({ error: "Internal Error" }), { status: 500 });
   }
 });

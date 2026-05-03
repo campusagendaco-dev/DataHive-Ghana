@@ -4,6 +4,7 @@ import { createHmac, timingSafeEqual } from "node:crypto";
 import { corsHeaders } from "../_shared/cors.ts";
 import { normalizePhone, getSmsConfig, sendSmsViaTxtConnect, formatTemplate, sendPaymentSms } from "../_shared/sms.ts";
 import { sendWhatsAppMessage } from "../_shared/whatsapp.ts";
+import { notifyApiClient } from "../_shared/webhooks.ts";
 
 function getFirstEnvValue(keys: string[]): string {
   for (const key of keys) {
@@ -784,6 +785,10 @@ serve(async (req) => {
 
     if (claimError) {
       console.error("Webhook failed to claim order for fulfillment:", orderId, claimError);
+    }
+
+    if (claimedOrder) {
+      await notifyApiClient(supabaseAdmin, orderId, "processing");
     }
 
     if (!claimedOrder) {
