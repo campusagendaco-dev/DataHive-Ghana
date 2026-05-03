@@ -2,6 +2,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { corsHeaders } from "../_shared/cors.ts";
 import { normalizePhone, sendSmsViaTxtConnect, getSmsConfig } from "../_shared/sms.ts";
+import { getActiveProviders, logProviderError } from "../_shared/providers.ts";
 
 declare const Deno: any;
 
@@ -37,103 +38,82 @@ function isHtmlBody(ct: string | null, body: string): boolean {
   return Boolean(ct?.includes("text/html") || p.startsWith("<!doctype") || p.startsWith("<html"));
 }
 
-async function callProvider(
-  baseUrl: string, apiKey: string,
-  network: string, packageSize: string, phone: string, webhookUrl: string,
-  amount: number, orderType: "airtime" | "data", orderId: string
-): Promise<{ ok: boolean; reason: string; body?: string }> {
-  const clean = baseUrl.replace(/\/+$/, "");
-  const urls: string[] = [];
-  try {
-    const { origin } = new URL(clean);
-    urls.push(
-      `${clean}/api/purchase`,
-      `${clean}/purchase`,
-      `${clean}/developer/purchase`,
-      `${clean}/api/developer/purchase`,
-      `${origin}/api/purchase`,
-      `${origin}/purchase`
-    );
-  } catch {
-    urls.push(`${clean}/api/purchase`, `${clean}/purchase`);
+function buildProviderUrls(baseUrl: string, endpoint: string = "purchase", handlerType?: string): string[] {
+  const clean = baseUrl.trim().replace(/\/+$/, "");
+  if (!clean) return [];
+  const urls = new Set<string>();
+  let aliases: string[] = [];
+  if (handlerType === "datamart") {
+    if (endpoint === "status") aliases = ["order-status"];
+    else if (endpoint === "purchase") aliases = ["purchase"];
+    else aliases = [endpoint];
+  } else {
+    aliases = endpoint === "purchase" ? ["purchase", "order", "airtime", "buy", "topup", "recharge"] : (endpoint === "status" ? ["status", "query", "check"] : [endpoint]);
   }
+  for (const alias of aliases) {
+    urls.add(`${clean}/api/${alias}`);
+    urls.add(`${clean}/${alias}`);
+  }
+  try {
+    const root = new URL(clean).origin;
+    for (const alias of aliases) {
+      urls.add(`${root}/api/${alias}`);
+      urls.add(`${root}/${alias}`);
+    }
+  } catch { /* ignore */ }
+  return Array.from(urls);
+}
 
-  const recipient = normalizeRecipient(phone);
-  const networkKey = mapNetworkKey(network);
-  
-  const body: Record<string, unknown> = {
-    networkRaw: network,
-    networkKey: networkKey,
-    recipient: recipient,
-    customerNumber: recipient, // DataMart/DataHive alias
-    phoneNumber: recipient,    // DataMart/DataHive alias
-    capacity: orderType === "airtime" ? amount : parseCapacity(packageSize),
-    plan: packageSize,         // Standard data plan (e.g. "5GB")
-    bundle: packageSize,       // Alias for plan
-    package_size: packageSize, // Alias for plan
-    amount: amount,
-    orderReference: orderId,   // Deduplication key
-    reference: orderId,        // Alias for orderReference
-    description: `${orderType} purchase via API: ${packageSize || amount} for ${phone}`,
-    order_type: orderType,
-  };
-  if (webhookUrl) body.webhook_url = webhookUrl;
-
-  let lastError = "";
+async function callProviderApi(
+  provider: any,
+  data: Record<string, unknown>,
+  endpoint: string = "purchase"
+): Promise<{ ok: boolean; reason: string; id?: string; body?: string }> {
+  const handlerType = provider.handler_type || "standard";
+  const urls = buildProviderUrls(provider.base_url, endpoint, handlerType);
   let lastBody = "";
+  let lastReason = "Provider error";
 
-  for (const url of [...new Set(urls)]) {
+  for (const url of urls) {
     const ctrl = new AbortController();
     const tid = setTimeout(() => ctrl.abort(), 25000);
     try {
-      console.log(`[developer-api] Calling provider: ${url}`);
+      const headers: Record<string, string> = { "Content-Type": "application/json", "Accept": "application/json" };
+      headers["X-API-Key"] = provider.api_key;
+      if (handlerType !== "datamart") headers["Authorization"] = `Bearer ${provider.api_key}`;
+      headers["X-Idempotency-Key"] = String(data.orderReference || data.reference || "");
+      headers["User-Agent"] = "SwiftDataGH/2.0";
+
       const res = await fetch(url, {
         method: "POST",
-        headers: { 
-          "Content-Type": "application/json", 
-          "Accept": "application/json", 
-          "X-API-Key": apiKey,
-          "Authorization": `Bearer ${apiKey}`,
-          "X-Idempotency-Key": orderId,
-          "User-Agent": "SwiftDataGH/2.0"
-        },
-        body: JSON.stringify(body),
+        headers,
+        body: JSON.stringify(data),
         signal: ctrl.signal,
       });
       clearTimeout(tid);
-      
-      const contentType = res.headers.get("content-type");
+      const ct = res.headers.get("content-type");
       const text = await res.text();
       lastBody = text;
 
-      if (res.ok && !isHtmlBody(contentType, text)) {
+      if (res.ok && !isHtmlBody(ct, text)) {
         try {
           const p = JSON.parse(text);
-          const s = String(p?.status ?? "").toLowerCase();
-          const isSuccess = p?.success === true || s === "success" || s === "true" || p?.status === true;
-          
-          if (isSuccess) return { ok: true, reason: "" };
-          
-          if (s === "false" || s === "error" || s === "failed") {
-            return { ok: false, reason: p?.message || p?.error || "Provider rejected the order", body: text };
-          }
-        } catch { 
-          // If it's 2xx but not JSON, treat as success if not HTML
-          return { ok: true, reason: "" };
-        }
+          const s = String(p?.status ?? p?.success ?? "").toLowerCase();
+          const ok = p?.success === true || s === "success" || s === "true" || p?.status === true;
+          if (ok) return { ok: true, reason: "", id: String(p?.data?.purchaseId ?? p?.transaction_id ?? p?.id ?? "") };
+          lastReason = p?.message || p?.error || "Provider rejected the order";
+        } catch { return { ok: true, reason: "" }; }
+      } else {
+        lastReason = `HTTP ${res.status}`;
       }
-      
-      if (res.status === 404 || isHtmlBody(contentType, text)) continue;
-      
-      return { ok: false, reason: `Provider error ${res.status}: ${text.slice(0, 100)}`, body: text };
-    } catch (e) {
+      if (res.status === 404 || isHtmlBody(ct, text)) continue;
+      break;
+    } catch (e: any) {
       clearTimeout(tid);
-      lastError = e instanceof Error ? e.message : "Provider unreachable";
-      if (url === [...new Set(urls)].at(-1))
-        return { ok: false, reason: lastError, body: lastBody };
+      lastReason = e?.message || "Network error";
     }
   }
-  return { ok: false, reason: "All provider endpoints failed", body: lastBody };
+  return { ok: false, reason: lastReason, body: lastBody };
 }
 
 // Timing-safe string comparison
@@ -458,30 +438,78 @@ serve(async (req: Request) => {
       const rawWebhook = profile.api_webhook_url || getEnv("DATA_PROVIDER_WEBHOOK_URL");
       const WEBHOOK_URL = rawWebhook && isSafeWebhookUrl(rawWebhook) ? rawWebhook : "";
 
-      // FORCED MOCK FOR MISSING CONFIG
-      if (!DATA_PROVIDER_API_KEY || !DATA_PROVIDER_BASE_URL) {
-        await supabase.from("orders").update({ status: "fulfilled", failure_reason: "Mock fulfillment (Provider not configured)" }).eq("id", orderId);
-        const { data: w } = await supabase.from("wallets").select("balance").eq("agent_id", profile.user_id).maybeSingle();
-        return json({ success: true, order_id: orderId, client_reference: request_id, status: "fulfilled", message: "Purchase simulated successfully", balance: Number(w?.balance ?? 0) });
-      }
-
       const orderType = isAirtime ? "airtime" : "data";
+      const providers = await getActiveProviders(supabase, orderType);
       
-      const result = await callProvider(DATA_PROVIDER_BASE_URL, DATA_PROVIDER_API_KEY, normalizedNetwork, package_size || "", phone, WEBHOOK_URL, expectedPrice, orderType, orderId);
+      let finalResult = { ok: false, reason: "No active providers configured", body: "" };
+      let successfulProviderId = null;
+
+      if (providers.length > 0) {
+        for (const provider of providers) {
+          const hType = provider.handler_type || "standard";
+          const networkKey = hType === "datamart" 
+            ? (normalizedNetwork.toUpperCase() === "MTN" ? "YELLO" : (normalizedNetwork.toUpperCase() === "TELECEL" ? "TELECEL" : "AT_PREMIUM"))
+            : mapNetworkKey(normalizedNetwork);
+
+          const dataPayload = {
+            networkRaw: normalizedNetwork,
+            networkKey: networkKey,
+            recipient: normalizeRecipient(phone),
+            customerNumber: normalizeRecipient(phone),
+            phoneNumber: normalizeRecipient(phone),
+            capacity: isAirtime ? expectedPrice : parseCapacity(package_size),
+            plan: package_size,
+            bundle: package_size,
+            package_size: package_size,
+            amount: expectedPrice,
+            orderReference: orderId,
+            reference: orderId,
+            order_type: orderType,
+            webhook_url: WEBHOOK_URL
+          };
+
+          const result = await callProviderApi(provider, dataPayload, "purchase");
+          if (result.ok) {
+            finalResult = result;
+            successfulProviderId = provider.id;
+            break;
+          } else {
+            await logProviderError(supabase, provider.id, orderId, result.reason);
+            finalResult = result;
+          }
+        }
+      } else {
+        // FALLBACK TO LEGACY ENV VARS IF NO PROVIDERS IN DB
+        if (DATA_PROVIDER_API_KEY && DATA_PROVIDER_BASE_URL) {
+          const legacyProvider = { base_url: DATA_PROVIDER_BASE_URL, api_key: DATA_PROVIDER_API_KEY, handler_type: "standard" };
+          const result = await callProviderApi(legacyProvider, {
+             networkRaw: normalizedNetwork, networkKey: mapNetworkKey(normalizedNetwork),
+             recipient: normalizeRecipient(phone), amount: expectedPrice, orderReference: orderId
+          }, "purchase");
+          finalResult = result;
+        }
+      }
       
-      if (result.ok) {
-        await supabase.from("orders").update({ status: "fulfilled", failure_reason: null }).eq("id", orderId);
+      if (finalResult.ok) {
+        await supabase.from("orders").update({ 
+          status: "fulfilled", 
+          failure_reason: null,
+          provider_id: successfulProviderId,
+          provider_order_id: finalResult.id
+        }).eq("id", orderId);
+        
         const { data: w } = await supabase.from("wallets").select("balance").eq("agent_id", profile.user_id).maybeSingle();
         return json({ success: true, order_id: orderId, client_reference: request_id, status: "fulfilled", balance: Number(w?.balance ?? 0) });
       }
 
-      // If initial attempt fails, we still keep it as fulfilled but record the error
+      // If all attempts fail, we still keep it as fulfilled (because it's paid and we intend to fulfill it)
+      // but record the error for admin attention.
       await supabase.from("orders").update({ 
-        failure_reason: result.reason,
+        failure_reason: finalResult.reason,
         provider_response: { 
           client_reference: request_id,
-          provider_error: result.reason,
-          provider_body: result.body?.slice(0, 1000) 
+          provider_error: finalResult.reason,
+          provider_body: finalResult.body?.slice(0, 1000) 
         }
       }).eq("id", orderId);
       
@@ -493,7 +521,7 @@ serve(async (req: Request) => {
         client_reference: request_id,
         status: "fulfilled", 
         message: "Order received and is being delivered.",
-        error_info: result.reason,
+        error_info: finalResult.reason,
         balance: Number(w2?.balance ?? 0) 
       });
     }
