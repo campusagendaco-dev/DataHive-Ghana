@@ -73,6 +73,12 @@ const makeSnippets = (key: string): Record<string, Record<Lang, string>> => {
       node: `const res = await fetch("${BASE_URL}/orders?limit=10", {\n  headers: { "Authorization": "Bearer ${K}" },\n});\nconst { orders } = await res.json();`,
       python: `import requests\n\nres = requests.get(\n    "${BASE_URL}/orders",\n    params={"limit": 10},\n    headers={"Authorization": "Bearer ${K}"},\n)\nprint(res.json()["orders"])`,
       php: `<?php\n$ch = curl_init("${BASE_URL}/orders?limit=10");\ncurl_setopt_array($ch, [\n    CURLOPT_HTTPHEADER    => ["Authorization: Bearer ${K}"],\n    CURLOPT_RETURNTRANSFER => true,\n]);\necho curl_exec($ch);`,
+    },
+    status: {
+      curl: `curl -X GET "${BASE_URL}/status?order_id=a3f2b1c0-..." \\\n  -H "Authorization: Bearer ${K}"`,
+      node: `const res = await fetch("${BASE_URL}/status?order_id=a3f2b1c0-...", {\n  headers: { "Authorization": "Bearer ${K}" },\n});\nconst { order } = await res.json();\nconsole.log("Status:", order.status);`,
+      python: `import requests\n\nres = requests.get(\n    "${BASE_URL}/status",\n    params={"order_id": "a3f2b1c0-..."},\n    headers={"Authorization": "Bearer ${K}"},\n)\nprint(res.json()["order"]["status"])`,
+      php: `<?php\n$ch = curl_init("${BASE_URL}/status?order_id=a3f2b1c0-...");\ncurl_setopt_array($ch, [\n    CURLOPT_HTTPHEADER    => ["Authorization: Bearer ${K}"],\n    CURLOPT_RETURNTRANSFER => true,\n]);\n$data = json_decode(curl_exec($ch));\necho $data->order->status;`,
     }
   };
 };
@@ -87,6 +93,7 @@ const RESPONSES: Record<string, string> = {
   bill_ok: `{\n  "success": true,\n  "transaction_id": "SWFT_BILL_1234567890",\n  "cost": 41.00,\n  "balance": 9.00\n}`,
   sms_ok: `{\n  "success": true,\n  "message": "SMS sent successfully"\n}`,
   orders_ok: `{\n  "success": true,\n  "orders": [\n    {\n      "id": "...",\n      "created_at": "...",\n      "network": "MTN",\n      "package_size": "5GB",\n      "customer_phone": "...",\n      "amount": 22.00,\n      "status": "fulfilled"\n    }\n  ]\n}`,
+  status_ok: `{\n  "success": true,\n  "order": {\n    "id": "a3f2b1c0-...",\n    "status": "fulfilled",\n    "network": "MTN",\n    "amount": 22.00,\n    "created_at": "..."\n  }\n}`,
   error_401: `{\n  "success": false,\n  "error": "Invalid API key"\n}`,
   error_402: `{\n  "success": false,\n  "error": "Insufficient balance"\n}`,
 };
@@ -186,6 +193,7 @@ const NAV_ITEMS = [
   { id: "bills-pay",       label: "Pay Bills",           icon: CreditCard },
   { id: "sms",             label: "Send SMS",            icon: Zap },
   { id: "orders",          label: "Order History",       icon: List },
+  { id: "status",          label: "Order Status",        icon: Activity },
   { id: "errors",          label: "Error Reference",     icon: AlertTriangle },
   { id: "best-practices",  label: "Best Practices",      icon: Shield },
 ];
@@ -370,6 +378,14 @@ const APIDocumentation = () => {
                       <code className="text-sky-400 text-xs">Authorization: Bearer {userApiKey || "swft_live_..."}</code>
                       <span className="text-[9px] text-white/20 font-bold uppercase">Standard</span>
                     </div>
+                  </div>
+                </div>
+
+                <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 p-4 flex gap-3">
+                  <Zap className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+                  <div>
+                    <p className="text-xs font-bold text-amber-300 mb-1">Testing Mode</p>
+                    <p className="text-[11px] text-white/40 leading-relaxed">Enable **Testing Mode** in your dashboard to bypass security signatures and test fulfillment without real charges.</p>
                   </div>
                 </div>
 
@@ -644,7 +660,32 @@ const APIDocumentation = () => {
           </section>
 
 
-          {/* ── Error Reference ──────────────────────────────────────── */}
+          {/* ── Order Status ────────────────────────────────────────── */}
+          <section>
+            <SectionAnchor id="status" />
+            <div className="flex items-center gap-3 mb-2">
+              <div className="w-8 h-8 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center shrink-0">
+                <Activity className="w-4 h-4 text-white/40" />
+              </div>
+              <h2 className="text-2xl font-black">Check Order Status</h2>
+            </div>
+            <div className="ml-11 flex flex-wrap items-center gap-3 mb-6">
+              <MethodBadge method="GET" />
+              <code className="text-white/55 text-sm font-mono bg-white/5 px-3 py-1 rounded-lg border border-white/8">/status</code>
+            </div>
+            <div className="ml-11 space-y-6">
+              <div className="rounded-xl border border-white/8 overflow-hidden">
+                <div className="px-4 py-2.5 bg-white/[0.03] border-b border-white/5">
+                  <span className="text-[10px] font-bold uppercase tracking-widest text-white/25">Query Parameters</span>
+                </div>
+                <ParamRow name="order_id" type="string" required desc="The ID returned during purchase" />
+              </div>
+              <div className="grid lg:grid-cols-2 gap-6">
+                <CodeBlock code={snippets.status[activeLang]} label="Request" />
+                <ResponseBlock code={RESPONSES.status_ok} label="Response · 200 OK" />
+              </div>
+            </div>
+          </section>
           <section>
             <SectionAnchor id="errors" />
             <div className="flex items-center gap-3 mb-2">
@@ -661,7 +702,7 @@ const APIDocumentation = () => {
                 </div>
                 {[
                   { code: "400", title: "Bad Request", desc: "Missing parameters" },
-                  { code: "401", title: "Unauthorized", desc: "Invalid X-API-Key" },
+                  { code: "401", title: "Unauthorized", desc: "Invalid API key" },
                   { code: "402", title: "Low Balance", desc: "Wallet balance too low" },
                   { code: "403", title: "Forbidden", desc: "Key disabled" },
                   { code: "404", title: "Not Found", desc: "Invalid endpoint" },
@@ -674,6 +715,59 @@ const APIDocumentation = () => {
                 ))}
               </div>
               <ResponseBlock code={RESPONSES.error_402} variant="error" label="Example Error" />
+            </div>
+          </section>
+
+          {/* ── Best Practices ───────────────────────────────────────── */}
+          <section>
+            <SectionAnchor id="best-practices" />
+            <div className="flex items-center gap-3 mb-6">
+              <div className="w-8 h-8 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center shrink-0">
+                <Shield className="w-4 h-4 text-white/40" />
+              </div>
+              <h2 className="text-2xl font-black">Best Practices</h2>
+            </div>
+            
+            <div className="ml-11 grid md:grid-cols-2 gap-6">
+              <div className="space-y-4">
+                <div className="p-4 rounded-xl border border-white/8 bg-white/[0.02]">
+                  <h3 className="text-sm font-bold text-white mb-2 flex items-center gap-2">
+                    <Lock className="w-4 h-4 text-sky-400" /> Security First
+                  </h3>
+                  <p className="text-xs text-white/45 leading-relaxed">
+                    Never store your API keys in client-side code (HTML/JS). Always keep them on your server and proxy requests through your own backend.
+                  </p>
+                </div>
+                
+                <div className="p-4 rounded-xl border border-white/8 bg-white/[0.02]">
+                  <h3 className="text-sm font-bold text-white mb-2 flex items-center gap-2">
+                    <RotateCcw className="w-4 h-4 text-amber-400" /> Use Idempotency
+                  </h3>
+                  <p className="text-xs text-white/45 leading-relaxed">
+                    Always send a unique <code className="text-amber-400">request_id</code> with POST requests. This prevents duplicate charges if your request is retried due to network issues.
+                  </p>
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                <div className="p-4 rounded-xl border border-white/8 bg-white/[0.02]">
+                  <h3 className="text-sm font-bold text-white mb-2 flex items-center gap-2">
+                    <Activity className="w-4 h-4 text-emerald-400" /> Handle Errors
+                  </h3>
+                  <p className="text-xs text-white/45 leading-relaxed">
+                    Monitor for 402 (Low Balance) and 401 (Unauthorized) errors. Implement proper logging on your end to catch failed fulfillment attempts.
+                  </p>
+                </div>
+                
+                <div className="p-4 rounded-xl border border-white/8 bg-white/[0.02]">
+                  <h3 className="text-sm font-bold text-white mb-2 flex items-center gap-2">
+                    <Globe className="w-4 h-4 text-blue-400" /> IP Whitelisting
+                  </h3>
+                  <p className="text-xs text-white/45 leading-relaxed">
+                    For maximum security, whitelist your server's IP address in the Developer Dashboard to restrict API access only to your infrastructure.
+                  </p>
+                </div>
+              </div>
             </div>
           </section>
 

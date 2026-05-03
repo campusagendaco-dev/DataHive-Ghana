@@ -109,9 +109,9 @@ const SubAgentSignup = () => {
     // Fetch dynamic activation fee from system_settings
     let platformBaseFee = 50;
     try {
-      const { data: settings } = await supabase.from("system_settings").select("sub_agent_base_fee").eq("id", 1).maybeSingle();
-      if (settings?.sub_agent_base_fee) {
-        platformBaseFee = Number(settings.sub_agent_base_fee);
+      const { data: settings } = await supabase.from("system_settings").select("agent_activation_fee").eq("id", 1).maybeSingle();
+      if (settings?.agent_activation_fee) {
+        platformBaseFee = Number(settings.agent_activation_fee);
       }
     } catch (e) {
       console.error("Error fetching platform fee:", e);

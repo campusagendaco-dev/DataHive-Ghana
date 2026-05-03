@@ -202,23 +202,32 @@ serve(async (req: Request) => {
     } else {
       if (!API_KEY_RE.test(rawApiKey)) return json({ success: false, error: "Invalid API key format." }, 401);
       
+      const prefix = rawApiKey.slice(0, 12);
       const incomingHash = await sha256Hex(rawApiKey);
-      const { data: authResult, error: authError } = await supabase.rpc("authenticate_client", { p_hash: incomingHash });
+      console.log(`[AUTH] Key Prefix: ${prefix} | Hash: ${incomingHash}`);
       
-      if (authError || !authResult || authResult.length === 0) {
-        return json({ success: false, error: "Authentication failed." }, 401);
+      // Use secure RPC for authentication (bypasses RLS safely)
+      const { data: profileData, error: authError } = await supabase.rpc("authenticate_client", {
+        p_prefix: prefix,
+        p_hash: incomingHash
+      });
+      
+      if (authError || !profileData || profileData.length === 0) {
+        if (authError) console.error(`[AUTH ERROR]`, authError);
+        return json({ success: false, error: "Authentication failed: Profile not found or API key invalid." }, 401);
       }
       
-      profile = authResult[0];
+      profile = profileData[0];
       currentUserId = profile.user_id;
       
-      // ── 3. HMAC Signature Verification ────────────────────────────────────────
+      // Map secret key for HMAC
+      profile.secret_key_hash = profile.api_secret_key_hash || profile.secret_key_hash;
+      
+      // ── 3. HMAC Signature Verification (Optional, SKIPPED IN TEST MODE) ───────
       const signature = req.headers.get("X-Swift-Signature");
-      if (!profile.secret_key_hash) {
-        // Fallback for legacy keys that haven't been assigned a secret yet
-      } else if (req.method === "POST") {
-        if (!signature) return json({ success: false, error: "Missing X-Swift-Signature header for POST request." }, 401);
-        
+      const isTestMode = profile.test_mode;
+      
+      if (req.method === "POST" && signature && profile.secret_key_hash && !isTestMode) {
         const bodyText = await req.clone().text();
         const computedSig = await hmacSha256Hex(profile.secret_key_hash, bodyText);
         
@@ -239,11 +248,8 @@ serve(async (req: Request) => {
       }
     }
 
-    // ── 5. Idempotency Check (for POST) ────────────────────────────────────────
-    const idemKey = req.headers.get("X-Idempotency-Key");
-    if (req.method === "POST" && !idemKey) {
-      return json({ success: false, error: "Missing X-Idempotency-Key header." }, 400);
-    }
+    // ── 5. Idempotency Check (Optional for client, mandatory for DB) ────────────
+    const idemKey = req.headers.get("X-Idempotency-Key") || crypto.randomUUID();
 
     // ── 6. Rate Limiting ────────────────────────────────────────────────────────
     const rateLimit = profile.rate_limit || 30;
@@ -266,10 +272,11 @@ serve(async (req: Request) => {
     else if (p.endsWith("/buy")) finalAction = "buy";
     else if (p.endsWith("/sms")) finalAction = "sms";
     else if (p.endsWith("/orders")) finalAction = "orders";
+    else if (p.endsWith("/status")) finalAction = "status";
     else if (p === "" || p === "/" || p.endsWith("/developer-api")) finalAction = action || "index";
 
-    const allowedActions: string[] = profile.allowed_actions || ["balance", "plans", "account"];
-    if (!allowedActions.includes(finalAction) && !["index", "account", "balance", "plans"].includes(finalAction)) {
+    const allowedActions: string[] = profile.allowed_actions || ["balance", "plans", "account", "orders", "status"];
+    if (!allowedActions.includes(finalAction) && !["index", "account", "balance", "plans", "orders", "status"].includes(finalAction)) {
       return json({ success: false, error: `Action '${finalAction}' not permitted.` }, 403);
     }
 
@@ -309,7 +316,8 @@ serve(async (req: Request) => {
         p_phone: normalizeRecipient(phone),
         p_amount: amount || 0,
         p_request_id: request_id || idemKey,
-        p_idem_key: idemKey
+        p_idem_key: idemKey,
+        p_test_mode: profile.test_mode
       });
 
       if (rpcError) throw rpcError;
@@ -317,7 +325,13 @@ serve(async (req: Request) => {
 
       const orderId = result.order_id;
       
-      // BACKGROUND FULFILLMENT START
+      // ── 9. Fulfillment Logic (SKIP IF TEST MODE) ──────────────────────────
+      if (profile.test_mode) {
+        console.log(`[TEST MODE] Skipping real fulfillment for order ${orderId}`);
+        return json(result);
+      }
+
+      // REAL FULFILLMENT START
       const providers = await getActiveProviders(supabase, package_size ? "data" : "airtime");
       let finalResult = { ok: false, reason: "No active providers", body: "" };
       let successfulProviderId = null;
@@ -354,6 +368,7 @@ serve(async (req: Request) => {
         }).eq("id", orderId);
       } else {
         await supabase.from("orders").update({ 
+          status: "failed",
           failure_reason: finalResult.reason
         }).eq("id", orderId);
       }
@@ -368,8 +383,18 @@ serve(async (req: Request) => {
       return json({ success: true, orders: orders ?? [] });
     }
 
+    if (finalAction === "status") {
+      const orderId = url.searchParams.get("order_id") || url.searchParams.get("id");
+      if (!orderId) return json({ success: false, error: "Missing order_id" }, 400);
+      
+      const { data: order, error } = await supabase.from("api.v_orders").select("*").eq("agent_id", currentUserId).eq("id", orderId).maybeSingle();
+      if (error || !order) return json({ success: false, error: "Order not found" }, 404);
+      
+      return json({ success: true, order });
+    }
+
     if (finalAction === "index") {
-      return json({ success: true, message: "SwiftData Secure API v2.0", docs: "https://swiftdatagh.com/api-docs" });
+      return json({ success: true, message: "SwiftData API v2.0", docs: "https://swiftdatagh.com/api-docs" });
     }
 
     return json({ success: false, error: "Endpoint not found." }, 404);

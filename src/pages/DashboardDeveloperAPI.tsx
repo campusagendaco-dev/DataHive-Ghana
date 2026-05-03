@@ -8,8 +8,9 @@ import { Input } from "@/components/ui/input";
 import {
   Key, Copy, RefreshCw, Loader2, ExternalLink,
   Shield, AlertTriangle, CheckCircle, Eye, EyeOff, Zap,
-  Terminal, History, Bug
+  Terminal, History, Bug, FlaskConical
 } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
 import { Link } from "react-router-dom";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
@@ -35,6 +36,8 @@ const DashboardDeveloperAPI = () => {
   const [accessEnabled, setAccessEnabled] = useState(true);
   const [rateLimit, setRateLimit] = useState(30);
   const [confirmRegen, setConfirmRegen] = useState(false);
+  const [testMode, setTestMode] = useState(false);
+  const [updatingTestMode, setUpdatingTestMode] = useState(false);
 
   const BASE_URL = "https://lsocdjpflecduumopijn.supabase.co/functions/v1/developer-api";
 
@@ -43,7 +46,7 @@ const DashboardDeveloperAPI = () => {
     setLoading(true);
     const { data } = await supabase
       .from("profiles")
-      .select("api_key_prefix, api_access_enabled, api_rate_limit, api_secret_key_hash")
+      .select("api_key_prefix, api_access_enabled, api_rate_limit, api_secret_key_hash, api_test_mode")
       .eq("user_id", user.id)
       .maybeSingle();
     
@@ -52,6 +55,7 @@ const DashboardDeveloperAPI = () => {
       setHasKey(!!data.api_key_prefix);
       setAccessEnabled(data.api_access_enabled ?? true);
       setRateLimit(data.api_rate_limit ?? 30);
+      setTestMode(data.api_test_mode ?? false);
     }
     
     // Fetch recent logs
@@ -90,7 +94,7 @@ const DashboardDeveloperAPI = () => {
       .update({ 
         api_key_hash: keyHash, 
         api_key_prefix: prefix, 
-        api_secret_key_hash: secretHash 
+        api_secret_key_hash: newSecret 
       })
       .eq("user_id", user.id);
 
@@ -98,13 +102,35 @@ const DashboardDeveloperAPI = () => {
       toast({ title: "Failed to generate keys", description: error.message, variant: "destructive" });
     } else {
       setPlaintextKey(newKey);
-      setPlaintextSecret(secretHash); // We use the hash itself as the secret for the client to sign with
+      setPlaintextSecret(newSecret); 
       setApiKeyPrefix(prefix);
       setHasKey(true);
       setRevealed(true);
       toast({ title: "✅ New API Credentials generated", description: "Copy and store them securely — they will not be shown again." });
     }
     setGenerating(false);
+  };
+
+  const toggleTestMode = async (enabled: boolean) => {
+    if (!user) return;
+    setUpdatingTestMode(true);
+    const { error } = await supabase
+      .from("profiles")
+      .update({ api_test_mode: enabled })
+      .eq("user_id", user.id);
+    
+    if (error) {
+      toast({ title: "Failed to update testing mode", description: error.message, variant: "destructive" });
+    } else {
+      setTestMode(enabled);
+      toast({ 
+        title: enabled ? "🚀 API Testing Mode Enabled" : "🔒 API Testing Mode Disabled",
+        description: enabled 
+          ? "You can now test integrations with only Bearer tokens. Charges and fulfillment are simulated."
+          : "Production security and real fulfillment are now active."
+      });
+    }
+    setUpdatingTestMode(false);
   };
 
   const copyToClipboard = (text: string) => {
@@ -137,7 +163,7 @@ const DashboardDeveloperAPI = () => {
       {!loading && (
         <div className={`flex items-center gap-3 px-4 py-3 rounded-xl border text-sm font-medium ${accessEnabled ? "border-emerald-500/20 bg-emerald-500/5 text-emerald-400" : "border-red-500/20 bg-red-500/5 text-red-400"}`}>
           {accessEnabled ? <CheckCircle className="w-4 h-4 shrink-0" /> : <AlertTriangle className="w-4 h-4 shrink-0" />}
-          {accessEnabled ? "API access is active. Authentication via HMAC is required for all POST requests." : "API access disabled. Please contact support."}
+          {accessEnabled ? "API access is active. Use your API key to start integrating." : "API access disabled. Please contact support."}
         </div>
       )}
 
@@ -148,7 +174,7 @@ const DashboardDeveloperAPI = () => {
             <Key className="w-5 h-5 text-sky-500" /> Authentication Credentials
           </CardTitle>
           <CardDescription>
-            Use these to authenticate your requests. Keep your Secret Key private.
+            Use this key to authenticate your requests. Keep it secure.
           </CardDescription>
         </CardHeader>
         <CardContent className="p-6 space-y-6">
@@ -178,32 +204,25 @@ const DashboardDeveloperAPI = () => {
                 </div>
               </div>
 
-              {/* Secret Key (Signing Secret) */}
-              <div className="space-y-2">
-                <label className="text-[10px] font-black uppercase tracking-widest text-emerald-500/70">Secret Signing Key (HMAC Secret)</label>
-                <div className="flex gap-2">
-                  <Input
-                    value={plaintextSecret && revealed ? plaintextSecret : "••••••••••••••••••••••••••••••••"}
-                    readOnly
-                    className="font-mono bg-black/40 border-white/10 text-sm h-10 text-emerald-400"
-                  />
-                  <Button variant="secondary" size="icon" className="h-10 w-10" onClick={() => copyToClipboard(plaintextSecret || "")} disabled={!plaintextSecret}>
-                    <Copy className="w-4 h-4" />
-                  </Button>
-                </div>
-                {plaintextSecret ? (
-                  <p className="text-[10px] text-amber-400 font-medium">⚠️ Copy this now! This secret is used for HMAC-SHA256 request signing and will never be shown again.</p>
-                ) : (
-                  <p className="text-[10px] text-white/30 italic">Key is hidden. Regenerate to view a new signing secret.</p>
-                )}
-              </div>
 
-              <div className="flex flex-wrap gap-4 pt-2">
+              <div className="flex flex-wrap items-center gap-6 pt-2">
                 <div className="flex items-center gap-2 text-xs text-white/40">
                   <Shield className="w-3.5 h-3.5" /> Rate Limit: <strong className="text-white/60">{rateLimit} req/min</strong>
                 </div>
                 <div className="flex items-center gap-2 text-xs text-white/40">
-                  <Terminal className="w-3.5 h-3.5" /> Method: <strong className="text-sky-400">HMAC-SHA256</strong>
+                  <Terminal className="w-3.5 h-3.5" /> Auth: <strong className="text-sky-400">Bearer Token</strong>
+                </div>
+                
+                <div className="flex items-center gap-3 ml-auto bg-white/5 px-3 py-1.5 rounded-lg border border-white/8">
+                  <div className="flex flex-col">
+                    <span className="text-[10px] font-bold text-white/60 uppercase tracking-wider leading-none">Testing Mode</span>
+                    <span className="text-[9px] text-white/30 mt-1">Bypass signatures</span>
+                  </div>
+                  <Switch 
+                    checked={testMode} 
+                    onCheckedChange={toggleTestMode} 
+                    disabled={updatingTestMode}
+                  />
                 </div>
               </div>
             </div>
@@ -230,7 +249,7 @@ const DashboardDeveloperAPI = () => {
               <Button variant="ghost" size="sm" className="text-white/40" onClick={() => setConfirmRegen(false)}>Cancel</Button>
             )}
             {hasKey && !confirmRegen && (
-              <p className="text-[10px] text-white/20 italic max-w-xs">Rotating keys will immediately invalidate your current API Key and Signing Secret.</p>
+              <p className="text-[10px] text-white/20 italic max-w-xs">Rotating keys will immediately invalidate your current API Key.</p>
             )}
           </div>
         </CardContent>
@@ -242,24 +261,25 @@ const DashboardDeveloperAPI = () => {
         <Card className="lg:col-span-1 bg-white/3 border-white/8">
           <CardHeader>
             <CardTitle className="text-base flex items-center gap-2">
-              <Zap className="w-4 h-4 text-sky-400" /> Signing Requirements
+              <Zap className="w-4 h-4 text-sky-400" /> Quick Integration
             </CardTitle>
           </CardHeader>
           <CardContent className="text-xs space-y-4 text-muted-foreground">
             <div className="space-y-1">
-              <p className="font-bold text-white/60">1. Required Headers</p>
+              <p className="font-bold text-white/60">1. Required Header</p>
               <ul className="list-disc list-inside space-y-1">
-                <li><code>Authorization: Bearer [KEY]</code></li>
-                <li><code>X-Swift-Signature: [HMAC]</code></li>
-                <li><code>X-Idempotency-Key: [UUID]</code></li>
+                <li><code>Authorization: Bearer [YOUR_KEY]</code></li>
               </ul>
             </div>
             <div className="space-y-1">
-              <p className="font-bold text-white/60">2. Generating Signature</p>
-              <p className="leading-relaxed">Sign the raw JSON body using <strong>HMAC-SHA256</strong> with your <strong>Secret Key</strong>. Send the hex-encoded result in <code>X-Swift-Signature</code>.</p>
+              <p className="font-bold text-white/60">2. Sample Request</p>
+              <pre className="p-2 bg-black/40 rounded border border-white/5 overflow-x-auto text-[10px]">
+                curl -X GET {BASE_URL}/balance \<br />
+                &nbsp;&nbsp;-H "Authorization: Bearer [KEY]"
+              </pre>
             </div>
             <Button variant="link" className="p-0 h-auto text-sky-400 text-xs" asChild>
-              <Link to="/api-docs#signing">View Code Examples →</Link>
+              <Link to="/api-docs">View Integration Guide →</Link>
             </Button>
           </CardContent>
         </Card>

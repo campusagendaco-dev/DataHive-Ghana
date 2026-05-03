@@ -13,6 +13,7 @@ interface AuditLog {
   profiles: { full_name: string } | null;
 }
 
+const AdminAuditLogs = () => {
   const [logType, setLogType] = useState<"audit" | "api">("audit");
   const [logs, setLogs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -92,21 +93,22 @@ interface AuditLog {
           <p className="text-sm text-muted-foreground mt-1">Audit administrative actions and API activity.</p>
         </div>
         
-        <div className="flex items-center gap-2 bg-white/5 p-1 rounded-xl border border-white/10">
-          <button 
-            onClick={() => setLogType("audit")}
-            className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${logType === "audit" ? "bg-amber-500 text-black shadow-lg" : "text-white/40 hover:text-white"}`}
-          >
-            Admin Actions
-          </button>
-          <button 
-            onClick={() => setLogType("api")}
-            className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${logType === "api" ? "bg-sky-500 text-black shadow-lg" : "text-white/40 hover:text-white"}`}
-          >
-            API Activity
-          </button>
-        </div>
-      </div>
+        <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2 bg-white/5 p-1 rounded-xl border border-white/10">
+            <button 
+              onClick={() => setLogType("audit")}
+              className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${logType === "audit" ? "bg-amber-500 text-black shadow-lg" : "text-white/40 hover:text-white"}`}
+            >
+              Admin Actions
+            </button>
+            <button 
+              onClick={() => setLogType("api")}
+              className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${logType === "api" ? "bg-sky-500 text-black shadow-lg" : "text-white/40 hover:text-white"}`}
+            >
+              API Activity
+            </button>
+          </div>
+
           <div className="hidden sm:flex items-center gap-2 px-3 py-1 rounded-full bg-green-500/10 border border-green-500/20">
             <span className="relative flex h-2 w-2">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
@@ -114,15 +116,16 @@ interface AuditLog {
             </span>
             <span className="text-[10px] font-bold text-green-500 uppercase tracking-wider">Live Activity</span>
           </div>
+
+          <button 
+            onClick={() => fetchLogs(false)} 
+            disabled={loading}
+            className="flex items-center gap-2 text-xs font-semibold bg-white/5 hover:bg-white/10 px-4 py-2 rounded-lg transition-colors border border-white/10"
+          >
+            {loading ? <Loader2 className="w-3 h-3 animate-spin" /> : <FileSearch className="w-3 h-3" />}
+            Refresh Logs
+          </button>
         </div>
-        <button 
-          onClick={() => fetchLogs(false)} 
-          disabled={loading}
-          className="flex items-center gap-2 text-xs font-semibold bg-white/5 hover:bg-white/10 px-4 py-2 rounded-lg transition-colors border border-white/10"
-        >
-          {loading ? <Loader2 className="w-3 h-3 animate-spin" /> : <FileSearch className="w-3 h-3" />}
-          Refresh Logs
-        </button>
       </div>
 
       {error && (
@@ -152,7 +155,7 @@ interface AuditLog {
           <CardDescription>Latest administrative actions across the platform.</CardDescription>
         </CardHeader>
         <CardContent>
-          {loading ? (
+          {loading && logs.length === 0 ? (
             <div className="flex justify-center py-10"><Loader2 className="w-6 h-6 animate-spin text-muted-foreground" /></div>
           ) : logs.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-20 text-center">
@@ -173,6 +176,7 @@ interface AuditLog {
           ) : (
             <>
               {/* Desktop View */}
+              <div className="hidden md:block overflow-x-auto rounded-xl border border-white/8">
                 <Table>
                   <TableHeader>
                     <TableRow className="bg-white/5 hover:bg-white/5 border-white/5">
@@ -239,18 +243,19 @@ interface AuditLog {
                   </div>
                 ))}
               </div>
-                {hasMore && (
-                  <div className="pt-8 flex justify-center border-t border-white/5 mt-6">
-                    <button
-                      onClick={() => fetchLogs(true)}
-                      disabled={loading}
-                      className="text-xs font-bold text-amber-400 hover:text-amber-300 flex items-center gap-2"
-                    >
-                      {loading ? <Loader2 className="w-3 h-3 animate-spin" /> : <FileSearch className="w-3 h-3" />}
-                      Load Older Logs
-                    </button>
-                  </div>
-                )}
+
+              {hasMore && (
+                <div className="pt-8 flex justify-center border-t border-white/5 mt-6">
+                  <button
+                    onClick={() => fetchLogs(true)}
+                    disabled={loading}
+                    className="text-xs font-bold text-amber-400 hover:text-amber-300 flex items-center gap-2"
+                  >
+                    {loading ? <Loader2 className="w-3 h-3 animate-spin" /> : <FileSearch className="w-3 h-3" />}
+                    Load Older Logs
+                  </button>
+                </div>
+              )}
             </>
           )}
         </CardContent>

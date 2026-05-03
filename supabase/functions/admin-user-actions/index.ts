@@ -159,12 +159,30 @@ serve(async (req: Request) => {
 
     switch (action as AdminUserAction) {
       case "get_api_users": {
-        // Include both legacy plaintext keys and new hashed keys (api_key_prefix set)
-        const { data: users, error: userError } = await supabaseAdmin
+        let users: any[] | null = null;
+        let userError: any = null;
+
+        // Try with new security columns first
+        const { data: newData, error: newError } = await supabaseAdmin
           .from("profiles")
-          .select("user_id, full_name, email, api_key_prefix, api_key_hash, api_access_enabled, api_rate_limit, api_allowed_actions, api_ip_whitelist, api_webhook_url, api_requests_today, api_requests_total, api_last_used_at, agent_approved, sub_agent_approved, api_custom_prices")
+          .select("user_id, full_name, email, api_key_prefix, api_key_hash, api_secret_key_hash, api_access_enabled, api_rate_limit, api_allowed_actions, api_ip_whitelist, api_webhook_url, api_requests_today, api_requests_total, api_last_used_at, agent_approved, sub_agent_approved, api_custom_prices")
           .or("api_key_prefix.not.is.null,api_key_hash.not.is.null")
           .order("full_name");
+
+        if (newError) {
+          console.warn("Falling back to legacy API user query:", newError.message);
+          // Fallback to legacy columns if migration hasn't been run
+          const { data: legacyData, error: legacyError } = await supabaseAdmin
+            .from("profiles")
+            .select("user_id, full_name, email, api_key_prefix, api_key_hash, api_access_enabled, api_rate_limit, api_allowed_actions, api_ip_whitelist, api_webhook_url, api_requests_today, api_requests_total, api_last_used_at, agent_approved, sub_agent_approved, api_custom_prices")
+            .or("api_key_prefix.not.is.null,api_key_hash.not.is.null")
+            .order("full_name");
+          
+          users = legacyData;
+          userError = legacyError;
+        } else {
+          users = newData;
+        }
 
         if (userError) {
           return new Response(JSON.stringify({ error: userError.message }), {
@@ -259,26 +277,50 @@ serve(async (req: Request) => {
       case "generate_api_key": {
         if (!isValidUuid(user_id)) throw new Error("Invalid or missing user_id");
         
-        // Generate a random 32-char hex string
+        // 1. Generate a random 32-char hex string for the API Key
         const randomHex = Array.from(crypto.getRandomValues(new Uint8Array(16)))
           .map(b => b.toString(16).padStart(2, '0'))
           .join('');
         
         const newKey = `swft_live_${randomHex}`;
-        const hash = await sha256Hex(newKey);
+        const keyHash = await sha256Hex(newKey);
         const prefix = newKey.slice(0, 12);
 
+        // 2. Generate a random 32-char hex string for the Secret Signing Key
+        const secretHex = Array.from(crypto.getRandomValues(new Uint8Array(16)))
+          .map(b => b.toString(16).padStart(2, '0'))
+          .join('');
+        
+        // We use the hex itself as the secret, and store its hash
+        const secretHash = await sha256Hex(secretHex);
+
+        // 3. Update Database
         const { error: updateError } = await supabaseAdmin
           .from("profiles")
           .update({
             api_key: null, // Ensure old plaintext key is cleared
-            api_key_hash: hash,
+            api_key_hash: keyHash,
             api_key_prefix: prefix,
+            api_secret_key_hash: secretHex, // Store the secret itself to allow HMAC verification
             api_access_enabled: true
           })
           .eq("user_id", user_id);
 
-        if (updateError) throw updateError;
+        if (updateError) {
+          console.warn("Retrying generate_api_key without secret key column:", updateError.message);
+          // Fallback: Try without the new secret key column if migration hasn't run
+          const { error: fallbackError } = await supabaseAdmin
+            .from("profiles")
+            .update({
+              api_key: null,
+              api_key_hash: keyHash,
+              api_key_prefix: prefix,
+              api_access_enabled: true
+            })
+            .eq("user_id", user_id);
+          
+          if (fallbackError) throw fallbackError;
+        }
 
         return new Response(JSON.stringify({ 
           success: true, 

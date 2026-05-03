@@ -403,6 +403,7 @@ const AdminAPIUsers = () => {
                         <Badge variant="outline" className={user.api_access_enabled ? "border-emerald-500/30 text-emerald-400 text-[10px]" : "border-red-500/30 text-red-400 text-[10px]"}>
                           {user.api_access_enabled ? "Active" : "Revoked"}
                         </Badge>
+                        {user.api_test_mode && <Badge variant="outline" className="border-sky-500/30 text-sky-400 text-[10px] bg-sky-500/5">Testing</Badge>}
                         {user.agent_approved && <Badge variant="outline" className="border-amber-500/30 text-amber-400 text-[10px]">Agent</Badge>}
                         {user.sub_agent_approved && <Badge variant="outline" className="border-blue-500/30 text-blue-400 text-[10px]">Sub-Agent</Badge>}
                       </div>
@@ -416,25 +417,17 @@ const AdminAPIUsers = () => {
                     </div>
 
                       {/* API Key display — prefix shown, full key is hashed and never stored */}
-                    <div className="flex flex-col gap-1 flex-1 md:max-w-xs min-w-0">
-                      <div className="flex items-center gap-2">
-                        {hasKey ? (
-                          <>
+                      <div className="flex flex-col gap-1 flex-1 md:max-w-xs min-w-0">
+                        <div className="flex items-center gap-2">
+                          {hasKey ? (
                             <code className="text-[10px] font-mono text-amber-300/80 bg-white/5 px-2 py-0.5 rounded truncate flex-1" title="API Key Prefix">
                               {user.api_key_prefix}•••
                             </code>
-                            <Badge variant="outline" className="border-emerald-500/20 text-emerald-500 text-[8px] h-4 px-1">
-                              HMAC SET
-                            </Badge>
-                          </>
-                        ) : (
-                          <span className="text-xs text-white/30 italic">No key generated</span>
-                        )}
+                          ) : (
+                            <span className="text-xs text-white/30 italic">No key generated</span>
+                          )}
+                        </div>
                       </div>
-                      {hasKey && user.api_secret_key_hash && (
-                        <p className="text-[9px] text-white/20 truncate font-mono">Secret: {user.api_secret_key_hash.slice(0, 8)}•••</p>
-                      )}
-                    </div>
 
                     {/* Usage counters */}
                     <div className="flex gap-4 shrink-0 text-center">
@@ -706,27 +699,30 @@ const AdminAPIUsers = () => {
           </DialogHeader>
           
           <div className="space-y-4 py-4">
-            <div className="p-4 bg-black/40 rounded-xl border border-white/5 break-all font-mono text-amber-300 text-sm flex items-center justify-between gap-4">
-              <span>{generatedKey?.key}</span>
-              <Button 
-                variant="ghost" 
-                size="sm" 
-                className="h-8 w-8 p-0 shrink-0 hover:bg-white/10" 
-                onClick={() => {
-                  if (generatedKey?.key) {
-                    navigator.clipboard.writeText(generatedKey.key);
-                    toast({ title: "API Key copied to clipboard" });
-                  }
-                }}
-              >
-                <Copy className="w-4 h-4" />
-              </Button>
+            <div className="space-y-2">
+              <p className="text-[10px] font-black uppercase tracking-widest text-amber-500/70">Public API Key (Bearer Token)</p>
+              <div className="p-4 bg-black/40 rounded-xl border border-white/5 break-all font-mono text-amber-300 text-sm flex items-center justify-between gap-4">
+                <span>{generatedKey?.key}</span>
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  className="h-8 w-8 p-0 shrink-0 hover:bg-white/10" 
+                  onClick={() => {
+                    if (generatedKey?.key) {
+                      navigator.clipboard.writeText(generatedKey.key);
+                      toast({ title: "API Key copied to clipboard" });
+                    }
+                  }}
+                >
+                  <Copy className="w-4 h-4" />
+                </Button>
+              </div>
             </div>
             
             <div className="bg-amber-500/10 border border-amber-500/20 p-3 rounded-lg flex gap-3 items-start">
               <Shield className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" />
               <p className="text-xs text-amber-200/70 leading-relaxed">
-                This key allows full access to the user's wallet and order history. Standardize on the <strong>Authorization: Bearer</strong> header when using it.
+                This credential allows full access to the user's wallet. Always use the <strong>Authorization: Bearer [KEY]</strong> header.
               </p>
             </div>
           </div>

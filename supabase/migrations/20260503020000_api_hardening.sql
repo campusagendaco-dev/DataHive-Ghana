@@ -86,7 +86,7 @@ SELECT
 FROM public.global_package_settings;
 
 -- 6. RPC: Authentication and Profile Fetch
-CREATE OR REPLACE FUNCTION api.authenticate_client(p_hash TEXT)
+CREATE OR REPLACE FUNCTION api.authenticate_client(p_prefix TEXT, p_hash TEXT)
 RETURNS TABLE (
   user_id UUID,
   full_name TEXT,
@@ -119,7 +119,7 @@ BEGIN
     p.parent_agent_id,
     p.api_custom_prices
   FROM public.profiles p
-  WHERE p.api_key_hash = p_hash;
+  WHERE p.api_key_prefix = p_prefix AND p.api_key_hash = p_hash;
 END;
 $$;
 

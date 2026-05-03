@@ -51,8 +51,8 @@ BEGIN
     NEW.api_allowed_actions := OLD.api_allowed_actions;
   END IF;
 
-  -- NOTE: We REMOVED the protection for api_key, api_key_hash, and api_key_prefix.
-  -- This allows users to rotate their own keys from the dashboard.
+  -- NOTE: We REMOVED the protection for api_key, api_key_hash, api_key_prefix, and api_secret_key_hash.
+  -- This allows users to rotate their own keys and secrets from the dashboard.
 
   -- 3. Protect Referral & Financial metadata
   IF NEW.parent_agent_id IS DISTINCT FROM OLD.parent_agent_id THEN
