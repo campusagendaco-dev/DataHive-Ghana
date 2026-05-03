@@ -169,6 +169,10 @@ const DashboardDeveloperAPI = () => {
                 <Shield className="w-3.5 h-3.5 shrink-0" />
                 Rate limit: <strong className="text-white/60">{rateLimit} requests/min</strong> (controlled by admin)
               </div>
+              <div className="flex items-center gap-2 text-xs text-white/40">
+                <Shield className="w-3.5 h-3.5 shrink-0" />
+                Auth Method: <strong className="text-sky-400">Authorization: Bearer</strong>
+              </div>
             </div>
           ) : (
             <p className="text-sm text-muted-foreground italic">No API key yet. Click below to generate one.</p>
@@ -207,9 +211,9 @@ const DashboardDeveloperAPI = () => {
           <CardContent className="text-sm space-y-2 text-muted-foreground">
             <p>1. Fund your wallet with sufficient balance.</p>
             <p>2. Copy your API key above.</p>
-            <p>3. Call <code className="text-sky-400 bg-white/5 px-1 rounded text-xs">GET /plans</code> to list packages.</p>
-            <p>4. POST to <code className="text-sky-400 bg-white/5 px-1 rounded text-xs">/airtime</code> with recipient details.</p>
-            <p>5. POST to <code className="text-sky-400 bg-white/5 px-1 rounded text-xs">/payment/bills/validate</code> for bill lookups.</p>
+            <p>3. Add header <code className="text-sky-400 bg-white/5 px-1 rounded text-xs">Authorization: Bearer [YOUR_KEY]</code> to your requests.</p>
+            <p>4. Call <code className="text-sky-400 bg-white/5 px-1 rounded text-xs">GET /plans</code> to list packages.</p>
+            <p>5. POST to <code className="text-sky-400 bg-white/5 px-1 rounded text-xs">/airtime</code> with recipient details.</p>
           </CardContent>
         </Card>
 
@@ -242,7 +246,7 @@ const DashboardDeveloperAPI = () => {
               <Copy className="w-4 h-4" />
             </Button>
           </div>
-          <p className="text-xs text-white/30 mt-2">Append <code className="text-sky-400">/balance</code>, <code className="text-sky-400">/plans</code>, or <code className="text-sky-400">/airtime</code> to the URL.</p>
+            <p className="text-xs text-white/30 mt-2">Always include your key in the <code className="text-sky-400">Authorization: Bearer</code> header.</p>
         </CardContent>
       </Card>
     </div>

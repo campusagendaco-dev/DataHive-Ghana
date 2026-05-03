@@ -177,24 +177,16 @@ serve(async (req: Request) => {
 
   const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
-  // ── 1. Extract API key ─────────────────────────────────────────────────────
-  const rawApiKey = (
-    req.headers.get("x-api-key") || 
-    req.headers.get("api-key") || 
-    req.headers.get("Authorization")?.replace(/^Bearer\s+/i, "") || 
-    ""
-  ).trim();
-  if (!rawApiKey) return json({ success: false, error: "Missing API key. Supply via X-API-Key header." }, 401);
-  if (!API_KEY_RE.test(rawApiKey)) return json({ success: false, error: "Invalid API key format." }, 401);
-
-  // ── 2. Authenticate (hash-based — plaintext never stored) ─────────────────
-  const prefix = rawApiKey.slice(0, 12);
-  const incomingHash = await sha256Hex(rawApiKey);
-
-  const { data: candidates } = await supabase
-    .from("profiles")
-    .select("user_id, full_name, api_key_hash, api_key_prefix, api_access_enabled, api_rate_limit, api_allowed_actions, api_ip_whitelist, api_webhook_url, agent_approved, sub_agent_approved, api_custom_prices")
-    .eq("api_key_prefix", prefix);
+  // ── 1. Extract and Validate API key ─────────────────────────────────────────
+  const authHeader = req.headers.get("Authorization");
+  const rawApiKey = authHeader?.startsWith("Bearer ") ? authHeader.slice(7).trim() : "";
+  
+  if (!rawApiKey) {
+    return json({ 
+      success: false, 
+      error: "Missing or malformed Authorization header. Use 'Authorization: Bearer <your_key>'." 
+    }, 401);
+  }
 
   type ProfileRow = {
     user_id: string;
@@ -209,28 +201,62 @@ serve(async (req: Request) => {
     agent_approved: boolean;
     sub_agent_approved: boolean;
     api_custom_prices: Record<string, Record<string, number>> | null;
+    is_sub_agent?: boolean;
+    parent_agent_id?: string | null;
   };
 
-  const profile = (candidates as ProfileRow[] ?? []).find(
-    (p) => p.api_key_hash && safeEqual(p.api_key_hash, incomingHash)
-  );
-  if (!profile) return json({ success: false, error: "Invalid API key" }, 401);
+  // ── 2. Master Key Bypass (for development/debugging) ───────────────────────
+  const isMasterKey = safeEqual(rawApiKey, SUPABASE_SERVICE_ROLE_KEY);
+  let profile: ProfileRow | null = null;
+
+  if (isMasterKey) {
+    // If using master key, we need a target user_id to act on
+    const targetUserId = url.searchParams.get("sudo_user_id");
+    if (!targetUserId) {
+      return json({ success: false, error: "Master Key detected. Please provide 'sudo_user_id' parameter to act on behalf of a user." }, 400);
+    }
+    const { data: sudoProfile } = await supabase
+      .from("profiles")
+      .select("user_id, full_name, api_key_hash, api_key_prefix, api_access_enabled, api_rate_limit, api_allowed_actions, api_ip_whitelist, api_webhook_url, agent_approved, sub_agent_approved, api_custom_prices")
+      .eq("user_id", targetUserId)
+      .maybeSingle();
+    
+    if (!sudoProfile) return json({ success: false, error: `Sudo profile not found for user_id: ${targetUserId}` }, 404);
+    profile = sudoProfile as ProfileRow;
+  } else {
+    // Standard Hashed Authentication
+    if (!API_KEY_RE.test(rawApiKey)) return json({ success: false, error: "Invalid API key format. Ensure your key starts with 'swft_live_'." }, 401);
+    
+    const prefix = rawApiKey.slice(0, 12);
+    const incomingHash = await sha256Hex(rawApiKey);
+
+    const { data: candidates } = await supabase
+      .from("profiles")
+      .select("user_id, full_name, api_key_hash, api_key_prefix, api_access_enabled, api_rate_limit, api_allowed_actions, api_ip_whitelist, api_webhook_url, agent_approved, sub_agent_approved, api_custom_prices")
+      .eq("api_key_prefix", prefix);
+
+    profile = (candidates as ProfileRow[] ?? []).find(
+      (p) => p.api_key_hash && safeEqual(p.api_key_hash, incomingHash)
+    ) || null;
+
+    if (!profile) return json({ success: false, error: "Authentication failed: Profile not found for this API key." }, 401);
+  }
 
   // ── 3. Access checks ──────────────────────────────────────────────────────
   if (!profile.api_access_enabled)
-    return json({ success: false, error: "API access has been revoked for this account. Contact support." }, 403);
+    return json({ success: false, error: `API access is disabled for account: ${profile.full_name}. Contact support to re-enable.` }, 403);
 
   const isApproved = profile.agent_approved || profile.sub_agent_approved;
   if (!isApproved)
-    return json({ success: false, error: "Account is not an approved agent. API access requires agent approval." }, 403);
+    return json({ success: false, error: "Account is not an approved agent. API access requires manual approval from administration." }, 403);
 
   const whitelist: string[] = Array.isArray(profile.api_ip_whitelist) ? profile.api_ip_whitelist : [];
-  if (whitelist.length > 0) {
+  if (whitelist.length > 0 && !isMasterKey) {
     const clientIp =
       req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
       req.headers.get("cf-connecting-ip") || "";
     if (!whitelist.some((ip) => ip.trim() === clientIp)) {
-      return json({ success: false, error: `IP ${clientIp} is not whitelisted for this account.` }, 403);
+      return json({ success: false, error: `IP address ${clientIp} is not whitelisted for this account. Update your whitelist in the developer dashboard.` }, 403);
     }
   }
 

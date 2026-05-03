@@ -25,6 +25,11 @@ async function sendManualCreditSms(supabaseAdmin: any, userId: string, amount: n
   }
 }
 
+async function sha256Hex(input: string): Promise<string> {
+  const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(input));
+  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, "0")).join("");
+}
+
 async function sendWithdrawalCompletedSms(supabaseAdmin: any, userId: string, amount: number) {
   try {
     const { data: profile } = await supabaseAdmin.from("profiles").select("phone").eq("user_id", userId).maybeSingle();
@@ -73,7 +78,8 @@ type AdminUserAction =
   | "get_providers"
   | "update_provider"
   | "get_paystack_transactions"
-  | "bulk_fulfill_api_orders";
+  | "bulk_fulfill_api_orders"
+  | "generate_api_key";
 
 
 
@@ -245,6 +251,40 @@ serve(async (req: Request) => {
 
         if (updateError) throw updateError;
         return new Response(JSON.stringify({ success: true }), {
+          status: 200,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      case "generate_api_key": {
+        if (!isValidUuid(user_id)) throw new Error("Invalid or missing user_id");
+        
+        // Generate a random 32-char hex string
+        const randomHex = Array.from(crypto.getRandomValues(new Uint8Array(16)))
+          .map(b => b.toString(16).padStart(2, '0'))
+          .join('');
+        
+        const newKey = `swft_live_${randomHex}`;
+        const hash = await sha256Hex(newKey);
+        const prefix = newKey.slice(0, 12);
+
+        const { error: updateError } = await supabaseAdmin
+          .from("profiles")
+          .update({
+            api_key: null, // Ensure old plaintext key is cleared
+            api_key_hash: hash,
+            api_key_prefix: prefix,
+            api_access_enabled: true
+          })
+          .eq("user_id", user_id);
+
+        if (updateError) throw updateError;
+
+        return new Response(JSON.stringify({ 
+          success: true, 
+          api_key: newKey,
+          prefix: prefix
+        }), {
           status: 200,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });

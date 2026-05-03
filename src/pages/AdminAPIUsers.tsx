@@ -10,6 +10,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
   Key, Search, Shield, ShieldOff, RefreshCw, Loader2,
   Activity, Users, TrendingUp, Ban,
   CheckCircle, XCircle, ChevronDown, ChevronUp, Copy,
@@ -83,6 +90,8 @@ const AdminAPIUsers = () => {
   const [webhookEdits, setWebhookEdits] = useState<Record<string, string>>({});
   const [priceEdits, setPriceEdits] = useState<Record<string, Record<string, Record<string, number>>>>({});
   const [saving, setSaving] = useState<string | null>(null);
+  const [generatedKey, setGeneratedKey] = useState<{ userId: string; key: string } | null>(null);
+  const [generating, setGenerating] = useState<string | null>(null);
 
   const fetchUsers = async () => {
     setLoading(true);
@@ -180,6 +189,26 @@ const AdminAPIUsers = () => {
     } else {
       toast({ title: "API Key revoked" });
       setUsers((prev) => prev.map((u) => u.user_id === userId ? { ...u, api_key_prefix: null, api_key_hash: null } : u));
+    }
+  };
+
+  const generateKey = async (userId: string) => {
+    const accessToken = session?.access_token;
+    if (!accessToken) return;
+
+    setGenerating(userId);
+    const { data: fnData, error } = await supabase.functions.invoke("admin-user-actions", {
+      body: { action: "generate_api_key", user_id: userId },
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+    setGenerating(null);
+
+    if (error || fnData?.error) {
+      toast({ title: "Failed to generate key", description: fnData?.error ?? error?.message, variant: "destructive" });
+    } else {
+      setGeneratedKey({ userId, key: fnData.api_key });
+      setUsers((prev) => prev.map((u) => u.user_id === userId ? { ...u, api_key_prefix: fnData.prefix, api_key_hash: "Hashed" } : u));
+      toast({ title: "API Key Generated Successfully" });
     }
   };
 
@@ -427,6 +456,16 @@ const AdminAPIUsers = () => {
                       >
                         {user.api_access_enabled ? <><ShieldOff className="w-3.5 h-3.5" /> Revoke</> : <><Shield className="w-3.5 h-3.5" /> Enable</>}
                       </Button>
+                      <Button 
+                        size="sm" 
+                        variant="outline" 
+                        className="gap-1.5 h-8 text-xs border-amber-500/30 text-amber-400 hover:bg-amber-500/10" 
+                        onClick={() => generateKey(user.user_id)}
+                        disabled={generating === user.user_id}
+                      >
+                        {generating === user.user_id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
+                        {hasKey ? "Regenerate" : "Generate Key"}
+                      </Button>
                       {hasKey && (
                         <Button size="sm" variant="outline" className="gap-1.5 h-8 text-xs border-orange-500/30 text-orange-400 hover:bg-orange-500/10" onClick={() => revokeKey(user.user_id)}>
                           <Ban className="w-3.5 h-3.5" /> Delete Key
@@ -649,8 +688,53 @@ const AdminAPIUsers = () => {
               </Card>
             );
           })}
-        </div>
       )}
+
+      {/* Generated Key Modal */}
+      <Dialog open={!!generatedKey} onOpenChange={(open) => !open && setGeneratedKey(null)}>
+        <DialogContent className="bg-zinc-900 border-white/10 text-white sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Key className="w-5 h-5 text-amber-400" /> New API Key Generated
+            </DialogTitle>
+            <DialogDescription className="text-zinc-400">
+              Copy this key now. For security, it will never be shown again in full.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4 py-4">
+            <div className="p-4 bg-black/40 rounded-xl border border-white/5 break-all font-mono text-amber-300 text-sm flex items-center justify-between gap-4">
+              <span>{generatedKey?.key}</span>
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                className="h-8 w-8 p-0 shrink-0 hover:bg-white/10" 
+                onClick={() => {
+                  if (generatedKey?.key) {
+                    navigator.clipboard.writeText(generatedKey.key);
+                    toast({ title: "API Key copied to clipboard" });
+                  }
+                }}
+              >
+                <Copy className="w-4 h-4" />
+              </Button>
+            </div>
+            
+            <div className="bg-amber-500/10 border border-amber-500/20 p-3 rounded-lg flex gap-3 items-start">
+              <Shield className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" />
+              <p className="text-xs text-amber-200/70 leading-relaxed">
+                This key allows full access to the user's wallet and order history. Standardize on the <strong>Authorization: Bearer</strong> header when using it.
+              </p>
+            </div>
+          </div>
+          
+          <div className="flex justify-end">
+            <Button onClick={() => setGeneratedKey(null)} className="bg-white text-black hover:bg-white/90">
+              I have saved the key
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
