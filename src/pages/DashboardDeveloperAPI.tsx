@@ -8,8 +8,11 @@ import { Input } from "@/components/ui/input";
 import {
   Key, Copy, RefreshCw, Loader2, ExternalLink,
   Shield, AlertTriangle, CheckCircle, Eye, EyeOff, Zap,
+  Terminal, History, Bug
 } from "lucide-react";
 import { Link } from "react-router-dom";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Badge } from "@/components/ui/badge";
 
 async function sha256Hex(input: string): Promise<string> {
   const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(input));
@@ -20,11 +23,11 @@ const DashboardDeveloperAPI = () => {
   const { user } = useAuth();
   const { toast } = useToast();
 
-  // `plaintextKey` holds the key only immediately after generation (one-time display).
-  // `apiKeyPrefix` is the first 12 chars stored in the DB — used for masked display.
   const [plaintextKey, setPlaintextKey] = useState<string | null>(null);
+  const [plaintextSecret, setPlaintextSecret] = useState<string | null>(null);
   const [apiKeyPrefix, setApiKeyPrefix] = useState<string | null>(null);
   const [hasKey, setHasKey] = useState(false);
+  const [logs, setLogs] = useState<any[]>([]);
 
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
@@ -35,23 +38,36 @@ const DashboardDeveloperAPI = () => {
 
   const BASE_URL = "https://lsocdjpflecduumopijn.supabase.co/functions/v1/developer-api";
 
+  const fetchApiKey = async () => {
+    if (!user) return;
+    setLoading(true);
+    const { data } = await supabase
+      .from("profiles")
+      .select("api_key_prefix, api_access_enabled, api_rate_limit, api_secret_key_hash")
+      .eq("user_id", user.id)
+      .maybeSingle();
+    
+    if (data) {
+      setApiKeyPrefix(data.api_key_prefix ?? null);
+      setHasKey(!!data.api_key_prefix);
+      setAccessEnabled(data.api_access_enabled ?? true);
+      setRateLimit(data.api_rate_limit ?? 30);
+    }
+    
+    // Fetch recent logs
+    const { data: logData } = await supabase
+      .from("api_logs")
+      .select("log_reference, endpoint, method, error_message, created_at")
+      .eq("user_id", user.id)
+      .order("created_at", { ascending: false })
+      .limit(5);
+    
+    if (logData) setLogs(logData);
+    
+    setLoading(false);
+  };
+
   useEffect(() => {
-    const fetchApiKey = async () => {
-      if (!user) return;
-      setLoading(true);
-      const { data } = await supabase
-        .from("profiles")
-        .select("api_key_prefix, api_access_enabled, api_rate_limit")
-        .eq("user_id", user.id)
-        .maybeSingle();
-      if (data) {
-        setApiKeyPrefix(data.api_key_prefix ?? null);
-        setHasKey(!!data.api_key_prefix);
-        setAccessEnabled(data.api_access_enabled ?? true);
-        setRateLimit(data.api_rate_limit ?? 30);
-      }
-      setLoading(false);
-    };
     fetchApiKey();
   }, [user]);
 
@@ -62,22 +78,31 @@ const DashboardDeveloperAPI = () => {
     setConfirmRegen(false);
 
     const newKey = `swft_live_${crypto.randomUUID().replace(/-/g, "")}`;
-    const hash = await sha256Hex(newKey);
+    const keyHash = await sha256Hex(newKey);
     const prefix = newKey.slice(0, 12);
+    
+    // Generate a new Secret Signing Key
+    const newSecret = crypto.randomUUID().replace(/-/g, "");
+    const secretHash = await sha256Hex(newSecret);
 
     const { error } = await supabase
       .from("profiles")
-      .update({ api_key_hash: hash, api_key_prefix: prefix, api_key: null })
+      .update({ 
+        api_key_hash: keyHash, 
+        api_key_prefix: prefix, 
+        api_secret_key_hash: secretHash 
+      })
       .eq("user_id", user.id);
 
     if (error) {
-      toast({ title: "Failed to generate API Key", description: error.message, variant: "destructive" });
+      toast({ title: "Failed to generate keys", description: error.message, variant: "destructive" });
     } else {
       setPlaintextKey(newKey);
+      setPlaintextSecret(secretHash); // We use the hash itself as the secret for the client to sign with
       setApiKeyPrefix(prefix);
       setHasKey(true);
       setRevealed(true);
-      toast({ title: "✅ New API Key generated", description: "Copy and store it securely — it will not be shown again." });
+      toast({ title: "✅ New API Credentials generated", description: "Copy and store them securely — they will not be shown again." });
     }
     setGenerating(false);
   };
@@ -87,24 +112,23 @@ const DashboardDeveloperAPI = () => {
     toast({ title: "Copied to clipboard" });
   };
 
-  // Masked display: show prefix + bullets. Full key only shown right after generation.
   const maskedKey = apiKeyPrefix ? `${apiKeyPrefix}${"•".repeat(24)}` : "";
 
   return (
-    <div className="p-6 md:p-8 max-w-4xl space-y-6">
+    <div className="p-6 md:p-8 max-w-5xl space-y-6">
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="font-display text-2xl font-bold flex items-center gap-2">
-            <Zap className="w-6 h-6 text-sky-400" /> SwiftData Developers
+            <Zap className="w-6 h-6 text-sky-400" /> Developer Portal
           </h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Integrate SwiftData Ghana directly into your own applications.
+            Build custom integrations using our secure, production-grade API.
           </p>
         </div>
         <Link to="/api-docs">
           <Button variant="outline" className="gap-2 border-sky-500/30 text-sky-400 hover:bg-sky-500/10">
-            <ExternalLink className="w-4 h-4" /> View Full Docs
+            <ExternalLink className="w-4 h-4" /> API Documentation
           </Button>
         </Link>
       </div>
@@ -113,142 +137,183 @@ const DashboardDeveloperAPI = () => {
       {!loading && (
         <div className={`flex items-center gap-3 px-4 py-3 rounded-xl border text-sm font-medium ${accessEnabled ? "border-emerald-500/20 bg-emerald-500/5 text-emerald-400" : "border-red-500/20 bg-red-500/5 text-red-400"}`}>
           {accessEnabled ? <CheckCircle className="w-4 h-4 shrink-0" /> : <AlertTriangle className="w-4 h-4 shrink-0" />}
-          {accessEnabled ? "API access is active on your account." : "API access has been disabled by an administrator. Contact support."}
+          {accessEnabled ? "API access is active. Authentication via HMAC is required for all POST requests." : "API access disabled. Please contact support."}
         </div>
       )}
 
-      {/* API Key Card */}
-      <Card className="border-sky-500/20 bg-sky-500/5">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Key className="w-5 h-5 text-sky-500" /> Your Secret API Key
+      {/* API Credentials Card */}
+      <Card className="border-sky-500/20 bg-sky-500/5 overflow-hidden">
+        <CardHeader className="border-b border-sky-500/10 bg-sky-500/5">
+          <CardTitle className="flex items-center gap-2 text-lg">
+            <Key className="w-5 h-5 text-sky-500" /> Authentication Credentials
           </CardTitle>
           <CardDescription>
-            Used to authenticate every API request. Never expose this in client-side code.
+            Use these to authenticate your requests. Keep your Secret Key private.
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent className="p-6 space-y-6">
           {loading ? (
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <Loader2 className="w-4 h-4 animate-spin" /> Loading...
+            <div className="flex items-center gap-2 text-sm text-muted-foreground py-4">
+              <Loader2 className="w-4 h-4 animate-spin" /> Loading credentials...
             </div>
           ) : hasKey ? (
-            <div className="space-y-3">
-              <div className="flex gap-2">
-                <Input
-                  value={plaintextKey && revealed ? plaintextKey : maskedKey}
-                  readOnly
-                  className="font-mono bg-black/20 border-white/10 text-sm"
-                />
-                {/* Reveal only available immediately after generation */}
-                {plaintextKey && (
-                  <Button variant="secondary" size="icon" onClick={() => setRevealed(!revealed)} title={revealed ? "Hide" : "Reveal"}>
-                    {revealed ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                  </Button>
-                )}
-                {plaintextKey && (
-                  <Button variant="secondary" size="icon" onClick={() => copyToClipboard(plaintextKey)} title="Copy">
+            <div className="grid gap-6">
+              {/* API Key */}
+              <div className="space-y-2">
+                <label className="text-[10px] font-black uppercase tracking-widest text-sky-500/70">Public API Key (Bearer Token)</label>
+                <div className="flex gap-2">
+                  <Input
+                    value={plaintextKey && revealed ? plaintextKey : maskedKey}
+                    readOnly
+                    className="font-mono bg-black/40 border-white/10 text-sm h-10"
+                  />
+                  {plaintextKey && (
+                    <Button variant="secondary" size="icon" className="h-10 w-10" onClick={() => setRevealed(!revealed)}>
+                      {revealed ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </Button>
+                  )}
+                  <Button variant="secondary" size="icon" className="h-10 w-10" onClick={() => copyToClipboard(plaintextKey || maskedKey)}>
                     <Copy className="w-4 h-4" />
                   </Button>
+                </div>
+              </div>
+
+              {/* Secret Key (Signing Secret) */}
+              <div className="space-y-2">
+                <label className="text-[10px] font-black uppercase tracking-widest text-emerald-500/70">Secret Signing Key (HMAC Secret)</label>
+                <div className="flex gap-2">
+                  <Input
+                    value={plaintextSecret && revealed ? plaintextSecret : "••••••••••••••••••••••••••••••••"}
+                    readOnly
+                    className="font-mono bg-black/40 border-white/10 text-sm h-10 text-emerald-400"
+                  />
+                  <Button variant="secondary" size="icon" className="h-10 w-10" onClick={() => copyToClipboard(plaintextSecret || "")} disabled={!plaintextSecret}>
+                    <Copy className="w-4 h-4" />
+                  </Button>
+                </div>
+                {plaintextSecret ? (
+                  <p className="text-[10px] text-amber-400 font-medium">⚠️ Copy this now! This secret is used for HMAC-SHA256 request signing and will never be shown again.</p>
+                ) : (
+                  <p className="text-[10px] text-white/30 italic">Key is hidden. Regenerate to view a new signing secret.</p>
                 )}
               </div>
 
-              {plaintextKey ? (
-                <div className="flex items-center gap-2 text-xs text-amber-400/80 bg-amber-500/5 border border-amber-500/20 rounded-lg px-3 py-2">
-                  <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
-                  Copy this key now — it will not be shown again after you leave this page.
-                </div>
-              ) : (
+              <div className="flex flex-wrap gap-4 pt-2">
                 <div className="flex items-center gap-2 text-xs text-white/40">
-                  <Shield className="w-3.5 h-3.5 shrink-0" />
-                  Key is set. Regenerate to get a new one (your current key will be invalidated).
+                  <Shield className="w-3.5 h-3.5" /> Rate Limit: <strong className="text-white/60">{rateLimit} req/min</strong>
                 </div>
-              )}
-
-              <div className="flex items-center gap-2 text-xs text-white/40">
-                <Shield className="w-3.5 h-3.5 shrink-0" />
-                Rate limit: <strong className="text-white/60">{rateLimit} requests/min</strong> (controlled by admin)
-              </div>
-              <div className="flex items-center gap-2 text-xs text-white/40">
-                <Shield className="w-3.5 h-3.5 shrink-0" />
-                Auth Method: <strong className="text-sky-400">Authorization: Bearer</strong>
+                <div className="flex items-center gap-2 text-xs text-white/40">
+                  <Terminal className="w-3.5 h-3.5" /> Method: <strong className="text-sky-400">HMAC-SHA256</strong>
+                </div>
               </div>
             </div>
           ) : (
-            <p className="text-sm text-muted-foreground italic">No API key yet. Click below to generate one.</p>
+            <div className="text-center py-6 space-y-4">
+              <div className="w-12 h-12 rounded-full bg-sky-500/10 flex items-center justify-center mx-auto">
+                <Key className="w-6 h-6 text-sky-500 opacity-50" />
+              </div>
+              <p className="text-sm text-muted-foreground italic">No API credentials found. Generate them below to get started.</p>
+            </div>
           )}
 
-          <div className="pt-3 border-t border-white/5 space-y-2">
-            {confirmRegen && (
-              <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-sm text-red-400">
-                ⚠️ Regenerating will <strong>invalidate your current key</strong>. All integrations using the old key will break. Click again to confirm.
-              </div>
-            )}
+          <div className="pt-6 border-t border-white/5 flex flex-col sm:flex-row items-center gap-4">
             <Button
               onClick={generateApiKey}
               disabled={generating || !accessEnabled}
-              variant="secondary"
-              className={`gap-2 ${confirmRegen ? "border-red-500/30 text-red-400 hover:bg-red-500/10" : ""}`}
+              variant={confirmRegen ? "destructive" : "secondary"}
+              className="gap-2 w-full sm:w-auto"
             >
               {generating ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
-              {generating ? "Generating..." : confirmRegen ? "⚠️ Confirm Regenerate" : hasKey ? "Regenerate API Key" : "Generate API Key"}
+              {confirmRegen ? "Confirm Regeneration" : hasKey ? "Rotate Keys" : "Generate API Credentials"}
             </Button>
             {confirmRegen && (
               <Button variant="ghost" size="sm" className="text-white/40" onClick={() => setConfirmRegen(false)}>Cancel</Button>
             )}
+            {hasKey && !confirmRegen && (
+              <p className="text-[10px] text-white/20 italic max-w-xs">Rotating keys will immediately invalidate your current API Key and Signing Secret.</p>
+            )}
           </div>
         </CardContent>
       </Card>
 
-      {/* Quick start + security cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <Card className="bg-white/3 border-white/8">
+      {/* API Logs & Quick Start */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Quick Start */}
+        <Card className="lg:col-span-1 bg-white/3 border-white/8">
           <CardHeader>
             <CardTitle className="text-base flex items-center gap-2">
-              <Zap className="w-4 h-4 text-sky-400" /> Quick Start
+              <Zap className="w-4 h-4 text-sky-400" /> Signing Requirements
             </CardTitle>
           </CardHeader>
-          <CardContent className="text-sm space-y-2 text-muted-foreground">
-            <p>1. Fund your wallet with sufficient balance.</p>
-            <p>2. Copy your API key above.</p>
-            <p>3. Add header <code className="text-sky-400 bg-white/5 px-1 rounded text-xs">Authorization: Bearer [YOUR_KEY]</code> to your requests.</p>
-            <p>4. Call <code className="text-sky-400 bg-white/5 px-1 rounded text-xs">GET /plans</code> to list packages.</p>
-            <p>5. POST to <code className="text-sky-400 bg-white/5 px-1 rounded text-xs">/airtime</code> with recipient details.</p>
+          <CardContent className="text-xs space-y-4 text-muted-foreground">
+            <div className="space-y-1">
+              <p className="font-bold text-white/60">1. Required Headers</p>
+              <ul className="list-disc list-inside space-y-1">
+                <li><code>Authorization: Bearer [KEY]</code></li>
+                <li><code>X-Swift-Signature: [HMAC]</code></li>
+                <li><code>X-Idempotency-Key: [UUID]</code></li>
+              </ul>
+            </div>
+            <div className="space-y-1">
+              <p className="font-bold text-white/60">2. Generating Signature</p>
+              <p className="leading-relaxed">Sign the raw JSON body using <strong>HMAC-SHA256</strong> with your <strong>Secret Key</strong>. Send the hex-encoded result in <code>X-Swift-Signature</code>.</p>
+            </div>
+            <Button variant="link" className="p-0 h-auto text-sky-400 text-xs" asChild>
+              <Link to="/api-docs#signing">View Code Examples →</Link>
+            </Button>
           </CardContent>
         </Card>
 
-        <Card className="bg-white/3 border-white/8">
-          <CardHeader>
+        {/* Recent API Logs */}
+        <Card className="lg:col-span-2 bg-white/3 border-white/8">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0">
             <CardTitle className="text-base flex items-center gap-2">
-              <Shield className="w-4 h-4 text-emerald-400" /> Security Tips
+              <History className="w-4 h-4 text-amber-400" /> Recent Errors & Activity
             </CardTitle>
+            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={fetchApiKey}>
+              <RefreshCw className="w-3.5 h-3.5 text-white/40" />
+            </Button>
           </CardHeader>
-          <CardContent className="text-sm space-y-2 text-muted-foreground">
-            <p>🔑 Store key in environment variables, not source code.</p>
-            <p>🔁 All endpoints are RESTful and path-based.</p>
-            <p>🚫 Never expose your key in browser/mobile apps.</p>
-            <p>🔄 Rotate your key periodically from this page.</p>
+          <CardContent>
+            {logs.length === 0 ? (
+              <div className="text-center py-10 opacity-30">
+                <Bug className="w-8 h-8 mx-auto mb-2" />
+                <p className="text-xs">No errors or activity logged yet.</p>
+              </div>
+            ) : (
+              <div className="rounded-lg border border-white/5 overflow-hidden">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="bg-white/5 hover:bg-white/5 border-white/5">
+                      <TableHead className="text-[10px] font-black uppercase tracking-widest px-3">Reference</TableHead>
+                      <TableHead className="text-[10px] font-black uppercase tracking-widest px-3">Endpoint</TableHead>
+                      <TableHead className="text-[10px] font-black uppercase tracking-widest px-3">Status</TableHead>
+                      <TableHead className="text-[10px] font-black uppercase tracking-widest px-3 text-right">Time</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {logs.map((log) => (
+                      <TableRow key={log.log_reference} className="border-white/5 text-[11px] hover:bg-white/[0.02]">
+                        <TableCell className="font-mono text-amber-400 px-3">{log.log_reference}</TableCell>
+                        <TableCell className="text-white/60 px-3 truncate max-w-[120px]">{log.method} {log.endpoint}</TableCell>
+                        <TableCell className="px-3">
+                          <Badge variant="outline" className="text-[9px] border-red-500/20 text-red-400 bg-red-500/5">Error</Badge>
+                        </TableCell>
+                        <TableCell className="text-right text-white/30 px-3">
+                          {new Date(log.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+            <p className="text-[10px] text-white/20 mt-4 italic flex items-center gap-1.5">
+              <Shield className="w-3 h-3" /> If you receive an Internal Server Error, provide the 8-character reference ID to support for troubleshooting.
+            </p>
           </CardContent>
         </Card>
       </div>
-
-      {/* Base URL reference */}
-      <Card className="bg-white/3 border-white/8">
-        <CardHeader>
-          <CardTitle className="text-sm font-bold uppercase tracking-widest text-white/40">Base Endpoint</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="flex items-center gap-2">
-            <code className="font-mono text-xs text-emerald-400 bg-black/30 px-3 py-2 rounded-lg flex-1 truncate">
-              {BASE_URL}
-            </code>
-            <Button variant="secondary" size="icon" className="shrink-0" onClick={() => copyToClipboard(BASE_URL)}>
-              <Copy className="w-4 h-4" />
-            </Button>
-          </div>
-            <p className="text-xs text-white/30 mt-2">Always include your key in the <code className="text-sky-400">Authorization: Bearer</code> header.</p>
-        </CardContent>
-      </Card>
     </div>
   );
 };

@@ -33,6 +33,7 @@ interface APIUser {
   email: string;
   api_key_prefix: string | null;
   api_key_hash: string | null;
+  api_secret_key_hash: string | null;
   api_access_enabled: boolean;
   api_rate_limit: number;
   api_allowed_actions: string[] | null;
@@ -414,23 +415,24 @@ const AdminAPIUsers = () => {
                       )}
                     </div>
 
-                    {/* API Key display — prefix shown, full key is hashed and never stored */}
-                    <div className="flex items-center gap-2 min-w-0 flex-1 md:max-w-xs">
-                      {hasKey ? (
-                        <>
-                          <code className="text-xs font-mono text-amber-300/80 bg-white/5 px-2 py-1 rounded truncate flex-1">
-                            {maskedKey}
-                          </code>
-                          <button
-                            onClick={() => { navigator.clipboard.writeText(user.api_key_prefix ?? ""); toast({ title: "Key prefix copied" }); }}
-                            className="p-1 rounded hover:bg-white/10 transition shrink-0"
-                            title="Copy prefix"
-                          >
-                            <Copy className="w-3.5 h-3.5 text-white/40" />
-                          </button>
-                        </>
-                      ) : (
-                        <span className="text-xs text-white/30 italic">No key generated</span>
+                      {/* API Key display — prefix shown, full key is hashed and never stored */}
+                    <div className="flex flex-col gap-1 flex-1 md:max-w-xs min-w-0">
+                      <div className="flex items-center gap-2">
+                        {hasKey ? (
+                          <>
+                            <code className="text-[10px] font-mono text-amber-300/80 bg-white/5 px-2 py-0.5 rounded truncate flex-1" title="API Key Prefix">
+                              {user.api_key_prefix}•••
+                            </code>
+                            <Badge variant="outline" className="border-emerald-500/20 text-emerald-500 text-[8px] h-4 px-1">
+                              HMAC SET
+                            </Badge>
+                          </>
+                        ) : (
+                          <span className="text-xs text-white/30 italic">No key generated</span>
+                        )}
+                      </div>
+                      {hasKey && user.api_secret_key_hash && (
+                        <p className="text-[9px] text-white/20 truncate font-mono">Secret: {user.api_secret_key_hash.slice(0, 8)}•••</p>
                       )}
                     </div>
 

@@ -13,8 +13,8 @@ interface AuditLog {
   profiles: { full_name: string } | null;
 }
 
-const AdminAuditLogs = () => {
-  const [logs, setLogs] = useState<AuditLog[]>([]);
+  const [logType, setLogType] = useState<"audit" | "api">("audit");
+  const [logs, setLogs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [hasMore, setHasMore] = useState(true);
   const [page, setPage] = useState(0);
@@ -32,8 +32,9 @@ const AdminAuditLogs = () => {
       const from = currentPage * PAGE_SIZE;
       const to = from + PAGE_SIZE - 1;
 
+      const table = logType === "audit" ? "audit_logs" : "api_logs";
       const { data: logData, error: logError } = await supabase
-        .from("audit_logs")
+        .from(table)
         .select("*")
         .order("created_at", { ascending: false })
         .range(from, to);
@@ -41,24 +42,26 @@ const AdminAuditLogs = () => {
       if (logError) throw logError;
 
       if (logData && logData.length > 0) {
-        const adminIds = [...new Set(logData.map(l => l.admin_id).filter(Boolean))];
-        let profileMap: Record<string, string> = {};
-        if (adminIds.length > 0) {
-          const { data: profileData } = await supabase
-            .from("profiles")
-            .select("user_id, full_name")
-            .in("user_id", adminIds);
-          if (profileData) {
-            profileMap = profileData.reduce((acc, curr) => ({ ...acc, [curr.user_id]: curr.full_name }), {});
+        let enrichedLogs = logData;
+        if (logType === "audit") {
+          const adminIds = [...new Set(logData.map(l => l.admin_id).filter(Boolean))];
+          let profileMap: Record<string, string> = {};
+          if (adminIds.length > 0) {
+            const { data: profileData } = await supabase.from("profiles").select("user_id, full_name").in("user_id", adminIds);
+            if (profileData) profileMap = profileData.reduce((acc, curr) => ({ ...acc, [curr.user_id]: curr.full_name }), {});
           }
+          enrichedLogs = logData.map(log => ({ ...log, profiles: log.admin_id ? { full_name: profileMap[log.admin_id] || "Unknown Admin" } : null }));
+        } else {
+          const userIds = [...new Set(logData.map(l => l.user_id).filter(Boolean))];
+          let profileMap: Record<string, string> = {};
+          if (userIds.length > 0) {
+            const { data: profileData } = await supabase.from("profiles").select("user_id, full_name").in("user_id", userIds);
+            if (profileData) profileMap = profileData.reduce((acc, curr) => ({ ...acc, [curr.user_id]: curr.full_name }), {});
+          }
+          enrichedLogs = logData.map(log => ({ ...log, profiles: log.user_id ? { full_name: profileMap[log.user_id] || "API Client" } : null }));
         }
 
-        const enrichedLogs = logData.map(log => ({
-          ...log,
-          profiles: log.admin_id ? { full_name: profileMap[log.admin_id] || "Unknown Admin" } : null
-        }));
-
-        setLogs(prev => isLoadMore ? [...prev, ...enrichedLogs] : enrichedLogs as any[]);
+        setLogs(prev => isLoadMore ? [...prev, ...enrichedLogs] : enrichedLogs);
         setHasMore(logData.length === PAGE_SIZE);
         if (isLoadMore) setPage(currentPage);
       } else {
@@ -66,7 +69,7 @@ const AdminAuditLogs = () => {
         setHasMore(false);
       }
     } catch (err: any) {
-      setError(err.message || "Could not load audit logs.");
+      setError(err.message || "Could not load logs.");
     } finally {
       setLoading(false);
     }
@@ -74,54 +77,36 @@ const AdminAuditLogs = () => {
 
   useEffect(() => {
     fetchLogs();
-
-    // Enable Realtime Subscription for Live Updates
-    const channel = supabase
-      .channel("audit-logs-live")
-      .on(
-        "postgres_changes",
-        { event: "INSERT", schema: "public", table: "audit_logs" },
-        async (payload) => {
-          const newLog = payload.new as any;
-          
-          // Fetch the admin name for the new log
-          let adminName = "Unknown Admin";
-          if (newLog.admin_id) {
-            const { data: profile } = await supabase
-              .from("profiles")
-              .select("full_name")
-              .eq("user_id", newLog.admin_id)
-              .maybeSingle();
-            if (profile) adminName = profile.full_name;
-          }
-
-          const enrichedLog = {
-            ...newLog,
-            profiles: newLog.admin_id ? { full_name: adminName } : null
-          };
-
-          setLogs(prev => [enrichedLog, ...prev].slice(0, 100));
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [logType]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const formatAction = (action: string) => {
+    if (!action) return "Unknown";
     return action.split("_").map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(" ");
   };
 
   return (
-    <div className="space-y-6 max-w-5xl pb-10">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <div>
-            <h1 className="font-display text-2xl font-bold">Audit Logs</h1>
-            <p className="text-sm text-muted-foreground mt-1">Track all administrative actions for security and compliance.</p>
-          </div>
+    <div className="space-y-6 max-w-6xl pb-10">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <h1 className="font-display text-2xl font-bold">System Logs</h1>
+          <p className="text-sm text-muted-foreground mt-1">Audit administrative actions and API activity.</p>
+        </div>
+        
+        <div className="flex items-center gap-2 bg-white/5 p-1 rounded-xl border border-white/10">
+          <button 
+            onClick={() => setLogType("audit")}
+            className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${logType === "audit" ? "bg-amber-500 text-black shadow-lg" : "text-white/40 hover:text-white"}`}
+          >
+            Admin Actions
+          </button>
+          <button 
+            onClick={() => setLogType("api")}
+            className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${logType === "api" ? "bg-sky-500 text-black shadow-lg" : "text-white/40 hover:text-white"}`}
+          >
+            API Activity
+          </button>
+        </div>
+      </div>
           <div className="hidden sm:flex items-center gap-2 px-3 py-1 rounded-full bg-green-500/10 border border-green-500/20">
             <span className="relative flex h-2 w-2">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
@@ -188,14 +173,13 @@ const AdminAuditLogs = () => {
           ) : (
             <>
               {/* Desktop View */}
-              <div className="hidden md:block rounded-md border border-white/5 overflow-hidden">
                 <Table>
                   <TableHeader>
                     <TableRow className="bg-white/5 hover:bg-white/5 border-white/5">
                       <TableHead className="w-[180px] text-white/50 uppercase text-[10px] font-black tracking-widest">Timestamp</TableHead>
-                      <TableHead className="text-white/50 uppercase text-[10px] font-black tracking-widest">Admin</TableHead>
-                      <TableHead className="text-white/50 uppercase text-[10px] font-black tracking-widest">Action</TableHead>
-                      <TableHead className="text-white/50 uppercase text-[10px] font-black tracking-widest">Details</TableHead>
+                      <TableHead className="text-white/50 uppercase text-[10px] font-black tracking-widest">{logType === "audit" ? "Admin" : "Agent / Client"}</TableHead>
+                      <TableHead className="text-white/50 uppercase text-[10px] font-black tracking-widest">{logType === "audit" ? "Action" : "Endpoint / Ref"}</TableHead>
+                      <TableHead className="text-white/50 uppercase text-[10px] font-black tracking-widest">{logType === "audit" ? "Details" : "Error Message"}</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -205,15 +189,22 @@ const AdminAuditLogs = () => {
                           {new Date(log.created_at).toLocaleString()}
                         </TableCell>
                         <TableCell className="font-semibold text-sm text-white/90">
-                          {log.profiles?.full_name || "System"}
+                          {log.profiles?.full_name || (logType === "audit" ? "System" : "API Client")}
                         </TableCell>
                         <TableCell>
-                          <Badge variant="outline" className="font-mono text-[10px] bg-amber-400/5 text-amber-400 border-amber-400/20">
-                            {formatAction(log.action)}
-                          </Badge>
+                          {logType === "audit" ? (
+                            <Badge variant="outline" className="font-mono text-[10px] bg-amber-400/5 text-amber-400 border-amber-400/20">
+                              {formatAction(log.action)}
+                            </Badge>
+                          ) : (
+                            <div className="space-y-1">
+                              <p className="font-mono text-[10px] text-white/70">{log.method} {log.endpoint}</p>
+                              <code className="text-[10px] text-sky-400 bg-sky-400/5 px-1 rounded">{log.log_reference}</code>
+                            </div>
+                          )}
                         </TableCell>
                         <TableCell className="text-[11px] text-muted-foreground max-w-[300px] truncate group hover:text-white transition-colors cursor-help">
-                          {JSON.stringify(log.details)}
+                          {logType === "audit" ? JSON.stringify(log.details) : log.error_message}
                         </TableCell>
                       </TableRow>
                     ))}
@@ -228,15 +219,21 @@ const AdminAuditLogs = () => {
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
                         <p className="text-[10px] text-white/30 font-mono mb-1">{new Date(log.created_at).toLocaleString()}</p>
-                        <p className="font-bold text-sm text-white/90">{log.profiles?.full_name || "System"}</p>
+                        <p className="font-bold text-sm text-white/90">{log.profiles?.full_name || (logType === "audit" ? "System" : "API Client")}</p>
                       </div>
-                      <Badge variant="outline" className="font-mono text-[9px] bg-amber-400/5 text-amber-400 border-amber-400/20 shrink-0">
-                        {formatAction(log.action)}
-                      </Badge>
+                      {logType === "audit" ? (
+                        <Badge variant="outline" className="font-mono text-[9px] bg-amber-400/5 text-amber-400 border-amber-400/20 shrink-0">
+                          {formatAction(log.action)}
+                        </Badge>
+                      ) : (
+                        <Badge variant="outline" className="font-mono text-[9px] bg-sky-400/5 text-sky-400 border-sky-400/20 shrink-0">
+                          {log.log_reference}
+                        </Badge>
+                      )}
                     </div>
                     <div className="bg-black/20 p-3 rounded-lg border border-white/5">
-                      <p className="text-[10px] text-white/40 font-mono break-all line-clamp-3 group-hover:line-clamp-none transition-all">
-                        {JSON.stringify(log.details)}
+                      <p className="text-[10px] text-white/40 font-mono break-all line-clamp-3">
+                        {logType === "audit" ? JSON.stringify(log.details) : `${log.method} ${log.endpoint} - ${log.error_message}`}
                       </p>
                     </div>
                   </div>
