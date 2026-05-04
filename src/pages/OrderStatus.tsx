@@ -13,6 +13,7 @@ import { useAppTheme } from "@/contexts/ThemeContext";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import SEO from "@/components/SEO";
+import html2canvas from "html2canvas";
 
 type OrderStatusType = "pending" | "paid" | "processing" | "fulfilled" | "fulfillment_failed" | "error" | "not_paid";
 
@@ -82,6 +83,8 @@ const OrderStatus = () => {
   const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
   const [searchPhone, setSearchPhone] = useState("");
   const [showReceipt, setShowReceipt] = useState(false);
+  const [isDownloading, setIsDownloading] = useState(false);
+  const receiptRef = useRef<HTMLDivElement>(null);
 
   const meta = getStatusMeta(orderStatus, failed, statusMessage);
 
@@ -144,6 +147,29 @@ const OrderStatus = () => {
     } else {
       navigator.clipboard.writeText(text);
       toast.success("Receipt copied to clipboard!");
+    }
+  };
+
+  const downloadReceipt = async () => {
+    if (!receiptRef.current) return;
+    setIsDownloading(true);
+    try {
+      const canvas = await html2canvas(receiptRef.current, {
+        backgroundColor: "#0F0F12",
+        scale: 2,
+        logging: false,
+        useCORS: true
+      });
+      const link = document.createElement("a");
+      link.download = `SwiftData-Receipt-${reference.slice(0, 8)}.png`;
+      link.href = canvas.toDataURL("image/png");
+      link.click();
+      toast.success("Receipt saved to your device!");
+    } catch (err) {
+      console.error("Download error:", err);
+      toast.error("Could not save receipt image. Try copying text instead.");
+    } finally {
+      setIsDownloading(false);
     }
   };
 
@@ -304,7 +330,7 @@ const OrderStatus = () => {
                       </button>
                     </div>
 
-                    <div className="bg-white/[0.02] border border-white/5 rounded-3xl p-6 space-y-4 font-mono">
+                    <div ref={receiptRef} className="bg-[#0F0F12] border border-white/5 rounded-3xl p-6 space-y-4 font-mono">
                       <div className="text-center pb-4 border-b border-dashed border-white/10">
                         <p className="text-sm font-black text-white mb-1 uppercase tracking-widest">SwiftData Ghana</p>
                         <p className="text-[10px] text-white/30">{new Date().toLocaleString()}</p>
@@ -351,11 +377,12 @@ const OrderStatus = () => {
                         Copy Text
                       </button>
                       <button 
-                        onClick={() => window.print()}
-                        className="h-12 rounded-2xl bg-white/5 border border-white/10 hover:bg-white/10 text-white/60 font-bold text-xs flex items-center justify-center gap-2 transition-all active:scale-95"
+                        onClick={downloadReceipt}
+                        disabled={isDownloading}
+                        className="h-12 rounded-2xl bg-white/5 border border-white/10 hover:bg-white/10 text-white/60 font-bold text-xs flex items-center justify-center gap-2 transition-all active:scale-95 disabled:opacity-50"
                       >
-                        <RefreshCw className="w-4 h-4" />
-                        Save PDF
+                        {isDownloading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Package className="w-4 h-4" />}
+                        Save Image
                       </button>
                     </div>
                   </div>
