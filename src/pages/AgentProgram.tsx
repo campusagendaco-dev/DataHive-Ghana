@@ -7,6 +7,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { getAppBaseUrl } from "@/lib/app-base-url";
 import { invokePublicFunction } from "@/lib/public-function-client";
+import SEO from "@/components/SEO";
 
 const benefits = [
   { icon: TrendingUp, title: "Set Your Own Profit", desc: "Set your reseller prices above our wholesale base and keep the margin." },
@@ -138,6 +139,12 @@ const AgentProgram = () => {
 
   return (
     <div className="min-h-screen pt-24 pb-16 px-4">
+      <SEO 
+        title="Become a Data Reseller Agent — Start Your Business"
+        description="Launch your own data reselling business in Ghana. Unlock wholesale prices for MTN, Telecel & AirtelTigo and get your own branded store."
+        keywords="data reseller Ghana, start data business, wholesale MTN data, agent program Ghana"
+        canonical="https://swiftdatagh.com/agent-program"
+      />
       <div className="container mx-auto max-w-4xl">
         <div className="text-center mb-16">
           <h1 className="font-display text-3xl md:text-5xl font-black mb-4">

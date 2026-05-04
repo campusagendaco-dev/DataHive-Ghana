@@ -10,6 +10,7 @@ import PhoneOrderTracker from "@/components/PhoneOrderTracker";
 import StoreVisitorPopup from "@/components/StoreVisitorPopup";
 import PromoCarousel from "@/components/PromoCarousel";
 import { useAuth } from "@/hooks/useAuth";
+import SEO from "@/components/SEO";
 
 // ─── Data ─────────────────────────────────────────────────────────────────────
 const NETWORK_CARDS = [
@@ -263,6 +264,12 @@ const Index = () => {
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-[#030305] text-gray-900 dark:text-white">
+      <SEO 
+        title="SwiftData Ghana | Cheapest MTN, Telecel & AirtelTigo Data Bundles — Instant Delivery"
+        description="Buy cheap non-expiry MTN, Telecel & AirtelTigo data bundles in Ghana. Instant delivery in 5 seconds, no account needed. Best prices guaranteed."
+        keywords="SwiftData Ghana, buy data Ghana, cheap MTN data, cheap Telecel data, cheap AirtelTigo data, non-expiry bundles Ghana"
+        canonical="https://swiftdatagh.com/"
+      />
 
       {/* First-visit agent popup — shown once per session, admin-toggleable */}
       <StoreVisitorPopup agentSlug="home" showSubAgentLink={false} />

@@ -11,6 +11,7 @@ import { fetchApiPricingContext, applyPriceMultiplier } from "@/lib/api-source-p
 import { invokePublicFunction } from "@/lib/public-function-client";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAppTheme } from "@/contexts/ThemeContext";
+import SEO from "@/components/SEO";
 
 const NETWORK_GLASS_ACTIVE: Record<string, Record<string, string>> = {
   MTN: {
@@ -289,6 +290,12 @@ const BuyData = () => {
 
   return (
     <div className={`min-h-screen pt-20 transition-all duration-300 ${selectedPkg ? "pb-44" : "pb-24 sm:pb-20"}`}>
+      <SEO 
+        title="Buy Cheap Data Bundles — MTN, Telecel & AirtelTigo"
+        description="Select your network and buy cheap non-expiry data bundles in Ghana. We support MTN, Telecel and AirtelTigo with instant delivery."
+        keywords="buy MTN data Ghana, buy Telecel data, buy AirtelTigo data, cheap data bundles, non-expiry data"
+        canonical="https://swiftdatagh.com/buy-data"
+      />
       {/* Hero header */}
       <div className="text-white py-10 px-4 mb-6" style={{ background: theme.heroHex }}>
         <div className="container mx-auto max-w-5xl">

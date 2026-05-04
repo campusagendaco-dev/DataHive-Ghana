@@ -12,6 +12,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useAppTheme } from "@/contexts/ThemeContext";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import SEO from "@/components/SEO";
 
 type OrderStatusType = "pending" | "paid" | "processing" | "fulfilled" | "fulfillment_failed" | "error" | "not_paid";
 
@@ -195,6 +196,12 @@ const OrderStatus = () => {
   if (reference) {
     return (
       <div className="min-h-screen bg-black flex flex-col items-center justify-center p-6 font-sans antialiased">
+        <SEO 
+          title="Track Order Status — SwiftData Ghana"
+          description="Track the real-time delivery status of your data bundle purchase. Enter your reference ID to see payment and fulfillment progress."
+          keywords="track data order Ghana, order status SwiftData, data delivery status"
+          canonical={`https://swiftdatagh.com/order-status?reference=${reference}`}
+        />
         <div className="w-full max-w-[340px]">
           <div className="relative overflow-hidden rounded-[2.5rem] bg-white/[0.03] border border-white/10 backdrop-blur-3xl shadow-2xl">
             <div className="absolute inset-0 bg-gradient-to-br from-white/[0.02] to-transparent pointer-events-none" />
@@ -368,6 +375,12 @@ const OrderStatus = () => {
   // --- RENDER GLOBAL SYSTEM TRACKER ---
   return (
     <div className="min-h-screen bg-[#050505] text-white selection:bg-amber-500/30 font-sans antialiased">
+      <SEO 
+        title="Live Delivery Scanner — Order Tracking"
+        description="View live data bundle deliveries and track your orders in real-time. Ghana's most transparent data vending platform."
+        keywords="live data scanner, track data delivery Ghana, real-time data tracking"
+        canonical="https://swiftdatagh.com/order-status"
+      />
       <div className="fixed inset-0 pointer-events-none overflow-hidden">
         <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-amber-500/5 rounded-full blur-[120px]" />
         <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-blue-500/5 rounded-full blur-[120px]" />
