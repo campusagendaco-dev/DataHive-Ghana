@@ -13,8 +13,16 @@ serve(async (req: Request) => {
 
   const body = await req.json();
   const { action, payload } = body;
+  
+  // Robust RP ID detection
   const origin = req.headers.get("origin") || req.headers.get("referer");
-  const originHost = origin ? new URL(origin).hostname : null;
+  let originHost = null;
+  try {
+    if (origin) originHost = new URL(origin).hostname;
+  } catch (e) {
+    console.error("Invalid origin:", origin);
+  }
+  
   const rpId = body.rpId || payload?.rpId || originHost || req.headers.get("host")?.split(":")[0] || "localhost";
   const authHeader = req.headers.get("Authorization")!;
   
