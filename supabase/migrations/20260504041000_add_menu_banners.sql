@@ -9,19 +9,15 @@ CREATE TABLE IF NOT EXISTS public.menu_banners (
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Enable RLS
+-- Policies
 ALTER TABLE public.menu_banners ENABLE ROW LEVEL SECURITY;
 
--- Policies
+DROP POLICY IF EXISTS "Public Read Access for Menu Banners" ON public.menu_banners;
 CREATE POLICY "Public Read Access for Menu Banners" ON public.menu_banners
     FOR SELECT TO public USING (is_active = TRUE);
 
+DROP POLICY IF EXISTS "Admin Manage Menu Banners" ON public.menu_banners;
 CREATE POLICY "Admin Manage Menu Banners" ON public.menu_banners
-    FOR ALL USING (
-        EXISTS (
-            SELECT 1 FROM public.user_roles
-            WHERE user_id = auth.uid() AND role = 'admin'
-        )
-    );
+    FOR ALL USING (public.has_role(auth.uid(), 'admin'));
 
 -- Storage bucket is already created as 'promo-banners', we can reuse it

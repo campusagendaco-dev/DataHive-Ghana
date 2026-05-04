@@ -14,21 +14,16 @@ CREATE TABLE IF NOT EXISTS public.promo_banners (
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Enable RLS
+-- Policies
 ALTER TABLE public.promo_banners ENABLE ROW LEVEL SECURITY;
 
--- Public can view active banners
+DROP POLICY IF EXISTS "Public can view active banners" ON public.promo_banners;
 CREATE POLICY "Public can view active banners" ON public.promo_banners
     FOR SELECT USING (is_active = TRUE);
 
--- Admins can do everything
+DROP POLICY IF EXISTS "Admins can manage promo banners" ON public.promo_banners;
 CREATE POLICY "Admins can manage promo banners" ON public.promo_banners
-    FOR ALL USING (
-        EXISTS (
-            SELECT 1 FROM public.user_roles
-            WHERE user_id = auth.uid() AND role = 'admin'
-        )
-    );
+    FOR ALL USING (public.has_role(auth.uid(), 'admin'));
 
 -- Create storage bucket for promo banners if it doesn't exist
 INSERT INTO storage.buckets (id, name, public) 
@@ -37,16 +32,13 @@ ON CONFLICT (id) DO NOTHING;
 
 -- Storage policies for promo banners
 -- Allow public to read
+DROP POLICY IF EXISTS "Public Read Access" ON storage.objects;
 CREATE POLICY "Public Read Access" ON storage.objects
     FOR SELECT TO public USING (bucket_id = 'promo-banners');
 
 -- Allow admins to upload/manage
+DROP POLICY IF EXISTS "Admin Manage Banners" ON storage.objects;
 CREATE POLICY "Admin Manage Banners" ON storage.objects
     FOR ALL TO authenticated USING (
-        bucket_id = 'promo-banners' AND (
-            EXISTS (
-                SELECT 1 FROM public.user_roles
-                WHERE user_id = auth.uid() AND role = 'admin'
-            )
-        )
+        bucket_id = 'promo-banners' AND public.has_role(auth.uid(), 'admin')
     );

@@ -16,13 +16,7 @@ CREATE POLICY "Admins can view all api logs"
   ON public.api_logs
   FOR ALL
   TO authenticated
-  USING (
-    EXISTS (
-      SELECT 1 FROM public.profiles
-      WHERE user_id = auth.uid()
-      AND (is_admin = true OR is_super_admin = true)
-    )
-  );
+  USING (public.has_role(auth.uid(), 'admin'));
 
 -- 4. View for Agents (Filtered by RLS)
 CREATE OR REPLACE VIEW api.v_logs AS

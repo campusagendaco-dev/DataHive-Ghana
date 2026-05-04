@@ -1,8 +1,12 @@
 -- ADD API TESTING MODE
+-- Failsafe: Ensure columns exist before updating views/functions
+ALTER TABLE public.profiles 
+  ADD COLUMN IF NOT EXISTS api_custom_prices JSONB DEFAULT '{}'::jsonb;
 ALTER TABLE public.profiles 
   ADD COLUMN IF NOT EXISTS api_test_mode BOOLEAN DEFAULT false;
 
 -- Update API Views
+DROP VIEW IF EXISTS api.v_profiles;
 CREATE OR REPLACE VIEW api.v_profiles AS
 SELECT 
   user_id,
