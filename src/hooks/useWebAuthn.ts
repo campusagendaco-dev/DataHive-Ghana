@@ -90,7 +90,8 @@ export function useWebAuthn() {
   const register = async (deviceName = "My Device"): Promise<void> => {
     const options = await invoke("registration-options", { 
       displayName: deviceName,
-      rpId: window.location.hostname
+      rpId: window.location.hostname,
+      payload: { rpId: window.location.hostname } 
     });
     const response = await startRegistration({ optionsJSON: options });
     await invoke("verify-registration", { response, deviceName });

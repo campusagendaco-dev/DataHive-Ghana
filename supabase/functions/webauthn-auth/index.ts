@@ -23,7 +23,7 @@ serve(async (req: Request) => {
     console.error("Invalid origin:", origin);
   }
   
-  const rpId = body.rpId || payload?.rpId || originHost || req.headers.get("host")?.split(":")[0] || "localhost";
+  const rpId = body.rpId || payload?.rpId || originHost || req.headers.get("x-forwarded-host") || req.headers.get("host")?.split(":")[0] || "localhost";
   const authHeader = req.headers.get("Authorization")!;
   
   const supabaseClient = createClient(
