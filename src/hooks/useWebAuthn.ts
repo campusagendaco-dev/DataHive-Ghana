@@ -91,7 +91,7 @@ export function useWebAuthn() {
     console.log("Registering biometric for RP ID:", window.location.hostname);
     const options = await invoke("registration-options", { 
       displayName: deviceName,
-      rpId: window.location.hostname,
+      requested_rp_id: window.location.hostname,
       payload: { rpId: window.location.hostname } 
     });
     const response = await startRegistration({ optionsJSON: options });

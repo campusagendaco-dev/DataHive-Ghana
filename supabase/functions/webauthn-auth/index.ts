@@ -23,13 +23,15 @@ serve(async (req: Request) => {
     console.error("Invalid origin:", origin);
   }
   
-  let rpId = body.rpId || payload?.rpId || originHost || req.headers.get("x-forwarded-host") || req.headers.get("host")?.split(":")[0] || "localhost";
+  let rpId = body.requested_rp_id || body.rpId || payload?.rpId || originHost || req.headers.get("x-forwarded-host") || req.headers.get("host")?.split(":")[0] || "swiftdatagh.com";
   
   // Security Fix: Supabase Edge Functions often report their internal host. 
   // We MUST use the client's actual domain for WebAuthn to work.
   if (rpId.includes("supabase.co") || rpId.includes("supabase.com") || rpId === "localhost") {
     if (originHost && !originHost.includes("supabase")) {
       rpId = originHost;
+    } else if (body.requested_rp_id) {
+      rpId = body.requested_rp_id;
     } else if (body.rpId) {
       rpId = body.rpId;
     }
