@@ -17,9 +17,45 @@ export interface WebAuthnCredential {
 }
 
 export function useWebAuthn() {
-  const isSupported = typeof window !== "undefined" && browserSupportsWebAuthn();
+  const [supportReason, setSupportReason] = useState<string | null>(null);
+  const [isSupported, setIsSupported] = useState(false);
   const [credentials, setCredentials] = useState<WebAuthnCredential[]>([]);
   const [loadingCredentials, setLoadingCredentials] = useState(true);
+
+  useEffect(() => {
+    const checkSupport = async () => {
+      if (typeof window === "undefined") return;
+
+      if (!window.isSecureContext) {
+        setSupportReason("Security Error: Biometrics require a secure (HTTPS) connection.");
+        setIsSupported(false);
+        return;
+      }
+
+      if (!browserSupportsWebAuthn()) {
+        setSupportReason("Hardware Error: Your browser does not support biometric APIs. Try Chrome, Safari, or Edge.");
+        setIsSupported(false);
+        return;
+      }
+
+      try {
+        // Deep check for actual hardware (TouchID/FaceID)
+        const hasHardware = await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable();
+        if (!hasHardware) {
+          setSupportReason("Device Error: No biometric hardware (Fingerprint/Face ID) detected on this device.");
+          setIsSupported(false);
+          return;
+        }
+      } catch (e) {
+        console.error("WebAuthn Hardware Check Error:", e);
+      }
+
+      setIsSupported(true);
+      setSupportReason(null);
+    };
+
+    checkSupport();
+  }, []);
 
   const getToken = async (): Promise<string> => {
     const { data } = await supabase.auth.getSession();
@@ -72,6 +108,7 @@ export function useWebAuthn() {
 
   return {
     isSupported,
+    supportReason,
     credentials,
     loadingCredentials,
     fetchCredentials,

@@ -25,7 +25,7 @@ const DashboardAccountSettings = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [updatingPassword, setUpdatingPassword] = useState(false);
 
-  const { isSupported, credentials, loadingCredentials, register, deleteCredential } = useWebAuthn();
+  const { isSupported, supportReason, credentials, loadingCredentials, register, deleteCredential } = useWebAuthn();
   const [registering, setRegistering] = useState(false);
   const [deviceName, setDeviceName] = useState("My Device");
 
@@ -304,8 +304,9 @@ const DashboardAccountSettings = () => {
             </CardHeader>
             <CardContent className="space-y-5">
               {!isSupported && (
-                <div className="rounded-xl bg-amber-500/10 border border-amber-500/20 p-4 text-sm text-amber-300">
-                  Your browser or device does not support WebAuthn. Try Chrome / Safari on a modern device.
+                <div className="rounded-xl bg-amber-500/10 border border-amber-500/20 p-4 text-sm text-amber-300 flex items-start gap-3">
+                  <Shield className="w-5 h-5 shrink-0 mt-0.5" />
+                  <p>{supportReason || "Biometric authentication is not available on this browser."}</p>
                 </div>
               )}
 
