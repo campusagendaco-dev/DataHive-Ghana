@@ -346,7 +346,7 @@ const AdminSettings = () => {
   }
 
   return (
-    <div className="space-y-6 max-w-4xl pb-10">
+    <div className="space-y-6 max-w-4xl pb-4">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="font-display text-2xl font-bold">System Settings</h1>

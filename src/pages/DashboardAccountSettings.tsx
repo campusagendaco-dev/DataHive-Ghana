@@ -107,7 +107,7 @@ const DashboardAccountSettings = () => {
   };
 
   return (
-    <div className="p-4 sm:p-6 lg:p-8 space-y-8 max-w-4xl mx-auto pb-10">
+    <div className="p-2 sm:p-4 lg:p-6 space-y-4 max-w-4xl mx-auto pb-10">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="font-display text-2xl font-black tracking-tight">Account Settings</h1>
@@ -168,7 +168,7 @@ const DashboardAccountSettings = () => {
 
         {/* Right Column: Form */}
         <div className="lg:col-span-2">
-          <Card className="border-none bg-card shadow-sm h-full">
+          <Card className="border-none bg-card shadow-sm">
             <CardHeader>
               <CardTitle className="text-lg font-bold">Profile Details</CardTitle>
               <CardDescription>Update your public information used across the platform.</CardDescription>

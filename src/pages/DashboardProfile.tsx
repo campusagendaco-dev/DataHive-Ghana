@@ -71,7 +71,7 @@ const DashboardProfile = () => {
   const accountId = (profile as any)?.topup_reference || "PENDING";
 
   return (
-    <div className="min-h-screen pb-24">
+    <div className="min-h-screen pb-6">
       <div className="relative h-48 sm:h-64 bg-gradient-to-br from-indigo-600 via-purple-600 to-pink-500 overflow-hidden">
         <div className="absolute inset-0 bg-black/20" />
         <div className="absolute inset-0 backdrop-blur-[2px]" />

@@ -94,7 +94,7 @@ const DashboardSettings = () => {
     : null;
 
   return (
-    <div className="p-6 md:p-8 max-w-2xl">
+    <div className="p-4 md:p-6 max-w-2xl">
       <div className="mb-8">
         <h1 className="font-display text-3xl font-bold">Store Settings</h1>
         <p className="text-muted-foreground">Update your store details, contact info, and branding.</p>
