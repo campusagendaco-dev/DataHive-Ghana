@@ -7,21 +7,6 @@ const corsHeaders = {
 };
 import { getActiveProviders, logProviderError } from "../_shared/providers.ts";
 
-async function fetchScannerStats(apiKey: string) {
-  try {
-    const res = await fetch("https://api.datamartgh.shop/api/developer/delivery-tracker", {
-      headers: { "X-API-Key": apiKey }
-    });
-    if (res.ok) {
-      const json = await res.json();
-      return json.data;
-    }
-  } catch (e) {
-    console.error("Failed to fetch scanner stats:", e);
-  }
-  return null;
-}
-
 // --- Utilities ---
 
 function getFirstEnv(...keys: string[]): string {
@@ -77,8 +62,6 @@ async function getProviderCredentials(supabaseAdmin: any): Promise<{ apiKey: str
     "DATA_PROVIDER_BASE_URL",
     "DATA_PROVIDER_PRIMARY_BASE_URL",
   ).replace(/\/+$/, "");
-
-  if (apiKey && baseUrl) return { apiKey, baseUrl };
 
   const { data: settings } = await supabaseAdmin
     .from("system_settings")
@@ -420,7 +403,7 @@ serve(async (req) => {
           
           const isFailed = checkResult.status === "failed" || checkResult.status === "error" || checkResult.status === "refunded";
           if (isFailed) {
-            await supabaseAdmin.from("orders").update({ status: "fulfillment_failed", failure_reason: "Provider reported failure during status check" }).eq("id", reference);
+            await supabaseAdmin.from("orders").update({ status: "fulfillment_failed", failure_reason: "Provider reported failure during status check" }).eq("id", targetReference);
             break; 
           } else {
             return new Response(JSON.stringify({ status: "processing", message: "Still processing", provider_order_id: existingOrder.provider_order_id }), { headers: corsHeaders });
@@ -513,7 +496,7 @@ serve(async (req) => {
     }
 
     if (isInternalPayment || orderType.toLowerCase() === "free_data_claim") {
-      console.log(`[verify-payment] Internal/Free payment confirmed for ${reference}`);
+      console.log(`[verify-payment] Internal/Free payment confirmed for ${targetReference}`);
       verifiedAmount = Number(existingOrder?.amount || 0);
     } else {
       const PAYSTACK_SECRET_KEY = getFirstEnv("PAYSTACK_SECRET_KEY") || paystackSecretKey;
@@ -592,7 +575,7 @@ serve(async (req) => {
       const agentId = claimedOrder.agent_id || metadata?.agent_id;
       if (agentId) {
         await supabaseAdmin.rpc("credit_wallet", { p_agent_id: agentId, p_amount: verifiedAmount });
-        await supabaseAdmin.from("orders").update({ status: "fulfilled" }).eq("id", reference);
+        await supabaseAdmin.from("orders").update({ status: "fulfilled" }).eq("id", targetReference);
       }
       return new Response(JSON.stringify({ status: "fulfilled" }), { headers: corsHeaders });
     }
@@ -616,8 +599,8 @@ serve(async (req) => {
       package_size: packageSize, // Alias
       amount: claimedOrder.amount,
       order_type: currentOrderType,
-      orderReference: reference,
-      reference: reference,      // Alias
+      orderReference: targetReference,
+      reference: targetReference,      // Alias
     };
 
     let result: any = { ok: false, reason: "No providers" };
@@ -637,9 +620,9 @@ serve(async (req) => {
             plan: packageSize,   // DataMart standard
             bundle: packageSize, // Alias
             capacity: String(parseCapacity(packageSize)), 
-            orderReference: reference, 
+            orderReference: targetReference, 
             gateway: "wallet", 
-            reference: reference 
+            reference: targetReference 
           }
         : requestBody;
 
@@ -648,7 +631,7 @@ serve(async (req) => {
         successfulProviderId = provider.id;
         break;
       } else {
-        await logProviderError(supabaseAdmin, provider.id, reference, result.reason);
+        await logProviderError(supabaseAdmin, provider.id, targetReference, result.reason);
       }
     }
 
@@ -671,7 +654,16 @@ serve(async (req) => {
       return new Response(JSON.stringify({ status: "failed", reason: result.reason }), { headers: corsHeaders });
     }
   } catch (error: any) {
-    console.error("[verify-payment] Error:", error);
-    return new Response(JSON.stringify({ error: error?.message || "Internal error" }), { status: 500, headers: corsHeaders });
+    console.error("[verify-payment] CRITICAL ERROR:", error);
+    // Extract the most useful error message
+    const errorMsg = error?.message || (typeof error === 'string' ? error : "Internal fulfillment error");
+    return new Response(JSON.stringify({ 
+      error: errorMsg,
+      stack: error?.stack,
+      hint: "Check environment variables and database RLS policies."
+    }), { 
+      status: 500, 
+      headers: { ...corsHeaders, "Content-Type": "application/json" } 
+    });
   }
 });
