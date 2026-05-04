@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import {
   Wallet, ArrowDownToLine, Loader2, CheckCircle, XCircle, Clock, TrendingUp,
-  ShieldCheck, User, Phone, Activity, RefreshCw, Fingerprint
+  ShieldCheck, User, Phone, Activity, RefreshCw, Fingerprint, Lock, Key
 } from "lucide-react";
 import { useWebAuthn } from "@/hooks/useWebAuthn";
 import {
@@ -52,6 +52,8 @@ const DashboardWithdraw = () => {
   const [loading, setLoading] = useState(true);
   const [withdrawing, setWithdrawing] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [pinDialogOpen, setPinDialogOpen] = useState(false);
+  const [enteredPin, setEnteredPin] = useState("");
   const [biometricScanning, setBiometricScanning] = useState(false);
 
   const { isSupported, credentials, authenticate } = useWebAuthn();
@@ -107,6 +109,19 @@ const DashboardWithdraw = () => {
     const fee = parseFloat((numAmount * WITHDRAWAL_FEE_RATE).toFixed(2));
     const net = numAmount - fee;
 
+    if (profile?.last_security_update) {
+      const lastUpdate = new Date(profile.last_security_update);
+      const now = new Date();
+      const diffHours = (now.getTime() - lastUpdate.getTime()) / (1000 * 60 * 60);
+      if (diffHours < 24) {
+        toast.error("Security Hold Active", { 
+          description: `You recently updated your security settings. Withdrawals are disabled for 24 hours (approx. ${Math.ceil(24 - diffHours)} hours remaining).` 
+        });
+        setWithdrawing(false);
+        return;
+      }
+    }
+
     const { data, error } = await supabase.functions.invoke("agent-withdraw", {
       body: { amount: numAmount },
     });
@@ -116,6 +131,7 @@ const DashboardWithdraw = () => {
     } else {
       toast.success("Withdrawal request placed!", { description: "You will receive your funds within 24 hours." });
       setAmount("");
+      setEnteredPin("");
     }
 
     await fetchData();
@@ -293,6 +309,14 @@ const DashboardWithdraw = () => {
                   } finally {
                     setBiometricScanning(false);
                   }
+                } else if (profile?.transaction_pin) {
+                  setPinDialogOpen(true);
+                  return;
+                } else if (!hasBiometric && !profile?.transaction_pin) {
+                  toast.error("Security Required", { 
+                    description: "Please set a Transaction PIN or Biometric in Account Settings to secure your withdrawals." 
+                  });
+                  return;
                 }
                 setConfirmOpen(true);
               }}
@@ -375,6 +399,48 @@ const DashboardWithdraw = () => {
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction onClick={handleWithdraw}>Submit Request</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+      
+      <AlertDialog open={pinDialogOpen} onOpenChange={setPinDialogOpen}>
+        <AlertDialogContent className="max-w-[340px]">
+          <AlertDialogHeader>
+            <div className="mx-auto w-12 h-12 rounded-full bg-indigo-500/10 flex items-center justify-center mb-2">
+              <Key className="w-6 h-6 text-indigo-500" />
+            </div>
+            <AlertDialogTitle className="text-center">Enter Transaction PIN</AlertDialogTitle>
+            <AlertDialogDescription className="text-center">
+              Verify your identity to authorize this withdrawal.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="py-4">
+            <Input
+              type="password"
+              inputMode="numeric"
+              pattern="[0-9]*"
+              maxLength={4}
+              placeholder="••••"
+              className="h-14 text-center text-2xl tracking-[0.5em] font-black bg-secondary border-white/10"
+              value={enteredPin}
+              onChange={(e) => {
+                const val = e.target.value.replace(/\D/g, "");
+                setEnteredPin(val);
+                if (val.length === 4) {
+                  if (val === profile?.transaction_pin) {
+                    setPinDialogOpen(false);
+                    setConfirmOpen(true);
+                  } else {
+                    toast.error("Incorrect PIN");
+                    setEnteredPin("");
+                  }
+                }
+              }}
+              autoFocus
+            />
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="w-full">Cancel</AlertDialogCancel>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

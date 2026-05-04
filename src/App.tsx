@@ -148,10 +148,43 @@ const SubAgentPendingGuard = ({ children }: { children: React.ReactNode }) => {
 
 /** Admin guard */
 const AdminGuard = ({ children }: { children: React.ReactNode }) => {
-  const { user, isAdmin, loading } = useAuth();
-  if (loading) return <LoadingScreen />;
+  const { user, isAdmin, profile, loading } = useAuth();
+  const [ipAllowed, setIpAllowed] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    if (isAdmin && user) {
+      const checkIp = async () => {
+        try {
+          const { data: roleData } = await supabase
+            .from("user_roles")
+            .select("allowed_ips")
+            .eq("user_id", user.id)
+            .eq("role", "admin")
+            .maybeSingle();
+
+          const allowed = roleData?.allowed_ips as string[] | null;
+          if (!allowed || allowed.length === 0) {
+            setIpAllowed(true);
+            return;
+          }
+
+          const res = await fetch("https://api.ipify.org?format=json");
+          const { ip } = await res.json();
+          setIpAllowed(allowed.includes(ip));
+        } catch (e) {
+          console.error("IP check failed:", e);
+          setIpAllowed(true); // Fallback to allow if API fails, but logged
+        }
+      };
+      checkIp();
+    }
+  }, [isAdmin, user]);
+
+  if (loading || (isAdmin && ipAllowed === null)) return <LoadingScreen />;
   if (!user) return <Navigate to="/login" replace />;
   if (!isAdmin) return <Navigate to="/" replace />;
+  if (ipAllowed === false) return <Navigate to="/ip-blocked" replace />;
+  
   return <>{children}</>;
 };
 

@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { User, Mail, Phone, Shield, Camera, Lock, Eye, EyeOff, Fingerprint, Smartphone, Trash2, Loader2, Plus } from "lucide-react";
+import { User, Mail, Phone, Shield, Camera, Lock, Eye, EyeOff, Fingerprint, Smartphone, Trash2, Key, Loader2, Plus } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useWebAuthn } from "@/hooks/useWebAuthn";
 import { toast } from "sonner";
@@ -28,6 +28,8 @@ const DashboardAccountSettings = () => {
   const { isSupported, supportReason, credentials, loadingCredentials, register, deleteCredential } = useWebAuthn();
   const [registering, setRegistering] = useState(false);
   const [deviceName, setDeviceName] = useState("My Device");
+  const [savingPin, setSavingPin] = useState(false);
+  const [pin, setPin] = useState("");
 
   useEffect(() => {
     setFullName(profile?.full_name || "");
@@ -402,6 +404,73 @@ const DashboardAccountSettings = () => {
                   </div>
                 </>
               )}
+            </CardContent>
+          </Card>
+          {/* ── Transaction PIN ── */}
+          <Card className="border-none bg-card shadow-sm mt-8">
+            <CardHeader>
+              <CardTitle className="text-lg font-bold flex items-center gap-2">
+                <Key className="w-5 h-5 text-indigo-400" />
+                Security Transaction PIN
+              </CardTitle>
+              <CardDescription>
+                Set a 4-digit PIN to authorize withdrawals if biometric is unavailable.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex flex-col sm:flex-row gap-4 items-end">
+                <div className="flex-1 space-y-2">
+                  <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">
+                    {profile?.transaction_pin ? "Update 4-Digit PIN" : "Set 4-Digit PIN"}
+                  </Label>
+                  <div className="relative">
+                    <Input
+                      type="password"
+                      inputMode="numeric"
+                      pattern="[0-9]*"
+                      maxLength={4}
+                      placeholder="••••"
+                      className="h-12 bg-secondary/50 border-white/5 rounded-xl text-center text-xl tracking-[0.5em] font-black"
+                      value={pin}
+                      onChange={(e) => setPin(e.target.value.replace(/\D/g, ""))}
+                    />
+                  </div>
+                </div>
+                <Button 
+                  onClick={async () => {
+                    if (pin.length !== 4) {
+                      toast.error("PIN must be exactly 4 digits");
+                      return;
+                    }
+                    setSavingPin(true);
+                    try {
+                      const { error } = await supabase
+                        .from("profiles")
+                        .update({ 
+                          transaction_pin: pin,
+                          last_security_update: new Date().toISOString() 
+                        })
+                        .eq("user_id", user?.id);
+                      
+                      if (error) throw error;
+                      toast.success("Security PIN Updated!");
+                      setPin("");
+                      refreshProfile();
+                    } catch (e: any) {
+                      toast.error("Could not save PIN", { description: e.message });
+                    } finally {
+                      setSavingPin(false);
+                    }
+                  }}
+                  disabled={savingPin || pin.length !== 4}
+                  className="h-12 px-8 rounded-xl font-bold"
+                >
+                  {savingPin ? <Loader2 className="w-4 h-4 animate-spin" /> : "Save PIN"}
+                </Button>
+              </div>
+              <p className="text-[10px] text-muted-foreground">
+                Note: For security, changing your PIN will trigger a 24-hour hold on withdrawals.
+              </p>
             </CardContent>
           </Card>
         </div>

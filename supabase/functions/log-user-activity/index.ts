@@ -75,6 +75,19 @@ serve(async (req) => {
   }
 
   const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+  
+  // Log to security_logs
+  await supabaseAdmin.from("security_logs").insert({
+    user_id: user.id,
+    action: "login",
+    ip_address: ip,
+    metadata: { 
+      location: location,
+      user_agent: req.headers.get("user-agent")
+    }
+  });
+
+  // Also update standard activity log
   await supabaseAdmin.rpc("log_user_activity", {
     p_user_id: user.id,
     p_ip: ip,

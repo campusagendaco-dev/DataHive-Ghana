@@ -118,6 +118,28 @@ const AdminSettings = () => {
     scrolling_ad_text: "",
   });
 
+  const [currentIp, setCurrentIp] = useState("");
+  const [allowedIps, setAllowedIps] = useState<string[]>([]);
+
+  useEffect(() => {
+    fetch("https://api.ipify.org?format=json")
+      .then(r => r.json())
+      .then(d => setCurrentIp(d.ip))
+      .catch(e => console.error("IP fetch failed:", e));
+
+    if (session?.user.id) {
+      supabase
+        .from("user_roles")
+        .select("allowed_ips")
+        .eq("user_id", session.user.id)
+        .eq("role", "admin")
+        .maybeSingle()
+        .then(({ data }) => {
+          if (data?.allowed_ips) setAllowedIps(data.allowed_ips);
+        });
+    }
+  }, [session?.user.id]);
+
   useEffect(() => {
     const fetchSettings = async () => {
       const { data, error } = await supabase
@@ -1105,6 +1127,73 @@ const AdminSettings = () => {
                   Securely managed via Supabase Secrets
                 </p>
               </div>
+            </CardContent>
+          </Card>
+          <Card className="border-red-500/20 bg-red-500/5">
+            <CardHeader>
+              <CardTitle className="text-lg flex items-center gap-2">
+                <Shield className="w-5 h-5 text-red-500" />
+                Admin IP Lockdown
+              </CardTitle>
+              <CardDescription>
+                Restrict Admin Dashboard access to specific IP addresses. 
+                <span className="block text-red-500 font-bold mt-1 uppercase text-[10px]">Warning: If you enable this, you must include your current IP or you will be locked out!</span>
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="p-3 rounded-xl bg-white/5 border border-white/10 flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Your Current IP</p>
+                  <p className="text-sm font-mono font-bold text-primary">{currentIp || "Detecting..."}</p>
+                </div>
+                <Button 
+                  size="sm" 
+                  variant="outline" 
+                  disabled={!currentIp || allowedIps.includes(currentIp)}
+                  onClick={() => setAllowedIps([...allowedIps, currentIp])}
+                  className="text-[10px] font-black uppercase"
+                >
+                  Whitelist Current IP
+                </Button>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Whitelisted IPs (One per line)</Label>
+                <Textarea 
+                  value={allowedIps.join("\n")}
+                  onChange={(e) => setAllowedIps(e.target.value.split("\n").filter(i => i.trim() !== ""))}
+                  placeholder="e.g. 123.45.67.89"
+                  className="min-h-[100px] font-mono text-xs"
+                />
+                <p className="text-[10px] text-muted-foreground">
+                  Leave empty to allow access from any IP address (Recommended for dynamic IPs).
+                </p>
+              </div>
+
+              <Button 
+                onClick={async () => {
+                  setSaving(true);
+                  try {
+                    const { error } = await supabase
+                      .from("user_roles")
+                      .update({ allowed_ips: allowedIps })
+                      .eq("user_id", session?.user.id)
+                      .eq("role", "admin");
+                    
+                    if (error) throw error;
+                    toast({ title: "IP Restrictions Updated", description: "Your access rules have been saved." });
+                  } catch (e: any) {
+                    toast({ title: "Failed to update IPs", description: e.message, variant: "destructive" });
+                  } finally {
+                    setSaving(false);
+                  }
+                }}
+                disabled={saving}
+                variant="destructive"
+                className="w-full font-bold"
+              >
+                Apply IP Restrictions
+              </Button>
             </CardContent>
           </Card>
         </div>
