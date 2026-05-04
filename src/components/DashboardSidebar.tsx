@@ -29,7 +29,8 @@ import {
   MessageCircle,
   Gift,
   Send,
-  Bot
+  Bot,
+  CalendarClock,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -42,6 +43,7 @@ const userNavItems = [
   { to: "/dashboard/profile", label: "My Profile", icon: User },
   { to: "/dashboard/account-settings", label: "Account & Security", icon: UserCog },
   { to: "/dashboard/wallet", label: "Wallet", icon: Wallet },
+  { to: "/dashboard/schedule", label: "Auto-Renewal", icon: CalendarClock },
   { to: "/dashboard/transactions", label: "Transactions", icon: ClipboardList },
   { to: "/dashboard/buy-data/mtn", label: "Buy Data - MTN", icon: ShoppingCart },
   { to: "/dashboard/buy-data/telecel", label: "Buy Data - Telecel", icon: ShoppingCart },

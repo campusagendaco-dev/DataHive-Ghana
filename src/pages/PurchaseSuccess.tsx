@@ -185,6 +185,14 @@ const PurchaseSuccess = () => {
                   </Button>
                 )}
 
+                {/* Track order — prominent, passes reference so it pre-fills */}
+                <Button asChild className="w-full h-12 rounded-2xl bg-white/8 hover:bg-white/14 border border-white/10 text-white/80 hover:text-white font-bold transition-all">
+                  <Link to={`/order-status?ref=${encodeURIComponent(reference)}`}>
+                    <ReceiptText className="w-4 h-4 mr-2 text-sky-400" />
+                    Track Your Order Live
+                  </Link>
+                </Button>
+
                 <div className="grid grid-cols-2 gap-3">
                   <Button
                     onClick={copyReceipt}
@@ -194,18 +202,13 @@ const PurchaseSuccess = () => {
                     {copied ? <><Check className="w-4 h-4 mr-2" /> Copied</> : <><Copy className="w-4 h-4 mr-2" /> Copy Receipt</>}
                   </Button>
                   <Button asChild variant="outline" className="h-12 rounded-2xl border-white/10 bg-white/5 hover:bg-white/10 text-white/60 font-bold">
-                    <Link to="/order-status">
-                      <ReceiptText className="w-4 h-4 mr-2" />
-                      Track Live
+                    <Link to="/">
+                      <Home className="w-4 h-4 mr-2" />
+                      Home
                     </Link>
                   </Button>
                 </div>
 
-                <div className="flex items-center justify-center pt-4">
-                  <Link to="/" className="text-xs font-bold text-white/20 hover:text-white/60 transition-colors uppercase tracking-widest flex items-center gap-2">
-                    <Home className="w-3.5 h-3.5" /> Back to Homepage
-                  </Link>
-                </div>
               </div>
 
               {/* Footer Banner */}

@@ -3,89 +3,93 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
-import { useEffect, useState } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
 import { AuthProvider, useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import DashboardLayout from "@/components/DashboardLayout";
 import AdminLayout from "@/components/AdminLayout";
-import Index from "./pages/Index";
-import AgentProgram from "./pages/AgentProgram";
-import Dashboard from "./pages/Dashboard";
-import DashboardPricing from "./pages/DashboardPricing";
-import DashboardOrders from "./pages/DashboardOrders";
-import DashboardWithdraw from "./pages/DashboardWithdraw";
-import DashboardWallet from "./pages/DashboardWallet";
-import DashboardFlyer from "./pages/DashboardFlyer";
-import DashboardSettings from "./pages/DashboardSettings";
-import DashboardSubAgents from "./pages/DashboardSubAgents";
-import DashboardResultCheckers from "./pages/DashboardResultCheckers";
-import DashboardBuyDataNetwork from "./pages/DashboardBuyDataNetwork";
-import DashboardBuyAirtime from "./pages/DashboardBuyAirtime";
-import DashboardMyStore from "./pages/DashboardMyStore";
-import DashboardReportIssue from "./pages/DashboardReportIssue";
-import DashboardAccountSettings from "./pages/DashboardAccountSettings";
-import DashboardProfile from "./pages/DashboardProfile";
-import DashboardSubAgentPricing from "./pages/DashboardSubAgentPricing";
-import AuthPage from "./pages/AuthPage";
-import BuyData from "./pages/BuyData";
-import BuyAirtime from "./pages/BuyAirtime";
-import AuthCallback from "./pages/AuthCallback";
 import { ThemeProvider } from "@/contexts/ThemeContext";
 import ThemeSelector from "@/components/ThemeSelector";
 import WhatsAppButton from "@/components/WhatsAppButton";
 import FreeDataButton from "@/components/FreeDataButton";
 import TutorialModal from "@/components/TutorialModal";
-import ForgotPassword from "./pages/ForgotPassword";
-import VerifyOtp from "./pages/VerifyOtp";
-import ResetPassword from "./pages/ResetPassword";
-import AgentPending from "./pages/AgentPending";
-import AgentStore from "./pages/AgentStore";
-import OrderStatus from "./pages/OrderStatus";
-import PurchaseSuccess from "./pages/PurchaseSuccess";
-import DashboardLeaderboard from "./pages/DashboardLeaderboard";
-import AdminOverview from "./pages/AdminOverview";
-import AdminAgents from "./pages/AdminAgents";
-import AdminOrders from "./pages/AdminOrders";
-import AdminUsers from "./pages/AdminUsers";
-import AdminWithdrawals from "./pages/AdminWithdrawals";
-import AdminNotificationsPage from "./pages/AdminNotificationsPage";
-import AdminPackages from "./pages/AdminPackages";
-import AdminWalletTopup from "./pages/AdminWalletTopup";
-import AdminSystemHealth from "./pages/AdminSystemHealth";
-import AdminSettings from "./pages/AdminSettings";
-import AdminAnalytics from "./pages/AdminAnalytics";
-import AdminPromotions from "./pages/AdminPromotions";
-import AdminTickets from "./pages/AdminTickets";
-import AdminAuditLogs from "./pages/AdminAuditLogs";
-import AdminSecurity from "./pages/AdminSecurity";
-import AdminAPIUsers from "./pages/AdminAPIUsers";
-import AdminProfits from "./pages/AdminProfits";
-import AdminEngagement from "./pages/AdminEngagement";
-import AdminReconciliation from "./pages/AdminReconciliation";
-import SubAgentSignup from "./pages/SubAgentSignup";
-import SubAgentPending from "./pages/SubAgentPending";
-import DashboardDeveloperAPI from "./pages/DashboardDeveloperAPI";
-import APIDocumentation from "./pages/APIDocumentation";
-import DeveloperPortal from "./pages/DeveloperPortal";
-import Maintenance from "./pages/Maintenance";
-import IpBlocked from "./pages/IpBlocked";
-import NotFound from "./pages/NotFound";
-import LoadingScreen from "@/components/LoadingScreen";
 import InstallPrompt from "@/components/InstallPrompt";
 import AudioUnlocker from "@/components/AudioUnlocker";
 import NotificationPopup from "@/components/NotificationPopup";
-import DashboardCustomers from "./pages/DashboardCustomers";
-import DashboardMarketing from "./pages/DashboardMarketing";
-import DashboardUtilities from "./pages/DashboardUtilities";
-import DashboardAirtimeCash from "./pages/DashboardAirtimeCash";
-import DashboardReferral from "./pages/DashboardReferral";
 import { OfflineAlert } from "@/components/OfflineAlert";
 import { useRegisterSW } from "virtual:pwa-register/react";
-import DashboardBulk from "./pages/DashboardBulk";
-import DashboardWhatsAppBot from "./pages/DashboardWhatsAppBot";
-import MyOrders from "./pages/MyOrders";
+import LoadingScreen from "@/components/LoadingScreen";
+import IpBlocked from "./pages/IpBlocked";
+import Maintenance from "./pages/Maintenance";
+
+// Route-level code splitting — each page chunk loads only when first visited
+const Index = lazy(() => import("./pages/Index"));
+const AgentProgram = lazy(() => import("./pages/AgentProgram"));
+const Dashboard = lazy(() => import("./pages/Dashboard"));
+const DashboardPricing = lazy(() => import("./pages/DashboardPricing"));
+const DashboardOrders = lazy(() => import("./pages/DashboardOrders"));
+const DashboardWithdraw = lazy(() => import("./pages/DashboardWithdraw"));
+const DashboardWallet = lazy(() => import("./pages/DashboardWallet"));
+const DashboardFlyer = lazy(() => import("./pages/DashboardFlyer"));
+const DashboardSettings = lazy(() => import("./pages/DashboardSettings"));
+const DashboardSubAgents = lazy(() => import("./pages/DashboardSubAgents"));
+const DashboardResultCheckers = lazy(() => import("./pages/DashboardResultCheckers"));
+const DashboardBuyDataNetwork = lazy(() => import("./pages/DashboardBuyDataNetwork"));
+const DashboardBuyAirtime = lazy(() => import("./pages/DashboardBuyAirtime"));
+const DashboardMyStore = lazy(() => import("./pages/DashboardMyStore"));
+const DashboardReportIssue = lazy(() => import("./pages/DashboardReportIssue"));
+const DashboardAccountSettings = lazy(() => import("./pages/DashboardAccountSettings"));
+const DashboardProfile = lazy(() => import("./pages/DashboardProfile"));
+const DashboardSubAgentPricing = lazy(() => import("./pages/DashboardSubAgentPricing"));
+const AuthPage = lazy(() => import("./pages/AuthPage"));
+const BuyData = lazy(() => import("./pages/BuyData"));
+const BuyAirtime = lazy(() => import("./pages/BuyAirtime"));
+const AuthCallback = lazy(() => import("./pages/AuthCallback"));
+const ForgotPassword = lazy(() => import("./pages/ForgotPassword"));
+const VerifyOtp = lazy(() => import("./pages/VerifyOtp"));
+const ResetPassword = lazy(() => import("./pages/ResetPassword"));
+const AgentPending = lazy(() => import("./pages/AgentPending"));
+const AgentStore = lazy(() => import("./pages/AgentStore"));
+const OrderStatus = lazy(() => import("./pages/OrderStatus"));
+const PurchaseSuccess = lazy(() => import("./pages/PurchaseSuccess"));
+const DashboardLeaderboard = lazy(() => import("./pages/DashboardLeaderboard"));
+const AdminOverview = lazy(() => import("./pages/AdminOverview"));
+const AdminAgents = lazy(() => import("./pages/AdminAgents"));
+const AdminOrders = lazy(() => import("./pages/AdminOrders"));
+const AdminUsers = lazy(() => import("./pages/AdminUsers"));
+const AdminWithdrawals = lazy(() => import("./pages/AdminWithdrawals"));
+const AdminNotificationsPage = lazy(() => import("./pages/AdminNotificationsPage"));
+const AdminPackages = lazy(() => import("./pages/AdminPackages"));
+const AdminWalletTopup = lazy(() => import("./pages/AdminWalletTopup"));
+const AdminSystemHealth = lazy(() => import("./pages/AdminSystemHealth"));
+const AdminSettings = lazy(() => import("./pages/AdminSettings"));
+const AdminAnalytics = lazy(() => import("./pages/AdminAnalytics"));
+const AdminPromotions = lazy(() => import("./pages/AdminPromotions"));
+const AdminTickets = lazy(() => import("./pages/AdminTickets"));
+const AdminAuditLogs = lazy(() => import("./pages/AdminAuditLogs"));
+const AdminSecurity = lazy(() => import("./pages/AdminSecurity"));
+const AdminAPIUsers = lazy(() => import("./pages/AdminAPIUsers"));
+const AdminProfits = lazy(() => import("./pages/AdminProfits"));
+const AdminBanners = lazy(() => import("./pages/AdminBanners"));
+const AdminEngagement = lazy(() => import("./pages/AdminEngagement"));
+const AdminReconciliation = lazy(() => import("./pages/AdminReconciliation"));
+const SubAgentSignup = lazy(() => import("./pages/SubAgentSignup"));
+const SubAgentPending = lazy(() => import("./pages/SubAgentPending"));
+const DashboardDeveloperAPI = lazy(() => import("./pages/DashboardDeveloperAPI"));
+const APIDocumentation = lazy(() => import("./pages/APIDocumentation"));
+const DeveloperPortal = lazy(() => import("./pages/DeveloperPortal"));
+const NotFound = lazy(() => import("./pages/NotFound"));
+const DashboardCustomers = lazy(() => import("./pages/DashboardCustomers"));
+const DashboardMarketing = lazy(() => import("./pages/DashboardMarketing"));
+const DashboardUtilities = lazy(() => import("./pages/DashboardUtilities"));
+const DashboardAirtimeCash = lazy(() => import("./pages/DashboardAirtimeCash"));
+const DashboardReferral = lazy(() => import("./pages/DashboardReferral"));
+const DashboardBulk = lazy(() => import("./pages/DashboardBulk"));
+const DashboardSchedule = lazy(() => import("./pages/DashboardSchedule"));
+const DashboardWhatsAppBot = lazy(() => import("./pages/DashboardWhatsAppBot"));
+const MyOrders = lazy(() => import("./pages/MyOrders"));
 
 
 const queryClient = new QueryClient();
@@ -257,6 +261,7 @@ const AppContent = () => {
   return (
     <>
       {!isDashboard && !isAgentStore && !isAdmin && <Navbar />}
+      <Suspense fallback={<LoadingScreen />}>
       <Routes>
         {/* Public pages */}
         <Route path="/" element={<Index />} />
@@ -308,6 +313,7 @@ const AppContent = () => {
           <Route path="customers" element={<DashboardCustomers />} />
           <Route path="referral" element={<DashboardReferral />} />
           <Route path="bulk" element={<AgentFeatureGuard><DashboardBulk /></AgentFeatureGuard>} />
+          <Route path="schedule" element={<DashboardSchedule />} />
 
           {/* Paid agent-only pages */}
           <Route path="cheaper-prices" element={<AgentFeatureGuard><DashboardPricing /></AgentFeatureGuard>} />
@@ -351,12 +357,14 @@ const AppContent = () => {
           <Route path="security" element={<AdminSecurity />} />
           <Route path="api-users" element={<AdminAPIUsers />} />
           <Route path="profits" element={<AdminProfits />} />
+          <Route path="banners" element={<AdminBanners />} />
           <Route path="engagement" element={<AdminEngagement />} />
           <Route path="account-settings" element={<DashboardAccountSettings />} />
         </Route>
 
         <Route path="*" element={<NotFound />} />
       </Routes>
+      </Suspense>
       {!isDashboard && !isAgentStore && !isAdmin && <Footer />}
       {!isDashboard && !isAdmin && <TutorialModal />}
       <AudioUnlocker />

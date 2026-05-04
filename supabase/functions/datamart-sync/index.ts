@@ -2,13 +2,30 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { corsHeaders } from "../_shared/cors.ts";
 
+declare const Deno: any;
+
 serve(async (req: Request) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
+  // Require admin JWT
+  const authHeader = req.headers.get("Authorization") || "";
+  const token = authHeader.replace("Bearer ", "").trim();
+  if (!token) {
+    return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: corsHeaders });
+  }
+  const supabaseUser = createClient((Deno as any).env.get("SUPABASE_URL")!, (Deno as any).env.get("SUPABASE_ANON_KEY")!);
+  const { data: { user }, error: authErr } = await supabaseUser.auth.getUser(token);
+  if (authErr || !user) {
+    return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: corsHeaders });
+  }
   const supabaseAdmin = createClient(
-    Deno.env.get("SUPABASE_URL")!,
-    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
+    (Deno as any).env.get("SUPABASE_URL")!,
+    (Deno as any).env.get("SUPABASE_SERVICE_ROLE_KEY")!
   );
+  const { data: profile } = await supabaseAdmin.from("profiles").select("role").eq("user_id", user.id).maybeSingle();
+  if (profile?.role !== "admin") {
+    return new Response(JSON.stringify({ error: "Forbidden" }), { status: 403, headers: corsHeaders });
+  }
 
   try {
     const { page = 1, limit = 50, auto_fix = true } = await req.json().catch(() => ({}));

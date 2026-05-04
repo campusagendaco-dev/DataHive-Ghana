@@ -5,7 +5,7 @@ import { invokePublicFunctionAsUser } from "@/lib/public-function-client";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ClipboardList, RefreshCw, CheckCircle2, XCircle, Clock, Loader2, Wallet, ChevronDown, Phone, Package, Calendar, Receipt, Copy, Check, Smartphone, Zap } from "lucide-react";
+import { ClipboardList, RefreshCw, CheckCircle2, XCircle, Clock, Loader2, Wallet, ChevronDown, Phone, Package, Calendar, Receipt, Copy, Check, Smartphone, Zap, Download } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAppTheme } from "@/contexts/ThemeContext";
 
@@ -261,6 +261,65 @@ const DashboardOrders = () => {
     });
   }, []);
 
+  const downloadReceiptPDF = useCallback((order: Order) => {
+    const { date, time } = fmt(order.created_at);
+    const isWalletTopup = order.order_type === "wallet_topup";
+    const isAirtime = order.order_type === "airtime";
+    const isUtility = order.order_type === "utility";
+    const statusLabel =
+      order.status === "fulfilled" ? "Delivered" :
+      order.status === "fulfillment_failed" ? "Failed" :
+      order.status === "paid" || order.status === "processing" ? "Processing" : "Pending";
+    const statusColor =
+      order.status === "fulfilled" ? "#16a34a" :
+      order.status === "fulfillment_failed" ? "#dc2626" : "#d97706";
+    const serviceLabel = isWalletTopup ? "Wallet Top-up" : isAirtime ? `${order.network} Airtime` : isUtility ? order.package_size : `${order.network} ${order.package_size}`;
+
+    const html = `<!DOCTYPE html><html><head><meta charset="utf-8"/><title>SwiftData Receipt</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{font-family:'Helvetica Neue',Arial,sans-serif;background:#f9fafb;display:flex;justify-content:center;padding:40px 16px}
+  .card{background:#fff;border-radius:16px;box-shadow:0 4px 24px rgba(0,0,0,.08);max-width:400px;width:100%;overflow:hidden}
+  .header{background:#030305;padding:28px 28px 20px;text-align:center}
+  .logo{font-size:18px;font-weight:900;color:#fbbf24;letter-spacing:-.5px}
+  .sub{font-size:11px;color:rgba(255,255,255,.4);margin-top:4px;text-transform:uppercase;letter-spacing:.15em}
+  .body{padding:28px}
+  .status-chip{display:inline-block;padding:5px 14px;border-radius:999px;font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;background:${statusColor}18;color:${statusColor};border:1px solid ${statusColor}40;margin-bottom:20px}
+  .amount{font-size:38px;font-weight:900;color:#030305;letter-spacing:-1px;margin-bottom:4px}
+  .amount-label{font-size:11px;color:#9ca3af;text-transform:uppercase;letter-spacing:.12em;margin-bottom:24px}
+  .row{display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid #f3f4f6}
+  .row:last-child{border-bottom:none}
+  .row-label{font-size:11px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:.08em}
+  .row-value{font-size:13px;font-weight:700;color:#111827;text-align:right;max-width:55%}
+  .footer{background:#f9fafb;border-top:1px solid #f3f4f6;padding:16px 28px;text-align:center;font-size:10px;color:#9ca3af;letter-spacing:.05em}
+  .footer strong{color:#fbbf24;font-weight:900}
+  @media print{body{background:#fff;padding:0}.card{box-shadow:none;border-radius:0;max-width:100%}}
+</style></head><body>
+<div class="card">
+  <div class="header">
+    <div class="logo">SwiftData Ghana</div>
+    <div class="sub">Official Transaction Receipt</div>
+  </div>
+  <div class="body">
+    <div class="status-chip">${statusLabel}</div>
+    <div class="amount">GH₵ ${Number(order.amount).toFixed(2)}</div>
+    <div class="amount-label">Total Paid</div>
+    <div class="row"><span class="row-label">Order ID</span><span class="row-value">${order.id.slice(0, 8).toUpperCase()}</span></div>
+    <div class="row"><span class="row-label">Service</span><span class="row-value">${serviceLabel || "—"}</span></div>
+    ${!isWalletTopup ? `<div class="row"><span class="row-label">Recipient</span><span class="row-value">${order.customer_phone || "—"}</span></div>` : ""}
+    <div class="row"><span class="row-label">Date</span><span class="row-value">${date}</span></div>
+    <div class="row"><span class="row-label">Time</span><span class="row-value">${time}</span></div>
+    ${Number(order.profit) > 0 ? `<div class="row"><span class="row-label">Your Profit</span><span class="row-value" style="color:#16a34a">+GH₵ ${Number(order.profit).toFixed(2)}</span></div>` : ""}
+  </div>
+  <div class="footer">Powered by <strong>SwiftData Ghana</strong> · swiftdataghana.com · Secured by Paystack</div>
+</div>
+<script>window.onload=()=>{window.print();}</script>
+</body></html>`;
+
+    const w = window.open("", "_blank", "width=480,height=680");
+    if (w) { w.document.write(html); w.document.close(); }
+  }, []);
+
   const stats = orders.reduce(
     (acc, o) => {
       if (o.status === "fulfilled") acc.delivered += 1;
@@ -271,7 +330,10 @@ const DashboardOrders = () => {
       if (o.status === "fulfilled" && !["agent_activation", "sub_agent_activation"].includes(o.order_type)) {
         acc.totalSales += Number(o.amount);
       }
-      acc.totalProfit += Number(o.profit) + Number(o.parent_profit || 0);
+      // Only count profit on delivered orders; parent_profit is the upstream commission, not this agent's income
+      if (o.status === "fulfilled") {
+        acc.totalProfit += Number(o.profit);
+      }
       
       if (o.order_type === "data") acc.dataOrders += 1;
       else if (o.order_type === "airtime") acc.airtimeOrders += 1;
@@ -530,24 +592,37 @@ const DashboardOrders = () => {
                         ))}
                       </div>
 
-                      {/* Copy Receipt button */}
-                      <button
-                        onClick={() => copyReceipt(order)}
-                        className="w-full flex items-center justify-center gap-2 py-2 mb-3 rounded-xl text-xs font-bold border transition-all duration-150"
-                        style={
-                          copiedId === order.id
-                            ? { background: "rgba(34,197,94,0.12)", borderColor: "rgba(34,197,94,0.30)", color: "rgb(74,222,128)" }
-                            : { 
-                                background: isDark ? "rgba(255,255,255,0.04)" : "rgba(0,0,0,0.03)", 
-                                borderColor: isDark ? "rgba(255,255,255,0.09)" : "rgba(0,0,0,0.08)", 
-                                color: isDark ? "rgba(255,255,255,0.55)" : "rgba(0,0,0,0.6)" 
-                              }
-                        }
-                      >
-                        {copiedId === order.id
-                          ? <><Check className="w-3.5 h-3.5" /> Receipt Copied!</>
-                          : <><Copy className="w-3.5 h-3.5" /> Copy Receipt</>}
-                      </button>
+                      {/* Receipt actions */}
+                      <div className="grid grid-cols-2 gap-2 mb-3">
+                        <button
+                          onClick={() => copyReceipt(order)}
+                          className="flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-bold border transition-all duration-150"
+                          style={
+                            copiedId === order.id
+                              ? { background: "rgba(34,197,94,0.12)", borderColor: "rgba(34,197,94,0.30)", color: "rgb(74,222,128)" }
+                              : {
+                                  background: isDark ? "rgba(255,255,255,0.04)" : "rgba(0,0,0,0.03)",
+                                  borderColor: isDark ? "rgba(255,255,255,0.09)" : "rgba(0,0,0,0.08)",
+                                  color: isDark ? "rgba(255,255,255,0.55)" : "rgba(0,0,0,0.6)"
+                                }
+                          }
+                        >
+                          {copiedId === order.id
+                            ? <><Check className="w-3.5 h-3.5" /> Copied!</>
+                            : <><Copy className="w-3.5 h-3.5" /> Copy Receipt</>}
+                        </button>
+                        <button
+                          onClick={() => downloadReceiptPDF(order)}
+                          className="flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-bold border transition-all duration-150"
+                          style={{
+                            background: isDark ? "rgba(251,191,36,0.08)" : "rgba(251,191,36,0.1)",
+                            borderColor: isDark ? "rgba(251,191,36,0.25)" : "rgba(251,191,36,0.3)",
+                            color: "#d97706"
+                          }}
+                        >
+                          <Download className="w-3.5 h-3.5" /> Download PDF
+                        </button>
+                      </div>
 
                       {/* Timeline */}
                       {!isWalletTopup && (

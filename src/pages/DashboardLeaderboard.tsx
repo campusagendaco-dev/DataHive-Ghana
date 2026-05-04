@@ -1,9 +1,10 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAppTheme } from "@/contexts/ThemeContext";
 import {
-  Trophy, Medal, Award, TrendingUp, AlertCircle,
+  Medal, Award, AlertCircle,
   Target, Crown, Star, Zap, Users, BarChart3, RefreshCw,
+  ImageDown,
 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import SpinTheWheel from "@/components/SpinTheWheel";
@@ -74,6 +75,8 @@ const DashboardLeaderboard = () => {
   const [data, setData] = useState<LeaderboardEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [downloading, setDownloading] = useState(false);
+  const shareCardRef = useRef<HTMLDivElement>(null);
   const { isDark } = useAppTheme();
 
   const load = async () => {
@@ -98,6 +101,28 @@ const DashboardLeaderboard = () => {
   const maxWeekly = Math.max(...data.map((d) => d.week_orders), 1);
   const totalDay  = data.reduce((s, d) => s + d.day_orders, 0);
   const currentUser = data.find((d) => d.is_current_user);
+
+  const downloadCard = useCallback(async () => {
+    if (!shareCardRef.current || !currentUser) return;
+    setDownloading(true);
+    try {
+      const html2canvas = (await import("html2canvas")).default;
+      const canvas = await html2canvas(shareCardRef.current, {
+        backgroundColor: null,
+        scale: 2,
+        useCORS: true,
+        logging: false,
+      });
+      const link = document.createElement("a");
+      link.download = `swiftdata-agent-rank-${currentUser.rank_position}.png`;
+      link.href = canvas.toDataURL("image/png");
+      link.click();
+    } catch (e) {
+      console.error("Card capture failed:", e);
+    } finally {
+      setDownloading(false);
+    }
+  }, [currentUser]);
 
   // ── Shared class shorthands ──────────────────────────────────────────────────
   const card   = isDark ? "bg-white/[0.025] border-white/6" : "bg-white border-gray-200 shadow-sm";
@@ -185,6 +210,137 @@ const DashboardLeaderboard = () => {
           </div>
         </div>
       </div>
+
+      {/* ── My Achievement Card ───────────────────────────────────────── */}
+      {currentUser && (() => {
+        const isTop3 = currentUser.rank_position <= 3;
+        const medal = isTop3 ? MEDALS[currentUser.rank_position - 1] : null;
+        const rankLabel = medal ? medal.label : "Verified Partner";
+        const rankEmoji = currentUser.rank_position === 1 ? "🏆" : currentUser.rank_position === 2 ? "🥈" : currentUser.rank_position === 3 ? "🥉" : "⭐";
+        const accentColor = medal ? medal.accent : "text-emerald-400";
+        const badgeClass = medal ? medal.badge : "bg-emerald-500 text-white";
+
+        return (
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <p className={`text-[10px] font-black uppercase tracking-[0.2em] ${muted}`}>Your Achievement Card</p>
+              <button
+                type="button"
+                onClick={downloadCard}
+                disabled={downloading}
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-amber-400 hover:bg-amber-300 text-black font-black text-xs transition-all disabled:opacity-50"
+              >
+                {downloading ? (
+                  <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                ) : (
+                  <ImageDown className="w-3.5 h-3.5" />
+                )}
+                {downloading ? "Generating…" : "Download PNG"}
+              </button>
+            </div>
+
+            {/* ── Captured card (html2canvas target) ── */}
+            <div ref={shareCardRef} style={{ borderRadius: 24, overflow: "hidden", display: "inline-block", width: "100%" }}>
+              <div style={{
+                background: "linear-gradient(135deg, #0a0a12 0%, #0f172a 50%, #0a0a12 100%)",
+                padding: "2rem",
+                position: "relative",
+                fontFamily: "system-ui, -apple-system, sans-serif",
+              }}>
+                {/* Ambient blobs */}
+                <div style={{ position: "absolute", top: -40, right: -40, width: 160, height: 160, background: "rgba(251,191,36,0.08)", borderRadius: "50%", filter: "blur(60px)", pointerEvents: "none" }} />
+                <div style={{ position: "absolute", bottom: -30, left: -30, width: 120, height: 120, background: "rgba(99,102,241,0.08)", borderRadius: "50%", filter: "blur(50px)", pointerEvents: "none" }} />
+
+                <div style={{ position: "relative", display: "flex", flexDirection: "column", gap: "1.25rem" }}>
+
+                  {/* Branding row */}
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                      <div style={{ width: 28, height: 28, background: "#fbbf24", borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                        <span style={{ fontSize: 14, fontWeight: 900, color: "#000" }}>S</span>
+                      </div>
+                      <span style={{ fontSize: 13, fontWeight: 800, color: "#fbbf24", letterSpacing: "0.05em" }}>SwiftData Ghana</span>
+                    </div>
+                    <div style={{ fontSize: 10, fontWeight: 700, color: "rgba(255,255,255,0.3)", letterSpacing: "0.15em", textTransform: "uppercase" }}>
+                      Agent Network
+                    </div>
+                  </div>
+
+                  {/* Main content */}
+                  <div style={{ display: "flex", alignItems: "center", gap: "1.5rem" }}>
+                    {/* Avatar */}
+                    <div style={{
+                      width: 72, height: 72, borderRadius: 20,
+                      background: isTop3 ? "rgba(251,191,36,0.15)" : "rgba(99,102,241,0.15)",
+                      border: `2px solid ${isTop3 ? "rgba(251,191,36,0.35)" : "rgba(99,102,241,0.35)"}`,
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                      fontSize: 24, fontWeight: 900,
+                      color: isTop3 ? "#fbbf24" : "#818cf8",
+                      flexShrink: 0,
+                    }}>
+                      {initials(currentUser.agent_name)}
+                    </div>
+
+                    {/* Name + label */}
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <p style={{ fontSize: 22, fontWeight: 900, color: "#fff", margin: 0, letterSpacing: "-0.02em", lineHeight: 1.1 }}>
+                        {currentUser.agent_name}
+                      </p>
+                      <p style={{ fontSize: 11, fontWeight: 700, color: isTop3 ? "#fbbf24" : "#6ee7b7", margin: "4px 0 0", textTransform: "uppercase", letterSpacing: "0.12em" }}>
+                        {rankEmoji} {rankLabel}
+                      </p>
+                    </div>
+
+                    {/* Rank badge */}
+                    <div style={{
+                      width: 56, height: 56, borderRadius: 16, flexShrink: 0,
+                      background: isTop3 ? "#fbbf24" : "rgba(99,102,241,0.2)",
+                      border: isTop3 ? "none" : "2px solid rgba(99,102,241,0.4)",
+                      display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
+                    }}>
+                      <span style={{ fontSize: 20, fontWeight: 900, color: isTop3 ? "#000" : "#818cf8", lineHeight: 1 }}>#{currentUser.rank_position}</span>
+                      <span style={{ fontSize: 8, fontWeight: 700, color: isTop3 ? "rgba(0,0,0,0.6)" : "rgba(129,140,248,0.7)", textTransform: "uppercase", letterSpacing: "0.1em" }}>Rank</span>
+                    </div>
+                  </div>
+
+                  {/* Stats row */}
+                  <div style={{
+                    display: "grid", gridTemplateColumns: "1fr 1fr 1fr",
+                    gap: "0.75rem",
+                  }}>
+                    {[
+                      { label: "Today", value: currentUser.day_orders, color: "#fbbf24" },
+                      { label: "This Week", value: currentUser.week_orders, color: "#6ee7b7" },
+                      { label: "Rank", value: `#${currentUser.rank_position}`, color: "#818cf8" },
+                    ].map(({ label, value, color }) => (
+                      <div key={label} style={{
+                        background: "rgba(255,255,255,0.03)",
+                        border: "1px solid rgba(255,255,255,0.07)",
+                        borderRadius: 14, padding: "0.75rem",
+                        textAlign: "center",
+                      }}>
+                        <p style={{ fontSize: 22, fontWeight: 900, color, margin: 0, lineHeight: 1 }}>{value}</p>
+                        <p style={{ fontSize: 9, fontWeight: 700, color: "rgba(255,255,255,0.3)", margin: "4px 0 0", textTransform: "uppercase", letterSpacing: "0.1em" }}>{label}</p>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Footer */}
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", borderTop: "1px solid rgba(255,255,255,0.06)", paddingTop: "0.875rem" }}>
+                    <span style={{ fontSize: 10, fontWeight: 700, color: "rgba(255,255,255,0.2)", letterSpacing: "0.08em" }}>swiftdataghana.com</span>
+                    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                      <div style={{ width: 6, height: 6, borderRadius: "50%", background: "#22c55e" }} />
+                      <span style={{ fontSize: 10, fontWeight: 700, color: "#22c55e", letterSpacing: "0.1em", textTransform: "uppercase" }}>Active Agent</span>
+                    </div>
+                  </div>
+
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
       <SpinTheWheel />
 
       {/* ── Podium (top 3) ───────────────────────────────────────────────── */}

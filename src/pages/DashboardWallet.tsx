@@ -150,8 +150,8 @@ const DashboardWallet = () => {
 
     const [walletRes, ordersRes, parentProfitRes, withdrawalsRes] = await Promise.all([
       supabase.from("wallets").select("balance, loyalty_balance").eq("agent_id", user.id).maybeSingle(),
-      supabase.from("orders").select("profit").eq("agent_id", user.id).in("status", ["paid", "fulfilled", "fulfillment_failed"]),
-      supabase.from("orders").select("parent_profit").eq("parent_agent_id", user.id).in("status", ["paid", "fulfilled", "fulfillment_failed"]),
+      supabase.from("orders").select("profit").eq("agent_id", user.id).eq("status", "fulfilled"),
+      supabase.from("orders").select("parent_profit").eq("parent_agent_id", user.id).eq("status", "fulfilled"),
       supabase.from("withdrawals").select("amount, status").eq("agent_id", user.id).in("status", ["completed", "pending", "processing"]),
     ]);
 

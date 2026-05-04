@@ -1,10 +1,11 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { basePackages, networks } from "@/lib/data";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
-import { Download, Sparkles, Loader2, Eye, MessageCircle, RefreshCw, Check } from "lucide-react";
+import { Download, Sparkles, Loader2, Eye, MessageCircle, RefreshCw, Check, QrCode } from "lucide-react";
 import html2canvas from "html2canvas";
+import { QRCodeCanvas } from "qrcode.react";
 
 interface AgentPrices { [network: string]: { [size: string]: string } }
 interface DisabledPackages { [network: string]: string[] }
@@ -54,7 +55,20 @@ function packagesSection(pkgs: FlyerInfo["packages"], cardStyle: string, priceCo
     }).join("");
 }
 
-function buildBlackGold(info: FlyerInfo): string {
+function qrSection(qrDataUrl: string, accentColor: string, storeUrl: string): string {
+  if (!qrDataUrl) return "";
+  return `
+  <div style="display:flex;align-items:center;gap:14px;margin-top:16px;padding:12px 14px;border-radius:10px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.07)">
+    <img src="${qrDataUrl}" width="64" height="64" style="border-radius:8px;flex-shrink:0;display:block" alt="" />
+    <div>
+      <div style="font-size:9px;font-weight:700;color:rgba(255,255,255,0.3);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:4px;font-family:Inter,sans-serif">📱 Scan to order instantly</div>
+      <div style="font-size:13px;font-weight:800;color:${accentColor};font-family:Montserrat,sans-serif">${storeUrl}</div>
+      <div style="font-size:9px;color:rgba(255,255,255,0.2);margin-top:3px;font-family:Inter,sans-serif">Point your camera · No app needed</div>
+    </div>
+  </div>`;
+}
+
+function buildBlackGold(info: FlyerInfo, qrDataUrl = ""): string {
   const { storeName, storeUrl, contact, packages } = info;
   const nets = packagesSection(
     packages,
@@ -107,13 +121,14 @@ function buildBlackGold(info: FlyerInfo): string {
         <div style="color:rgba(234,179,8,0.55);font-size:10px;margin-top:4px;font-family:Inter,sans-serif">${storeUrl}</div>
       </div>
     </div>
+    ${qrSection(qrDataUrl, "#EAB308", storeUrl)}
     <div style="text-align:center;color:rgba(255,255,255,0.13);font-size:9px;margin-top:18px;letter-spacing:2px;text-transform:uppercase;font-family:Inter,sans-serif">Powered by SwiftData Ghana</div>
   </div>
 </div>
 </body></html>`;
 }
 
-function buildRoyalBlue(info: FlyerInfo): string {
+function buildRoyalBlue(info: FlyerInfo, qrDataUrl = ""): string {
   const { storeName, storeUrl, contact, packages } = info;
   const nets = packagesSection(
     packages,
@@ -159,13 +174,14 @@ function buildRoyalBlue(info: FlyerInfo): string {
         <div style="color:rgba(96,165,250,0.65);font-size:10px;margin-top:4px;font-family:Inter,sans-serif">${storeUrl}</div>
       </div>
     </div>
+    ${qrSection(qrDataUrl, "#60A5FA", storeUrl)}
     <div style="text-align:center;color:rgba(255,255,255,0.13);font-size:9px;margin-top:18px;letter-spacing:2px;text-transform:uppercase;font-family:Inter,sans-serif">Powered by SwiftData Ghana</div>
   </div>
 </div>
 </body></html>`;
 }
 
-function buildGhanaPride(info: FlyerInfo): string {
+function buildGhanaPride(info: FlyerInfo, qrDataUrl = ""): string {
   const { storeName, storeUrl, contact, packages } = info;
   const nets = packagesSection(
     packages,
@@ -212,7 +228,6 @@ function buildGhanaPride(info: FlyerInfo): string {
 
   <!-- footer -->
   <div style="border-top:1px solid rgba(255,255,255,0.05);padding:26px 44px">
-    <!-- Ghana flag bottom stripe -->
     <div style="display:flex;gap:16px;align-items:center;justify-content:space-between;flex-wrap:wrap">
       <a href="https://${storeUrl}" style="display:inline-flex;align-items:center;gap:10px;background:linear-gradient(135deg,#FCD116 0%,#CA8A04 100%);color:#000;padding:13px 30px;border-radius:50px;font-weight:900;font-size:14px;text-decoration:none;font-family:Montserrat,sans-serif;box-shadow:0 4px 24px rgba(252,209,22,0.3)">
         🛒 Order Now
@@ -223,6 +238,7 @@ function buildGhanaPride(info: FlyerInfo): string {
         <div style="color:rgba(252,209,22,0.55);font-size:10px;margin-top:4px;font-family:Inter,sans-serif">${storeUrl}</div>
       </div>
     </div>
+    ${qrSection(qrDataUrl, "#FCD116", storeUrl)}
     <div style="display:flex;height:3px;margin-top:18px;border-radius:2px;overflow:hidden">
       <div style="flex:1;background:#CE1126"></div>
       <div style="flex:1;background:#FCD116"></div>
@@ -234,16 +250,15 @@ function buildGhanaPride(info: FlyerInfo): string {
 </body></html>`;
 }
 
-function buildFlyerHtml(template: Template, info: FlyerInfo): string {
-  if (template === "royal-blue") return buildRoyalBlue(info);
-  if (template === "ghana-pride") return buildGhanaPride(info);
-  return buildBlackGold(info);
+function buildFlyerHtml(template: Template, info: FlyerInfo, qrDataUrl = ""): string {
+  if (template === "royal-blue") return buildRoyalBlue(info, qrDataUrl);
+  if (template === "ghana-pride") return buildGhanaPride(info, qrDataUrl);
+  return buildBlackGold(info, qrDataUrl);
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
 const FLYER_W = 800;
-const SCALE = 0.54;
 
 const DashboardFlyer = () => {
   const { profile } = useAuth();
@@ -252,10 +267,14 @@ const DashboardFlyer = () => {
   const [flyerHtml, setFlyerHtml] = useState<string | null>(null);
   const [generating, setGenerating] = useState(false);
   const [downloading, setDownloading] = useState(false);
+  const [sharingStatus, setSharingStatus] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [includeQr, setIncludeQr] = useState(true);
+  const [qrDataUrl, setQrDataUrl] = useState<string>("");
   const [agentPrices, setAgentPrices] = useState<AgentPrices>({});
   const [disabledPackages, setDisabledPackages] = useState<DisabledPackages>({});
   const hiddenRef = useRef<HTMLDivElement>(null);
+  const qrContainerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (profile) {
@@ -263,6 +282,19 @@ const DashboardFlyer = () => {
       setDisabledPackages((profile.disabled_packages as DisabledPackages) || {});
     }
   }, [profile]);
+
+  // Capture QR canvas data URL after QRCodeCanvas renders
+  useEffect(() => {
+    if (!profile?.slug || !includeQr) {
+      setQrDataUrl("");
+      return;
+    }
+    const timer = setTimeout(() => {
+      const canvas = qrContainerRef.current?.querySelector("canvas");
+      if (canvas) setQrDataUrl(canvas.toDataURL("image/png"));
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [profile?.slug, includeQr]);
 
   const getAgentPrice = (network: string, size: string): number => {
     const price = agentPrices[network]?.[size];
@@ -300,7 +332,7 @@ const DashboardFlyer = () => {
     setGenerating(true);
     setTimeout(() => {
       try {
-        const html = buildFlyerHtml(template, buildInfo());
+        const html = buildFlyerHtml(template, buildInfo(), includeQr ? qrDataUrl : "");
         setFlyerHtml(html);
         toast({ title: "Flyer ready!", description: "Your flyer is ready to download or share." });
       } catch {
@@ -311,32 +343,78 @@ const DashboardFlyer = () => {
     }, 400);
   };
 
+  const captureFlyerBlob = useCallback(async (): Promise<Blob | null> => {
+    if (!flyerHtml || !hiddenRef.current) return null;
+    hiddenRef.current.innerHTML = flyerHtml;
+    const el = hiddenRef.current.firstElementChild as HTMLElement;
+    if (!el) return null;
+    const canvas = await html2canvas(el, {
+      width: FLYER_W, scale: 2.5, useCORS: true, allowTaint: true,
+      backgroundColor: null, logging: false,
+    });
+    hiddenRef.current.innerHTML = "";
+    return new Promise((resolve) =>
+      canvas.toBlob((b) => resolve(b), "image/png", 0.97)
+    );
+  }, [flyerHtml]);
+
   const downloadFlyer = async () => {
-    if (!flyerHtml || !hiddenRef.current) return;
     setDownloading(true);
     try {
-      hiddenRef.current.innerHTML = flyerHtml;
-      const el = hiddenRef.current.firstElementChild as HTMLElement;
-      if (!el) return;
-      const canvas = await html2canvas(el, {
-        width: FLYER_W, scale: 2.5, useCORS: true, allowTaint: true,
-        backgroundColor: null, logging: false,
-      });
-      hiddenRef.current.innerHTML = "";
-      canvas.toBlob(blob => {
-        if (!blob) return;
-        const url = URL.createObjectURL(blob);
-        Object.assign(document.createElement("a"), {
-          href: url,
-          download: `${profile?.store_name || "flyer"}-${template}.png`,
-        }).click();
-        URL.revokeObjectURL(url);
-        toast({ title: "Saved!", description: "Flyer saved as PNG." });
-      }, "image/png", 0.97);
+      const blob = await captureFlyerBlob();
+      if (!blob) return;
+      const url = URL.createObjectURL(blob);
+      Object.assign(document.createElement("a"), {
+        href: url,
+        download: `${profile?.store_name || "flyer"}-${template}.png`,
+      }).click();
+      URL.revokeObjectURL(url);
+      toast({ title: "Saved!", description: "Flyer saved as PNG." });
     } catch {
       toast({ title: "Download failed", variant: "destructive" });
     } finally {
       setDownloading(false);
+    }
+  };
+
+  const shareToStatus = async () => {
+    setSharingStatus(true);
+    try {
+      const blob = await captureFlyerBlob();
+      if (!blob) return;
+      const file = new File([blob], `${profile?.store_name || "flyer"}.png`, { type: "image/png" });
+
+      if (typeof navigator.canShare === "function" && navigator.canShare({ files: [file] })) {
+        await navigator.share({
+          files: [file],
+          title: `${profile?.store_name} — Data Bundles`,
+          text: `🛒 Order data from ${profile?.store_name}!\n\nhttps://swiftdatagh.com/store/${profile?.slug}`,
+        });
+      } else {
+        // Fallback: download then open WhatsApp
+        const url = URL.createObjectURL(blob);
+        Object.assign(document.createElement("a"), {
+          href: url,
+          download: `${profile?.store_name || "flyer"}.png`,
+        }).click();
+        URL.revokeObjectURL(url);
+        const caption = encodeURIComponent(
+          `🛒 Order affordable data from ${profile?.store_name}!\n\n` +
+          `⚡ Instant delivery · All networks · Best prices 🇬🇭\n\n` +
+          `👇 Shop now:\nhttps://swiftdatagh.com/store/${profile?.slug}`
+        );
+        setTimeout(() => window.open(`https://wa.me/?text=${caption}`, "_blank"), 600);
+        toast({
+          title: "Flyer downloaded!",
+          description: "Open WhatsApp → Status → upload this image.",
+        });
+      }
+    } catch (e: any) {
+      if (e?.name !== "AbortError") {
+        toast({ title: "Share failed", variant: "destructive" });
+      }
+    } finally {
+      setSharingStatus(false);
     }
   };
 
@@ -362,6 +440,24 @@ const DashboardFlyer = () => {
 
   return (
     <div className="min-h-screen pb-20 px-4 md:px-8 pt-6 max-w-5xl mx-auto space-y-8">
+
+      {/* Hidden QR canvas for data URL capture */}
+      <div
+        ref={qrContainerRef}
+        aria-hidden="true"
+        className="absolute pointer-events-none"
+        style={{ left: -9999, top: -9999, width: 120, height: 120 }}
+      >
+        {profile?.slug && includeQr && (
+          <QRCodeCanvas
+            value={`https://swiftdatagh.com/store/${profile.slug}`}
+            size={120}
+            bgColor="#000000"
+            fgColor="#ffffff"
+            level="M"
+          />
+        )}
+      </div>
 
       {/* Header */}
       <div className="flex items-center gap-3">
@@ -406,8 +502,8 @@ const DashboardFlyer = () => {
         </div>
       </div>
 
-      {/* Store summary */}
-      <div className="rounded-2xl bg-white/[0.02] border border-white/8 p-5">
+      {/* Store summary + QR toggle */}
+      <div className="rounded-2xl bg-white/[0.02] border border-white/8 p-5 space-y-4">
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-sm">
           {[
             { label: "Store Name", value: profile?.store_name || "Not set", highlight: !!profile?.store_name },
@@ -420,6 +516,25 @@ const DashboardFlyer = () => {
               <p className={`font-bold text-sm truncate ${highlight ? "text-white" : "text-white/30"}`}>{value}</p>
             </div>
           ))}
+        </div>
+
+        {/* QR code toggle */}
+        <div className="flex items-center justify-between pt-3 border-t border-white/6">
+          <div className="flex items-center gap-2.5">
+            <QrCode className="w-4 h-4 text-white/40" />
+            <div>
+              <p className="text-sm font-bold text-white/70">Include QR Code</p>
+              <p className="text-[11px] text-white/30">Embed scan-to-order QR in flyer footer</p>
+            </div>
+          </div>
+          <button
+            type="button"
+            aria-label={includeQr ? "Disable QR code in flyer" : "Enable QR code in flyer"}
+            onClick={() => { setIncludeQr(v => !v); setFlyerHtml(null); }}
+            className={`relative w-11 h-6 rounded-full transition-colors duration-200 ${includeQr ? "bg-amber-400" : "bg-white/10"}`}
+          >
+            <div className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-all duration-200 ${includeQr ? "left-5" : "left-0.5"}`} />
+          </button>
         </div>
       </div>
 
@@ -442,13 +557,13 @@ const DashboardFlyer = () => {
         <div className="space-y-4">
           <p className="text-[11px] font-black uppercase tracking-widest text-white/30">Preview</p>
 
-          {/* Scaled preview container — 800px flyer shown at 54% = 432px */}
-          <div className="mx-auto rounded-2xl overflow-hidden border border-white/10 shadow-2xl w-[432px]">
-            <div className="w-[800px] origin-top-left scale-[0.54]">
+          {/* Scaled preview — 800×1200 flyer at 54% = 432×648px visible */}
+          <div className="mx-auto rounded-2xl overflow-hidden border border-white/10 shadow-2xl" style={{ width: 432, height: 648 }}>
+            <div style={{ width: 800, transformOrigin: "top left", transform: "scale(0.54)" }}>
               <iframe
                 srcDoc={flyerHtml}
                 title="Flyer preview"
-                className="w-[800px] h-[1200px] border-0 block"
+                style={{ width: 800, height: 1200, border: "none", display: "block" }}
               />
             </div>
           </div>
@@ -457,15 +572,24 @@ const DashboardFlyer = () => {
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             <Button
               onClick={downloadFlyer}
-              disabled={downloading}
+              disabled={downloading || sharingStatus}
               className="h-11 gap-2 bg-amber-400 hover:bg-amber-300 text-black font-black rounded-xl"
             >
               {downloading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
               {downloading ? "Saving…" : "Download PNG"}
             </Button>
             <Button
+              onClick={shareToStatus}
+              disabled={downloading || sharingStatus}
+              className="h-11 gap-2 bg-green-600 hover:bg-green-500 text-white font-black rounded-xl"
+            >
+              {sharingStatus ? <Loader2 className="w-4 h-4 animate-spin" /> : <MessageCircle className="w-4 h-4" />}
+              {sharingStatus ? "Sharing…" : "WhatsApp Status"}
+            </Button>
+            <Button
               onClick={shareWhatsApp}
-              className="h-11 gap-2 bg-[#25D366] hover:bg-[#1ebe5d] text-white font-black rounded-xl"
+              variant="outline"
+              className="h-11 gap-2 border-green-500/30 bg-green-500/8 text-green-400 hover:bg-green-500/15 rounded-xl font-bold"
             >
               <MessageCircle className="w-4 h-4" />
               Share Link
@@ -475,16 +599,20 @@ const DashboardFlyer = () => {
               variant="outline"
               className="h-11 gap-2 border-white/10 text-white/70 hover:text-white rounded-xl font-bold"
             >
-              {copied ? <Check className="w-4 h-4 text-green-400" /> : <Check className="w-4 h-4 opacity-0" />}
-              {copied ? "Copied!" : "Copy Link"}
+              {copied ? <Check className="w-4 h-4 text-green-400" /> : <Eye className="w-4 h-4" />}
+              {copied ? "Copied!" : "Full Size"}
             </Button>
+          </div>
+
+          {/* Secondary actions row */}
+          <div className="flex gap-3">
             <Button
               onClick={openFull}
               variant="outline"
-              className="h-11 gap-2 border-white/10 text-white/70 hover:text-white rounded-xl font-bold"
+              className="h-9 gap-2 border-white/10 text-white/50 hover:text-white rounded-xl font-bold text-xs flex-1"
             >
-              <Eye className="w-4 h-4" />
-              Full Size
+              <Eye className="w-3.5 h-3.5" />
+              Open Full Size
             </Button>
           </div>
         </div>
@@ -493,7 +621,8 @@ const DashboardFlyer = () => {
       {/* Hidden render target for html2canvas */}
       <div
         ref={hiddenRef}
-        className="absolute w-[800px] pointer-events-none -left-[9999px] -top-[9999px]"
+        className="absolute pointer-events-none"
+        style={{ left: -9999, top: -9999, width: FLYER_W }}
         aria-hidden="true"
       />
     </div>

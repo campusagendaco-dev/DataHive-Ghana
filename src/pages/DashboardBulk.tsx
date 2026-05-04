@@ -2,16 +2,15 @@ import { useState, useMemo } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { 
-  Zap, Loader2, Users, FileText, Send, 
-  CheckCircle2, AlertTriangle, ShieldCheck,
-  TrendingUp, Download, Info
+import {
+  Loader2, Users, Send,
+  CheckCircle2, AlertTriangle,
+  Download, Info, Building2, MessageCircle, ChevronDown, ChevronUp
 } from "lucide-react";
 import { basePackages } from "@/lib/data";
-import { detectNetwork } from "@/lib/utils";
 
 const DashboardBulk = () => {
-  const { user, profile } = useAuth();
+  const { profile } = useAuth();
   const { toast } = useToast();
 
   const [inputNumbers, setInputNumbers] = useState("");
@@ -20,6 +19,7 @@ const DashboardBulk = () => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [results, setResults] = useState<{ phone: string; status: "success" | "failed"; error?: string }[] | null>(null);
   const [showSuccessOverlay, setShowSuccessOverlay] = useState(false);
+  const [showB2B, setShowB2B] = useState(false);
 
   const packages = useMemo(() => basePackages[selectedNetwork] || [], [selectedNetwork]);
   const selectedPackage = packages.find(p => p.size === selectedSize);
@@ -262,6 +262,93 @@ const DashboardBulk = () => {
           )}
         </div>
       </div>
+      {/* ── B2B / Corporate Pricing ───────────────────────────────────── */}
+      <div className="rounded-3xl border border-amber-400/20 bg-amber-400/5 overflow-hidden">
+        <button
+          type="button"
+          onClick={() => setShowB2B(v => !v)}
+          className="w-full flex items-center justify-between gap-4 px-8 py-5 text-left"
+        >
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-amber-400/15 border border-amber-400/25 flex items-center justify-center shrink-0">
+              <Building2 className="w-5 h-5 text-amber-400" />
+            </div>
+            <div>
+              <p className="font-black text-base text-white">B2B & Corporate Pricing</p>
+              <p className="text-[11px] text-white/40">Volume discounts for businesses, churches, schools & companies</p>
+            </div>
+          </div>
+          {showB2B ? <ChevronUp className="w-4 h-4 text-white/40 shrink-0" /> : <ChevronDown className="w-4 h-4 text-white/40 shrink-0" />}
+        </button>
+
+        {showB2B && (
+          <div className="px-8 pb-8 space-y-6 border-t border-amber-400/10">
+            <p className="text-sm text-white/50 pt-4">
+              Buying data for a company, school, or event? Get volume discounts applied automatically.
+              Contact us via WhatsApp to lock in your corporate rate.
+            </p>
+
+            {/* Tier table */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              {[
+                { label: "Starter", range: "1 – 9 numbers", discount: "Standard rate", highlight: false, icon: "🟡" },
+                { label: "Business", range: "10 – 49 numbers", discount: "5% off each bundle", highlight: false, icon: "🔵" },
+                { label: "Enterprise", range: "50+ numbers", discount: "12% off + priority", highlight: true, icon: "🏆" },
+              ].map(tier => (
+                <div key={tier.label} className={`rounded-2xl border p-5 space-y-2 ${tier.highlight ? "border-amber-400/40 bg-amber-400/10" : "border-white/8 bg-white/[0.02]"}`}>
+                  <p className="text-lg">{tier.icon}</p>
+                  <p className={`font-black text-sm ${tier.highlight ? "text-amber-400" : "text-white"}`}>{tier.label}</p>
+                  <p className="text-[11px] text-white/40">{tier.range}</p>
+                  <p className={`text-xs font-bold ${tier.highlight ? "text-amber-300" : "text-white/60"}`}>{tier.discount}</p>
+                </div>
+              ))}
+            </div>
+
+            {/* What's included */}
+            <div className="rounded-2xl border border-white/6 bg-white/[0.02] p-5 space-y-3">
+              <p className="text-[10px] font-black uppercase tracking-widest text-white/30">What corporate clients get</p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                {[
+                  "Volume discount on every bundle",
+                  "Dedicated WhatsApp support line",
+                  "Monthly usage report (CSV)",
+                  "Priority fulfillment queue",
+                  "Recurring bulk schedule option",
+                  "Custom invoice on request",
+                ].map(f => (
+                  <div key={f} className="flex items-center gap-2 text-xs text-white/60">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                    {f}
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* CTA */}
+            <div className="flex flex-wrap gap-3">
+              <a
+                href={`https://wa.me/${encodeURIComponent("233" + (profile?.momo_number?.replace(/^0/, "") || ""))}?text=${encodeURIComponent(`Hi, I'm interested in a corporate bulk data plan for my organisation. I'll be sending to more than 10 numbers regularly. Please share pricing details.`)}`}
+                target="_blank"
+                rel="noreferrer"
+                className="flex items-center gap-2 px-6 py-3 rounded-2xl bg-amber-400 text-black font-black text-sm hover:bg-amber-300 transition-all"
+              >
+                <MessageCircle className="w-4 h-4" />
+                Request Corporate Quote
+              </a>
+              <a
+                href={`https://wa.me/?text=${encodeURIComponent(`Hi! I need bulk data for my organisation. I want to send data to multiple employees/members at once. Can you help me set up a corporate plan?`)}`}
+                target="_blank"
+                rel="noreferrer"
+                className="flex items-center gap-2 px-6 py-3 rounded-2xl border border-white/10 bg-white/5 text-white/70 font-bold text-sm hover:bg-white/10 transition-all"
+              >
+                <MessageCircle className="w-4 h-4" />
+                WhatsApp SwiftData
+              </a>
+            </div>
+          </div>
+        )}
+      </div>
+
       {/* ── Success Overlay ── */}
       {showSuccessOverlay && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center p-6 animate-in fade-in duration-500">

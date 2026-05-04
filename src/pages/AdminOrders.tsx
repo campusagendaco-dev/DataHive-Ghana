@@ -9,7 +9,7 @@ import {
   Search, RotateCcw, Loader2, RefreshCw,
   TrendingUp, ShoppingCart, AlertTriangle, Clock,
   ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight,
-  CheckCircle2, PlayCircle,
+  CheckCircle2, PlayCircle, UserCheck,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { getFunctionErrorMessage } from "@/lib/function-errors";
@@ -24,6 +24,7 @@ interface OrderRow {
   network: string | null;
   package_size: string | null;
   customer_phone: string | null;
+  customer_name: string | null;
   amount: number;
   profit: number;
   parent_profit: number;
@@ -98,7 +99,7 @@ const AdminOrders = () => {
       if (isUuid) {
         q = q.or(`id.eq.${search.trim()},agent_id.eq.${search.trim()}`);
       } else {
-        q = q.or(`customer_phone.ilike.%${search}%,network.ilike.%${search}%,status.ilike.%${search}%`);
+        q = q.or(`customer_phone.ilike.%${search}%,customer_name.ilike.%${search}%,network.ilike.%${search}%,status.ilike.%${search}%`);
       }
     }
 
@@ -138,7 +139,7 @@ const AdminOrders = () => {
       
       return {
         ...o,
-        agent_name: profile?.full_name || (isPlaceholder ? "Guest (Direct Purchase)" : "Unknown Agent"),
+        agent_name: profile?.full_name || (isPlaceholder ? (o.customer_name || "Guest (Direct Purchase)") : "Unknown Agent"),
         agent_email: profile?.email || "",
         is_sub_agent: profile?.is_sub_agent ?? false,
       };
@@ -252,6 +253,43 @@ const AdminOrders = () => {
 
     setForcingFulfill(false);
     await fetchOrders();
+  };
+
+  const [resolvingNames, setResolvingNames] = useState<Record<string, boolean>>({});
+
+  const handleResolveGuestName = async (orderId: string, phone: string, network: string | null) => {
+    if (!phone || !network) return;
+    setResolvingNames(prev => ({ ...prev, [orderId]: true }));
+    
+    try {
+      let bankCode = "MTN";
+      const net = (network || "").toUpperCase();
+      if (net.includes("VODA") || net.includes("TELECEL")) bankCode = "VOD";
+      if (net.includes("AIRTEL") || net.includes("TIGO") || net.includes("AT")) bankCode = "ATL";
+
+      const { data, error } = await supabase.functions.invoke("paystack-resolve", {
+        body: { account_number: phone.replace(/\D+/g, ""), bank_code: bankCode }
+      });
+
+      if (error || !data?.success) {
+        throw new Error(data?.error || "Could not resolve name");
+      }
+
+      const name = data.account_name;
+      const { error: updateError } = await supabase
+        .from("orders")
+        .update({ customer_name: name })
+        .eq("id", orderId);
+
+      if (updateError) throw updateError;
+
+      toast({ title: "Name Resolved", description: `Updated to: ${name}` });
+      await fetchOrders();
+    } catch (e: any) {
+      toast({ title: "Resolution failed", description: e.message, variant: "destructive" });
+    } finally {
+      setResolvingNames(prev => ({ ...prev, [orderId]: false }));
+    }
   };
 
   // Client-side filtering
@@ -467,7 +505,27 @@ const AdminOrders = () => {
                       </span>
                     </div>
                   </td>
-                  <td className="px-4 py-3 text-xs font-mono text-white/50 hidden sm:table-cell">{order.customer_phone || "—"}</td>
+                  <td className="px-4 py-3 hidden sm:table-cell group/phone">
+                    <div className="flex items-center gap-2">
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-mono text-white/50">{order.customer_phone || "—"}</p>
+                        {order.customer_name ? (
+                          <p className="text-[10px] text-emerald-400 font-bold uppercase truncate max-w-[100px]">{order.customer_name}</p>
+                        ) : (
+                          (order.agent_id === "00000000-0000-0000-0000-000000000000" || !order.agent_id) && order.customer_phone && (
+                            <button 
+                              onClick={() => handleResolveGuestName(order.id, order.customer_phone!, order.network)}
+                              disabled={resolvingNames[order.id]}
+                              className="text-[9px] text-white/20 hover:text-amber-400 font-bold uppercase flex items-center gap-1 transition-colors mt-0.5"
+                            >
+                              {resolvingNames[order.id] ? <Loader2 className="w-2.5 h-2.5 animate-spin" /> : <UserCheck className="w-2.5 h-2.5" />}
+                              Resolve Name
+                            </button>
+                          )
+                        )}
+                      </div>
+                    </div>
+                  </td>
                   <td className="px-4 py-3 text-xs text-white/60 hidden md:table-cell">{order.network || "—"}</td>
                   <td className="px-4 py-3 text-xs text-white/60 hidden md:table-cell">{order.package_size || "—"}</td>
                   <td className="px-4 py-3 text-right">
@@ -577,7 +635,23 @@ const AdminOrders = () => {
               </div>
               <div>
                 <p className="text-[10px] uppercase tracking-wider text-white/30 mb-0.5">Recipient</p>
-                <p className="text-xs text-white/80 font-mono">{order.customer_phone || "—"}</p>
+                <div className="flex flex-col">
+                  <span className="text-xs text-white/80 font-mono">{order.customer_phone || "—"}</span>
+                  {order.customer_name ? (
+                    <span className="text-[9px] text-emerald-400 font-bold uppercase truncate">{order.customer_name}</span>
+                  ) : (
+                    (order.agent_id === "00000000-0000-0000-0000-000000000000" || !order.agent_id) && order.customer_phone && (
+                      <button 
+                        onClick={() => handleResolveGuestName(order.id, order.customer_phone!, order.network)}
+                        disabled={resolvingNames[order.id]}
+                        className="text-[9px] text-amber-500/80 hover:text-amber-400 font-bold uppercase flex items-center gap-1 transition-colors mt-0.5"
+                      >
+                        {resolvingNames[order.id] ? <Loader2 className="w-2.5 h-2.5 animate-spin" /> : <UserCheck className="w-2.5 h-2.5" />}
+                        Resolve Name
+                      </button>
+                    )
+                  )}
+                </div>
               </div>
             </div>
             <div className="flex items-center gap-2 pt-1">

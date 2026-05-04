@@ -79,7 +79,9 @@ type AdminUserAction =
   | "update_provider"
   | "get_paystack_transactions"
   | "bulk_fulfill_api_orders"
-  | "generate_api_key";
+  | "generate_api_key"
+  | "save_package_settings"
+  | "approve_all_pending_agents";
 
 
 
@@ -364,6 +366,45 @@ serve(async (req: Request) => {
         });
       }
 
+      case "approve_all_pending_agents": {
+        const { data: pending, error: fetchErr } = await supabaseAdmin
+          .from("profiles")
+          .select("user_id")
+          .eq("is_agent", true)
+          .eq("onboarding_complete", true)
+          .eq("agent_approved", false);
+
+        if (fetchErr) throw fetchErr;
+        if (!pending || pending.length === 0) {
+          return new Response(JSON.stringify({ success: true, approved: 0 }), {
+            status: 200,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+
+        const ids = pending.map((p: any) => p.user_id);
+
+        const { error: bulkErr } = await supabaseAdmin
+          .from("profiles")
+          .update({ is_agent: true, agent_approved: true, onboarding_complete: true, is_sub_agent: false, parent_agent_id: null })
+          .in("user_id", ids);
+
+        if (bulkErr) throw bulkErr;
+
+        // Fulfil any pending activation orders for these agents
+        await supabaseAdmin
+          .from("orders")
+          .update({ status: "fulfilled", failure_reason: null })
+          .in("agent_id", ids)
+          .in("order_type", ["agent_activation", "sub_agent_activation"])
+          .in("status", ["paid", "pending", "processing"]);
+
+        return new Response(JSON.stringify({ success: true, approved: ids.length }), {
+          status: 200,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
       case "approve_by_email": {
         try {
           console.log("APPROVE_BY_EMAIL_START", email);
@@ -602,9 +643,9 @@ serve(async (req: Request) => {
         const validKeys = existing ? Object.keys(existing) : [];
 
         // Define expected types for known sensitive settings
-        const BOOLEAN_KEYS = new Set(["disable_ordering", "maintenance_mode", "auto_failover_enabled", "holiday_mode_enabled"]);
+        const BOOLEAN_KEYS = new Set(["disable_ordering", "maintenance_mode", "auto_failover_enabled", "holiday_mode_enabled", "show_scrolling_ad"]);
         const NUMERIC_KEYS = new Set(["min_order_amount", "max_order_amount", "agent_activation_fee", "sub_agent_activation_fee"]);
-        const STRING_KEYS = new Set(["holiday_message", "data_provider_base_url", "secondary_data_provider_base_url", "whatsapp_bot_prompt", "site_name"]);
+        const STRING_KEYS = new Set(["holiday_message", "data_provider_base_url", "secondary_data_provider_base_url", "whatsapp_bot_prompt", "site_name", "scrolling_ad_text"]);
 
         const filteredSettings: Record<string, any> = {};
 
@@ -758,7 +799,8 @@ serve(async (req: Request) => {
               amount: Math.round(netAmount * 100), // Convert to pesewas
               recipient: recipientCode,
               reason: `SwiftData Withdrawal: ${withdrawal_id.slice(0, 8)}`,
-              currency: "GHS"
+              currency: "GHS",
+              reference: withdrawal_id, // Idempotency key — prevents double-crediting on retries
             })
           });
 
@@ -767,35 +809,34 @@ serve(async (req: Request) => {
             throw new Error(transferData.message || "Transfer initiation failed");
           }
 
-          // 5. Finalize in Database
-          const { data: finalizeResult, error: finalizeErr } = await supabaseAdmin.rpc("finalize_withdrawal", {
-            p_withdrawal_id: withdrawal_id
-          });
+          const transferCode = transferData.data?.transfer_code ?? null;
+          const transferReference = transferData.data?.reference ?? withdrawal_id;
 
-          if (finalizeErr || !finalizeResult?.success) {
-            // This is a critical state: transfer initiated but DB update failed
-            console.error("CRITICAL: Paystack transfer success but DB finalize failed", finalizeErr || finalizeResult?.error);
-            return new Response(JSON.stringify({ 
-              success: true, 
-              warning: "Transfer initiated successfully but local status update failed. Please update manually.",
-              transfer_reference: transferData.data.reference 
-            }), {
-              status: 200,
-              headers: { ...corsHeaders, "Content-Type": "application/json" },
+          // 5. Mark as processing — wallet debit happens only when webhook confirms transfer.success
+          const { error: updateErr } = await supabaseAdmin
+            .from("withdrawals")
+            .update({
+              status: "processing",
+              transfer_code: transferCode,
+              paystack_transfer_reference: transferReference,
+            })
+            .eq("id", withdrawal_id);
+
+          if (updateErr) {
+            // Transfer is live but DB update failed — log for manual recovery
+            console.error("CRITICAL: Transfer initiated but status update failed", {
+              withdrawal_id,
+              transferCode,
+              transferReference,
+              error: updateErr.message,
             });
           }
 
-          // Send SMS
-          try {
-            await sendWithdrawalCompletedSms(supabaseAdmin, withdrawal.agent_id, withdrawal.amount);
-          } catch (smsErr) {
-            console.error("SMS_ERROR", smsErr);
-          }
-
-          return new Response(JSON.stringify({ 
-            success: true, 
-            message: "Payout completed successfully via Paystack",
-            transfer_reference: transferData.data.reference
+          return new Response(JSON.stringify({
+            success: true,
+            message: "Transfer initiated. Payout will complete once Paystack confirms via webhook.",
+            transfer_code: transferCode,
+            transfer_reference: transferReference,
           }), {
             status: 200,
             headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -1182,6 +1223,44 @@ serve(async (req: Request) => {
           fulfilled: count,
           profits_failed: profitsFailed
         }), {
+          status: 200,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      case "save_package_settings": {
+        const { packages } = body;
+        if (!Array.isArray(packages) || packages.length === 0) {
+          return new Response(JSON.stringify({ error: "packages array is required" }), {
+            status: 400,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+
+        const upserts = packages.map((p: any) => ({
+          network: p.network,
+          package_size: p.package_size,
+          cost_price: p.cost_price ?? null,
+          agent_price: p.agent_price ?? null,
+          sub_agent_price: p.sub_agent_price ?? null,
+          public_price: p.public_price ?? null,
+          api_price: p.api_price ?? null,
+          is_unavailable: !!p.is_unavailable,
+          updated_at: new Date().toISOString(),
+        }));
+
+        const { error: upsertError } = await supabaseAdmin
+          .from("global_package_settings")
+          .upsert(upserts, { onConflict: "network,package_size" });
+
+        if (upsertError) {
+          return new Response(JSON.stringify({ error: upsertError.message }), {
+            status: 500,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+
+        return new Response(JSON.stringify({ success: true, saved: upserts.length }), {
           status: 200,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });

@@ -7,7 +7,7 @@ import {
   LayoutDashboard, Users, ShieldCheck, ShoppingCart, LogOut, Menu,
   Wallet, Bell, Package, CreditCard, Activity, Settings, ChevronRight,
   BarChart3, Ticket, LifeBuoy, FileSearch, Key, TrendingUp, Sun, Moon,
-  Sparkles,
+  Sparkles, Image as ImageIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
@@ -31,6 +31,7 @@ const NAV_SECTIONS = [
       { label: "Withdrawals",  icon: Wallet,        path: "/admin/withdrawals" },
       { label: "Reconciliation", icon: CreditCard,   path: "/admin/reconciliation" },
       { label: "Profits",      icon: TrendingUp,   path: "/admin/profits" },
+      { label: "Promo Banners", icon: ImageIcon,    path: "/admin/banners" },
     ],
   },
   {

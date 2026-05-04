@@ -264,6 +264,7 @@ const BuyData = () => {
           network: selectedNetwork,
           package_size: selectedPkg.size,
           customer_phone: phoneDigits,
+          customer_name: resolvedName,
           fee,
           payment_source: "direct",
           ...(validPromo && !validPromo.is_free ? {

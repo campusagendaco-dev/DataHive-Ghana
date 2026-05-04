@@ -5,13 +5,19 @@ import { basePackages, networks } from "@/lib/data";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Loader2, Save, DatabaseZap } from "lucide-react";
 import { fetchApiPricingContext } from "@/lib/api-source-pricing";
 import { logAudit } from "@/utils/auditLogger";
 import { useAuth } from "@/hooks/useAuth";
+
+async function getValidSession() {
+  const { data: { session } } = await supabase.auth.getSession();
+  if (session) return session;
+  const { data: { session: refreshed } } = await supabase.auth.refreshSession();
+  return refreshed;
+}
 
 interface PackageSetting {
   network: string;
@@ -65,6 +71,13 @@ const AdminPackages = () => {
 
   const seedDefaultPrices = async () => {
     setSeeding(true);
+    const session = await getValidSession();
+    if (!session) {
+      toast({ title: "Session expired", description: "Please sign in again.", variant: "destructive" });
+      setSeeding(false);
+      return;
+    }
+
     const upserts: PackageSetting[] = [];
     for (const n of networks) {
       for (const pkg of basePackages[n.name] || []) {
@@ -80,22 +93,23 @@ const AdminPackages = () => {
         });
       }
     }
-    const { error } = await supabase
-      .from("global_package_settings")
-      .upsert(upserts.map((u) => ({ ...u, updated_at: new Date().toISOString() })), { onConflict: "network,package_size" });
 
-    if (error) {
-      toast({ title: "Seed failed", description: error.message, variant: "destructive" });
+    const { data, error } = await supabase.functions.invoke("admin-user-actions", {
+      body: { action: "save_package_settings", packages: upserts },
+      headers: { Authorization: `Bearer ${session.access_token}` },
+    });
+
+    if (error || data?.error) {
+      toast({ title: "Seed failed", description: data?.error || error?.message, variant: "destructive" });
     } else {
-      // Rebuild local state
       const next: Record<string, PackageSetting> = {};
       upserts.forEach((u) => { next[`${u.network}-${u.package_size}`] = u; });
       setSettings((prev) => ({ ...prev, ...next }));
-      
+
       if (currentUser) {
         await logAudit(currentUser.id, "seed_default_prices", { timestamp: new Date().toISOString() });
       }
-      
+
       toast({ title: "Default prices seeded!", description: "All packages populated with base prices. Agent price = base, Public price = base × 1.12." });
     }
     setSeeding(false);
@@ -136,7 +150,13 @@ const AdminPackages = () => {
         }
       }
     }
-    // Collect all modified settings
+    const session = await getValidSession();
+    if (!session) {
+      toast({ title: "Session expired", description: "Please sign in again.", variant: "destructive" });
+      setSaving(false);
+      return;
+    }
+
     const upserts = Object.values(settings).map((s) => ({
       network: s.network,
       package_size: s.package_size,
@@ -146,16 +166,16 @@ const AdminPackages = () => {
       public_price: s.public_price,
       api_price: s.api_price,
       is_unavailable: s.is_unavailable,
-      updated_at: new Date().toISOString(),
     }));
 
     if (upserts.length > 0) {
-      const { error } = await supabase
-        .from("global_package_settings")
-        .upsert(upserts, { onConflict: "network,package_size" });
+      const { data, error } = await supabase.functions.invoke("admin-user-actions", {
+        body: { action: "save_package_settings", packages: upserts },
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      });
 
-      if (error) {
-        toast({ title: "Save failed", description: error.message, variant: "destructive" });
+      if (error || data?.error) {
+        toast({ title: "Save failed", description: data?.error || error?.message, variant: "destructive" });
         setSaving(false);
         return;
       }
@@ -187,8 +207,11 @@ const AdminPackages = () => {
         const current = next[key] || {
           network: n.name,
           package_size: pkg.size,
+          cost_price: null,
           agent_price: null,
+          sub_agent_price: null,
           public_price: null,
+          api_price: null,
           is_unavailable: false,
         };
         const reducedUserPrice = parseFloat((pkg.price * (1 - discount / 100)).toFixed(2));

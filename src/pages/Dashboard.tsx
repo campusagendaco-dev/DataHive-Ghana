@@ -13,6 +13,7 @@ import FreeDataClaimBanner from "@/components/FreeDataClaimBanner";
 import WelcomeAnnouncement from "@/components/WelcomeAnnouncement";
 import ReferAndEarn from "@/components/ReferAndEarn";
 import DailyCheckIn from "@/components/DailyCheckIn";
+import PromoCarousel from "@/components/PromoCarousel";
 
 interface DashboardStats {
   walletBalance: number;
@@ -125,6 +126,7 @@ const Dashboard = () => {
       <FreeDataClaimBanner />
       <DailyCheckIn />
       <WelcomeAnnouncement />
+      <PromoCarousel />
 
       {/* ── Hero balance card ── */}
       <div className="rounded-2xl p-5 sm:p-6 text-white" style={{ background: theme.heroHex }}>

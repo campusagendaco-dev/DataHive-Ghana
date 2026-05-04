@@ -398,8 +398,51 @@ function buildAfaPayload(metadata: Record<string, unknown>) {
   };
 }
 
-function amountMatches(expected: number, actual: number, tolerance = 0.01): boolean {
+function amountMatches(expected: number, actual: number, tolerance = 0.05): boolean {
   return Math.abs(expected - actual) <= tolerance;
+}
+
+async function initiatePaystackRefund(reference: string, amountGhs: number, paystackKey: string): Promise<void> {
+  try {
+    const res = await fetch("https://api.paystack.co/refund", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${paystackKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ transaction: reference, amount: Math.round(amountGhs * 100) }),
+    });
+    const data = await res.json();
+    if (data.status) {
+      console.log(`[Refund] Initiated for ${reference}, id: ${data.data?.id}`);
+    } else {
+      console.error(`[Refund] Failed for ${reference}: ${data.message}`);
+    }
+  } catch (err) {
+    console.error(`[Refund] Error for ${reference}:`, err);
+  }
+}
+
+async function notifyFailureAndRefund(
+  supabaseAdmin: any,
+  phone: string,
+  amountGhs: number,
+  packageLabel: string,
+  reference: string,
+  paystackKey: string,
+): Promise<void> {
+  if (phone) {
+    try {
+      await sendPaymentSms(supabaseAdmin, phone, "order_failed", {
+        package: packageLabel,
+        phone,
+        amount: amountGhs.toFixed(2),
+      });
+    } catch (e) {
+      console.error("[Failure SMS] Error:", e);
+    }
+  }
+  await initiatePaystackRefund(reference, amountGhs, paystackKey);
 }
 
 serve(async (req) => {
@@ -478,6 +521,92 @@ serve(async (req) => {
     const DATA_PROVIDER_BASE_URL = providerConfig.baseUrl;
 
     const body = JSON.parse(rawBody);
+
+    // ── Transfer events (outbound payouts / withdrawals) ─────────────────────
+    if (body.event === "transfer.success") {
+      const transferRef = body.data?.reference;
+      console.log("Webhook: transfer.success for reference:", transferRef);
+
+      if (transferRef) {
+        const { data: withdrawal } = await supabaseAdmin
+          .from("withdrawals")
+          .select("id, agent_id, amount, status")
+          .eq("paystack_transfer_reference", transferRef)
+          .maybeSingle();
+
+        if (withdrawal && withdrawal.status === "processing") {
+          const { data: finalizeResult, error: finalizeErr } = await supabaseAdmin.rpc(
+            "finalize_withdrawal",
+            { p_withdrawal_id: withdrawal.id }
+          );
+
+          if (finalizeErr || !finalizeResult?.success) {
+            console.error("CRITICAL: transfer.success but finalize_withdrawal failed", finalizeErr || finalizeResult?.error);
+          } else {
+            // Import sendWithdrawalCompletedSms is in admin-user-actions only; call inline here
+            const { data: profile } = await supabaseAdmin
+              .from("profiles")
+              .select("momo_number")
+              .eq("user_id", withdrawal.agent_id)
+              .maybeSingle();
+
+            const phone = profile?.momo_number;
+            if (phone) {
+              try {
+                const smsConfig = await getSmsConfig(supabaseAdmin);
+                if (smsConfig?.apiKey) {
+                  const template = smsConfig.templates?.withdrawal_completed ||
+                    "Your SwiftData withdrawal of GHS {amount} has been sent to your MoMo. Thank you!";
+                  const message = formatTemplate(template, { amount: Number(withdrawal.amount).toFixed(2) });
+                  await sendSmsViaTxtConnect(smsConfig.apiKey, smsConfig.senderId, normalizePhone(phone) ?? "", message);
+                }
+              } catch (smsErr) {
+                console.error("SMS_ERROR on withdrawal complete:", smsErr);
+              }
+            }
+          }
+        } else if (withdrawal) {
+          console.warn("transfer.success received but withdrawal already in status:", withdrawal.status);
+        } else {
+          console.warn("transfer.success: no withdrawal found for reference:", transferRef);
+        }
+      }
+
+      return new Response(JSON.stringify({ received: true }), {
+        status: 200,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    if (body.event === "transfer.failed" || body.event === "transfer.reversed") {
+      const transferRef = body.data?.reference;
+      const failReason = body.data?.reason || body.event;
+      console.log(`Webhook: ${body.event} for reference:`, transferRef);
+
+      if (transferRef) {
+        const { data: withdrawal } = await supabaseAdmin
+          .from("withdrawals")
+          .select("id, status")
+          .eq("paystack_transfer_reference", transferRef)
+          .maybeSingle();
+
+        if (withdrawal && withdrawal.status === "processing") {
+          await supabaseAdmin
+            .from("withdrawals")
+            .update({ status: "failed", failure_reason: failReason })
+            .eq("id", withdrawal.id);
+
+          console.log(`Withdrawal ${withdrawal.id} marked failed due to ${body.event}`);
+        }
+      }
+
+      return new Response(JSON.stringify({ received: true }), {
+        status: 200,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    // ─────────────────────────────────────────────────────────────────────────
+
     if (body.event !== "charge.success") {
       return new Response(JSON.stringify({ received: true }), {
         status: 200,
@@ -563,7 +692,8 @@ serve(async (req) => {
       (typeof verifiedMetadata?.order_id === "string" && verifiedMetadata.order_id) ||
       reference;
     const verifiedAmount = Number(verifyData?.data?.amount || 0) / 100;
-    const paystackFeeOnVerified = parseFloat(Math.min(verifiedAmount * 0.03 / 1.03, 100).toFixed(2));
+    // Use the fee Paystack actually charged rather than estimating it
+    const paystackFeeOnVerified = parseFloat((Number(verifyData?.data?.fees || 0) / 100).toFixed(2));
     const orderTypeFromMetadata = typeof metadata?.order_type === "string" ? metadata.order_type : null;
 
     let { data: existingOrder } = await supabaseAdmin
@@ -691,6 +821,7 @@ serve(async (req) => {
         utility_provider: typeof metadata?.utility_provider === "string" ? metadata.utility_provider : null,
         utility_account_number: typeof metadata?.utility_account_number === "string" ? metadata.utility_account_number : null,
         utility_account_name: typeof metadata?.utility_account_name === "string" ? metadata.utility_account_name : null,
+        customer_name: typeof metadata?.customer_name === "string" ? metadata.customer_name : null,
       };
 
       const { error: recreateError } = await supabaseAdmin.from("orders").insert(recreatedOrder);
@@ -724,6 +855,9 @@ serve(async (req) => {
       if (!existingOrder.parent_agent_id && typeof metadata?.parent_agent_id === "string" && metadata.parent_agent_id) {
         patch.parent_agent_id = metadata.parent_agent_id;
       }
+      if (typeof metadata?.customer_name === "string" && metadata.customer_name) {
+        patch.customer_name = metadata.customer_name;
+      }
 
       if (existingOrder.status === "pending" || existingOrder.status === "fulfillment_failed") {
         patch.status = "paid";
@@ -750,14 +884,15 @@ serve(async (req) => {
         status: "fulfillment_failed",
         failure_reason: `Payment amount mismatch. Expected GHS ${existingAmount.toFixed(2)}, received GHS ${verifiedAmount.toFixed(2)}.`,
       }).eq("id", orderId);
-
+      const mismatchPhone = String(existingOrder?.customer_phone || "");
+      await notifyFailureAndRefund(supabaseAdmin, mismatchPhone, verifiedAmount, existingOrder?.package_size || "your order", reference, PAYSTACK_SECRET_KEY);
       return new Response(JSON.stringify({ received: true, fulfilled: false, failure_reason: "Payment amount mismatch" }), {
         status: 200,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    if (orderType === "wallet_topup" && Number.isFinite(existingAmount) && existingAmount > (verifiedAmount + 0.05)) {
+    if (orderType === "wallet_topup" && Number.isFinite(existingAmount) && existingAmount > (verifiedAmount + 0.10)) {
       await supabaseAdmin.from("orders").update({
         status: "fulfillment_failed",
         failure_reason: `Wallet credit mismatch. Credit GHS ${existingAmount.toFixed(2)} exceeds payment GHS ${verifiedAmount.toFixed(2)}.`,
@@ -938,6 +1073,8 @@ serve(async (req) => {
         status: "fulfillment_failed",
         failure_reason: "Data provider not configured",
       }).eq("id", orderId);
+      const unconfiguredPhone = String(existingOrder?.customer_phone || "");
+      await notifyFailureAndRefund(supabaseAdmin, unconfiguredPhone, verifiedAmount, existingOrder?.package_size || "your order", reference, PAYSTACK_SECRET_KEY);
       return new Response(JSON.stringify({ received: true, fulfilled: false }), {
         status: 200,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -976,6 +1113,8 @@ serve(async (req) => {
       }
 
       await supabaseAdmin.from("orders").update({ status: "fulfillment_failed", failure_reason: result.reason }).eq("id", orderId);
+      const afaPhone = String(existingOrder?.customer_phone || "");
+      await notifyFailureAndRefund(supabaseAdmin, afaPhone, verifiedAmount, "AFA Registration", reference, PAYSTACK_SECRET_KEY);
       return new Response(JSON.stringify({ received: true, fulfilled: false, failure_reason: result.reason }), {
         status: 200,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -1007,6 +1146,7 @@ serve(async (req) => {
           status: "fulfillment_failed",
           failure_reason: "Missing network, amount, or phone for airtime fulfillment.",
         }).eq("id", orderId);
+        await notifyFailureAndRefund(supabaseAdmin, customerPhone, verifiedAmount, "Airtime", reference, PAYSTACK_SECRET_KEY);
         return new Response(JSON.stringify({ received: true, fulfilled: false, failure_reason: "Missing airtime order details." }), {
           status: 200,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -1052,6 +1192,7 @@ serve(async (req) => {
       }
 
       await supabaseAdmin.from("orders").update({ status: "fulfillment_failed", failure_reason: airtimeResult.reason }).eq("id", orderId);
+      await notifyFailureAndRefund(supabaseAdmin, customerPhone, verifiedAmount, `${network} Airtime`, reference, PAYSTACK_SECRET_KEY);
       return new Response(JSON.stringify({ received: true, fulfilled: false, failure_reason: airtimeResult.reason }), {
         status: 200,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -1063,6 +1204,7 @@ serve(async (req) => {
         status: "fulfillment_failed",
         failure_reason: "Missing order details for fulfillment.",
       }).eq("id", orderId);
+      await notifyFailureAndRefund(supabaseAdmin, customerPhone, verifiedAmount, packageSize || "your order", reference, PAYSTACK_SECRET_KEY);
       return new Response(JSON.stringify({ received: true, fulfilled: false, failure_reason: "Missing order details for fulfillment." }), {
         status: 200,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -1131,14 +1273,7 @@ serve(async (req) => {
     }
 
     await supabaseAdmin.from("orders").update({ status: "fulfillment_failed", failure_reason: result.reason }).eq("id", orderId);
-    
-    if (customerPhone) {
-      await sendPaymentSms(supabaseAdmin, customerPhone, "order_failed", {
-        package: packageSize || "Data",
-        phone: customerPhone,
-        amount: (existingOrder?.amount || 0).toFixed(2)
-      });
-    }
+    await notifyFailureAndRefund(supabaseAdmin, customerPhone, verifiedAmount, packageSize || "Data", reference, PAYSTACK_SECRET_KEY);
     return new Response(JSON.stringify({ received: true, fulfilled: false, failure_reason: result.reason }), {
       status: 200,
       headers: { ...corsHeaders, "Content-Type": "application/json" },

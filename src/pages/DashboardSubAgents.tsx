@@ -167,6 +167,24 @@ const DashboardSubAgents = () => {
 
   const handleSavePrices = async () => {
     if (!user) return;
+    
+    // Validate that no price is below the parent's own base cost
+    for (const n of networks) {
+      for (const pkg of basePackages[n.name] || []) {
+        const parentBasePrice = getParentAgentBasePrice(n.name, pkg.size);
+        const setPrice = Number(subAgentPrices[n.name]?.[pkg.size]);
+        
+        if (parentBasePrice !== null && Number.isFinite(setPrice) && setPrice < parentBasePrice) {
+          toast({
+            title: "Invalid Price",
+            description: `${n.name} ${pkg.size} cannot be below your base cost (GH₵ ${parentBasePrice.toFixed(2)})`,
+            variant: "destructive"
+          });
+          return;
+        }
+      }
+    }
+
     setSavingPrices(true);
     const { error } = await supabase
       .from("profiles")
@@ -435,6 +453,9 @@ const DashboardSubAgents = () => {
                       />
                       {hasAdminBase && profit > 0 && (
                         <span className="text-xs text-green-600 font-medium">+GH₵{profit.toFixed(2)}</span>
+                      )}
+                      {hasAdminBase && profit < 0 && (
+                        <span className="text-xs text-red-600 font-bold animate-pulse">Below Cost!</span>
                       )}
                     </div>
                   </div>

@@ -7,6 +7,14 @@ import {
 import { useState, useEffect, useRef } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { useAppTheme } from "@/contexts/ThemeContext";
+import { supabase } from "@/integrations/supabase/client";
+import {
+  Carousel,
+  CarouselContent,
+  CarouselItem,
+  type CarouselApi,
+} from "@/components/ui/carousel";
+import Autoplay from "embla-carousel-autoplay";
 
 const openTutorial = () => window.dispatchEvent(new CustomEvent("open-tutorial"));
 
@@ -20,10 +28,34 @@ const Navbar = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const { user, profile, isAdmin, signOut } = useAuth();
-  const { isDark, toggleDark } = useAppTheme();
-  const drawerRef = useRef<HTMLDivElement>(null);
+   const { isDark, toggleDark } = useAppTheme();
+   const drawerRef = useRef<HTMLDivElement>(null);
+   const [menuBanners, setMenuBanners] = useState<any[]>([]);
+   const [api, setApi] = useState<CarouselApi>();
+   const [current, setCurrent] = useState(0);
 
-  useEffect(() => { setMenuOpen(false); }, [location.pathname]);
+   useEffect(() => {
+     const fetchMenuBanners = async () => {
+       const { data } = await supabase
+         .from("menu_banners")
+         .select("*")
+         .eq("is_active", true)
+         .order("priority", { ascending: false });
+       
+       if (data) setMenuBanners(data);
+     };
+     fetchMenuBanners();
+   }, []);
+
+   useEffect(() => {
+     if (!api) return;
+     setCurrent(api.selectedScrollSnap());
+     api.on("select", () => {
+       setCurrent(api.selectedScrollSnap());
+     });
+   }, [api]);
+ 
+   useEffect(() => { setMenuOpen(false); }, [location.pathname]);
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 12);
@@ -524,6 +556,51 @@ const Navbar = () => {
             >
               <Zap className="w-4 h-4" /> Get Started — It&apos;s Free
             </Link>
+          )}
+
+          {menuBanners.length > 0 && (
+            <div className="mt-8 pt-4 border-t border-white/5 relative group">
+              <Carousel
+                setApi={setApi}
+                plugins={[
+                  Autoplay({
+                    delay: 4000,
+                  }),
+                ]}
+                className="w-full"
+              >
+                <CarouselContent className="-ml-0">
+                  {menuBanners.map((banner) => (
+                    <CarouselItem 
+                      key={banner.id} 
+                      className="pl-0 cursor-pointer"
+                      onClick={() => banner.target_url && navigate(banner.target_url)}
+                    >
+                      <div className="relative aspect-[16/9] overflow-hidden rounded-xl border border-white/5">
+                        <img 
+                          src={banner.image_url} 
+                          alt="Promotion" 
+                          className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+                        />
+                      </div>
+                    </CarouselItem>
+                  ))}
+                </CarouselContent>
+              </Carousel>
+              
+              {menuBanners.length > 1 && (
+                <div className="flex justify-center gap-1.5 mt-3">
+                  {menuBanners.map((_, i) => (
+                    <div
+                      key={i}
+                      className={`h-1 rounded-full transition-all duration-300 ${
+                        current === i ? "w-4 bg-amber-500" : "w-1 bg-white/10"
+                      }`}
+                    />
+                  ))}
+                </div>
+              )}
+            </div>
           )}
         </div>
       </div>

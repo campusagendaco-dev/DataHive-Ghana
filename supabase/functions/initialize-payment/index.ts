@@ -389,6 +389,7 @@ serve(async (req: Request) => {
           cost_price: resolvedCostPrice,
           profit: 0,
           parent_profit: 0,
+          customer_name: metadata.customer_name || null,
           pricing_source: globalRow?.pricing_source ?? "unknown",
         };
       }
@@ -603,6 +604,9 @@ serve(async (req: Request) => {
       if (metadata.utility_provider) orderRow.utility_provider = metadata.utility_provider;
       if (metadata.utility_account_number) orderRow.utility_account_number = metadata.utility_account_number;
       if (metadata.utility_account_name) orderRow.utility_account_name = metadata.utility_account_name;
+      
+      // Verified Guest Name
+      if (metadata.customer_name) orderRow.customer_name = metadata.customer_name;
 
       const { error: insertError } = await supabaseAdmin.from("orders").insert(orderRow);
       if (insertError) {
@@ -631,6 +635,7 @@ serve(async (req: Request) => {
       if (metadata.utility_provider) patch.utility_provider = metadata.utility_provider;
       if (metadata.utility_account_number) patch.utility_account_number = metadata.utility_account_number;
       if (metadata.utility_account_name) patch.utility_account_name = metadata.utility_account_name;
+      if (metadata.customer_name) patch.customer_name = metadata.customer_name;
 
       if (orderType === "data") {
         patch.amount = resolvedAmount;

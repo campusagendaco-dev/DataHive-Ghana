@@ -86,24 +86,26 @@ const AdminOverview = () => {
   const navigate = useNavigate();
   const { isDark } = useAppTheme();
 
-  const [stats, setStats] = useState({ 
-    totalOrders: 0, 
-    totalRevenue: 0, // This will be Total Inflow (Deposits + Activations)
-    totalPurchases: 0, // This will be Total Consumption (Data/Airtime)
-    totalUsers: 0, 
-    pendingAgents: 0, 
-    swiftDataSubAgentShare: 0, 
-    totalAgentProfit: 0, 
-    totalSubAgentProfit: 0, 
-    todaySignups: 0, 
-    pendingWithdrawals: 0, 
+  const [stats, setStats] = useState({
+    totalOrders: 0,
+    totalRevenue: 0,
+    totalPurchases: 0,
+    totalUsers: 0,
+    pendingAgents: 0,
+    swiftDataSubAgentShare: 0,
+    totalAgentProfit: 0,
+    totalSubAgentProfit: 0,
+    todaySignups: 0,
+    pendingWithdrawals: 0,
     unreadTickets: 0,
     totalSystemBalance: 0,
     totalRangePurchase: 0,
     rangeInflow: 0,
     rangeVerifiedInflow: 0,
     rangePurchases: 0,
-    totalNetAdminProfit: 0
+    totalNetAdminProfit: 0,
+    apiVolume: 0,
+    paystackVolume: 0,
   });
   const [recentOrders, setRecentOrders] = useState<RecentOrder[]>([]);
   const [dailySales, setDailySales] = useState<DailySalesPoint[]>([]);
@@ -142,9 +144,9 @@ const AdminOverview = () => {
       supabase.from("profiles").select("user_id, is_agent, is_sub_agent, agent_approved, sub_agent_approved, onboarding_complete, created_at"),
       supabase.functions.invoke("maintenance-mode", { body: { action: "get" } }),
       supabase.from("orders").select("id, network, package_size, customer_phone, amount, status, created_at").order("created_at", { ascending: false }).limit(8),
-      supabase.from("orders").select("id, amount, agent_id, created_at, status, order_type, paystack_verified_amount").gte("created_at", startDate.toISOString()).order("created_at", { ascending: false }).limit(4000),
+      supabase.from("orders").select("id, amount, agent_id, created_at, status, order_type, paystack_verified_amount, paystack_fee, profit, parent_profit, cost_price").gte("created_at", startDate.toISOString()).order("created_at", { ascending: false }).limit(4000),
       supabase.functions.invoke("admin-user-actions", { body: { action: "get_provider_balance" } }).catch(e => ({ data: { success: false, error: e.message }, error: e })),
-      supabase.from("withdrawals").select("id", { count: "exact", head: true }).eq("status", "pending"),
+      supabase.from("withdrawals").select("id, status", { count: "exact" }).in("status", ["pending", "processing"]),
       supabase.from("support_tickets").select("id", { count: "exact", head: true }).eq("status", "open"),
       supabase.from("orders").select("id, order_type, amount, status, created_at, network, package_size, customer_phone").eq("status", "fulfilled").order("created_at", { ascending: false }).limit(15),
       supabase.from("audit_logs").select("id, action, details, created_at, profiles(full_name)").order("created_at", { ascending: false }).limit(6),
@@ -164,28 +166,33 @@ const AdminOverview = () => {
     const totalAgentProfitsAllTime = Array.isArray(salesStats) ? salesStats.reduce((s, st) => s + (Number(st?.total_own_profit) || 0), 0) : 0;
     const totalSubAgentProfitsAllTime = Array.isArray(salesStats) ? salesStats.reduce((s, st) => s + (Number(st?.total_commissions_paid) || 0), 0) : 0;
     
-    // Calculate Net Admin Profit for fulfilled orders
+    // Calculate Net Admin Profit for fulfilled orders.
+    // API orders: amount - profit - parent_profit - cost_price (no Paystack fee).
+    // Paystack orders: paystack_verified_amount - paystack_fee - profit - parent_profit - cost_price.
     const fulfilledOrders = orders.filter((o: any) => o.status === "fulfilled");
     const totalNetAdminProfit = fulfilledOrders.reduce((s, o: any) => {
-      const amt = Number(o.paystack_verified_amount || o.amount) || 0;
-      const fee = Number(o.paystack_fee) || 0;
+      const isApiOrder = o.order_type === "api";
+      const amt = isApiOrder
+        ? (Number(o.amount) || 0)
+        : (Number(o.paystack_verified_amount) || Number(o.amount) || 0);
+      const fee = isApiOrder ? 0 : (Number(o.paystack_fee) || 0);
       const agentProf = Number(o.profit) || 0;
       const parentProf = Number(o.parent_profit) || 0;
       const cost = Number(o.cost_price) || 0;
-      
+
       if (["data", "airtime", "utility", "afa", "api"].includes(o.order_type)) {
-        if (cost > 0) {
-          return s + (amt - fee - agentProf - parentProf - cost);
-        }
-        return s;
-      } 
-      
+        return s + (amt - fee - agentProf - parentProf - cost);
+      }
+
       if (["agent_activation", "sub_agent_activation"].includes(o.order_type)) {
         return s + (amt - fee);
       }
-      
+
+      // wallet_topup: admin earns the Paystack spread (verified - fee - amount credited to wallet)
       if (o.order_type === "wallet_topup") {
-        return s - fee;
+        const credited = Number(o.amount) || 0;
+        const received = Number(o.paystack_verified_amount) || credited;
+        return s + (received - fee - credited);
       }
 
       return s;
@@ -251,18 +258,33 @@ const AdminOverview = () => {
     const inflowOrders = orders.filter((o: any) => o.status === "fulfilled" && ["wallet_topup", "agent_activation", "sub_agent_activation"].includes(o.order_type));
     const purchaseOrders = orders.filter((o: any) => o.status === "fulfilled" && ["data", "airtime", "utility", "afa", "api"].includes(o.order_type));
 
-    const totalRevenue = inflowOrders.reduce((s: number, o: any) => s + (Number(o.paystack_verified_amount || o.amount) || 0), 0);
-    const totalPurchases = purchaseOrders.reduce((s: number, o: any) => s + (Number(o.amount) || 0), 0);
-    const displayRevenue = totalRevenue; 
+    // Inflow: always use paystack_verified_amount (confirmed settlement)
+    const totalRevenue = inflowOrders.reduce((s: number, o: any) => s + (Number(o.paystack_verified_amount) || Number(o.amount) || 0), 0);
+
+    // Purchases: API orders use amount (no Paystack), Paystack orders use verified amount
+    const totalPurchases = purchaseOrders.reduce((s: number, o: any) => {
+      if (o.order_type === "api") return s + (Number(o.amount) || 0);
+      return s + (Number(o.paystack_verified_amount) || Number(o.amount) || 0);
+    }, 0);
+
+    // Separate API vs Paystack volumes for reconciliation accuracy
+    const apiVolume = purchaseOrders.filter((o: any) => o.order_type === "api").reduce((s: number, o: any) => s + (Number(o.amount) || 0), 0);
+    const paystackVolume = purchaseOrders.filter((o: any) => o.order_type !== "api").reduce((s: number, o: any) => s + (Number(o.paystack_verified_amount) || Number(o.amount) || 0), 0);
+
+    const displayRevenue = totalRevenue;
 
     const PURCHASE_TYPES = ["data", "airtime", "utility", "afa", "api"];
     const todayFulfilledPurchases = todayOrders.filter((o: any) => o.status === "fulfilled" && PURCHASE_TYPES.includes(o.order_type));
     
-    setTodaySales({ 
-      total: todayFulfilledPurchases.reduce((s, o) => s + (Number(o.amount) || 0), 0),
-      customers: todayFulfilledPurchases.filter(o => !agentIds.has(o.agent_id) && !subAgentIds.has(o.agent_id)).reduce((s, o) => s + (Number(o.amount) || 0), 0),
-      agents: todayFulfilledPurchases.filter(o => agentIds.has(o.agent_id)).reduce((s, o) => s + (Number(o.amount) || 0), 0),
-      subAgents: todayFulfilledPurchases.filter(o => subAgentIds.has(o.agent_id)).reduce((s, o) => s + (Number(o.amount) || 0), 0),
+    const todayAmt = (o: any) => o.order_type === "api"
+      ? (Number(o.amount) || 0)
+      : (Number(o.paystack_verified_amount) || Number(o.amount) || 0);
+
+    setTodaySales({
+      total: todayFulfilledPurchases.reduce((s, o) => s + todayAmt(o), 0),
+      customers: todayFulfilledPurchases.filter(o => !agentIds.has(o.agent_id) && !subAgentIds.has(o.agent_id)).reduce((s, o) => s + todayAmt(o), 0),
+      agents: todayFulfilledPurchases.filter(o => agentIds.has(o.agent_id)).reduce((s, o) => s + todayAmt(o), 0),
+      subAgents: todayFulfilledPurchases.filter(o => subAgentIds.has(o.agent_id)).reduce((s, o) => s + todayAmt(o), 0),
       successCount: todaySuccess,
       failedCount: todayFailed,
       pendingCount: todayPending,
@@ -270,7 +292,16 @@ const AdminOverview = () => {
     });
     const rangeInflow = rangeOrders.filter((o: any) => o.status === "fulfilled" && ["wallet_topup", "agent_activation", "sub_agent_activation"].includes(o.order_type)).reduce((s: number, o: any) => s + (Number(o.amount) || 0), 0);
     const rangeVerifiedInflow = rangeOrders.filter((o: any) => o.status === "fulfilled" && ["wallet_topup", "agent_activation", "sub_agent_activation"].includes(o.order_type)).reduce((s: number, o: any) => s + (Number(o.paystack_verified_amount) || Number(o.amount) || 0), 0);
-    const rangePurchases = rangeOrders.filter((o: any) => o.status === "fulfilled" && ["data", "airtime", "utility", "afa", "api"].includes(o.order_type)).reduce((s: number, o: any) => s + (Number(o.amount) || 0), 0);
+    // Range purchases: API orders use amount, Paystack orders use verified amount
+    const rangePurchaseOrders = rangeOrders.filter((o: any) => o.status === "fulfilled" && ["data", "airtime", "utility", "afa", "api"].includes(o.order_type));
+    const rangePurchases = rangePurchaseOrders.reduce((s: number, o: any) => {
+      if (o.order_type === "api") return s + (Number(o.amount) || 0);
+      return s + (Number(o.paystack_verified_amount) || Number(o.amount) || 0);
+    }, 0);
+
+    const withdrawalRows = withdrawalsRes.data || [];
+    const pendingWithdrawalsCount = withdrawalRows.filter((w: any) => w.status === "pending").length;
+    const processingWithdrawalsCount = withdrawalRows.filter((w: any) => w.status === "processing").length;
 
     setStats({
       totalOrders: orders.length,
@@ -281,15 +312,17 @@ const AdminOverview = () => {
       swiftDataSubAgentShare: totalVolumeAllTime - totalAgentProfitsAllTime,
       totalAgentProfit: totalAgentProfitsAllTime,
       totalSubAgentProfit: totalSubAgentProfitsAllTime,
-      pendingWithdrawals: withdrawalsRes.count || 0,
+      pendingWithdrawals: pendingWithdrawalsCount + processingWithdrawalsCount,
       unreadTickets: ticketsRes.count || 0,
       totalSystemBalance,
       todaySignups: todayOrders.filter((p: any) => (p.created_at as string)?.slice(0, 10) === todayStr).length,
-      totalRangePurchase: rangeOrders.filter((o: any) => o.status === "fulfilled" && SALE_TYPES.has(o.order_type)).reduce((s: number, o: any) => s + (Number(o.amount) || 0), 0),
+      totalRangePurchase: rangePurchases,
       rangeInflow: rangeOrders.filter((o: any) => o.status === "fulfilled" && DEPOSIT_TYPES.has(o.order_type)).reduce((s: number, o: any) => s + (Number(o.amount) || 0), 0),
       rangeVerifiedInflow: rangeOrders.filter((o: any) => o.status === "fulfilled" && DEPOSIT_TYPES.has(o.order_type)).reduce((s: number, o: any) => s + (Number(o.paystack_verified_amount) || Number(o.amount) || 0), 0),
-      rangePurchases: rangeOrders.filter((o: any) => o.status === "fulfilled" && SALE_TYPES.has(o.order_type)).reduce((s: number, o: any) => s + (Number(o.amount) || 0), 0),
-      totalNetAdminProfit
+      rangePurchases,
+      totalNetAdminProfit,
+      apiVolume,
+      paystackVolume,
     });
     setRecentOrders((recentRes.data || []) as RecentOrder[]);
     setVerifiedLogs(topupsRes.data || []);
@@ -376,18 +409,14 @@ const AdminOverview = () => {
 
   const approveAllPending = async () => {
     setApprovingPending(true);
-    const { data: pending } = await supabase.from("profiles").select("user_id").eq("is_agent", true).eq("onboarding_complete", true).eq("agent_approved", false);
-    if (!pending || pending.length === 0) {
-      toast({ title: "No pending agents to approve" });
-      setApprovingPending(false);
-      return;
-    }
-    const ids = pending.map((p: any) => p.user_id);
-    const { error } = await supabase.from("profiles").update({ agent_approved: true }).in("user_id", ids);
-    if (error) {
-      toast({ title: "Failed to approve agents", description: error.message, variant: "destructive" });
+    const { data, error } = await supabase.functions.invoke("admin-user-actions", {
+      body: { action: "approve_all_pending_agents" },
+    });
+    if (error || data?.error) {
+      toast({ title: "Failed to approve agents", description: data?.error || error?.message, variant: "destructive" });
     } else {
-      toast({ title: `Approved ${ids.length} agent${ids.length !== 1 ? "s" : ""}` });
+      const count = data?.approved ?? 0;
+      toast({ title: count > 0 ? `Approved ${count} agent${count !== 1 ? "s" : ""}` : "No pending agents to approve" });
       await fetchData();
     }
     setApprovingPending(false);
@@ -644,14 +673,34 @@ const AdminOverview = () => {
               </div>
             </div>
 
+            {/* API vs Paystack volume split */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+              <div className={`p-6 rounded-[2rem] border ${isDark ? "bg-black/40 border-white/5 shadow-inner" : "bg-white border-gray-100 shadow-sm"}`}>
+                <p className="text-[10px] uppercase font-black tracking-widest mb-2 text-pink-400">API Volume (All-time)</p>
+                <div className="flex items-baseline gap-1">
+                  <p className="text-2xl font-black text-white">GH₵ {(stats.apiVolume || 0).toFixed(2)}</p>
+                  <Activity className="w-4 h-4 text-pink-400" />
+                </div>
+                <p className="text-[10px] text-white/20 mt-2 font-medium">Developer API orders — no Paystack fee.</p>
+              </div>
+              <div className={`p-6 rounded-[2rem] border ${isDark ? "bg-black/40 border-white/5 shadow-inner" : "bg-white border-gray-100 shadow-sm"}`}>
+                <p className="text-[10px] uppercase font-black tracking-widest mb-2 text-emerald-400">Paystack Volume (All-time)</p>
+                <div className="flex items-baseline gap-1">
+                  <p className="text-2xl font-black text-white">GH₵ {(stats.paystackVolume || 0).toFixed(2)}</p>
+                  <ArrowUpRight className="w-4 h-4 text-emerald-400" />
+                </div>
+                <p className="text-[10px] text-white/20 mt-2 font-medium">Direct Paystack sales — verified settlement amounts.</p>
+              </div>
+            </div>
+
             <div className={`text-[11px] p-5 rounded-2xl border flex items-start gap-4 ${isDark ? "bg-white/[0.03] border-white/10 text-white/50" : "bg-white border-amber-200 text-amber-900 shadow-sm"}`}>
               <div className="w-10 h-10 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center shrink-0 mt-1">
                  <ShieldCheck className="w-5 h-5 text-amber-500" />
               </div>
               <p className="leading-relaxed">
                 <strong className="text-amber-500 block mb-0.5">Admin Insight</strong>
-                If settled inflow exceeds consumed volume, it indicates a high volume of unspent wallet balances (liabilities). 
-                Ideally, consumption should track closely to inflow over a 30-day window.
+                API volume uses the billed amount (no Paystack fee). Paystack volume uses the verified settlement amount.
+                Net Admin Profit deducts Paystack fees only from Paystack orders, keeping API margins accurate.
               </p>
             </div>
           </div>

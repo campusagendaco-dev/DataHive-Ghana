@@ -13,6 +13,7 @@ import { toast } from "sonner";
 interface Order {
   id: string;
   customer_phone: string;
+  customer_name?: string;
   network: string;
   package_size: string;
   amount: number;
@@ -283,7 +284,10 @@ const MyOrders = () => {
                       </div>
                       <div className="flex justify-between text-[11px]">
                         <span className="text-white/20 uppercase">Recipient</span>
-                        <span className="text-white/60">{showReceipt.customer_phone}</span>
+                        <div className="flex flex-col text-right">
+                          <span className="text-white/60">{showReceipt.customer_phone}</span>
+                          {showReceipt.customer_name && <span className="text-emerald-400 text-[9px] font-bold uppercase truncate max-w-[120px] leading-tight mt-0.5">{showReceipt.customer_name}</span>}
+                        </div>
                       </div>
                     </div>
 

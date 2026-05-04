@@ -1,25 +1,91 @@
 import { useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
-import { 
-  MessageCircle, Copy, Check, Share2, 
-  Smartphone, Zap, Gift, ShoppingCart,
+import {
+  MessageCircle, Copy, Check, Share2,
+  Zap, Gift,
   ExternalLink, QrCode, ArrowRight
 } from "lucide-react";
 import { basePackages } from "@/lib/data";
-import { getAppBaseUrl } from "@/lib/app-base-url";
 import { cn } from "@/lib/utils";
 import { useAppTheme } from "@/contexts/ThemeContext";
+
+// ── WhatsApp Status Kit data ───────────────────────────────────────────────────
+
+const STATUS_CATEGORIES = [
+  { id: "daily",    label: "🌅 Daily Promo" },
+  { id: "network",  label: "📡 Network Deal" },
+  { id: "referral", label: "💰 Referral Push" },
+  { id: "trust",    label: "✅ Trust Builder" },
+  { id: "flash",    label: "🔥 Flash Sale" },
+];
+
+const STATUS_TEMPLATES: Record<string, { title: string; text: string }[]> = {
+  daily: [
+    {
+      title: "Morning Boost",
+      text: `🌅 Good morning Ghana! 🇬🇭\n\nStarting your day right with {storeName} 📱\n\n✅ MTN data from GH₵3.00\n✅ Telecel bundles available\n✅ AirtelTigo deals ready\n\nInstant delivery, no wahala 💪\n\n👉 Order now: {storeUrl}`,
+    },
+    {
+      title: "Today's Deals",
+      text: `📊 Today's best deals are LIVE!\n\n💰 Affordable data for everyone in Ghana\n⚡ Pay with MoMo — instant delivery\n🔒 100% safe & secure\n\nDon't suffer no data 😂\n\n👇 Shop here: {storeUrl}`,
+    },
+  ],
+  network: [
+    {
+      title: "MTN Special",
+      text: `📡 MTN DATA DEALS 📡\n\nBest MTN bundles at the lowest prices in Ghana! 💥\n\n⚡ Instant activation\n💰 Prices nobody can beat\n📲 Order from {storeName}\n\n🔥 Shop now 👉 {storeUrl}`,
+    },
+    {
+      title: "Telecel Deal",
+      text: `🟣 TELECEL DATA DEALS 🟣\n\nTop Telecel bundles available NOW!\n\n💸 Super affordable prices\n⚡ Instant delivery\n✅ From your trusted plug — {storeName}\n\n👉 {storeUrl}`,
+    },
+    {
+      title: "AirtelTigo Offer",
+      text: `🔴 AIRTELTIGO BUNDLES 🔴\n\nGet AirtelTigo data at the best price in Ghana!\n\n⚡ Instant delivery\n💰 Lowest prices guaranteed\n📲 Order from {storeName}\n\n👉 {storeUrl}`,
+    },
+  ],
+  referral: [
+    {
+      title: "Earn Money",
+      text: `💰 Want to earn FREE money? 💰\n\nHere's how:\n\n1️⃣ Buy data from my store\n2️⃣ Get your referral link\n3️⃣ Share with friends\n4️⃣ Earn GH₵2+ per friend who buys!\n\nNo limit on earnings 🔥\n\n👇 Start here: {storeUrl}`,
+    },
+    {
+      title: "Friend Discount",
+      text: `🎁 Tell a friend about {storeName}!\n\n✅ They get the best data prices in Ghana\n✅ You earn wallet credit every time they buy\n\nForward this to 5 friends now 📤\n\nOur store: {storeUrl} 👈`,
+    },
+  ],
+  trust: [
+    {
+      title: "Verified Plug",
+      text: `✅ VERIFIED DATA PLUG 🇬🇭\n\n{storeName} — serving Ghana daily:\n\n📲 Instant delivery every time\n💰 Prices nobody can beat\n🔒 Safe MoMo payment\n⭐ Hundreds of happy customers\n\nTry us today 👉 {storeUrl}`,
+    },
+    {
+      title: "Trust Signal",
+      text: `🙌 Why customers choose {storeName}:\n\n⚡ Data arrives in seconds\n💸 Always the lowest price\n📞 Responsive support\n🇬🇭 Proudly Ghanaian\n\nJoin thousands of happy customers\n👉 {storeUrl}`,
+    },
+  ],
+  flash: [
+    {
+      title: "Flash Sale",
+      text: `🚨 FLASH SALE — LIMITED TIME! 🚨\n\nGet data before it's gone 👇\n\n⚡ Instant delivery 24/7\n💸 Lowest prices TODAY\n✅ All networks covered\n\n📱 Order NOW: {storeUrl}\n\n⏰ Don't wait!`,
+    },
+    {
+      title: "Weekend Deal",
+      text: `🎉 WEEKEND SPECIAL from {storeName}! 🎉\n\nTreat yourself to affordable data 🇬🇭\n\n📡 All networks available\n⚡ Instant MoMo payment\n💰 Best prices guaranteed\n\n👉 Order now: {storeUrl}`,
+    },
+  ],
+};
 
 const DashboardMarketing = () => {
   const { profile } = useAuth();
   const { isDark } = useAppTheme();
   const { toast } = useToast();
   const [copied, setCopied] = useState<string | null>(null);
-
+  const [statusCategory, setStatusCategory] = useState("daily");
   const [selectedNetwork, setSelectedNetwork] = useState<"MTN" | "Telecel" | "AirtelTigo">("MTN");
-  
-  const storeUrl = profile?.store_slug 
+
+  const storeUrl = profile?.slug
     ? `${window.location.origin}/store/${profile.store_slug}`
     : `${window.location.origin}/agent-program`;
 
@@ -28,7 +94,7 @@ const DashboardMarketing = () => {
   const handleCopy = (text: string, id: string) => {
     navigator.clipboard.writeText(text);
     setCopied(id);
-    toast({ title: "Link copied to clipboard!" });
+    toast({ title: "Copied to clipboard!" });
     setTimeout(() => setCopied(null), 2000);
   };
 
@@ -36,6 +102,13 @@ const DashboardMarketing = () => {
     const text = `Hi, I want to buy ${selectedNetwork} ${pkgSize} data bundle from your store: ${storeUrl}?pkg=${pkgSize}`;
     return `https://wa.me/?text=${encodeURIComponent(text)}`;
   };
+
+  const hydrateMsg = (text: string) =>
+    text
+      .replace(/\{storeName\}/g, profile?.store_name || "My Store")
+      .replace(/\{storeUrl\}/g, storeUrl);
+
+  const currentMessages = STATUS_TEMPLATES[statusCategory] ?? [];
 
   return (
     <div className="p-4 md:p-8 max-w-6xl mx-auto space-y-8 animate-in fade-in duration-700">
@@ -47,17 +120,16 @@ const DashboardMarketing = () => {
           Marketing Tools
         </h1>
         <p className={cn("text-sm mt-1.5 ml-[52px]", isDark ? "text-white/35" : "text-gray-500")}>
-          Generate smart links to sell faster on WhatsApp and Social Media.
+          Generate smart links, flyers, and status posts to sell faster.
         </p>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-        
+
         {/* Main Store Link */}
         <div className="lg:col-span-12">
           <div className="rounded-[2.5rem] bg-gradient-to-br from-indigo-600 to-violet-700 p-8 md:p-12 relative overflow-hidden shadow-2xl shadow-indigo-500/20">
             <div className="absolute top-0 right-0 w-96 h-96 bg-white/10 rounded-full blur-[100px] -translate-y-1/2 translate-x-1/2" />
-            
             <div className="relative z-10 flex flex-col md:flex-row items-center justify-between gap-8">
               <div className="space-y-4 text-center md:text-left">
                 <Badge className="bg-white/20 text-white border-none px-3 py-1 text-[10px] font-black uppercase tracking-widest">Your Public Storefront</Badge>
@@ -66,23 +138,22 @@ const DashboardMarketing = () => {
                   Your customers can visit this link to buy data directly. Your agent commission is automatically added to your wallet.
                 </p>
               </div>
-
               <div className="w-full md:w-auto bg-black/20 backdrop-blur-md p-2 rounded-3xl border border-white/10 flex flex-col sm:flex-row items-center gap-2">
                 <div className="px-4 py-3 font-mono text-sm text-white/80 truncate max-w-[250px]">
                   {storeUrl}
                 </div>
                 <div className="flex w-full sm:w-auto gap-2">
-                  <button 
+                  <button
+                    type="button"
                     onClick={() => handleCopy(storeUrl, "store")}
                     className="flex-1 sm:flex-none h-12 px-6 rounded-2xl bg-white text-black font-black text-xs flex items-center justify-center gap-2 hover:bg-white/90 transition-all"
                   >
                     {copied === "store" ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
                     {copied === "store" ? "Copied" : "Copy Link"}
                   </button>
-                  <a 
-                    href={storeUrl} 
-                    target="_blank" 
-                    rel="noreferrer"
+                  <a
+                    href={storeUrl} target="_blank" rel="noreferrer"
+                    aria-label="Open store in new tab"
                     className="h-12 w-12 rounded-2xl bg-white/10 border border-white/20 flex items-center justify-center text-white hover:bg-white/20 transition-all"
                   >
                     <ExternalLink className="w-4 h-4" />
@@ -90,6 +161,93 @@ const DashboardMarketing = () => {
                 </div>
               </div>
             </div>
+          </div>
+        </div>
+
+        {/* ── WhatsApp Status Kit ──────────────────────────────────────── */}
+        <div className="lg:col-span-12">
+          <div className="rounded-3xl bg-green-500/8 border border-green-500/20 p-8 space-y-6">
+            {/* Header + category tabs */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-green-500/20 flex items-center justify-center">
+                  <MessageCircle className="w-5 h-5 text-green-400" />
+                </div>
+                <div>
+                  <h3 className={cn("text-lg font-black", isDark ? "text-white" : "text-gray-900")}>WhatsApp Status Kit</h3>
+                  <p className="text-[10px] font-bold text-green-400 uppercase tracking-widest">Copy · post to Status · sell more</p>
+                </div>
+              </div>
+              <div className={cn("flex gap-1.5 flex-wrap p-1 rounded-2xl border", isDark ? "bg-black/30 border-white/8" : "bg-gray-100 border-gray-200")}>
+                {STATUS_CATEGORIES.map(cat => (
+                  <button
+                    key={cat.id}
+                    type="button"
+                    onClick={() => setStatusCategory(cat.id)}
+                    className={cn(
+                      "px-3 py-1.5 rounded-xl text-[10px] font-black transition-all whitespace-nowrap",
+                      statusCategory === cat.id
+                        ? "bg-green-500 text-white shadow"
+                        : isDark ? "text-white/40 hover:text-white/70" : "text-gray-400 hover:text-gray-700",
+                    )}
+                  >
+                    {cat.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Message cards */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {currentMessages.map((msg, i) => {
+                const hydrated = hydrateMsg(msg.text);
+                const cardId = `status-${statusCategory}-${i}`;
+                return (
+                  <div
+                    key={cardId}
+                    className={cn(
+                      "group rounded-2xl border p-5 space-y-4 transition-all",
+                      isDark ? "bg-black/20 border-white/8 hover:border-green-500/25" : "bg-white border-gray-200 hover:border-green-200",
+                    )}
+                  >
+                    <p className={cn("text-[10px] font-black uppercase tracking-widest", isDark ? "text-white/30" : "text-gray-400")}>{msg.title}</p>
+                    <p className={cn("text-xs leading-relaxed whitespace-pre-line line-clamp-6", isDark ? "text-white/65" : "text-gray-600")}>
+                      {hydrated}
+                    </p>
+                    <div className="flex gap-2 pt-1">
+                      <button
+                        type="button"
+                        onClick={() => handleCopy(hydrated, cardId)}
+                        className={cn(
+                          "flex-1 h-9 rounded-xl border text-[10px] font-black flex items-center justify-center gap-1.5 transition-all",
+                          copied === cardId
+                            ? "bg-green-500/15 border-green-500/30 text-green-400"
+                            : isDark
+                            ? "bg-white/5 border-white/10 text-white/60 hover:bg-white/10"
+                            : "bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100",
+                        )}
+                      >
+                        {copied === cardId ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
+                        {copied === cardId ? "Copied!" : "Copy"}
+                      </button>
+                      <a
+                        href={`https://wa.me/?text=${encodeURIComponent(hydrated)}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="flex-1 h-9 rounded-xl bg-green-500/15 border border-green-500/25 text-[10px] font-black text-green-400 hover:bg-green-500/25 transition-all flex items-center justify-center gap-1.5"
+                      >
+                        <MessageCircle className="w-3 h-3" />
+                        WhatsApp
+                      </a>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            <p className={cn("text-[10px]", isDark ? "text-white/20" : "text-gray-400")}>
+              💡 Tip: Post one message per day to your WhatsApp Status at 7am, 12pm and 7pm for maximum reach.
+            </p>
           </div>
         </div>
 
@@ -105,7 +263,6 @@ const DashboardMarketing = () => {
                 <p className="text-[10px] font-bold text-emerald-400 uppercase tracking-widest">Copy & Share with Customers</p>
               </div>
             </div>
-            
             <div className="relative group">
               <div className={cn(
                 "p-5 rounded-2xl border font-medium text-sm leading-relaxed italic transition-all",
@@ -113,7 +270,8 @@ const DashboardMarketing = () => {
               )}>
                 "🚀 BIG NEWS! We just launched **SwiftPoints**! 💎 Earn points every time you buy data or airtime on our platform. 💰 Get 1 Point for every GHS 10 spent. 🎁 Redeem points for FREE Wallet Cash! Start earning today: {storeUrl}"
               </div>
-              <button 
+              <button
+                type="button"
                 onClick={() => handleCopy(`🚀 BIG NEWS! We just launched SwiftPoints! 💎 Earn points every time you buy data or airtime on our platform. 💰 Get 1 Point for every GHS 10 spent. 🎁 Redeem points for FREE Wallet Cash! Start earning today: ${storeUrl}`, "announcement")}
                 className="absolute top-4 right-4 h-10 px-4 rounded-xl bg-emerald-500 text-white text-[10px] font-black uppercase tracking-widest flex items-center gap-2 hover:bg-emerald-600 transition-all shadow-xl"
               >
@@ -131,15 +289,15 @@ const DashboardMarketing = () => {
                 </div>
                 <h3 className={cn("text-lg font-black", isDark ? "text-white" : "text-gray-900")}>Smart Bundle Links</h3>
               </div>
-              
               <div className={cn("flex gap-2 p-1 rounded-xl border", isDark ? "bg-black/40 border-white/5" : "bg-gray-100 border-gray-200")}>
                 {(["MTN", "Telecel", "AirtelTigo"] as const).map(net => (
                   <button
                     key={net}
+                    type="button"
                     onClick={() => setSelectedNetwork(net)}
                     className={`px-4 py-1.5 rounded-lg text-[10px] font-black transition-all ${
-                      selectedNetwork === net 
-                        ? (isDark ? "bg-white/10 text-white" : "bg-white text-gray-900 shadow-sm") 
+                      selectedNetwork === net
+                        ? (isDark ? "bg-white/10 text-white" : "bg-white text-gray-900 shadow-sm")
                         : (isDark ? "text-white/30 hover:text-white/50" : "text-gray-400 hover:text-gray-600")
                     }`}
                   >
@@ -148,9 +306,7 @@ const DashboardMarketing = () => {
                 ))}
               </div>
             </div>
-
             <p className={cn("text-sm", isDark ? "text-white/40" : "text-gray-500")}>Generate links for specific bundles. When clicked, these pre-fill the order for your customer.</p>
-
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {packages.map(p => {
                 const pkgLink = `${storeUrl}?pkg=${p.size}`;
@@ -167,9 +323,9 @@ const DashboardMarketing = () => {
                       </div>
                       <span className="text-lg font-black text-sky-400">₵{p.price.toFixed(2)}</span>
                     </div>
-
                     <div className="flex gap-2">
-                      <button 
+                      <button
+                        type="button"
                         onClick={() => handleCopy(pkgLink, p.size)}
                         className={cn(
                           "flex-1 h-10 rounded-xl border text-[10px] font-black uppercase transition-all flex items-center justify-center gap-2",
@@ -179,10 +335,8 @@ const DashboardMarketing = () => {
                         {copied === p.size ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
                         Copy Link
                       </button>
-                      <a 
-                        href={waLink}
-                        target="_blank"
-                        rel="noreferrer"
+                      <a
+                        href={waLink} target="_blank" rel="noreferrer"
                         className="flex-1 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-[10px] font-black uppercase text-emerald-400 hover:bg-emerald-500/20 transition-all flex items-center justify-center gap-2"
                       >
                         <MessageCircle className="w-3 h-3" />
@@ -205,12 +359,12 @@ const DashboardMarketing = () => {
             <h3 className="text-xl font-black leading-tight">Pro Agent Selling Tips</h3>
             <div className="space-y-4">
               {[
-                { title: "Use Status Updates", text: "Post your 'Smart Bundle Link' on your WhatsApp Status every morning." },
+                { title: "Post Status Daily", text: "Use the Status Kit above — post at 7am, 12pm, and 7pm for 3× more reach." },
                 { title: "Offer Bulk Rates", text: "Tell corporate clients you can handle 100+ employees via the Bulk Disbursement tool." },
-                { title: "Points Rewards", text: "Remind customers they earn 'SwiftPoints' for every purchase which can be redeemed for free data." }
+                { title: "Points Rewards", text: "Remind customers they earn SwiftPoints for every purchase which can be redeemed for free data." },
               ].map((tip, i) => (
                 <div key={i} className="space-y-1">
-                  <p className="text-xs font-black uppercase tracking-widest opacity-40">Tip {i+1}</p>
+                  <p className="text-xs font-black uppercase tracking-widest opacity-40">Tip {i + 1}</p>
                   <p className="font-bold text-sm">{tip.title}</p>
                   <p className="text-xs opacity-70 leading-relaxed">{tip.text}</p>
                 </div>

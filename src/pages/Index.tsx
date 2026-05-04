@@ -1,12 +1,15 @@
 import {
   ArrowRight, ShieldCheck, Zap, Store, TrendingUp, CheckCircle2,
   ChevronDown, Clock, Wifi, Users, BarChart3, Volume2, VolumeX,
+  RefreshCw, BadgeCheck, Timer,
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useState, useEffect, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import PhoneOrderTracker from "@/components/PhoneOrderTracker";
 import StoreVisitorPopup from "@/components/StoreVisitorPopup";
+import PromoCarousel from "@/components/PromoCarousel";
+import { useAuth } from "@/hooks/useAuth";
 
 // ─── Data ─────────────────────────────────────────────────────────────────────
 const NETWORK_CARDS = [
@@ -168,6 +171,24 @@ const useReveal = () => {
   return { ref, visible };
 };
 
+// ─── Animated counter ─────────────────────────────────────────────────────────
+const useCountUp = (target: number, duration = 1400) => {
+  const [value, setValue] = useState(0);
+  useEffect(() => {
+    if (target === 0) return;
+    const start = Date.now();
+    const tick = () => {
+      const elapsed = Date.now() - start;
+      const progress = Math.min(elapsed / duration, 1);
+      const eased = 1 - Math.pow(1 - progress, 3);
+      setValue(Math.round(eased * target));
+      if (progress < 1) requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+  }, [target, duration]);
+  return value;
+};
+
 // ─── FAQ Accordion ────────────────────────────────────────────────────────────
 const FaqItem = ({ q, a }: { q: string; a: string }) => {
   const [open, setOpen] = useState(false);
@@ -194,9 +215,11 @@ const FaqItem = ({ q, a }: { q: string; a: string }) => {
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 const Index = () => {
+  const { user } = useAuth();
   const [isMuted, setIsMuted] = useState(true);
   const [videoUrl, setVideoUrl] = useState("/assets/videos/ai_video.mp4");
   const videoRef = useRef<HTMLVideoElement>(null);
+  const [liveStats, setLiveStats] = useState({ totalDelivered: 0, successRate: 99.4, totalAgents: 0 });
 
   useEffect(() => {
     const fetchSettings = async () => {
@@ -205,7 +228,7 @@ const Index = () => {
         .select("home_page_video_url, home_page_video_muted")
         .eq("id", 1)
         .maybeSingle();
-      
+
       if (data?.home_page_video_url) {
         setVideoUrl(data.home_page_video_url);
       }
@@ -213,15 +236,30 @@ const Index = () => {
         setIsMuted(data.home_page_video_muted);
       }
     };
+    const fetchStats = async () => {
+      const { data } = await supabase.rpc("get_public_stats");
+      if (data) {
+        setLiveStats({
+          totalDelivered: Number(data.total_delivered) || 0,
+          successRate: Number(data.success_rate) || 99.4,
+          totalAgents: Number(data.total_agents) || 0,
+        });
+      }
+    };
     fetchSettings();
+    fetchStats();
   }, []);
 
   const networks = useReveal();
   const steps    = useReveal();
   const features = useReveal();
+  const guarantee = useReveal();
   const tracker  = useReveal();
   const agent    = useReveal();
   const faq      = useReveal();
+
+  const animatedDelivered = useCountUp(liveStats.totalDelivered);
+  const animatedAgents    = useCountUp(liveStats.totalAgents);
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-[#030305] text-gray-900 dark:text-white">
@@ -344,16 +382,32 @@ const Index = () => {
         </div>
       </section>
 
-      {/* ── Stats strip ────────────────────────────────────────────────────── */}
+      {/* ── Live stats strip ───────────────────────────────────────────────── */}
       <div className="border-y border-gray-200 dark:border-white/6 bg-white dark:bg-white/[0.018]">
         <div className="container mx-auto max-w-5xl px-4 py-6">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-6 text-center">
-            {TRUST_STATS.map((s) => (
-              <div key={s.label}>
-                <p className="font-black text-2xl md:text-3xl text-amber-500">{s.value}</p>
-                <p className="text-gray-400 dark:text-white/30 text-xs mt-1">{s.label}</p>
-              </div>
-            ))}
+            <div>
+              <p className="font-black text-2xl md:text-3xl text-amber-500">
+                {liveStats.totalDelivered > 0 ? animatedDelivered.toLocaleString() : "—"}
+              </p>
+              <p className="text-gray-400 dark:text-white/30 text-xs mt-1">Bundles delivered</p>
+            </div>
+            <div>
+              <p className="font-black text-2xl md:text-3xl text-emerald-500">
+                {liveStats.successRate}%
+              </p>
+              <p className="text-gray-400 dark:text-white/30 text-xs mt-1">Delivery success rate</p>
+            </div>
+            <div>
+              <p className="font-black text-2xl md:text-3xl text-amber-500">&lt; 5 sec</p>
+              <p className="text-gray-400 dark:text-white/30 text-xs mt-1">Average delivery time</p>
+            </div>
+            <div>
+              <p className="font-black text-2xl md:text-3xl text-sky-500">
+                {liveStats.totalAgents > 0 ? animatedAgents.toLocaleString() : "—"}
+              </p>
+              <p className="text-gray-400 dark:text-white/30 text-xs mt-1">Active resellers</p>
+            </div>
           </div>
         </div>
       </div>
@@ -509,6 +563,61 @@ const Index = () => {
         </div>
       </section>
 
+      {/* ── Delivery Guarantee ─────────────────────────────────────────────── */}
+      <section className="py-20 px-4 border-t border-gray-200 dark:border-white/6">
+        <div className="container mx-auto max-w-5xl">
+          <div
+            ref={guarantee.ref}
+            style={{
+              opacity: guarantee.visible ? 1 : 0,
+              transform: guarantee.visible ? "translateY(0)" : "translateY(24px)",
+              transition: "opacity 0.55s cubic-bezier(0.22,1,0.36,1), transform 0.55s cubic-bezier(0.22,1,0.36,1)",
+            }}
+          >
+            <div className="relative rounded-3xl overflow-hidden border border-emerald-400/25 bg-emerald-400/5 dark:bg-emerald-400/[0.06] p-10 md:p-14 shadow-sm">
+              {/* Glow */}
+              <div className="absolute -top-20 -right-20 w-[360px] h-[300px] bg-emerald-400/10 rounded-full blur-[100px] pointer-events-none" />
+
+              <div className="relative flex flex-col md:flex-row md:items-center gap-10">
+                {/* Icon + headline */}
+                <div className="flex-1">
+                  <div className="inline-flex items-center gap-2 bg-emerald-500/10 border border-emerald-500/20 rounded-full px-3.5 py-1.5 mb-5">
+                    <BadgeCheck className="w-3.5 h-3.5 text-emerald-500" />
+                    <span className="text-emerald-600 dark:text-emerald-400 text-[11px] font-bold uppercase tracking-widest">Our Guarantee</span>
+                  </div>
+                  <h2 className="text-3xl md:text-4xl font-black mb-4 leading-tight">
+                    10-Minute Delivery<br />
+                    <span className="text-emerald-500">Guarantee</span>
+                  </h2>
+                  <p className="text-gray-600 dark:text-white/50 text-sm max-w-lg leading-relaxed">
+                    If your data bundle doesn't arrive within <strong className="text-gray-800 dark:text-white/80">10 minutes</strong> of payment confirmation, you get a <strong className="text-gray-800 dark:text-white/80">full refund — automatically</strong>. No calls, no forms, no waiting. Your money is safe with us.
+                  </p>
+                </div>
+
+                {/* 3 trust points */}
+                <div className="flex flex-col gap-4 shrink-0 min-w-[220px]">
+                  {[
+                    { icon: Timer,       color: "text-emerald-500", bg: "bg-emerald-500/10", border: "border-emerald-500/20", title: "10-Min SLA",      desc: "Delivery or full refund" },
+                    { icon: RefreshCw,   color: "text-sky-500",     bg: "bg-sky-500/10",     border: "border-sky-500/20",     title: "Auto Refund",     desc: "No manual claims needed" },
+                    { icon: ShieldCheck, color: "text-amber-500",   bg: "bg-amber-500/10",   border: "border-amber-500/20",   title: "Paystack Secured", desc: "Every payment protected" },
+                  ].map(({ icon: Icon, color, bg, border, title, desc }) => (
+                    <div key={title} className={`flex items-center gap-3 rounded-2xl border ${border} ${bg} px-4 py-3`}>
+                      <div className={`w-9 h-9 rounded-xl ${bg} border ${border} flex items-center justify-center shrink-0`}>
+                        <Icon className={`w-4 h-4 ${color}`} />
+                      </div>
+                      <div>
+                        <p className="font-black text-sm text-gray-800 dark:text-white/90">{title}</p>
+                        <p className="text-[11px] text-gray-500 dark:text-white/35">{desc}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* ── Order tracker ──────────────────────────────────────────────────── */}
       <section className="py-24 px-4 border-t border-gray-200 dark:border-white/6">
         <div className="container mx-auto max-w-3xl">
@@ -599,6 +708,20 @@ const Index = () => {
           </div>
         </div>
       </section>
+
+      {/* ── Guest Promo (Strategic Placement) ────────────────────────────────── */}
+      {!user && (
+        <section className="py-24 px-4 bg-white dark:bg-white/[0.01]">
+          <div className="container mx-auto max-w-5xl">
+            <div className="text-center mb-10">
+              <p className="text-amber-500 text-[11px] font-bold uppercase tracking-[0.2em] mb-3">Special Offers</p>
+              <h2 className="text-3xl font-black mb-3">Don't Miss Out!</h2>
+              <p className="text-gray-500 dark:text-white/35 text-sm">See our latest promotions and exclusive data deals.</p>
+            </div>
+            <PromoCarousel />
+          </div>
+        </section>
+      )}
 
       {/* ── FAQ ────────────────────────────────────────────────────────────── */}
       <section className="py-24 px-4 border-t border-gray-200 dark:border-white/6">

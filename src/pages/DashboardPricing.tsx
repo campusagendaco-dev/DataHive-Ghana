@@ -183,8 +183,8 @@ const DashboardPricing = () => {
         const basePrice = getBasePrice(network, pkg.size);
         if (!Number.isFinite(numericPrice) || numericPrice < basePrice) {
           toast({
-            title: "Invalid price",
-            description: `${network} ${pkg.size} price (GHS ${Number.isFinite(numericPrice) ? numericPrice.toFixed(2) : "0.00"}) cannot be below base price (GHS ${basePrice.toFixed(2)}).`,
+            title: "Price Too Low",
+            description: `${network} ${pkg.size}: Your selling price (GH₵ ${Number.isFinite(numericPrice) ? numericPrice.toFixed(2) : "0.00"}) is below your base cost (GH₵ ${basePrice.toFixed(2)}). Please increase it to save.`,
             variant: "destructive",
           });
           return;

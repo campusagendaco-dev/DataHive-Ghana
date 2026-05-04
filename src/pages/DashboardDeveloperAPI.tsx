@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import {
   Key, Copy, RefreshCw, Loader2, ExternalLink,
   Shield, AlertTriangle, CheckCircle, Eye, EyeOff, Zap,
-  Terminal, History, Bug, FlaskConical
+  Terminal, History, Bug, Users2, MessageCircle, Share2, Code2
 } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { Link } from "react-router-dom";
@@ -334,6 +334,81 @@ const DashboardDeveloperAPI = () => {
           </CardContent>
         </Card>
       </div>
+      {/* ── Developer Community ─────────────────────────────────────────── */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+        {/* WhatsApp Dev Group */}
+        <Card className="bg-green-500/5 border-green-500/20">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base flex items-center gap-2">
+              <MessageCircle className="w-4 h-4 text-green-400" /> Developer Community
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <p className="text-xs text-muted-foreground leading-relaxed">
+              Join our WhatsApp group to get help from other developers, share integrations, and get API update announcements.
+            </p>
+            <div className="space-y-2">
+              {[
+                { label: "💬 Developer WhatsApp Channel", href: "https://whatsapp.com/channel/0029Vb81tu4HVvTdqauPgU0Z", color: "text-green-400 hover:text-green-300" },
+                { label: "📖 API Documentation", href: "/api-docs", color: "text-sky-400 hover:text-sky-300" },
+              ].map(item => (
+                <a
+                  key={item.label}
+                  href={item.href}
+                  target="_blank"
+                  rel="noreferrer"
+                  className={`flex items-center gap-2 text-xs font-bold transition-colors ${item.color}`}
+                >
+                  {item.label} <ExternalLink className="w-3 h-3 opacity-60" />
+                </a>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Integration use cases */}
+        <Card className="lg:col-span-2 bg-white/3 border-white/8">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base flex items-center gap-2">
+              <Code2 className="w-4 h-4 text-amber-400" /> What Developers Build
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {[
+                { emoji: "🤖", title: "WhatsApp Bots", desc: "Auto-sell data via WhatsApp without lifting a finger" },
+                { emoji: "🏪", title: "Custom Storefronts", desc: "White-label stores with your own branding and domain" },
+                { emoji: "📊", title: "Business Dashboards", desc: "Internal tools for tracking corporate data spend" },
+                { emoji: "🔗", title: "POS Integrations", desc: "Connect SwiftData to existing point-of-sale systems" },
+              ].map(uc => (
+                <div key={uc.title} className="flex items-start gap-3 p-3 rounded-xl bg-white/[0.025] border border-white/5">
+                  <span className="text-lg shrink-0">{uc.emoji}</span>
+                  <div>
+                    <p className="text-xs font-black text-white/80">{uc.title}</p>
+                    <p className="text-[10px] text-muted-foreground mt-0.5">{uc.desc}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Share your integration CTA */}
+            <div className="mt-4 flex items-center gap-3 p-3 rounded-xl bg-amber-400/8 border border-amber-400/20">
+              <Share2 className="w-4 h-4 text-amber-400 shrink-0" />
+              <p className="text-xs text-white/60 flex-1">Built something cool with the API?</p>
+              <a
+                href={`https://wa.me/?text=${encodeURIComponent("🚀 I just built an integration with the SwiftData Ghana API! Check out the Developer Portal: https://swiftdataghana.com/developers")}`}
+                target="_blank"
+                rel="noreferrer"
+                className="text-[10px] font-black text-amber-400 hover:text-amber-300 whitespace-nowrap transition-colors"
+              >
+                Share it →
+              </a>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
     </div>
   );
 };
