@@ -6,10 +6,11 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { 
-  Wallet, ArrowDownToLine, Loader2, CheckCircle, XCircle, Clock, TrendingUp, 
-  ShieldCheck, User, Phone, Activity, RefreshCw 
+import {
+  Wallet, ArrowDownToLine, Loader2, CheckCircle, XCircle, Clock, TrendingUp,
+  ShieldCheck, User, Phone, Activity, RefreshCw, Fingerprint
 } from "lucide-react";
+import { useWebAuthn } from "@/hooks/useWebAuthn";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -51,6 +52,10 @@ const DashboardWithdraw = () => {
   const [loading, setLoading] = useState(true);
   const [withdrawing, setWithdrawing] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [biometricScanning, setBiometricScanning] = useState(false);
+
+  const { isSupported, credentials, authenticate } = useWebAuthn();
+  const hasBiometric = isSupported && credentials.length > 0;
 
   const theoreticalBalance = parseFloat((totalProfit - (completedWithdrawals + pendingWithdrawals)).toFixed(2));
   const availableBalance = Math.min(theoreticalBalance, profile?.wallet_balance || 0);
@@ -259,7 +264,7 @@ const DashboardWithdraw = () => {
               />
             </div>
             <Button
-              onClick={() => {
+              onClick={async () => {
                 const n = parseFloat(amount);
                 if (isNaN(n) || n < MIN_WITHDRAWAL) {
                   toast.error(`Minimum withdrawal is GHS ${MIN_WITHDRAWAL.toFixed(2)}`);
@@ -269,16 +274,43 @@ const DashboardWithdraw = () => {
                   toast.error("Amount exceeds available balance");
                   return;
                 }
+                if (hasBiometric) {
+                  setBiometricScanning(true);
+                  try {
+                    const ok = await authenticate();
+                    if (!ok) {
+                      toast.error("Biometric check failed. Withdrawal blocked.");
+                      return;
+                    }
+                  } catch (e: any) {
+                    const msg: string = e?.message ?? "";
+                    if (msg.includes("cancelled") || msg.includes("NotAllowedError")) {
+                      toast.error("Authentication cancelled.");
+                    } else {
+                      toast.error("Biometric error", { description: msg });
+                    }
+                    return;
+                  } finally {
+                    setBiometricScanning(false);
+                  }
+                }
                 setConfirmOpen(true);
               }}
-              disabled={withdrawing || availableBalance < MIN_WITHDRAWAL}
+              disabled={withdrawing || biometricScanning || availableBalance < MIN_WITHDRAWAL}
               className="gap-2"
             >
-              {withdrawing ? <Loader2 className="w-4 h-4 animate-spin" /> : <ArrowDownToLine className="w-4 h-4" />}
-              Request Withdrawal
+              {biometricScanning
+                ? <><Loader2 className="w-4 h-4 animate-spin" /> Verifying…</>
+                : withdrawing
+                  ? <><Loader2 className="w-4 h-4 animate-spin" /> Processing…</>
+                  : <>{hasBiometric ? <Fingerprint className="w-4 h-4" /> : <ArrowDownToLine className="w-4 h-4" />} Request Withdrawal</>
+              }
             </Button>
           </div>
-          <p className="text-xs text-muted-foreground mt-2">A 1.5% processing fee applies to all withdrawals. Funds are sent within 24 hours.</p>
+          <p className="text-xs text-muted-foreground mt-2">
+            A 1.5% processing fee applies to all withdrawals. Funds are sent within 24 hours.
+            {hasBiometric && " · Biometric verification enabled."}
+          </p>
         </CardContent>
       </Card>
 

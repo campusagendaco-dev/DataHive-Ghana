@@ -1,78 +1,49 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { basePackages, networks } from "@/lib/data";
+import { basePackages } from "@/lib/data";
 import {
   CalendarClock, Plus, Trash2, ToggleLeft, ToggleRight,
   Loader2, RefreshCw, Star, Zap, TrendingUp, Award,
-  AlertCircle, CheckCircle2, Clock
+  CheckCircle2, Clock, Phone, ShieldCheck, AlertTriangle,
+  XCircle, Info, ChevronRight, Repeat, Activity, User,
 } from "lucide-react";
 
-interface Schedule {
-  id: string;
-  network: string;
-  package_size: string;
-  recipient_phone: string;
-  frequency: "daily" | "weekly" | "monthly";
-  next_run_at: string;
-  active: boolean;
-  created_at: string;
-  last_run_at: string | null;
-}
-
-const FREQ_LABELS: Record<string, string> = {
-  daily: "Every Day",
-  weekly: "Every Week",
-  monthly: "Every Month",
+// ── Ghana phone validation ─────────────────────────────────────────────────────
+const GH_PREFIXES: Record<string, string[]> = {
+  MTN: ["024", "054", "055", "059", "025", "053"],
+  Telecel: ["020", "050"],
+  AirtelTigo: ["026", "056", "027", "057"],
 };
 
-// ── Loyalty tier config ────────────────────────────────────────────────────────
+function detectNetwork(phone: string): string | null {
+  const digits = phone.replace(/\D/g, "");
+  const prefix = digits.slice(0, 3);
+  for (const [net, prefixes] of Object.entries(GH_PREFIXES)) {
+    if (prefixes.includes(prefix)) return net;
+  }
+  return null;
+}
+
+function isValidGhanaPhone(phone: string): boolean {
+  const digits = phone.replace(/\D/g, "");
+  return digits.length === 10 && digits.startsWith("0");
+}
+
+// ── Network config ─────────────────────────────────────────────────────────────
+const NETWORK_CONFIG = {
+  MTN: { color: "bg-amber-500", border: "border-amber-500/40", text: "text-amber-400", glow: "shadow-amber-500/20", ring: "ring-amber-500/50" },
+  Telecel: { color: "bg-rose-500", border: "border-rose-500/40", text: "text-rose-400", glow: "shadow-rose-500/20", ring: "ring-rose-500/50" },
+  AirtelTigo: { color: "bg-sky-500", border: "border-sky-500/40", text: "text-sky-400", glow: "shadow-sky-500/20", ring: "ring-sky-500/50" },
+} as const;
+
+// ── Loyalty tiers ──────────────────────────────────────────────────────────────
 const LOYALTY_TIERS = [
-  {
-    name: "Bronze",
-    min: 0,
-    max: 19,
-    icon: Star,
-    color: "text-orange-600",
-    bg: "bg-orange-700/10 border-orange-700/25",
-    bar: "bg-orange-600",
-    perks: ["Standard rates", "Basic support"],
-    discount: 0,
-  },
-  {
-    name: "Silver",
-    min: 20,
-    max: 99,
-    icon: Zap,
-    color: "text-slate-300",
-    bg: "bg-slate-500/10 border-slate-500/25",
-    bar: "bg-slate-400",
-    perks: ["1% loyalty discount", "Priority support"],
-    discount: 1,
-  },
-  {
-    name: "Gold",
-    min: 100,
-    max: 499,
-    icon: TrendingUp,
-    color: "text-amber-400",
-    bg: "bg-amber-400/10 border-amber-400/25",
-    bar: "bg-amber-400",
-    perks: ["2% loyalty discount", "Dedicated support", "Early feature access"],
-    discount: 2,
-  },
-  {
-    name: "Platinum",
-    min: 500,
-    max: Infinity,
-    icon: Award,
-    color: "text-violet-400",
-    bg: "bg-violet-500/10 border-violet-500/25",
-    bar: "bg-violet-500",
-    perks: ["3% loyalty discount", "VIP support line", "Custom pricing on request"],
-    discount: 3,
-  },
+  { name: "Bronze", min: 0, max: 19, icon: Star, color: "text-orange-400", bg: "bg-orange-500/10 border-orange-500/20", bar: "bg-orange-500", badge: "bg-orange-500/15 text-orange-400 border-orange-500/25", discount: 0, perks: ["Standard rates", "Basic support"] },
+  { name: "Silver", min: 20, max: 99, icon: Zap, color: "text-slate-300", bg: "bg-slate-500/10 border-slate-500/20", bar: "bg-slate-400", badge: "bg-slate-500/15 text-slate-300 border-slate-500/25", discount: 1, perks: ["1% loyalty discount", "Priority support"] },
+  { name: "Gold", min: 100, max: 499, icon: TrendingUp, color: "text-amber-400", bg: "bg-amber-400/10 border-amber-400/20", bar: "bg-amber-400", badge: "bg-amber-400/15 text-amber-400 border-amber-400/25", discount: 2, perks: ["2% wallet discount", "Dedicated support", "Early access"] },
+  { name: "Platinum", min: 500, max: Infinity, icon: Award, color: "text-violet-400", bg: "bg-violet-500/10 border-violet-500/20", bar: "bg-violet-500", badge: "bg-violet-500/15 text-violet-400 border-violet-500/25", discount: 3, perks: ["3% wallet discount", "VIP support", "Custom pricing"] },
 ];
 
 const getLoyaltyTier = (orders: number) =>
@@ -82,9 +53,91 @@ const formatPhone = (v: string) => v.replace(/\D+/g, "").slice(0, 10);
 
 const nextRunLabel = (iso: string) => {
   const d = new Date(iso);
-  return d.toLocaleDateString("en-GH", { weekday: "short", day: "2-digit", month: "short", year: "numeric" });
+  const now = new Date();
+  const diffMs = d.getTime() - now.getTime();
+  const diffDays = Math.ceil(diffMs / 86400000);
+  if (diffDays <= 0) return "Today";
+  if (diffDays === 1) return "Tomorrow";
+  if (diffDays <= 7) return `In ${diffDays} days`;
+  return d.toLocaleDateString("en-GH", { day: "2-digit", month: "short" });
 };
 
+const FREQ_CONFIG = {
+  daily: { label: "Daily", sub: "Every 24 hrs", icon: Repeat },
+  weekly: { label: "Weekly", sub: "Every 7 days", icon: Repeat },
+  monthly: { label: "Monthly", sub: "Every 30 days", icon: Repeat },
+} as const;
+
+interface Schedule {
+  id: string;
+  network: string;
+  package_size: string;
+  recipient_phone: string;
+  recipient_name: string | null;
+  frequency: "daily" | "weekly" | "monthly";
+  next_run_at: string;
+  active: boolean;
+  created_at: string;
+  last_run_at: string | null;
+}
+
+// ── Phone validator widget ─────────────────────────────────────────────────────
+const PhoneValidator = ({
+  phone,
+  selectedNetwork,
+}: {
+  phone: string;
+  selectedNetwork: string;
+}) => {
+  if (!phone) return null;
+
+  const valid = isValidGhanaPhone(phone);
+  const detected = detectNetwork(phone);
+
+  if (!valid) {
+    return (
+      <div className="flex items-center gap-2 mt-2 px-3 py-2 rounded-xl bg-red-500/10 border border-red-500/20">
+        <XCircle className="w-3.5 h-3.5 text-red-400 shrink-0" />
+        <p className="text-[11px] text-red-400 font-semibold">
+          Invalid — must be 10 digits starting with 0 (e.g. 0241234567)
+        </p>
+      </div>
+    );
+  }
+
+  if (!detected) {
+    return (
+      <div className="flex items-center gap-2 mt-2 px-3 py-2 rounded-xl bg-amber-500/10 border border-amber-500/20">
+        <AlertTriangle className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+        <p className="text-[11px] text-amber-400 font-semibold">
+          Valid number — network could not be detected from this prefix
+        </p>
+      </div>
+    );
+  }
+
+  if (detected !== selectedNetwork) {
+    return (
+      <div className="flex items-center gap-2 mt-2 px-3 py-2 rounded-xl bg-amber-500/10 border border-amber-500/20">
+        <AlertTriangle className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+        <p className="text-[11px] text-amber-400 font-semibold">
+          This looks like a <span className="font-black">{detected}</span> number — you selected <span className="font-black">{selectedNetwork}</span>
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex items-center gap-2 mt-2 px-3 py-2 rounded-xl bg-emerald-500/10 border border-emerald-500/20">
+      <ShieldCheck className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+      <p className="text-[11px] text-emerald-400 font-semibold">
+        Verified — valid <span className="font-black">{detected}</span> number
+      </p>
+    </div>
+  );
+};
+
+// ── Main component ─────────────────────────────────────────────────────────────
 const DashboardSchedule = () => {
   const { user } = useAuth();
   const { toast } = useToast();
@@ -95,13 +148,26 @@ const DashboardSchedule = () => {
   const [totalOrders, setTotalOrders] = useState(0);
   const [showForm, setShowForm] = useState(false);
 
-  // Form state
   const [network, setNetwork] = useState<"MTN" | "Telecel" | "AirtelTigo">("MTN");
   const [packageSize, setPackageSize] = useState("");
   const [phone, setPhone] = useState("");
+  const [recipientName, setRecipientName] = useState("");
   const [frequency, setFrequency] = useState<"daily" | "weekly" | "monthly">("monthly");
+  const userChoseNetwork = useRef(false);
 
   const packages = basePackages[network] ?? [];
+  const netCfg = NETWORK_CONFIG[network];
+
+  // Auto-switch network tab when phone prefix is recognisable
+  useEffect(() => {
+    if (userChoseNetwork.current) return;
+    const detected = detectNetwork(phone) as "MTN" | "Telecel" | "AirtelTigo" | null;
+    if (!detected) return;
+    setNetwork(prev => {
+      if (prev !== detected) setPackageSize("");
+      return detected;
+    });
+  }, [phone]); // intentionally excludes `network` — only fires on phone change
 
   const load = useCallback(async () => {
     if (!user) return;
@@ -118,18 +184,35 @@ const DashboardSchedule = () => {
         .eq("agent_id", user.id)
         .eq("status", "fulfilled"),
     ]);
-    setSchedules((scheds as Schedule[]) ?? []);
+    setSchedules((scheds as unknown as Schedule[]) ?? []);
     setTotalOrders(count ?? 0);
     setLoading(false);
   }, [user]);
 
   useEffect(() => { load(); }, [load]);
 
+  const phoneValid = isValidGhanaPhone(phone);
+
   const handleCreate = async () => {
-    if (!user || !packageSize || phone.length < 9) {
-      toast({ title: "Fill all fields", description: "Network, package, and a valid phone are required.", variant: "destructive" });
+    if (!user || !packageSize) {
+      toast({ title: "Choose a bundle", description: "Select a data bundle to continue.", variant: "destructive" });
       return;
     }
+    if (!phoneValid) {
+      toast({ title: "Invalid phone number", description: "Enter a valid 10-digit Ghana mobile number.", variant: "destructive" });
+      return;
+    }
+
+    const detected = detectNetwork(phone);
+    if (detected && detected !== network) {
+      toast({
+        title: "Network mismatch",
+        description: `This looks like a ${detected} number. Are you sure you want to use ${network}?`,
+        variant: "destructive",
+      });
+      return;
+    }
+
     setSaving(true);
     const now = new Date();
     const nextRun = new Date(now);
@@ -137,23 +220,41 @@ const DashboardSchedule = () => {
     else if (frequency === "weekly") nextRun.setDate(now.getDate() + 7);
     else nextRun.setMonth(now.getMonth() + 1);
 
-    const { error } = await supabase.from("scheduled_orders" as any).insert({
+    let { error } = await supabase.from("scheduled_orders" as any).insert({
       user_id: user.id,
       network,
       package_size: packageSize,
       recipient_phone: phone,
+      recipient_name: recipientName.trim() || null,
       frequency,
       next_run_at: nextRun.toISOString(),
       active: true,
+      order_type: "data",
     });
+
+    // Column not yet in schema cache — retry without recipient_name
+    if (error?.message?.includes("recipient_name")) {
+      ({ error } = await supabase.from("scheduled_orders" as any).insert({
+        user_id: user.id,
+        network,
+        package_size: packageSize,
+        recipient_phone: phone,
+        frequency,
+        next_run_at: nextRun.toISOString(),
+        active: true,
+        order_type: "data",
+      }));
+    }
 
     if (error) {
       toast({ title: "Could not save schedule", description: error.message, variant: "destructive" });
     } else {
-      toast({ title: "Schedule created!", description: `${network} ${packageSize} will renew ${FREQ_LABELS[frequency].toLowerCase()}.` });
+      toast({ title: "Schedule created!", description: `${network} ${packageSize} will auto-renew ${frequency}.` });
       setShowForm(false);
       setPackageSize("");
       setPhone("");
+      setRecipientName("");
+      userChoseNetwork.current = false;
       await load();
     }
     setSaving(false);
@@ -176,253 +277,423 @@ const DashboardSchedule = () => {
     ? Math.min(((totalOrders - loyaltyTier.min) / (nextTier.min - loyaltyTier.min)) * 100, 100)
     : 100;
 
-  return (
-    <div className="p-4 md:p-8 max-w-4xl mx-auto space-y-8 animate-in fade-in duration-500">
+  const activeCount = schedules.filter(s => s.active).length;
 
-      {/* Header */}
-      <div className="flex items-center justify-between gap-4 flex-wrap">
+  return (
+    <div className="p-4 md:p-8 max-w-4xl mx-auto space-y-6 animate-in fade-in duration-500">
+
+      {/* ── Header ─────────────────────────────────────────────────────────── */}
+      <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
-          <h1 className="text-3xl font-black tracking-tight text-white flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-sky-500/20 border border-sky-500/25 flex items-center justify-center">
+          <div className="flex items-center gap-3 mb-1">
+            <div className="w-10 h-10 rounded-2xl bg-sky-500/15 border border-sky-500/25 flex items-center justify-center">
               <CalendarClock className="w-5 h-5 text-sky-400" />
             </div>
-            Scheduled Bundles
-          </h1>
-          <p className="text-white/40 text-sm mt-1.5 ml-[52px]">
-            Auto-renew data for yourself or your regular customers.
-          </p>
+            <h1 className="text-2xl font-black tracking-tight text-white">Auto-Renewal</h1>
+          </div>
+          <p className="text-white/40 text-sm ml-[52px]">Set up recurring data bundles that top-up automatically.</p>
         </div>
         <div className="flex items-center gap-2">
-          <button type="button" onClick={load} className="w-9 h-9 rounded-xl border border-white/10 bg-white/5 flex items-center justify-center text-white/40 hover:text-white transition-all">
+          <button
+            type="button"
+            onClick={load}
+            aria-label="Refresh schedules"
+            className="w-9 h-9 rounded-xl border border-white/10 bg-white/5 flex items-center justify-center text-white/40 hover:text-white transition-all"
+          >
             <RefreshCw className="w-4 h-4" />
           </button>
           <button
             type="button"
-            onClick={() => setShowForm(v => !v)}
-            className="flex items-center gap-2 px-5 py-2.5 rounded-2xl bg-sky-500 hover:bg-sky-400 text-white font-black text-sm transition-all"
+            onClick={() => { setShowForm(v => !v); setPackageSize(""); setPhone(""); setRecipientName(""); userChoseNetwork.current = false; }}
+            className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl font-black text-sm transition-all ${
+              showForm
+                ? "bg-white/10 text-white/50 border border-white/10"
+                : "bg-sky-500 hover:bg-sky-400 text-white shadow-lg shadow-sky-500/20"
+            }`}
           >
-            <Plus className="w-4 h-4" />
-            New Schedule
+            <Plus className={`w-4 h-4 transition-transform ${showForm ? "rotate-45" : ""}`} />
+            {showForm ? "Cancel" : "New Schedule"}
           </button>
         </div>
       </div>
 
-      {/* ── Wallet Loyalty Tier ─────────────────────────────────────────── */}
-      <div className={`relative overflow-hidden rounded-3xl border p-6 space-y-4 ${loyaltyTier.bg}`}>
-        <div className="flex items-center justify-between gap-4 flex-wrap">
-          <div className="flex items-center gap-4">
-            <div className={`w-14 h-14 rounded-2xl flex items-center justify-center border ${loyaltyTier.bg}`}>
-              <loyaltyTier.icon className={`w-7 h-7 ${loyaltyTier.color}`} />
-            </div>
-            <div>
-              <p className="text-[10px] font-black uppercase tracking-widest text-white/30">Loyalty Status</p>
-              <p className={`text-3xl font-black leading-none mt-0.5 ${loyaltyTier.color}`}>{loyaltyTier.name}</p>
-            </div>
+      {/* ── Stats row ──────────────────────────────────────────────────────── */}
+      <div className="grid grid-cols-3 gap-3">
+        {[
+          { label: "Active", value: activeCount, icon: Activity, color: "text-emerald-400", bg: "bg-emerald-500/10 border-emerald-500/20" },
+          { label: "Total", value: schedules.length, icon: CalendarClock, color: "text-sky-400", bg: "bg-sky-500/10 border-sky-500/20" },
+          { label: "Orders", value: totalOrders, icon: CheckCircle2, color: "text-amber-400", bg: "bg-amber-500/10 border-amber-500/20" },
+        ].map(({ label, value, icon: Icon, color, bg }) => (
+          <div key={label} className={`rounded-2xl border p-4 text-center ${bg}`}>
+            <Icon className={`w-4 h-4 ${color} mx-auto mb-1.5`} />
+            <p className={`text-xl font-black ${color}`}>{value}</p>
+            <p className="text-[10px] text-white/30 font-bold uppercase tracking-wider mt-0.5">{label}</p>
           </div>
-          <div className="text-right">
-            <p className="text-[10px] text-white/30 uppercase tracking-widest">Total orders</p>
-            <p className={`text-4xl font-black leading-none mt-0.5 ${loyaltyTier.color}`}>{totalOrders}</p>
+        ))}
+      </div>
+
+      {/* ── Loyalty tier ───────────────────────────────────────────────────── */}
+      <div className={`relative overflow-hidden rounded-3xl border p-5 ${loyaltyTier.bg}`}>
+        <div className="flex items-center gap-4 mb-4">
+          <div className={`w-12 h-12 rounded-2xl flex items-center justify-center border ${loyaltyTier.bg}`}>
+            <loyaltyTier.icon className={`w-6 h-6 ${loyaltyTier.color}`} />
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <p className={`text-xl font-black ${loyaltyTier.color}`}>{loyaltyTier.name} Member</p>
+              <span className={`text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full border ${loyaltyTier.badge}`}>
+                {loyaltyTier.discount > 0 ? `${loyaltyTier.discount}% off` : "Standard"}
+              </span>
+            </div>
+            <p className="text-white/30 text-xs mt-0.5">{totalOrders} fulfilled orders</p>
           </div>
         </div>
 
-        {/* Perks */}
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap gap-1.5 mb-4">
           {loyaltyTier.perks.map(p => (
-            <span key={p} className="flex items-center gap-1.5 text-[10px] font-bold text-white/50 bg-white/5 border border-white/8 rounded-full px-3 py-1">
-              <CheckCircle2 className="w-3 h-3 text-emerald-400" />{p}
+            <span key={p} className="flex items-center gap-1 text-[10px] font-bold text-white/50 bg-white/5 border border-white/8 rounded-full px-2.5 py-1">
+              <CheckCircle2 className="w-2.5 h-2.5 text-emerald-400" />{p}
             </span>
           ))}
         </div>
 
-        {/* Progress */}
         {nextTier ? (
-          <div>
-            <div className="flex justify-between text-xs text-white/30 mb-1.5">
-              <span>{totalOrders} orders</span>
-              <span>{nextTier.min - totalOrders} more to <span className={`font-black ${nextTier.color}`}>{nextTier.name}</span> ({nextTier.discount}% discount)</span>
+          <>
+            <div className="flex justify-between text-[10px] text-white/30 mb-1.5 font-bold">
+              <span>{totalOrders}</span>
+              <span>{nextTier.min - totalOrders} more → <span className={nextTier.color}>{nextTier.name} ({nextTier.discount}% off)</span></span>
             </div>
-            <div className="h-2 rounded-full bg-black/20 overflow-hidden">
-              <div className={`h-full rounded-full transition-all duration-700 ${loyaltyTier.bar}`} style={{ width: `${loyaltyProgress}%` }} />
+            <div className="h-1.5 rounded-full bg-black/25 overflow-hidden">
+              <div
+                className={`h-full rounded-full transition-all duration-700 ${loyaltyTier.bar}`}
+                role="progressbar"
+                aria-label={`Loyalty progress: ${Math.round(loyaltyProgress)}%`}
+                style={{ width: `${loyaltyProgress}%` }}
+              />
             </div>
-          </div>
+          </>
         ) : (
-          <p className={`text-xs font-bold ${loyaltyTier.color} flex items-center gap-1.5`}>
-            <Award className="w-3.5 h-3.5" /> Maximum tier — {loyaltyTier.discount}% discount applied to your wallet purchases.
-          </p>
-        )}
-
-        {loyaltyTier.discount > 0 && (
-          <div className="flex items-center gap-2 text-[10px] font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 rounded-xl px-3 py-2">
-            <CheckCircle2 className="w-3.5 h-3.5" />
-            {loyaltyTier.discount}% loyalty discount is automatically applied on wallet-funded purchases.
+          <div className={`flex items-center gap-2 text-[11px] font-bold ${loyaltyTier.color}`}>
+            <Award className="w-3.5 h-3.5" /> Max tier — {loyaltyTier.discount}% applied to all wallet purchases.
           </div>
         )}
       </div>
 
-      {/* ── New Schedule Form ───────────────────────────────────────────── */}
+      {/* ── New Schedule Form ───────────────────────────────────────────────── */}
       {showForm && (
-        <div className="rounded-3xl border border-sky-500/20 bg-sky-500/5 p-6 space-y-5">
-          <h3 className="font-black text-base text-white">New Auto-Renewal</h3>
-
-          {/* Network */}
-          <div className="space-y-2">
-            <p className="text-[10px] font-black uppercase tracking-widest text-white/30">Network</p>
-            <div className="flex gap-2 p-1 bg-black/30 rounded-2xl border border-white/6">
-              {(["MTN", "Telecel", "AirtelTigo"] as const).map(n => (
-                <button
-                  key={n}
-                  type="button"
-                  onClick={() => { setNetwork(n); setPackageSize(""); }}
-                  className={`flex-1 py-2.5 rounded-xl text-xs font-black transition-all ${network === n ? "bg-sky-500 text-white" : "text-white/30 hover:text-white/60"}`}
-                >
-                  {n}
-                </button>
-              ))}
+        <div className="rounded-3xl border border-white/10 bg-white/[0.025] overflow-hidden">
+          {/* Form header */}
+          <div className="px-6 py-4 border-b border-white/6 flex items-center gap-3">
+            <div className="w-7 h-7 rounded-xl bg-sky-500/15 border border-sky-500/25 flex items-center justify-center">
+              <Plus className="w-3.5 h-3.5 text-sky-400" />
+            </div>
+            <div>
+              <p className="text-sm font-black text-white">New Auto-Renewal</p>
+              <p className="text-[10px] text-white/30">Configure your recurring bundle</p>
             </div>
           </div>
 
-          {/* Package */}
-          <div className="space-y-2">
-            <p className="text-[10px] font-black uppercase tracking-widest text-white/30">Bundle</p>
-            <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
-              {packages.map(p => (
-                <button
-                  key={p.size}
-                  type="button"
-                  onClick={() => setPackageSize(p.size)}
-                  className={`p-3 rounded-2xl border text-center transition-all ${packageSize === p.size ? "border-sky-500 bg-sky-500/15" : "border-white/8 bg-white/[0.02] hover:border-white/20"}`}
-                >
-                  <p className="text-xs font-black text-white">{p.size}</p>
-                  <p className="text-[10px] text-sky-400 font-bold mt-0.5">₵{p.price.toFixed(2)}</p>
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Phone + Frequency */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <p className="text-[10px] font-black uppercase tracking-widest text-white/30">Recipient Phone</p>
-              <input
-                type="tel"
-                value={phone}
-                onChange={e => setPhone(formatPhone(e.target.value))}
-                placeholder="0240000000"
-                className="w-full h-11 bg-black/40 border border-white/10 rounded-xl px-4 text-sm text-white font-mono focus:border-sky-500/50 outline-none transition-all"
-              />
-            </div>
-            <div className="space-y-2">
-              <p className="text-[10px] font-black uppercase tracking-widest text-white/30">Renewal Frequency</p>
-              <div className="flex gap-2 h-11">
-                {(["daily", "weekly", "monthly"] as const).map(f => (
-                  <button
-                    key={f}
-                    type="button"
-                    onClick={() => setFrequency(f)}
-                    className={`flex-1 rounded-xl text-[10px] font-black transition-all capitalize ${frequency === f ? "bg-sky-500 text-white" : "border border-white/8 bg-white/[0.02] text-white/40 hover:text-white/70"}`}
-                  >
-                    {f}
-                  </button>
-                ))}
+          <div className="p-6 space-y-6">
+            {/* ── Step 1: Network ── */}
+            <div className="space-y-2.5">
+              <p className="text-[10px] font-black uppercase tracking-widest text-white/30 flex items-center gap-2">
+                <span className="w-4 h-4 rounded-full bg-white/10 text-white/50 text-[8px] font-black flex items-center justify-center">1</span>
+                Choose Network
+              </p>
+              <div className="grid grid-cols-3 gap-2">
+                {(["MTN", "Telecel", "AirtelTigo"] as const).map(n => {
+                  const cfg = NETWORK_CONFIG[n];
+                  const active = network === n;
+                  return (
+                    <button
+                      key={n}
+                      type="button"
+                      onClick={() => { userChoseNetwork.current = true; setNetwork(n); setPackageSize(""); }}
+                      className={`py-3 rounded-2xl border font-black text-sm transition-all ${
+                        active
+                          ? `${cfg.color} text-white border-transparent shadow-lg ${cfg.glow}`
+                          : `border-white/8 bg-white/[0.02] ${cfg.text} hover:border-white/20 hover:bg-white/[0.04]`
+                      }`}
+                    >
+                      {n}
+                    </button>
+                  );
+                })}
               </div>
             </div>
-          </div>
 
-          <div className="flex gap-3 pt-1">
+            {/* ── Step 2: Bundle ── */}
+            <div className="space-y-2.5">
+              <p className="text-[10px] font-black uppercase tracking-widest text-white/30 flex items-center gap-2">
+                <span className="w-4 h-4 rounded-full bg-white/10 text-white/50 text-[8px] font-black flex items-center justify-center">2</span>
+                Choose Bundle
+              </p>
+              <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+                {packages.map(p => {
+                  const selected = packageSize === p.size;
+                  return (
+                    <button
+                      key={p.size}
+                      type="button"
+                      onClick={() => setPackageSize(p.size)}
+                      className={`relative p-3 rounded-2xl border text-center transition-all ${
+                        selected
+                          ? `${netCfg.border} bg-white/[0.06] ring-1 ${netCfg.ring}`
+                          : "border-white/8 bg-white/[0.02] hover:border-white/20"
+                      }`}
+                    >
+                      {p.popular && !selected && (
+                        <span className="absolute -top-1.5 left-1/2 -translate-x-1/2 text-[7px] font-black uppercase bg-amber-500 text-black px-1.5 rounded-full">
+                          Popular
+                        </span>
+                      )}
+                      <p className={`text-xs font-black ${selected ? "text-white" : "text-white/70"}`}>{p.size}</p>
+                      <p className={`text-[10px] font-bold mt-0.5 ${selected ? netCfg.text : "text-white/30"}`}>₵{p.price.toFixed(2)}</p>
+                      {p.validity && <p className="text-[9px] text-white/20 mt-0.5">{p.validity}</p>}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* ── Step 3: Phone & Frequency ── */}
+            <div className="space-y-2.5">
+              <p className="text-[10px] font-black uppercase tracking-widest text-white/30 flex items-center gap-2">
+                <span className="w-4 h-4 rounded-full bg-white/10 text-white/50 text-[8px] font-black flex items-center justify-center">3</span>
+                Recipient & Schedule
+              </p>
+              {/* Name */}
+              <div className="space-y-1.5">
+                <p className="text-[10px] font-bold text-white/40 uppercase tracking-widest">Recipient Name <span className="text-white/20 normal-case tracking-normal font-normal">(optional label)</span></p>
+                <div className="relative">
+                  <User className="absolute left-3.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-white/25 pointer-events-none" />
+                  <input
+                    type="text"
+                    value={recipientName}
+                    onChange={e => setRecipientName(e.target.value)}
+                    placeholder="e.g. Mum, Wife, Client A"
+                    maxLength={40}
+                    className="w-full h-12 pl-10 pr-4 bg-black/40 border border-white/10 rounded-xl text-sm text-white outline-none transition-all focus:border-sky-500/50 placeholder:text-white/20"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {/* Phone */}
+                <div className="space-y-1.5">
+                  <p className="text-[10px] font-bold text-white/40 uppercase tracking-widest">Recipient Phone</p>
+                  <div className="relative">
+                    <Phone className="absolute left-3.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-white/25 pointer-events-none" />
+                    <input
+                      type="tel"
+                      value={phone}
+                      onChange={e => setPhone(formatPhone(e.target.value))}
+                      placeholder="0241234567"
+                      maxLength={10}
+                      className={`w-full h-12 pl-10 pr-4 bg-black/40 border rounded-xl text-sm text-white font-mono outline-none transition-all ${
+                        phone.length === 0
+                          ? "border-white/10 focus:border-sky-500/50"
+                          : isValidGhanaPhone(phone)
+                          ? detectNetwork(phone) === network
+                            ? "border-emerald-500/40 focus:border-emerald-500/60"
+                            : "border-amber-500/40 focus:border-amber-500/60"
+                          : "border-red-500/40 focus:border-red-500/60"
+                      }`}
+                    />
+                    {phone.length > 0 && (
+                      <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                        {isValidGhanaPhone(phone)
+                          ? <ShieldCheck className={`w-4 h-4 ${detectNetwork(phone) === network ? "text-emerald-400" : "text-amber-400"}`} />
+                          : <XCircle className="w-4 h-4 text-red-400" />}
+                      </div>
+                    )}
+                  </div>
+                  <PhoneValidator phone={phone} selectedNetwork={network} />
+                </div>
+
+                {/* Frequency */}
+                <div className="space-y-1.5">
+                  <p className="text-[10px] font-bold text-white/40 uppercase tracking-widest">Renewal Frequency</p>
+                  <div className="grid grid-cols-3 gap-1.5">
+                    {(["daily", "weekly", "monthly"] as const).map(f => {
+                      const cfg = FREQ_CONFIG[f];
+                      const active = frequency === f;
+                      return (
+                        <button
+                          key={f}
+                          type="button"
+                          onClick={() => setFrequency(f)}
+                          className={`py-2.5 rounded-xl border text-center transition-all ${
+                            active
+                              ? "bg-sky-500/20 border-sky-500/40 text-sky-300"
+                              : "border-white/8 bg-white/[0.02] text-white/30 hover:text-white/50 hover:border-white/20"
+                          }`}
+                        >
+                          <p className="text-[11px] font-black">{cfg.label}</p>
+                          <p className="text-[9px] opacity-60 mt-0.5">{cfg.sub}</p>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* ── Summary + Create ── */}
+            {packageSize && phoneValid && (
+              <div className={`p-4 rounded-2xl border ${netCfg.border} bg-white/[0.02] space-y-2`}>
+                <p className="text-[10px] font-black uppercase tracking-widest text-white/30">Schedule Summary</p>
+                <div className="flex items-center gap-3">
+                  <div className={`w-9 h-9 rounded-xl ${netCfg.color} flex items-center justify-center shrink-0`}>
+                    <CalendarClock className="w-4 h-4 text-white" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <p className="text-sm font-black text-white">{network} {packageSize}</p>
+                      <span className={`text-[9px] font-black uppercase px-1.5 py-0.5 rounded-full border ${netCfg.border} ${netCfg.text}`}>
+                        {detectNetwork(phone) === network ? "✓ verified" : network}
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-white/40 mt-0.5">
+                      {recipientName ? `${recipientName} · ` : ""}{phone} · {FREQ_CONFIG[frequency].label.toLowerCase()}
+                    </p>
+                  </div>
+                  <ChevronRight className={`w-4 h-4 ${netCfg.text} shrink-0`} />
+                </div>
+              </div>
+            )}
+
             <button
               type="button"
               onClick={handleCreate}
-              disabled={saving}
-              className="flex items-center gap-2 px-6 py-3 rounded-2xl bg-sky-500 hover:bg-sky-400 text-white font-black text-sm transition-all disabled:opacity-50"
+              disabled={saving || !packageSize || !phoneValid}
+              className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl bg-sky-500 hover:bg-sky-400 disabled:bg-white/10 disabled:text-white/30 text-white font-black text-sm transition-all shadow-lg shadow-sky-500/20 disabled:shadow-none"
             >
               {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <CalendarClock className="w-4 h-4" />}
-              {saving ? "Saving…" : "Create Schedule"}
-            </button>
-            <button
-              type="button"
-              onClick={() => setShowForm(false)}
-              className="px-6 py-3 rounded-2xl border border-white/10 bg-white/5 text-white/50 font-bold text-sm hover:bg-white/10 transition-all"
-            >
-              Cancel
+              {saving ? "Creating schedule…" : "Create Auto-Renewal"}
             </button>
           </div>
         </div>
       )}
 
-      {/* ── Schedule List ───────────────────────────────────────────────── */}
+      {/* ── Schedule List ───────────────────────────────────────────────────── */}
       <div className="rounded-3xl border border-white/8 bg-white/[0.02] overflow-hidden">
         <div className="px-6 py-4 border-b border-white/6 flex items-center justify-between">
-          <h3 className="font-black text-base text-white">Active Schedules</h3>
+          <div>
+            <h3 className="font-black text-sm text-white">Your Schedules</h3>
+            <p className="text-[10px] text-white/30 mt-0.5">{activeCount} active of {schedules.length} total</p>
+          </div>
           <span className="text-xs font-bold text-white/30 bg-white/5 border border-white/8 px-2.5 py-1 rounded-full">
-            {schedules.length} schedule{schedules.length !== 1 ? "s" : ""}
+            {schedules.length}
           </span>
         </div>
 
         {loading ? (
-          <div className="p-6 space-y-3">
-            {[1, 2].map(i => <div key={i} className="h-20 rounded-2xl bg-white/5 animate-pulse" />)}
+          <div className="p-4 space-y-3">
+            {[1, 2, 3].map(i => <div key={i} className="h-[72px] rounded-2xl bg-white/5 animate-pulse" />)}
           </div>
         ) : schedules.length === 0 ? (
-          <div className="py-16 text-center space-y-3">
-            <div className="w-14 h-14 rounded-2xl bg-white/5 border border-white/8 flex items-center justify-center mx-auto">
-              <CalendarClock className="w-7 h-7 text-white/20" />
+          <div className="py-16 text-center space-y-4">
+            <div className="w-16 h-16 rounded-3xl bg-white/5 border border-white/8 flex items-center justify-center mx-auto">
+              <CalendarClock className="w-7 h-7 text-white/15" />
             </div>
-            <p className="text-sm text-white/30">No schedules yet</p>
-            <p className="text-xs text-white/20">Click "New Schedule" to set up an auto-renewal</p>
+            <div>
+              <p className="text-sm font-bold text-white/30">No schedules yet</p>
+              <p className="text-xs text-white/20 mt-1">Hit "New Schedule" to set one up</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowForm(true)}
+              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-2xl bg-sky-500/15 border border-sky-500/25 text-sky-400 text-sm font-black hover:bg-sky-500/25 transition-all"
+            >
+              <Plus className="w-4 h-4" /> Create First Schedule
+            </button>
           </div>
         ) : (
-          <div className="p-4 space-y-3">
-            {schedules.map(s => (
-              <div
-                key={s.id}
-                className={`flex items-center justify-between gap-4 rounded-2xl border px-5 py-4 transition-all ${s.active ? "border-white/8 bg-white/[0.025]" : "border-white/4 bg-white/[0.01] opacity-50"}`}
-              >
-                <div className="flex items-center gap-4 min-w-0">
-                  <div className="w-10 h-10 rounded-xl bg-sky-500/10 border border-sky-500/20 flex items-center justify-center shrink-0">
-                    <CalendarClock className="w-4.5 h-4.5 text-sky-400" />
+          <div className="p-4 space-y-2">
+            {schedules.map(s => {
+              const cfg = NETWORK_CONFIG[s.network as keyof typeof NETWORK_CONFIG] ?? NETWORK_CONFIG.MTN;
+              return (
+                <div
+                  key={s.id}
+                  className={`group relative flex items-center gap-4 rounded-2xl border px-4 py-4 transition-all ${
+                    s.active
+                      ? "border-white/8 bg-white/[0.025] hover:border-white/15"
+                      : "border-white/4 bg-white/[0.01] opacity-45 hover:opacity-70"
+                  }`}
+                >
+                  {/* Network dot */}
+                  <div className={`w-2 h-2 rounded-full shrink-0 ${s.active ? cfg.color : "bg-white/15"}`} />
+
+                  {/* Network + package icon */}
+                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${s.active ? `${cfg.color} bg-opacity-15` : "bg-white/5"} border border-white/8`}>
+                    <CalendarClock className={`w-4 h-4 ${s.active ? cfg.text : "text-white/20"}`} />
                   </div>
-                  <div className="min-w-0">
-                    <p className="font-black text-sm text-white truncate">
-                      {s.network} {s.package_size} → {s.recipient_phone}
-                    </p>
-                    <div className="flex items-center gap-3 mt-0.5 flex-wrap">
-                      <span className="text-[10px] font-bold text-sky-400 uppercase">{FREQ_LABELS[s.frequency]}</span>
-                      <span className="text-[10px] text-white/30 flex items-center gap-1">
-                        <Clock className="w-2.5 h-2.5" /> Next: {nextRunLabel(s.next_run_at)}
+
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <p className="font-black text-sm text-white">{s.network} {s.package_size}</p>
+                      <span className={`text-[9px] font-black uppercase px-1.5 py-0.5 rounded-full border ${cfg.border} ${cfg.text} bg-white/[0.02]`}>
+                        {s.frequency}
                       </span>
+                      {!s.active && (
+                        <span className="text-[9px] font-black uppercase px-1.5 py-0.5 rounded-full bg-white/5 border border-white/10 text-white/30">
+                          Paused
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-3 mt-1 flex-wrap">
+                      {s.recipient_name && (
+                        <span className="text-[10px] font-bold text-white/60 flex items-center gap-1">
+                          <User className="w-2.5 h-2.5" /> {s.recipient_name}
+                        </span>
+                      )}
+                      <span className="text-[10px] text-white/35 flex items-center gap-1 font-mono">
+                        <Phone className="w-2.5 h-2.5" /> {s.recipient_phone}
+                      </span>
+                      {s.active && (
+                        <span className="text-[10px] text-white/30 flex items-center gap-1">
+                          <Clock className="w-2.5 h-2.5" /> {nextRunLabel(s.next_run_at)}
+                        </span>
+                      )}
                     </div>
                   </div>
+
+                  <div className="flex items-center gap-1.5 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <button
+                      type="button"
+                      onClick={() => toggleActive(s.id, s.active)}
+                      className={`w-8 h-8 rounded-xl flex items-center justify-center border transition-all ${
+                        s.active
+                          ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20"
+                          : "border-white/10 bg-white/5 text-white/30 hover:text-white/60"
+                      }`}
+                      aria-label={s.active ? "Pause" : "Resume"}
+                    >
+                      {s.active ? <ToggleRight className="w-4 h-4" /> : <ToggleLeft className="w-4 h-4" />}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => deleteSchedule(s.id)}
+                      className="w-8 h-8 rounded-xl flex items-center justify-center border border-red-500/20 bg-red-500/5 text-red-400/50 hover:text-red-400 hover:bg-red-500/15 transition-all"
+                      aria-label="Delete"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
                 </div>
-                <div className="flex items-center gap-2 shrink-0">
-                  <button
-                    type="button"
-                    onClick={() => toggleActive(s.id, s.active)}
-                    className={`transition-colors ${s.active ? "text-emerald-400 hover:text-emerald-300" : "text-white/20 hover:text-white/50"}`}
-                    aria-label={s.active ? "Pause schedule" : "Resume schedule"}
-                  >
-                    {s.active ? <ToggleRight className="w-6 h-6" /> : <ToggleLeft className="w-6 h-6" />}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => deleteSchedule(s.id)}
-                    className="text-red-400/50 hover:text-red-400 transition-colors"
-                    aria-label="Delete schedule"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>
 
-      {/* Info note */}
+      {/* ── Info note ──────────────────────────────────────────────────────── */}
       <div className="flex items-start gap-3 p-4 rounded-2xl bg-white/[0.02] border border-white/6">
-        <AlertCircle className="w-4 h-4 text-white/20 shrink-0 mt-0.5" />
-        <p className="text-[11px] text-white/30 leading-relaxed">
-          Scheduled bundles are funded from your wallet balance. Ensure sufficient balance before each renewal date.
-          Schedules with insufficient balance are skipped and retried the next day.
+        <Info className="w-4 h-4 text-white/20 shrink-0 mt-0.5" />
+        <p className="text-[11px] text-white/25 leading-relaxed">
+          Renewals are funded from your wallet. Maintain sufficient balance before each renewal date.
+          Schedules with insufficient balance are skipped and retried the following day.
         </p>
       </div>
 

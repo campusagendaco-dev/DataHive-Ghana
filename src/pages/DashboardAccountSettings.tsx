@@ -7,8 +7,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { User, Mail, Phone, Shield, Camera, Lock, Eye, EyeOff } from "lucide-react";
+import { User, Mail, Phone, Shield, Camera, Lock, Eye, EyeOff, Fingerprint, Smartphone, Trash2, Loader2, Plus } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { useWebAuthn } from "@/hooks/useWebAuthn";
+import { toast } from "sonner";
 
 const DashboardAccountSettings = () => {
   const { user, profile, refreshProfile, isAdmin } = useAuth();
@@ -22,6 +24,10 @@ const DashboardAccountSettings = () => {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [updatingPassword, setUpdatingPassword] = useState(false);
+
+  const { isSupported, credentials, loadingCredentials, register, deleteCredential } = useWebAuthn();
+  const [registering, setRegistering] = useState(false);
+  const [deviceName, setDeviceName] = useState("My Device");
 
   useEffect(() => {
     setFullName(profile?.full_name || "");
@@ -282,6 +288,119 @@ const DashboardAccountSettings = () => {
                   </Button>
                 </div>
               </form>
+            </CardContent>
+          </Card>
+
+          {/* ── Biometric / WebAuthn ── */}
+          <Card className="border-none bg-card shadow-sm mt-8">
+            <CardHeader>
+              <CardTitle className="text-lg font-bold flex items-center gap-2">
+                <Fingerprint className="w-5 h-5 text-amber-400" />
+                Biometric Authentication
+              </CardTitle>
+              <CardDescription>
+                Use your device fingerprint or Face ID to secure sensitive actions like withdrawals.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-5">
+              {!isSupported && (
+                <div className="rounded-xl bg-amber-500/10 border border-amber-500/20 p-4 text-sm text-amber-300">
+                  Your browser or device does not support WebAuthn. Try Chrome / Safari on a modern device.
+                </div>
+              )}
+
+              {isSupported && (
+                <>
+                  {/* Registered credentials */}
+                  {loadingCredentials ? (
+                    <div className="flex items-center gap-2 text-muted-foreground text-sm">
+                      <Loader2 className="w-4 h-4 animate-spin" /> Loading devices…
+                    </div>
+                  ) : credentials.length > 0 ? (
+                    <div className="space-y-2">
+                      {credentials.map((c) => (
+                        <div key={c.id} className="flex items-center justify-between rounded-xl bg-secondary/50 border border-white/5 px-4 py-3">
+                          <div className="flex items-center gap-3">
+                            <Smartphone className="w-4 h-4 text-amber-400 shrink-0" />
+                            <div>
+                              <p className="text-sm font-bold">{c.device_name}</p>
+                              <p className="text-[11px] text-muted-foreground">
+                                Registered {new Date(c.created_at).toLocaleDateString()}
+                                {c.last_used_at && ` · Last used ${new Date(c.last_used_at).toLocaleDateString()}`}
+                                {c.backed_up && " · Cloud-backed"}
+                              </p>
+                            </div>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              try {
+                                await deleteCredential(c.credential_id);
+                                toast.success("Device removed");
+                              } catch (e: any) {
+                                toast.error("Could not remove device", { description: e.message });
+                              }
+                            }}
+                            className="text-muted-foreground hover:text-red-400 transition-colors"
+                            aria-label="Remove device"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">No devices registered yet.</p>
+                  )}
+
+                  {/* Register new device */}
+                  <div className="space-y-3 pt-2 border-t border-white/5">
+                    <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">
+                      Device Label (optional)
+                    </Label>
+                    <div className="flex gap-2">
+                      <Input
+                        value={deviceName}
+                        onChange={(e) => setDeviceName(e.target.value)}
+                        placeholder="e.g. My iPhone 15"
+                        className="h-11 bg-secondary/50 border-white/5 rounded-xl"
+                        maxLength={40}
+                      />
+                      <Button
+                        type="button"
+                        disabled={registering}
+                        onClick={async () => {
+                          setRegistering(true);
+                          try {
+                            await register(deviceName.trim() || "My Device");
+                            toast.success("Biometric registered!", {
+                              description: "You can now use your fingerprint or Face ID to confirm withdrawals.",
+                            });
+                            setDeviceName("My Device");
+                          } catch (e: any) {
+                            const msg: string = e?.message ?? "";
+                            if (msg.includes("cancelled") || msg.includes("NotAllowedError")) {
+                              toast.error("Registration cancelled.");
+                            } else {
+                              toast.error("Could not register biometric", { description: msg });
+                            }
+                          } finally {
+                            setRegistering(false);
+                          }
+                        }}
+                        className="h-11 px-5 rounded-xl font-bold shrink-0 gap-2"
+                      >
+                        {registering ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <Plus className="w-4 h-4" />
+                        )}
+                        Add Device
+                      </Button>
+                    </div>
+                  </div>
+                </>
+              )}
             </CardContent>
           </Card>
         </div>

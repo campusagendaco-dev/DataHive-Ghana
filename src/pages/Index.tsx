@@ -251,15 +251,15 @@ const Index = () => {
   }, []);
 
   const networks = useReveal();
-  const steps    = useReveal();
+  const steps = useReveal();
   const features = useReveal();
   const guarantee = useReveal();
-  const tracker  = useReveal();
-  const agent    = useReveal();
-  const faq      = useReveal();
+  const tracker = useReveal();
+  const agent = useReveal();
+  const faq = useReveal();
 
   const animatedDelivered = useCountUp(liveStats.totalDelivered);
-  const animatedAgents    = useCountUp(liveStats.totalAgents);
+  const animatedAgents = useCountUp(liveStats.totalAgents);
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-[#030305] text-gray-900 dark:text-white">
@@ -273,13 +273,13 @@ const Index = () => {
         <div className="absolute inset-0 z-0 overflow-hidden">
           <div className="absolute inset-0 bg-black/60 z-10" /> {/* Dark overlay */}
           <div className="absolute inset-0 bg-gradient-to-b from-black/20 via-transparent to-black/60 z-10" />
-          <video 
+          <video
             key={videoUrl}
             ref={videoRef}
-            autoPlay 
+            autoPlay
             muted={isMuted}
-            loop 
-            playsInline 
+            loop
+            playsInline
             className="w-full h-full object-cover"
           >
             <source src={videoUrl} type="video/mp4" />
@@ -345,20 +345,20 @@ const Index = () => {
           </p>
 
           {/* CTA buttons */}
-            <div className="flex flex-col sm:flex-row gap-3 justify-center mb-12">
-              <Link
-                to="/buy-data"
-                className="inline-flex items-center justify-center gap-2.5 rounded-2xl bg-amber-400 hover:bg-amber-300 text-black font-black text-base px-8 py-4 transition-all duration-200 hover:scale-[1.02] active:scale-[0.98] shadow-xl shadow-amber-400/20"
-              >
-                Buy Data <ArrowRight className="w-5 h-5" />
-              </Link>
-              <Link
-                to="/agent-program"
-                className="inline-flex items-center justify-center gap-2 rounded-2xl border border-white/20 hover:border-white/30 bg-white/5 hover:bg-white/10 text-white/70 hover:text-white font-semibold text-base px-8 py-4 transition-all duration-200 backdrop-blur-sm"
-              >
-                Start Selling
-              </Link>
-            </div>
+          <div className="flex flex-col sm:flex-row gap-3 justify-center mb-12">
+            <Link
+              to="/buy-data"
+              className="inline-flex items-center justify-center gap-2.5 rounded-2xl bg-amber-400 hover:bg-amber-300 text-black font-black text-base px-8 py-4 transition-all duration-200 hover:scale-[1.02] active:scale-[0.98] shadow-xl shadow-amber-400/20"
+            >
+              Buy Data <ArrowRight className="w-5 h-5" />
+            </Link>
+            <Link
+              to="/agent-program"
+              className="inline-flex items-center justify-center gap-2 rounded-2xl border border-white/20 hover:border-white/30 bg-white/5 hover:bg-white/10 text-white/70 hover:text-white font-semibold text-base px-8 py-4 transition-all duration-200 backdrop-blur-sm"
+            >
+              Start Selling
+            </Link>
+          </div>
 
           {/* Trust pills */}
           <div
@@ -367,9 +367,9 @@ const Index = () => {
           >
             {[
               { icon: ShieldCheck, text: "Paystack secured", color: "text-emerald-400" },
-              { icon: Zap,         text: "Delivery under 5 s", color: "text-amber-400" },
-              { icon: CheckCircle2,text: "Non-expiry bundles", color: "text-sky-400" },
-              { icon: Clock,       text: "Available 24/7",     color: "text-purple-400" },
+              { icon: Zap, text: "Delivery under 5 s", color: "text-amber-400" },
+              { icon: CheckCircle2, text: "Non-expiry bundles", color: "text-sky-400" },
+              { icon: Clock, text: "Available 24/7", color: "text-purple-400" },
             ].map(({ icon: Icon, text, color }) => (
               <span
                 key={text}
@@ -458,9 +458,8 @@ const Index = () => {
                     {net.samples.map(({ size, price }, j) => (
                       <div
                         key={size}
-                        className={`flex items-center justify-between px-4 py-2.5 text-sm ${
-                          j % 2 === 0 ? "bg-gray-50 dark:bg-white/[0.02]" : ""
-                        } border-b border-gray-100 dark:border-white/5 last:border-0`}
+                        className={`flex items-center justify-between px-4 py-2.5 text-sm ${j % 2 === 0 ? "bg-gray-50 dark:bg-white/[0.02]" : ""
+                          } border-b border-gray-100 dark:border-white/5 last:border-0`}
                       >
                         <span className="font-semibold text-gray-700 dark:text-white/70">{size}</span>
                         <span className="font-black text-amber-500">{price}</span>
@@ -597,9 +596,9 @@ const Index = () => {
                 {/* 3 trust points */}
                 <div className="flex flex-col gap-4 shrink-0 min-w-[220px]">
                   {[
-                    { icon: Timer,       color: "text-emerald-500", bg: "bg-emerald-500/10", border: "border-emerald-500/20", title: "10-Min SLA",      desc: "Delivery or full refund" },
-                    { icon: RefreshCw,   color: "text-sky-500",     bg: "bg-sky-500/10",     border: "border-sky-500/20",     title: "Auto Refund",     desc: "No manual claims needed" },
-                    { icon: ShieldCheck, color: "text-amber-500",   bg: "bg-amber-500/10",   border: "border-amber-500/20",   title: "Paystack Secured", desc: "Every payment protected" },
+                    { icon: Timer, color: "text-emerald-500", bg: "bg-emerald-500/10", border: "border-emerald-500/20", title: "10-Min SLA", desc: "Delivery or full refund" },
+                    { icon: RefreshCw, color: "text-sky-500", bg: "bg-sky-500/10", border: "border-sky-500/20", title: "Auto Refund", desc: "No manual claims needed" },
+                    { icon: ShieldCheck, color: "text-amber-500", bg: "bg-amber-500/10", border: "border-amber-500/20", title: "Paystack Secured", desc: "Every payment protected" },
                   ].map(({ icon: Icon, color, bg, border, title, desc }) => (
                     <div key={title} className={`flex items-center gap-3 rounded-2xl border ${border} ${bg} px-4 py-3`}>
                       <div className={`w-9 h-9 rounded-xl ${bg} border ${border} flex items-center justify-center shrink-0`}>
@@ -676,9 +675,9 @@ const Index = () => {
                 <div className="flex flex-wrap gap-2">
                   {[
                     { icon: BarChart3, text: "Profit tracking" },
-                    { icon: Store,     text: "Your own store" },
-                    { icon: Zap,       text: "Wholesale prices" },
-                    { icon: Users,     text: "Sub-agents" },
+                    { icon: Store, text: "Your own store" },
+                    { icon: Zap, text: "Wholesale prices" },
+                    { icon: Users, text: "Sub-agents" },
                   ].map(({ icon: Icon, text }) => (
                     <span
                       key={text}

@@ -558,51 +558,77 @@ const Navbar = () => {
             </Link>
           )}
 
-          {menuBanners.length > 0 && (
-            <div className="mt-8 pt-4 border-t border-white/5 relative group">
+        </div>
+
+        {/* ── Pinned ad banner ── */}
+        {menuBanners.length > 0 && (
+          <div
+            className="shrink-0 relative z-10 px-3 pb-3 pt-2"
+            style={{ borderTop: `1px solid ${drawerDivider}` }}
+          >
+            <div className="relative">
+              {/* Sponsored badge */}
+              <span
+                className="absolute top-1.5 right-1.5 z-10 text-[8px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded-md pointer-events-none"
+                style={{
+                  background: "rgba(0,0,0,0.55)",
+                  color: "rgba(255,255,255,0.70)",
+                  backdropFilter: "blur(4px)",
+                }}
+              >
+                Sponsored
+              </span>
+
               <Carousel
                 setApi={setApi}
-                plugins={[
-                  Autoplay({
-                    delay: 4000,
-                  }),
-                ]}
+                plugins={[Autoplay({ delay: 4000 })]}
                 className="w-full"
               >
                 <CarouselContent className="-ml-0">
                   {menuBanners.map((banner) => (
-                    <CarouselItem 
-                      key={banner.id} 
-                      className="pl-0 cursor-pointer"
+                    <CarouselItem
+                      key={banner.id}
+                      className="pl-0"
                       onClick={() => banner.target_url && navigate(banner.target_url)}
                     >
-                      <div className="relative aspect-[16/9] overflow-hidden rounded-xl border border-white/5">
-                        <img 
-                          src={banner.image_url} 
-                          alt="Promotion" 
-                          className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+                      <div
+                        className="relative overflow-hidden rounded-xl cursor-pointer active:scale-[0.98] transition-transform"
+                        style={{ height: 68 }}
+                      >
+                        <img
+                          src={banner.image_url}
+                          alt="Sponsored"
+                          className="w-full h-full object-cover"
+                        />
+                        {/* subtle gradient vignette */}
+                        <div
+                          className="absolute inset-0 rounded-xl pointer-events-none"
+                          style={{
+                            background: "linear-gradient(90deg, rgba(0,0,0,0.28) 0%, transparent 55%)",
+                            boxShadow: "inset 0 0 0 1px rgba(255,255,255,0.07)",
+                          }}
                         />
                       </div>
                     </CarouselItem>
                   ))}
                 </CarouselContent>
               </Carousel>
-              
+
               {menuBanners.length > 1 && (
-                <div className="flex justify-center gap-1.5 mt-3">
+                <div className="flex justify-center gap-1 mt-1.5">
                   {menuBanners.map((_, i) => (
                     <div
                       key={i}
-                      className={`h-1 rounded-full transition-all duration-300 ${
-                        current === i ? "w-4 bg-amber-500" : "w-1 bg-white/10"
+                      className={`h-0.5 rounded-full transition-all duration-300 ${
+                        current === i ? "w-3 bg-amber-500" : "w-1.5 bg-white/10"
                       }`}
                     />
                   ))}
                 </div>
               )}
             </div>
-          )}
-        </div>
+          </div>
+        )}
       </div>
     </>
   );
