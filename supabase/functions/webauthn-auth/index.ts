@@ -11,7 +11,9 @@ serve(async (req: Request) => {
     return new Response(null, { headers: corsHeaders });
   }
 
-  const { action, payload } = await req.json();
+  const body = await req.json();
+  const { action, payload } = body;
+  const rpId = body.rpId || payload?.rpId || req.headers.get("host")?.split(":")[0] || "localhost";
   const authHeader = req.headers.get("Authorization")!;
   
   const supabaseClient = createClient(
@@ -48,7 +50,7 @@ serve(async (req: Request) => {
 
         return new Response(JSON.stringify({
           challenge,
-          rp: { name: "SwiftData Ghana", id: req.headers.get("host")?.split(":")[0] },
+          rp: { name: "SwiftData Ghana", id: rpId },
           user: {
             id: user.id,
             name: user.email,

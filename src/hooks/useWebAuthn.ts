@@ -88,14 +88,19 @@ export function useWebAuthn() {
   useEffect(() => { fetchCredentials(); }, []);
 
   const register = async (deviceName = "My Device"): Promise<void> => {
-    const options = await invoke("registration-options", { displayName: deviceName });
+    const options = await invoke("registration-options", { 
+      displayName: deviceName,
+      rpId: window.location.hostname
+    });
     const response = await startRegistration({ optionsJSON: options });
     await invoke("verify-registration", { response, deviceName });
     await fetchCredentials();
   };
 
   const authenticate = async (): Promise<boolean> => {
-    const options = await invoke("authentication-options");
+    const options = await invoke("authentication-options", {
+      rpId: window.location.hostname
+    });
     const response = await startAuthentication({ optionsJSON: options });
     const result = await invoke("verify-authentication", { response });
     return result?.verified === true;
