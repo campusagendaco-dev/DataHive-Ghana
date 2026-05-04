@@ -15,7 +15,7 @@ import { toast } from "sonner";
 const DashboardAccountSettings = () => {
   const { user, profile, refreshProfile, isAdmin } = useAuth();
   const navigate = useNavigate();
-  const { toast } = useToast();
+  const { toast: uiToast } = useToast();
   const [saving, setSaving] = useState(false);
   const [fullName, setFullName] = useState("");
   const [phone, setPhone] = useState("");
@@ -42,7 +42,7 @@ const DashboardAccountSettings = () => {
     if (!user) return;
 
     if (!fullName.trim()) {
-      toast({ title: "Full name is required", variant: "destructive" });
+      uiToast({ title: "Full name is required", variant: "destructive" });
       return;
     }
 
@@ -57,13 +57,13 @@ const DashboardAccountSettings = () => {
       .eq("user_id", user.id);
 
     if (error) {
-      toast({ title: "Could not save account settings", description: error.message, variant: "destructive" });
+      uiToast({ title: "Could not save account settings", description: error.message, variant: "destructive" });
       setSaving(false);
       return;
     }
 
     await refreshProfile();
-    toast({ title: "Account settings saved" });
+    uiToast({ title: "Account settings saved" });
     setSaving(false);
   };
 
@@ -71,7 +71,7 @@ const DashboardAccountSettings = () => {
     e.preventDefault();
     
     if (newPassword.length < 6) {
-      toast({ 
+      uiToast({ 
         title: "Password too short", 
         description: "Password must be at least 6 characters long.", 
         variant: "destructive" 
@@ -80,9 +80,9 @@ const DashboardAccountSettings = () => {
     }
 
     if (newPassword !== confirmPassword) {
-      toast({ 
+      uiToast({ 
         title: "Passwords do not match", 
-        description: "Please make sure both passwords match.", 
+        description: "Please make sure both passwords are the same.", 
         variant: "destructive" 
       });
       return;
@@ -92,13 +92,13 @@ const DashboardAccountSettings = () => {
     const { error } = await supabase.auth.updateUser({ password: newPassword });
 
     if (error) {
-      toast({ 
+      uiToast({ 
         title: "Could not update password", 
         description: error.message, 
         variant: "destructive" 
       });
     } else {
-      toast({ 
+      uiToast({ 
         title: "Password updated", 
         description: "Your password has been successfully changed." 
       });
