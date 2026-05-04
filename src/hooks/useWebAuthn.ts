@@ -88,6 +88,7 @@ export function useWebAuthn() {
   useEffect(() => { fetchCredentials(); }, []);
 
   const register = async (deviceName = "My Device"): Promise<void> => {
+    console.log("Registering biometric for RP ID:", window.location.hostname);
     const options = await invoke("registration-options", { 
       displayName: deviceName,
       rpId: window.location.hostname,
