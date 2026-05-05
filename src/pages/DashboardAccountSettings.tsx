@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { User, Mail, Phone, Shield, Camera, Lock, Eye, EyeOff, Fingerprint, Smartphone, Trash2, Key, Loader2, Plus } from "lucide-react";
+import { User, Mail, Phone, Shield, Camera, Lock, Eye, EyeOff, Fingerprint, Smartphone, Trash2, Key, Loader2, Plus, AlertTriangle } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useWebAuthn } from "@/hooks/useWebAuthn";
 import { toast } from "sonner";
@@ -24,6 +24,7 @@ const DashboardAccountSettings = () => {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [updatingPassword, setUpdatingPassword] = useState(false);
+  const [deletingAccount, setDeletingAccount] = useState(false);
 
   const { isSupported, supportReason, credentials, loadingCredentials, register, deleteCredential } = useWebAuthn();
   const [registering, setRegistering] = useState(false);
@@ -106,6 +107,40 @@ const DashboardAccountSettings = () => {
       setConfirmPassword("");
     }
     setUpdatingPassword(false);
+  };
+  
+  const handleDeleteAccount = async () => {
+    if (!user) return;
+    
+    const confirmDelete = window.confirm(
+      "Are you absolutely sure you want to delete your account? This action is PERMANENT and cannot be undone. All your data, including order history and wallet balance, will be lost."
+    );
+    
+    if (!confirmDelete) return;
+    
+    const secondConfirm = window.confirm(
+      "Final Confirmation: This is your last chance to cancel. Proceed with deletion?"
+    );
+    
+    if (!secondConfirm) return;
+
+    setDeletingAccount(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("delete-account");
+
+      if (error) throw error;
+      
+      toast.success("Account deleted successfully");
+      await supabase.auth.signOut();
+      navigate("/");
+    } catch (e: any) {
+      uiToast({ 
+        title: "Deletion failed", 
+        description: e.message || "An unexpected error occurred", 
+        variant: "destructive" 
+      });
+      setDeletingAccount(false);
+    }
   };
 
   return (
@@ -471,6 +506,41 @@ const DashboardAccountSettings = () => {
               <p className="text-[10px] text-muted-foreground">
                 Note: For security, changing your PIN will trigger a 24-hour hold on withdrawals.
               </p>
+            </CardContent>
+          </Card>
+
+          {/* ── Danger Zone ── */}
+          <Card className="border border-red-500/20 bg-red-500/5 shadow-sm mt-12 overflow-hidden">
+            <CardHeader className="bg-red-500/10 border-b border-red-500/10">
+              <CardTitle className="text-lg font-bold flex items-center gap-2 text-red-500">
+                <AlertTriangle className="w-5 h-5" />
+                Danger Zone
+              </CardTitle>
+              <CardDescription className="text-red-400/70">
+                Permanent actions that cannot be reversed.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="p-6">
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+                <div className="space-y-1">
+                  <p className="text-sm font-bold text-white/90">Delete My Account</p>
+                  <p className="text-xs text-muted-foreground">
+                    Instantly and permanently delete your SwiftData account and all associated data.
+                  </p>
+                </div>
+                <Button 
+                  onClick={handleDeleteAccount}
+                  disabled={deletingAccount}
+                  variant="destructive"
+                  className="h-12 px-8 rounded-xl font-bold bg-red-600 hover:bg-red-700 shadow-lg shadow-red-600/20 whitespace-nowrap"
+                >
+                  {deletingAccount ? (
+                    <><Loader2 className="w-4 h-4 animate-spin mr-2" /> Deleting...</>
+                  ) : (
+                    <><Trash2 className="w-4 h-4 mr-2" /> Delete Account</>
+                  )}
+                </Button>
+              </div>
             </CardContent>
           </Card>
         </div>

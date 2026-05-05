@@ -6,7 +6,7 @@ import {
   User, Store, ShieldCheck, Trophy, 
   TrendingUp, ShoppingCart, Award, Calendar, Activity,
   ChevronRight, BadgeCheck, Copy, Target, Star, Database, RefreshCw, Zap, Heart,
-  Settings, Phone
+  Settings, Phone, Trash2, AlertTriangle, Loader2
 } from "lucide-react";
 import { useAppTheme } from "@/contexts/ThemeContext";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -29,6 +29,7 @@ const DashboardProfile = () => {
   const { theme } = useAppTheme();
   const [stats, setStats] = useState<ProfileStats | null>(null);
   const [loading, setLoading] = useState(true);
+  const [deletingAccount, setDeletingAccount] = useState(false);
 
   useEffect(() => {
     if (!user) return;
@@ -59,6 +60,35 @@ const DashboardProfile = () => {
 
     fetchProfileData();
   }, [user]);
+
+  const handleDeleteAccount = async () => {
+    if (!user) return;
+    
+    const confirmDelete = window.confirm(
+      "Are you absolutely sure you want to delete your account? This action is PERMANENT and cannot be undone. All your data, including order history and wallet balance, will be lost."
+    );
+    
+    if (!confirmDelete) return;
+    
+    const secondConfirm = window.confirm(
+      "Final Confirmation: This is your last chance to cancel. Proceed with deletion?"
+    );
+    
+    if (!secondConfirm) return;
+
+    setDeletingAccount(true);
+    try {
+      const { error } = await supabase.functions.invoke("delete-account");
+      if (error) throw error;
+      
+      toast.success("Account deleted successfully");
+      await supabase.auth.signOut();
+      window.location.href = "/";
+    } catch (e: any) {
+      toast.error(e.message || "Could not delete account. Please contact support.");
+      setDeletingAccount(false);
+    }
+  };
 
   const isPaidAgent = Boolean(profile?.agent_approved || profile?.sub_agent_approved);
   const accountType = isPaidAgent ? (profile?.is_sub_agent ? "Sub-Agent" : "Direct Agent") : "Regular Customer";
@@ -438,6 +468,35 @@ const DashboardProfile = () => {
               </TabsContent>
             </Tabs>
           </div>
+        </div>
+        
+        {/* Danger Zone */}
+        <div className="mt-12 pt-8 border-t border-red-500/10">
+          <Card className="border-none bg-red-500/5 ring-1 ring-red-500/20">
+            <CardContent className="p-6 flex flex-col sm:flex-row items-center justify-between gap-6 text-center sm:text-left">
+              <div className="space-y-1">
+                <h3 className="text-lg font-black text-red-500 flex items-center gap-2 justify-center sm:justify-start">
+                  <AlertTriangle className="w-5 h-5" />
+                  Danger Zone
+                </h3>
+                <p className="text-sm text-muted-foreground max-w-md">
+                  Permanently delete your account and all associated data. This action cannot be undone.
+                </p>
+              </div>
+              <Button 
+                onClick={handleDeleteAccount}
+                disabled={deletingAccount}
+                variant="destructive" 
+                className="bg-red-600 hover:bg-red-700 font-bold px-8 h-12 rounded-xl shadow-lg shadow-red-600/20"
+              >
+                {deletingAccount ? (
+                  <><Loader2 className="w-4 h-4 animate-spin mr-2" /> Deleting...</>
+                ) : (
+                  <><Trash2 className="w-4 h-4 mr-2" /> Delete My Account</>
+                )}
+              </Button>
+            </CardContent>
+          </Card>
         </div>
       </div>
     </div>
