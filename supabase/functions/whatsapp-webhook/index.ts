@@ -10,7 +10,8 @@ declare const Deno: any;
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const PAYSTACK_SECRET_KEY = Deno.env.get("PAYSTACK_SECRET_KEY")!;
-const APP_BASE_URL = Deno.env.get("APP_BASE_URL") || "https://swiftdatagh.com";
+const APP_BASE_URL = Deno.env.get("APP_BASE_URL") || "https://swiftdatagh.shop";
+
 const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY");
 
 // const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
@@ -262,7 +263,8 @@ async function initDataPayment(
       method: "POST",
       headers: { Authorization: `Bearer ${PAYSTACK_SECRET_KEY}`, "Content-Type": "application/json" },
       body: JSON.stringify({
-        email: `wa-${from}@swiftdatagh.com`,
+        email: `wa-${from}@swiftdatagh.shop`,
+
         amount: Math.round(pkg.total * 100),
         reference: orderId,
         metadata,
@@ -337,7 +339,8 @@ async function initAirtimePayment(
       method: "POST",
       headers: { Authorization: `Bearer ${PAYSTACK_SECRET_KEY}`, "Content-Type": "application/json" },
       body: JSON.stringify({
-        email: `wa-${from}@swiftdatagh.com`,
+        email: `wa-${from}@swiftdatagh.shop`,
+
         amount: Math.round(total * 100),
         reference: orderId,
         metadata,

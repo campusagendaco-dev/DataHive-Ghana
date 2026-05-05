@@ -394,7 +394,8 @@ serve(async (req: Request) => {
     }
 
     if (finalAction === "index") {
-      return json({ success: true, message: "SwiftData API v2.0", docs: "https://swiftdatagh.com/api-docs" });
+      return json({ success: true, message: "SwiftData API v2.0", docs: "https://swiftdatagh.shop/api-docs" });
+
     }
 
     return json({ success: false, error: "Endpoint not found." }, 404);

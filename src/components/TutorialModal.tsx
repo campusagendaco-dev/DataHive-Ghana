@@ -211,7 +211,7 @@ const AgentStep2 = () => (
         <div className="w-2 h-2 rounded-full bg-red-500" />
         <div className="w-2 h-2 rounded-full bg-amber-400" />
         <div className="w-2 h-2 rounded-full bg-green-500" />
-        <span className="text-white/30 text-[10px] ml-1">swiftdatagh.com/login</span>
+        <span className="text-white/30 text-[10px] ml-1">swiftdatagh.shop/login</span>
       </div>
       <div className="p-4 space-y-2">
         <div className="h-7 rounded-lg border border-white/10" style={{ background: "rgba(255,255,255,0.05)", animation: "tutorial-fade-in 0.5s ease-out 0.2s both" }}>
@@ -266,7 +266,8 @@ const AgentStep4 = () => (
           <span className="text-white font-bold text-sm">Your Store is Live 🎉</span>
         </div>
         <div className="rounded-lg border border-amber-400/20 px-3 py-2 flex items-center gap-2" style={{ background: "rgba(245,158,11,0.08)" }}>
-          <span className="text-amber-400 text-xs font-mono truncate">swiftdatagh.com/store/</span>
+          <span className="text-amber-400 text-xs font-mono truncate">swiftdatagh.shop/store/</span>
+
           <span className="text-amber-300 font-bold text-xs">yourname</span>
         </div>
         <div className="mt-3 grid grid-cols-2 gap-2">
@@ -290,7 +291,8 @@ const SubStep1 = () => (
     <div className="relative w-full max-w-[280px] rounded-2xl border border-white/10 overflow-hidden" style={{ background: "#0d0d18" }}>
       <div className="p-4 text-center border-b border-white/8">
         <p className="text-white font-bold text-sm">Agent's Store</p>
-        <p className="text-white/40 text-xs">swiftdatagh.com/store/<span className="text-amber-400">agentname</span></p>
+        <p className="text-white/40 text-xs">swiftdatagh.shop/store/<span className="text-amber-400">agentname</span></p>
+
       </div>
       <div className="p-4">
         <div className="rounded-xl border border-amber-400/30 p-3" style={{ background: "rgba(245,158,11,0.06)" }}>

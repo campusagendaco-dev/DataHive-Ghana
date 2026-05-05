@@ -127,7 +127,8 @@ const TRUST_STATS = [
 const FAQS = [
   {
     q: "Where can I buy the cheapest MTN data bundles in Ghana?",
-    a: "SwiftData Ghana (swiftdatagh.com) offers some of the cheapest non-expiry MTN data bundles in Ghana — no account required. Select a bundle, enter the recipient number and pay with card or MoMo via Paystack.",
+    a: "SwiftData Ghana (swiftdatagh.shop) offers some of the cheapest non-expiry MTN data bundles in Ghana — no account required. Select a bundle, enter the recipient number and pay with card or MoMo via Paystack.",
+
   },
   {
     q: "Are SwiftData Ghana bundles non-expiry?",
@@ -268,7 +269,8 @@ const Index = () => {
         title="SwiftData Ghana | Cheapest MTN, Telecel & AirtelTigo Data Bundles — Instant Delivery"
         description="Buy cheap non-expiry MTN, Telecel & AirtelTigo data bundles in Ghana. Instant delivery in 5 seconds, no account needed. Best prices guaranteed."
         keywords="SwiftData Ghana, buy data Ghana, cheap MTN data, cheap Telecel data, cheap AirtelTigo data, non-expiry bundles Ghana"
-        canonical="https://swiftdatagh.com/"
+        canonical="https://swiftdatagh.shop/"
+
       />
 
       {/* First-visit agent popup — shown once per session, admin-toggleable */}
@@ -768,7 +770,8 @@ const Index = () => {
             Serving all regions of Ghana 24/7.
           </p>
           <p className="text-gray-300 dark:text-white/12 text-[10px] mt-5">
-            © {new Date().getFullYear()} SwiftData Ghana · swiftdatagh.com · All rights reserved.
+            © {new Date().getFullYear()} SwiftData Ghana · swiftdatagh.shop · All rights reserved.
+
           </p>
         </div>
       </section>

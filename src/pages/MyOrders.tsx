@@ -66,7 +66,8 @@ const MyOrders = () => {
       `Recipient : ${order.customer_phone}`,
       `Status    : ✅ ${order.status.toUpperCase()}`,
       "─────────────────────────────────",
-      "  swiftdataghana.com",
+      "  swiftdatagh.shop",
+
       "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
     ];
     const text = lines.join("\n");

@@ -400,7 +400,8 @@ const DashboardDeveloperAPI = () => {
               <Share2 className="w-4 h-4 text-amber-400 shrink-0" />
               <p className="text-xs text-white/60 flex-1">Built something cool with the API?</p>
               <a
-                href={`https://wa.me/?text=${encodeURIComponent("🚀 I just built an integration with the SwiftData Ghana API! Check out the Developer Portal: https://swiftdataghana.com/developers")}`}
+                href={`https://wa.me/?text=${encodeURIComponent("🚀 I just built an integration with the SwiftData Ghana API! Check out the Developer Portal: https://swiftdatagh.shop/developers")}`}
+
                 target="_blank"
                 rel="noreferrer"
                 className="text-[10px] font-black text-amber-400 hover:text-amber-300 whitespace-nowrap transition-colors"

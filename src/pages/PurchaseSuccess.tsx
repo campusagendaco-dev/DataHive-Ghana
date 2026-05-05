@@ -64,7 +64,8 @@ const PurchaseSuccess = () => {
       ...(customerPhone ? [`Recipient : ${customerPhone}`] : []),
       `Status    : ✅ Delivered`,
       "─────────────────────────────────",
-      "  swiftdataghana.com",
+      "  swiftdatagh.shop",
+
       "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
     ];
     const text = lines.join("\n");

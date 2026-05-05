@@ -302,13 +302,18 @@ const AdminAPIUsers = () => {
     const dbAc = user.api_allowed_actions ?? ["balance", "plans"];
     const dbIp = user.api_ip_whitelist ?? [];
     const dbWh = user.api_webhook_url ?? null;
+    const currentPrices = priceEdits[user.user_id] || {};
+    const dbPrices = user.api_custom_prices || {};
+
     return (
       rl !== dbRl ||
       JSON.stringify([...ac].sort()) !== JSON.stringify([...dbAc].sort()) ||
       JSON.stringify(ip) !== JSON.stringify(dbIp) ||
-      wh !== dbWh
+      wh !== dbWh ||
+      JSON.stringify(currentPrices) !== JSON.stringify(dbPrices)
     );
   };
+
 
   const filtered = users.filter(
     (u) =>

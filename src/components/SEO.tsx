@@ -14,8 +14,9 @@ const SEO = ({
   title,
   description,
   keywords,
-  url = "https://swiftdatagh.com",
-  image = "https://swiftdatagh.com/og-image.png",
+  url = "https://swiftdatagh.shop",
+  image = "https://swiftdatagh.shop/og-image.png",
+
   type = "website",
   canonical
 }: SEOProps) => {

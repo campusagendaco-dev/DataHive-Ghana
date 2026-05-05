@@ -131,7 +131,8 @@ const OrderStatus = () => {
       ...(phoneParam ? [`Recipient : ${phoneParam}`] : []),
       `Status    : ✅ ${orderStatus.toUpperCase()}`,
       "─────────────────────────────────",
-      "  swiftdataghana.com",
+      "  swiftdatagh.shop",
+
       "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
     ];
     const text = lines.join("\n");
@@ -226,7 +227,8 @@ const OrderStatus = () => {
           title="Track Order Status — SwiftData Ghana"
           description="Track the real-time delivery status of your data bundle purchase. Enter your reference ID to see payment and fulfillment progress."
           keywords="track data order Ghana, order status SwiftData, data delivery status"
-          canonical={`https://swiftdatagh.com/order-status?reference=${reference}`}
+          canonical={`https://swiftdatagh.shop/order-status?reference=${reference}`}
+
         />
         <div className="w-full max-w-[340px]">
           <div className="relative overflow-hidden rounded-[2.5rem] bg-white/[0.03] border border-white/10 backdrop-blur-3xl shadow-2xl">
@@ -406,7 +408,8 @@ const OrderStatus = () => {
         title="Live Delivery Scanner — Order Tracking"
         description="View live data bundle deliveries and track your orders in real-time. Ghana's most transparent data vending platform."
         keywords="live data scanner, track data delivery Ghana, real-time data tracking"
-        canonical="https://swiftdatagh.com/order-status"
+        canonical="https://swiftdatagh.shop/order-status"
+
       />
       <div className="fixed inset-0 pointer-events-none overflow-hidden">
         <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-amber-500/5 rounded-full blur-[120px]" />

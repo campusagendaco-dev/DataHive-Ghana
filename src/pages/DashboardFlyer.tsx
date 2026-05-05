@@ -318,7 +318,8 @@ const DashboardFlyer = () => {
     }
     return {
       storeName: profile?.store_name || "My Store",
-      storeUrl: profile?.slug ? `swiftdatagh.com/store/${profile.slug}` : "swiftdatagh.com",
+      storeUrl: profile?.slug ? `swiftdatagh.shop/store/${profile.slug}` : "swiftdatagh.shop",
+
       contact: profile?.momo_number || "",
       packages,
     };
@@ -388,7 +389,8 @@ const DashboardFlyer = () => {
         await navigator.share({
           files: [file],
           title: `${profile?.store_name} — Data Bundles`,
-          text: `🛒 Order data from ${profile?.store_name}!\n\nhttps://swiftdatagh.com/store/${profile?.slug}`,
+          text: `🛒 Order data from ${profile?.store_name}!\n\nhttps://swiftdatagh.shop/store/${profile?.slug}`,
+
         });
       } else {
         // Fallback: download then open WhatsApp
@@ -401,7 +403,8 @@ const DashboardFlyer = () => {
         const caption = encodeURIComponent(
           `🛒 Order affordable data from ${profile?.store_name}!\n\n` +
           `⚡ Instant delivery · All networks · Best prices 🇬🇭\n\n` +
-          `👇 Shop now:\nhttps://swiftdatagh.com/store/${profile?.slug}`
+          `👇 Shop now:\nhttps://swiftdatagh.shop/store/${profile?.slug}`
+
         );
         setTimeout(() => window.open(`https://wa.me/?text=${caption}`, "_blank"), 600);
         toast({
@@ -420,13 +423,15 @@ const DashboardFlyer = () => {
 
   const shareWhatsApp = () => {
     if (!profile?.slug) { toast({ title: "Store URL not set" }); return; }
-    const text = encodeURIComponent(`🛒 Order affordable data from ${profile.store_name}!\n\nVisit: https://swiftdatagh.com/store/${profile.slug}\n\n⚡ Instant delivery · All networks · Best prices`);
+    const text = encodeURIComponent(`🛒 Order affordable data from ${profile.store_name}!\n\nVisit: https://swiftdatagh.shop/store/${profile.slug}\n\n⚡ Instant delivery · All networks · Best prices`);
+
     window.open(`https://wa.me/?text=${text}`, "_blank");
   };
 
   const copyLink = async () => {
     if (!profile?.slug) return;
-    await navigator.clipboard.writeText(`https://swiftdatagh.com/store/${profile.slug}`);
+    await navigator.clipboard.writeText(`https://swiftdatagh.shop/store/${profile.slug}`);
+
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
     toast({ title: "Link copied!" });
@@ -450,7 +455,8 @@ const DashboardFlyer = () => {
       >
         {profile?.slug && includeQr && (
           <QRCodeCanvas
-            value={`https://swiftdatagh.com/store/${profile.slug}`}
+            value={`https://swiftdatagh.shop/store/${profile.slug}`}
+
             size={120}
             bgColor="#000000"
             fgColor="#ffffff"

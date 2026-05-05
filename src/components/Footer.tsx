@@ -78,11 +78,12 @@ const Footer = () => {
           <div className="md:col-span-3">
             <h4 className="font-bold text-sm mb-6 text-white uppercase tracking-wider">Contact Us</h4>
             <div className="space-y-4 text-sm text-white/60">
-              <a href="mailto:support@swiftdatagh.com" className="flex items-center gap-3 hover:text-white transition-colors">
+              <a href="mailto:support@swiftdatagh.shop" className="flex items-center gap-3 hover:text-white transition-colors">
                 <div className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center border border-white/10 shrink-0">
                   <Mail className="w-4 h-4" />
                 </div>
-                support@swiftdatagh.com
+                support@swiftdatagh.shop
+
               </a>
               <div className="flex items-center gap-3">
                 <div className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center border border-white/10 shrink-0">

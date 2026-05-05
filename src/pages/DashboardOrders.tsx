@@ -251,7 +251,8 @@ const DashboardOrders = () => {
       `Amount    : GH₵ ${Number(order.amount).toFixed(2)}`,
       `Status    : ${statusLabel}`,
       "─────────────────────────────────",
-      "  swiftdataghana.com",
+      "  swiftdatagh.shop",
+
       "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
     ];
 
@@ -311,7 +312,8 @@ const DashboardOrders = () => {
     <div class="row"><span class="row-label">Time</span><span class="row-value">${time}</span></div>
     ${Number(order.profit) > 0 ? `<div class="row"><span class="row-label">Your Profit</span><span class="row-value" style="color:#16a34a">+GH₵ ${Number(order.profit).toFixed(2)}</span></div>` : ""}
   </div>
-  <div class="footer">Powered by <strong>SwiftData Ghana</strong> · swiftdataghana.com · Secured by Paystack</div>
+  <div class="footer">Powered by <strong>SwiftData Ghana</strong> · swiftdatagh.shop · Secured by Paystack</div>
+
 </div>
 <script>window.onload=()=>{window.print();}</script>
 </body></html>`;

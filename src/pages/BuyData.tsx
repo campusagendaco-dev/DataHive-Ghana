@@ -294,7 +294,8 @@ const BuyData = () => {
         title="Buy Cheap Data Bundles — MTN, Telecel & AirtelTigo"
         description="Select your network and buy cheap non-expiry data bundles in Ghana. We support MTN, Telecel and AirtelTigo with instant delivery."
         keywords="buy MTN data Ghana, buy Telecel data, buy AirtelTigo data, cheap data bundles, non-expiry data"
-        canonical="https://swiftdatagh.com/buy-data"
+        canonical="https://swiftdatagh.shop/buy-data"
+
       />
       {/* Hero header */}
       <div className="text-white py-10 px-4 mb-6" style={{ background: theme.heroHex }}>

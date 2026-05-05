@@ -155,7 +155,8 @@ const DashboardBuyAirtime = () => {
     const reference = crypto.randomUUID();
     const { data, error } = await supabase.functions.invoke("initialize-payment", {
       body: {
-        email: user.email || `${user.id}@swiftdataghana.com`,
+        email: user.email || `${user.id}@swiftdatagh.shop`,
+
         amount: numAmount,
         reference,
         callback_url: `${window.location.origin}/dashboard/buy-airtime?ref=${reference}`,
