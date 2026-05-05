@@ -1,4 +1,5 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
+
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
@@ -41,7 +42,7 @@ const DashboardDeveloperAPI = () => {
 
   const BASE_URL = "https://lsocdjpflecduumopijn.supabase.co/functions/v1/developer-api";
 
-  const fetchApiKey = async () => {
+  const fetchApiKey = useCallback(async () => {
     if (!user) return;
     setLoading(true);
     const { data } = await supabase
@@ -69,11 +70,13 @@ const DashboardDeveloperAPI = () => {
     if (logData) setLogs(logData);
     
     setLoading(false);
-  };
+  }, [user, toast]);
+
 
   useEffect(() => {
     fetchApiKey();
-  }, [user]);
+  }, [fetchApiKey]);
+
 
   const generateApiKey = async () => {
     if (!user) return;
@@ -85,9 +88,8 @@ const DashboardDeveloperAPI = () => {
     const keyHash = await sha256Hex(newKey);
     const prefix = newKey.slice(0, 12);
     
-    // Generate a new Secret Signing Key
+    // Generate a new Secret Signing Key (Used for HMAC verification in production)
     const newSecret = crypto.randomUUID().replace(/-/g, "");
-    const secretHash = await sha256Hex(newSecret);
 
     const { error } = await supabase
       .from("profiles")
@@ -97,6 +99,7 @@ const DashboardDeveloperAPI = () => {
         api_secret_key_hash: newSecret 
       })
       .eq("user_id", user.id);
+
 
     if (error) {
       toast({ title: "Failed to generate keys", description: error.message, variant: "destructive" });

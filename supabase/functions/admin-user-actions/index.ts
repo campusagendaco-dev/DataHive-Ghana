@@ -1015,10 +1015,11 @@ serve(async (req: Request) => {
           return new Response(JSON.stringify({
             error: "Provider not configured",
             diagnostics: {
-              DATA_PROVIDER_API_KEY: !!(Deno as any).env.get("DATA_PROVIDER_API_KEY") ? "configured" : "not set",
-              PRIMARY_DATA_PROVIDER_API_KEY: !!(Deno as any).env.get("PRIMARY_DATA_PROVIDER_API_KEY") ? "configured" : "not set",
+              DATA_PROVIDER_API_KEY: (Deno as any).env.get("DATA_PROVIDER_API_KEY") ? "configured" : "not set",
+              PRIMARY_DATA_PROVIDER_API_KEY: (Deno as any).env.get("PRIMARY_DATA_PROVIDER_API_KEY") ? "configured" : "not set",
               baseUrl: baseUrl ? "configured" : "not set",
             }
+
           }), {
             status: 200,
             headers: { ...corsHeaders, "Content-Type": "application/json" },

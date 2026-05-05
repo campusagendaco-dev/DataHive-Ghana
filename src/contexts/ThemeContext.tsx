@@ -85,7 +85,8 @@ function applyTheme(theme: AppTheme, isDark: boolean) {
 export const ThemeProvider = ({ children }: { children: React.ReactNode }) => {
   const [themeId, setThemeIdState] = useState<string>(() => {
     try { return localStorage.getItem(THEME_KEY) ?? DEFAULT_THEME_ID; }
-    catch { return DEFAULT_THEME_ID; }
+    catch { /* Silently fail if localStorage is disabled */ return DEFAULT_THEME_ID; }
+
   });
 
   const [isDark, setIsDark] = useState<boolean>(() => {
@@ -94,8 +95,10 @@ export const ThemeProvider = ({ children }: { children: React.ReactNode }) => {
       if (stored !== null) return stored === "true";
       return true; // default: dark
     } catch {
+      /* Silently fail if localStorage is disabled */
       return true;
     }
+
   });
 
   const theme = getTheme(themeId);
@@ -106,14 +109,16 @@ export const ThemeProvider = ({ children }: { children: React.ReactNode }) => {
 
   const setThemeId = (id: string) => {
     setThemeIdState(id);
-    try { localStorage.setItem(THEME_KEY, id); } catch {}
+    try { localStorage.setItem(THEME_KEY, id); } catch { /* Ignore storage errors */ }
   };
+
 
   const toggleDark = () => {
     const next = !isDark;
     setIsDark(next);
-    try { localStorage.setItem(DARK_KEY, String(next)); } catch {}
+    try { localStorage.setItem(DARK_KEY, String(next)); } catch { /* Ignore storage errors */ }
   };
+
 
   return (
     <ThemeContext.Provider value={{ theme, setThemeId, isDark, toggleDark }}>

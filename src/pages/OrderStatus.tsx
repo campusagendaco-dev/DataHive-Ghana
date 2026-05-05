@@ -112,7 +112,7 @@ const OrderStatus = () => {
       setFailed(true);
       return;
     }
-    if (status === "fulfilled") {
+    if (status === "fulfilled") {  
       return;
     }
   };

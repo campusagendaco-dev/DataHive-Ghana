@@ -47,40 +47,55 @@ const SupportChat = () => {
     setLoading(true);
     
     // 1. Find or create conversation
-    let { data: conv, error: convError } = await supabase
+    const { data: conv, error: convError } = await supabase
       .from("support_conversations")
       .select("id")
       .eq("user_id", user.id)
       .maybeSingle();
 
-    if (!conv && !convError) {
-      const { data: newConv } = await supabase
+    if (convError) {
+      console.error("Error fetching conversation:", convError);
+      setLoading(false);
+      return;
+    }
+
+    let activeConv = conv;
+
+    if (!activeConv) {
+      const { data: newConv, error: createError } = await supabase
         .from("support_conversations")
         .insert([{ user_id: user.id }])
         .select()
         .single();
-      conv = newConv;
+      
+      if (createError) {
+        console.error("Error creating conversation:", createError);
+        setLoading(false);
+        return;
+      }
+      activeConv = newConv;
     }
 
-    if (conv) {
-      setConversationId(conv.id);
+    if (activeConv) {
+      setConversationId(activeConv.id);
       // 2. Fetch messages
-      const { data: msgs } = await supabase
+      const { data: msgs, error: msgError } = await supabase
         .from("support_messages")
         .select("*")
-        .eq("conversation_id", conv.id)
+        .eq("conversation_id", activeConv.id)
         .order("created_at", { ascending: true });
       
+      if (msgError) console.error("Error fetching messages:", msgError);
       setMessages(msgs || []);
 
       // 3. Subscribe to new messages
       const channel = supabase
-        .channel(`support-${conv.id}`)
+        .channel(`support-${activeConv.id}`)
         .on("postgres_changes", { 
           event: "INSERT", 
           schema: "public", 
           table: "support_messages", 
-          filter: `conversation_id=eq.${conv.id}` 
+          filter: `conversation_id=eq.${activeConv.id}` 
         }, (payload: any) => {
           setMessages(prev => [...prev, payload.new as Message]);
         })
@@ -90,6 +105,7 @@ const SupportChat = () => {
         supabase.removeChannel(channel);
       };
     }
+
     setLoading(false);
   };
 

@@ -1,4 +1,5 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
+
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { FileSearch, ShieldAlert, Loader2 } from "lucide-react";
@@ -14,7 +15,8 @@ interface AuditLog {
 }
 
 const AdminAuditLogs = () => {
-  const [logType, setLogType] = useState<"audit" | "api">("audit");
+  const [logType, setLogType] = useState<"audit" | "api" | "security">("audit");
+
   const [logs, setLogs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [hasMore, setHasMore] = useState(true);
@@ -22,7 +24,7 @@ const AdminAuditLogs = () => {
   const PAGE_SIZE = 50;
   const [error, setError] = useState<string | null>(null);
 
-  const fetchLogs = async (isLoadMore = false) => {
+  const fetchLogs = useCallback(async (isLoadMore = false) => {
     if (!isLoadMore) {
       setLoading(true);
       setPage(0);
@@ -33,7 +35,13 @@ const AdminAuditLogs = () => {
       const from = currentPage * PAGE_SIZE;
       const to = from + PAGE_SIZE - 1;
 
-      const table = logType === "audit" ? "audit_logs" : "api_logs";
+      if (!isLoadMore) setLogs([]); // Clear logs immediately to prevent flicker
+
+      let table = "";
+      if (logType === "audit") table = "audit_logs";
+      else if (logType === "api") table = "api_logs";
+      else if (logType === "security") table = "security_logs";
+
       const { data: logData, error: logError } = await supabase
         .from(table)
         .select("*")
@@ -52,7 +60,7 @@ const AdminAuditLogs = () => {
             if (profileData) profileMap = profileData.reduce((acc, curr) => ({ ...acc, [curr.user_id]: curr.full_name }), {});
           }
           enrichedLogs = logData.map(log => ({ ...log, profiles: log.admin_id ? { full_name: profileMap[log.admin_id] || "Unknown Admin" } : null }));
-        } else {
+        } else if (logType === "api") {
           const userIds = [...new Set(logData.map(l => l.user_id).filter(Boolean))];
           let profileMap: Record<string, string> = {};
           if (userIds.length > 0) {
@@ -60,6 +68,14 @@ const AdminAuditLogs = () => {
             if (profileData) profileMap = profileData.reduce((acc, curr) => ({ ...acc, [curr.user_id]: curr.full_name }), {});
           }
           enrichedLogs = logData.map(log => ({ ...log, profiles: log.user_id ? { full_name: profileMap[log.user_id] || "API Client" } : null }));
+        } else if (logType === "security") {
+          const userIds = [...new Set(logData.map(l => l.user_id).filter(Boolean))];
+          let profileMap: Record<string, string> = {};
+          if (userIds.length > 0) {
+            const { data: profileData } = await supabase.from("profiles").select("user_id, full_name").in("user_id", userIds);
+            if (profileData) profileMap = profileData.reduce((acc, curr) => ({ ...acc, [curr.user_id]: curr.full_name }), {});
+          }
+          enrichedLogs = logData.map(log => ({ ...log, profiles: log.user_id ? { full_name: profileMap[log.user_id] || "System" } : null }));
         }
 
         setLogs(prev => isLoadMore ? [...prev, ...enrichedLogs] : enrichedLogs);
@@ -74,11 +90,12 @@ const AdminAuditLogs = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [logType, page]);
 
   useEffect(() => {
     fetchLogs();
-  }, [logType]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [fetchLogs]);
+
 
   const formatAction = (action: string) => {
     if (!action) return "Unknown";
@@ -107,7 +124,14 @@ const AdminAuditLogs = () => {
             >
               API Activity
             </button>
+            <button 
+              onClick={() => setLogType("security")}
+              className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${logType === "security" ? "bg-red-500 text-black shadow-lg" : "text-white/40 hover:text-white"}`}
+            >
+              Security Events
+            </button>
           </div>
+
 
           <div className="hidden sm:flex items-center gap-2 px-3 py-1 rounded-full bg-green-500/10 border border-green-500/20">
             <span className="relative flex h-2 w-2">
@@ -181,10 +205,11 @@ const AdminAuditLogs = () => {
                   <TableHeader>
                     <TableRow className="bg-white/5 hover:bg-white/5 border-white/5">
                       <TableHead className="w-[180px] text-white/50 uppercase text-[10px] font-black tracking-widest">Timestamp</TableHead>
-                      <TableHead className="text-white/50 uppercase text-[10px] font-black tracking-widest">{logType === "audit" ? "Admin" : "Agent / Client"}</TableHead>
-                      <TableHead className="text-white/50 uppercase text-[10px] font-black tracking-widest">{logType === "audit" ? "Action" : "Endpoint / Ref"}</TableHead>
-                      <TableHead className="text-white/50 uppercase text-[10px] font-black tracking-widest">{logType === "audit" ? "Details" : "Error Message"}</TableHead>
+                      <TableHead className="text-white/50 uppercase text-[10px] font-black tracking-widest">{logType === "audit" ? "Admin" : "User / Agent"}</TableHead>
+                      <TableHead className="text-white/50 uppercase text-[10px] font-black tracking-widest">{logType === "audit" ? "Action" : logType === "api" ? "Endpoint / Ref" : "Security Action"}</TableHead>
+                      <TableHead className="text-white/50 uppercase text-[10px] font-black tracking-widest">{logType === "audit" ? "Details" : logType === "api" ? "Error Message" : "Metadata / IP"}</TableHead>
                     </TableRow>
+
                   </TableHeader>
                   <TableBody>
                     {logs.map((log) => (
@@ -200,16 +225,25 @@ const AdminAuditLogs = () => {
                             <Badge variant="outline" className="font-mono text-[10px] bg-amber-400/5 text-amber-400 border-amber-400/20">
                               {formatAction(log.action)}
                             </Badge>
-                          ) : (
+                          ) : logType === "api" ? (
                             <div className="space-y-1">
                               <p className="font-mono text-[10px] text-white/70">{log.method} {log.endpoint}</p>
                               <code className="text-[10px] text-sky-400 bg-sky-400/5 px-1 rounded">{log.log_reference}</code>
                             </div>
+                          ) : (
+                            <Badge variant="outline" className="font-mono text-[10px] bg-red-400/5 text-red-400 border-red-400/20">
+                              {formatAction(log.action)}
+                            </Badge>
                           )}
                         </TableCell>
                         <TableCell className="text-[11px] text-muted-foreground max-w-[300px] truncate group hover:text-white transition-colors cursor-help">
-                          {logType === "audit" ? JSON.stringify(log.details) : log.error_message}
+                          {logType === "audit" 
+                            ? JSON.stringify(log.details) 
+                            : logType === "api" 
+                              ? log.error_message 
+                              : `${log.ip_address || "Unknown IP"} - ${JSON.stringify(log.metadata)}`}
                         </TableCell>
+
                       </TableRow>
                     ))}
                   </TableBody>
@@ -229,17 +263,26 @@ const AdminAuditLogs = () => {
                         <Badge variant="outline" className="font-mono text-[9px] bg-amber-400/5 text-amber-400 border-amber-400/20 shrink-0">
                           {formatAction(log.action)}
                         </Badge>
-                      ) : (
+                      ) : logType === "api" ? (
                         <Badge variant="outline" className="font-mono text-[9px] bg-sky-400/5 text-sky-400 border-sky-400/20 shrink-0">
                           {log.log_reference}
+                        </Badge>
+                      ) : (
+                        <Badge variant="outline" className="font-mono text-[9px] bg-red-400/5 text-red-400 border-red-400/20 shrink-0">
+                          {formatAction(log.action)}
                         </Badge>
                       )}
                     </div>
                     <div className="bg-black/20 p-3 rounded-lg border border-white/5">
                       <p className="text-[10px] text-white/40 font-mono break-all line-clamp-3">
-                        {logType === "audit" ? JSON.stringify(log.details) : `${log.method} ${log.endpoint} - ${log.error_message}`}
+                        {logType === "audit" 
+                          ? JSON.stringify(log.details) 
+                          : logType === "api" 
+                            ? `${log.method} ${log.endpoint} - ${log.error_message}`
+                            : `${log.ip_address || "No IP"} - ${JSON.stringify(log.metadata)}`}
                       </p>
                     </div>
+
                   </div>
                 ))}
               </div>

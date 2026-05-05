@@ -1,4 +1,5 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
+
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
@@ -19,7 +20,7 @@ const DashboardReportIssue = () => {
   const [tickets, setTickets] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const fetchTickets = async () => {
+  const fetchTickets = useCallback(async () => {
     if (!user) return;
     setLoading(true);
     const { data, error } = await supabase
@@ -32,11 +33,13 @@ const DashboardReportIssue = () => {
       setTickets(data);
     }
     setLoading(false);
-  };
+  }, [user]);
+
 
   useEffect(() => {
     fetchTickets();
-  }, [user]);
+  }, [fetchTickets]);
+
 
   const handleSubmit = async () => {
     if (!subject.trim() || !details.trim()) {
