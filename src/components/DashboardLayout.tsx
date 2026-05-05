@@ -169,7 +169,7 @@ const DashboardLayout = () => {
               )}
             >
               <Avatar className={cn("w-9 h-9 border-2 transition-all", isDark ? "border-white/10 group-hover:border-primary/50" : "border-gray-200 group-hover:border-primary/50")}>
-                <AvatarImage src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${user?.id}`} />
+                <AvatarImage src={profile?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user?.id}`} />
                 <AvatarFallback className="bg-primary/10 text-xs">{firstName.charAt(0)}</AvatarFallback>
               </Avatar>
               <div className="hidden sm:flex flex-col items-start text-left leading-tight">

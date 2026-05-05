@@ -30,6 +30,7 @@ interface UserRow {
   total_sales_volume?: number;
   wallet_balance?: number;
   is_suspended?: boolean;
+  avatar_url?: string | null;
 }
 
 type RoleTab = "all" | "customers" | "agents" | "sub-agents";

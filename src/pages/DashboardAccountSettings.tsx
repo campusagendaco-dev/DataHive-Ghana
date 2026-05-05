@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
+import { AvatarPicker } from "@/components/AvatarPicker";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -25,6 +26,7 @@ const DashboardAccountSettings = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [updatingPassword, setUpdatingPassword] = useState(false);
   const [deletingAccount, setDeletingAccount] = useState(false);
+  const [isAvatarPickerOpen, setIsAvatarPickerOpen] = useState(false);
 
   const { isSupported, supportReason, credentials, loadingCredentials, register, deleteCredential } = useWebAuthn();
   const [registering, setRegistering] = useState(false);
@@ -143,6 +145,20 @@ const DashboardAccountSettings = () => {
     }
   };
 
+  const handleAvatarSelect = async (url: string) => {
+    if (!user) return;
+    
+    const { error } = await supabase
+      .from("profiles")
+      .update({ avatar_url: url })
+      .eq("user_id", user.id);
+
+    if (error) throw error;
+    
+    await refreshProfile();
+    toast.success("Avatar updated successfully!");
+  };
+
   return (
     <div className="p-2 sm:p-4 lg:p-6 space-y-4 max-w-4xl mx-auto pb-10">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -166,13 +182,30 @@ const DashboardAccountSettings = () => {
             <CardContent className="p-6 flex flex-col items-center text-center">
               <div className="relative group cursor-pointer">
                 <Avatar className="w-24 h-24 border-4 border-card shadow-lg">
-                  <AvatarImage src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${user?.id}`} />
-                  <AvatarFallback className="text-2xl bg-primary/10">{fullName.charAt(0)}</AvatarFallback>
+                  <AvatarImage src={profile?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user?.id}`} />
+                  <AvatarFallback className="text-4xl bg-primary/10">
+                    {profile?.full_name?.charAt(0) || "U"}
+                  </AvatarFallback>
                 </Avatar>
-                <div className="absolute inset-0 bg-black/40 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                  <Camera className="w-6 h-6 text-white" />
+                <div className="absolute -bottom-1 -right-1">
+                  <Button 
+                    size="icon" 
+                    variant="secondary" 
+                    className="h-8 w-8 rounded-full shadow-lg border-2 border-background"
+                    onClick={() => setIsAvatarPickerOpen(true)}
+                  >
+                    <Camera className="w-4 h-4" />
+                  </Button>
                 </div>
               </div>
+
+              <AvatarPicker 
+                isOpen={isAvatarPickerOpen}
+                onClose={() => setIsAvatarPickerOpen(false)}
+                onSelect={handleAvatarSelect}
+                currentAvatarUrl={profile?.avatar_url || undefined}
+              />
+
               <div className="mt-4">
                 <h3 className="font-bold text-lg">{fullName || "User"}</h3>
                 <p className="text-xs text-muted-foreground font-medium">{email}</p>

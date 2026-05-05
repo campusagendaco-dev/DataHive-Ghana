@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
@@ -32,6 +33,7 @@ interface UserRow {
   parent_name?: string;
   is_suspended?: boolean;
   admin_notes?: string | null;
+  avatar_url?: string | null;
 }
 
 interface Order {
@@ -262,9 +264,12 @@ const UserDetailDrawer = ({ user, onClose }: Props) => {
             <SheetTitle className="sr-only">User Detail</SheetTitle>
           </SheetHeader>
           <div className="flex items-start gap-4">
-            <div className={`w-14 h-14 rounded-2xl ${avatarColor(user.full_name)} flex items-center justify-center text-white font-black text-lg shrink-0`}>
-              {initials}
-            </div>
+            <Avatar className="w-14 h-14 rounded-2xl border-2 border-primary/20 shrink-0">
+              <AvatarImage src={user.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.user_id}`} />
+              <AvatarFallback className={`${avatarColor(user.full_name)} text-white font-black text-lg`}>
+                {initials}
+              </AvatarFallback>
+            </Avatar>
             <div className="min-w-0 flex-1">
               <p className="font-black text-white text-lg leading-tight truncate">{user.full_name || "—"}</p>
               <p className="text-xs text-white/40 truncate">{user.email}</p>
