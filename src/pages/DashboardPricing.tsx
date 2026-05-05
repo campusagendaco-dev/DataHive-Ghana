@@ -64,10 +64,11 @@ const DashboardPricing = () => {
     const loadBasePrices = async () => {
       const pricingContext = await fetchApiPricingContext();
       const nextBasePrices: PackageBasePrices = {};
-      for (const [network, pkgs] of Object.entries(basePackages)) {
-        nextBasePrices[network] = {};
+      for (const [net, pkgs] of Object.entries(basePackages)) {
+        nextBasePrices[net] = {};
+        const multiplier = pricingContext.multipliers[net] || 1;
         for (const pkg of pkgs) {
-          nextBasePrices[network][pkg.size] = applyPriceMultiplier(pkg.price, pricingContext.multiplier);
+          nextBasePrices[net][pkg.size] = applyPriceMultiplier(pkg.price, multiplier);
         }
       }
 
@@ -86,7 +87,8 @@ const DashboardPricing = () => {
 
         if (!Number.isFinite(priceToUse) || priceToUse <= 0) return;
         if (!nextBasePrices[row.network]) nextBasePrices[row.network] = {};
-        nextBasePrices[row.network][row.package_size] = applyPriceMultiplier(priceToUse, pricingContext.multiplier);
+        const multiplier = pricingContext.multipliers[row.network] || 1;
+        nextBasePrices[row.network][row.package_size] = applyPriceMultiplier(priceToUse, multiplier);
       });
 
       // For sub-agents, base prices come from the parent agent's assigned wholesale

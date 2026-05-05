@@ -119,7 +119,7 @@ serve(async (req: Request) => {
   try {
     const { data: settings } = await supabaseAdmin
       .from("system_settings")
-      .select("holiday_mode_enabled, holiday_message, disable_ordering")
+      .select("holiday_mode_enabled, holiday_message, disable_ordering, mtn_markup_percentage, telecel_markup_percentage, at_markup_percentage, agent_activation_fee")
       .eq("id", 1)
       .maybeSingle();
 
@@ -160,7 +160,15 @@ serve(async (req: Request) => {
     const agentId = metadata.agent_id || "00000000-0000-0000-0000-000000000000";
     const isAgentLinkedOrder = hasValidAgentId(agentId);
 
-    const priceMultiplier = 1;
+    // Network-specific markup from system settings
+    const networkRawForMarkup = typeof metadata.network === "string" ? metadata.network : "";
+    const normalizedNetForMarkup = normalizeNetwork(networkRawForMarkup);
+    let networkMarkupPercent = 0;
+    if (normalizedNetForMarkup === "MTN") networkMarkupPercent = Number(settings?.mtn_markup_percentage || 0);
+    if (normalizedNetForMarkup === "Telecel") networkMarkupPercent = Number(settings?.telecel_markup_percentage || 0);
+    if (normalizedNetForMarkup === "AirtelTigo") networkMarkupPercent = Number(settings?.at_markup_percentage || 0);
+
+    const priceMultiplier = 1 + (networkMarkupPercent / 100);
     let resolvedAmount = Number.isFinite(amount) && amount > 0 ? amount : 0;
     let resolvedProfit = 0;
     let resolvedParentProfit = 0;
@@ -425,7 +433,7 @@ serve(async (req: Request) => {
 
     // ── Agent activation: enforce fixed fee + bind agent_id to JWT user ────────
     if (orderType === "agent_activation") {
-      const AGENT_FEE = 80;
+      const AGENT_FEE = Number(settings?.agent_activation_fee || 50);
       resolvedPaystackFee = parseFloat(calculatePaystackFee(AGENT_FEE).toFixed(2));
       const expectedTotal = parseFloat((AGENT_FEE + resolvedPaystackFee).toFixed(2));
       if (!amountMatches(expectedTotal, amount)) {

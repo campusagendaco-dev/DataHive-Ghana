@@ -102,11 +102,14 @@ const SubAgentSignup = () => {
 
     toast({ title: "Account created!", description: "Initializing activation payment..." });
     
-    // Initialize payment immediately
-    const totalFee = Math.max(0, Number(agent!.sub_agent_activation_markup || 0));
+    const baseFee = Math.max(0, Number(agent!.sub_agent_activation_markup || 0));
+    const PAYSTACK_FEE_RATE = 0.03;
+    const PAYSTACK_FEE_CAP = 100;
+    const paystackFee = Math.min(baseFee * PAYSTACK_FEE_RATE, PAYSTACK_FEE_CAP);
+    const totalWithFee = parseFloat((baseFee + paystackFee).toFixed(2));
     const orderId = crypto.randomUUID();
     
-    // Fetch dynamic activation fee from system_settings
+    // Fetch dynamic platform base fee from system_settings for profit splitting
     let platformBaseFee = 50;
     try {
       const { data: settings } = await supabase.from("system_settings").select("agent_activation_fee").eq("id", 1).maybeSingle();
@@ -117,14 +120,14 @@ const SubAgentSignup = () => {
       console.error("Error fetching platform fee:", e);
     }
 
-    const agentProfitShare = Math.max(0, parseFloat((totalFee - platformBaseFee).toFixed(2)));
-    const swiftDataShare = parseFloat((totalFee - agentProfitShare).toFixed(2));
+    const agentProfitShare = Math.max(0, parseFloat((baseFee - platformBaseFee).toFixed(2)));
+    const swiftDataShare = parseFloat((baseFee - agentProfitShare).toFixed(2));
 
-    if (totalFee > 0) {
+    if (totalWithFee > 0) {
       const { data: paymentData, error: paymentError } = await invokePublicFunction("initialize-payment", {
         body: {
           email: email.trim(),
-          amount: totalFee,
+          amount: totalWithFee,
           reference: orderId,
           callback_url: `${getAppBaseUrl()}/sub-agent/pending?reference=${orderId}`,
           metadata: {
@@ -133,8 +136,8 @@ const SubAgentSignup = () => {
             sub_agent_id: userId,
             agent_id: agent!.user_id,
             parent_agent_id: agent!.user_id,
-            activation_fee: totalFee,
-            paystack_fee: 0,
+            activation_fee: baseFee,
+            paystack_fee: paystackFee,
             agent_profit: agentProfitShare,
             swiftdata_share: swiftDataShare,
           },

@@ -75,6 +75,7 @@ const AdminProfits = lazy(() => import("./pages/AdminProfits"));
 const AdminBanners = lazy(() => import("./pages/AdminBanners"));
 const AdminEngagement = lazy(() => import("./pages/AdminEngagement"));
 const AdminReconciliation = lazy(() => import("./pages/AdminReconciliation"));
+const AdminSubAgents = lazy(() => import("./pages/AdminSubAgents"));
 const SubAgentSignup = lazy(() => import("./pages/SubAgentSignup"));
 const SubAgentPending = lazy(() => import("./pages/SubAgentPending"));
 const DashboardDeveloperAPI = lazy(() => import("./pages/DashboardDeveloperAPI"));
@@ -374,6 +375,7 @@ const AppContent = () => {
         <Route path="/admin" element={<AdminGuard><AdminLayout /></AdminGuard>}>
           <Route index element={<AdminOverview />} />
           <Route path="agents" element={<AdminAgents />} />
+          <Route path="sub-agents" element={<AdminSubAgents />} />
           <Route path="orders" element={<AdminOrders />} />
           <Route path="users" element={<AdminUsers />} />
           <Route path="reconciliation" element={<AdminReconciliation />} />

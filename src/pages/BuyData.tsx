@@ -72,7 +72,7 @@ const BuyData = () => {
   const [holidayMode, setHolidayMode] = useState(false);
   const [holidayMessage, setHolidayMessage] = useState("");
   const [orderingDisabled, setOrderingDisabled] = useState(false);
-  const [priceMultiplier, setPriceMultiplier] = useState(1);
+  const [priceMultipliers, setPriceMultipliers] = useState<Record<string, number>>({ MTN: 1, Telecel: 1, AirtelTigo: 1 });
   const phoneInputRef = useRef<HTMLInputElement>(null);
   const promoInputRef = useRef<HTMLInputElement>(null);
 
@@ -104,7 +104,7 @@ const BuyData = () => {
         setHolidayMessage(String(sys.holiday_message || "Holiday mode active. Orders will resume soon."));
         setOrderingDisabled(Boolean(sys.disable_ordering));
       }
-      setPriceMultiplier(pricingCtx.multiplier);
+      setPriceMultipliers(pricingCtx.multipliers);
       setPkgLoading(false);
     };
     load();
@@ -154,7 +154,8 @@ const BuyData = () => {
       const gs = globalSettings[`${selectedNetwork}-${pkg.size}`];
       if (gs?.is_unavailable) return null;
       const base = gs?.public_price ?? getPublicPrice(pkg.price);
-      return { ...pkg, price: applyPriceMultiplier(base, priceMultiplier) };
+      const multiplier = priceMultipliers[selectedNetwork] || 1;
+      return { ...pkg, price: applyPriceMultiplier(base, multiplier) };
     })
     .filter(Boolean) as { size: string; price: number; validity: string; popular?: boolean }[];
 

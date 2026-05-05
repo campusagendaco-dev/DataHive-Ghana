@@ -149,7 +149,7 @@ const DashboardBuyDataNetwork = ({ network }: DashboardBuyDataNetworkProps) => {
         fetchApiPricingContext(),
       ]);
       setGlobalSettings((settingsRes.data || []) as GlobalPackageSetting[]);
-      setPriceMultiplier(pricingContext.multiplier);
+      setPriceMultiplier(pricingContext.multipliers[network] || 1);
       setSettingsLoading(false);
 
       if (profile?.is_sub_agent && profile?.parent_agent_id) {

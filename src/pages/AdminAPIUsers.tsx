@@ -93,6 +93,7 @@ const AdminAPIUsers = () => {
   const [saving, setSaving] = useState<string | null>(null);
   const [generatedKey, setGeneratedKey] = useState<{ userId: string; key: string } | null>(null);
   const [generating, setGenerating] = useState<string | null>(null);
+  const [globalPrices, setGlobalPrices] = useState<Record<string, Record<string, number>>>({});
 
   const fetchUsers = async () => {
     setLoading(true);
@@ -135,8 +136,27 @@ const AdminAPIUsers = () => {
     setLoading(false);
   };
 
+  const fetchGlobalPrices = async () => {
+    const { data } = await supabase
+      .from("global_package_settings")
+      .select("network, package_size, api_price, agent_price");
+    
+    if (data) {
+      const map: Record<string, Record<string, number>> = {};
+      data.forEach((row: any) => {
+        if (!map[row.network]) map[row.network] = {};
+        // Use api_price if set, otherwise fallback to agent_price
+        map[row.network][row.package_size] = row.api_price || row.agent_price || 0;
+      });
+      setGlobalPrices(map);
+    }
+  };
+
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => { fetchUsers(); }, []);
+  useEffect(() => { 
+    fetchUsers(); 
+    fetchGlobalPrices();
+  }, []);
 
   const fetchUserOrders = async (userId: string) => {
     if (userOrders[userId]) { setExpandedUser(userId); return; }
@@ -544,22 +564,25 @@ const AdminAPIUsers = () => {
                               <div key={n.name} className="space-y-2">
                                 <p className="text-[10px] font-black uppercase text-amber-500/70 border-b border-amber-500/10 pb-1">{n.name}</p>
                                 <div className="space-y-1.5">
-                                  {basePackages[n.name]?.map((pkg) => (
-                                    <div key={pkg.size} className="flex items-center justify-between gap-2">
-                                      <span className="text-[10px] text-white/60 font-mono">{pkg.size}</span>
-                                      <div className="flex items-center gap-1.5">
-                                        <span className="text-[10px] text-white/20">GH₵</span>
-                                        <Input
-                                          type="number"
-                                          step="0.01"
-                                          placeholder={pkg.price.toFixed(2)}
-                                          className="h-6 w-20 text-[10px] bg-black/40 border-white/5 text-right font-mono"
-                                          value={priceEdits[user.user_id]?.[n.name]?.[pkg.size] ?? ""}
-                                          onChange={(e) => updateCustomPrice(user.user_id, n.name, pkg.size, e.target.value)}
-                                        />
+                                  {basePackages[n.name]?.map((pkg) => {
+                                    const currentGlobal = globalPrices[n.name]?.[pkg.size] || pkg.price;
+                                    return (
+                                      <div key={pkg.size} className="flex items-center justify-between gap-2">
+                                        <span className="text-[10px] text-white/60 font-mono truncate max-w-[60px]">{pkg.size}</span>
+                                        <div className="flex items-center gap-1.5">
+                                          <span className="text-[10px] text-white/20">GH₵</span>
+                                          <Input
+                                            type="number"
+                                            step="0.01"
+                                            placeholder={currentGlobal.toFixed(2)}
+                                            className="h-6 w-20 text-[10px] bg-black/40 border-white/5 text-right font-mono"
+                                            value={priceEdits[user.user_id]?.[n.name]?.[pkg.size] ?? ""}
+                                            onChange={(e) => updateCustomPrice(user.user_id, n.name, pkg.size, e.target.value)}
+                                          />
+                                        </div>
                                       </div>
-                                    </div>
-                                  ))}
+                                    );
+                                  })}
                                 </div>
                               </div>
                             ))}

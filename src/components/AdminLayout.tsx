@@ -7,7 +7,7 @@ import {
   LayoutDashboard, Users, ShieldCheck, ShoppingCart, LogOut, Menu,
   Wallet, Bell, Package, CreditCard, Activity, Settings, ChevronRight,
   BarChart3, Ticket, LifeBuoy, FileSearch, Key, TrendingUp, Sun, Moon,
-  Sparkles, Image as ImageIcon,
+  Sparkles, Image as ImageIcon, Users2
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
@@ -24,6 +24,7 @@ const NAV_SECTIONS = [
     title: "Operations",
     items: [
       { label: "Agents",       icon: ShieldCheck,  path: "/admin/agents" },
+      { label: "Sub-Agents",   icon: Users2,       path: "/admin/sub-agents" },
       { label: "Orders",       icon: ShoppingCart, path: "/admin/orders" },
       { label: "Packages",     icon: Package,      path: "/admin/packages" },
       { label: "Promo Codes",  icon: Ticket,       path: "/admin/promotions" },
