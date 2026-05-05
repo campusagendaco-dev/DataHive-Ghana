@@ -43,7 +43,7 @@ function getStatusMeta(status: OrderStatusType, failed: boolean, message?: strin
     return { color: "#EF4444", glow: "rgba(239,68,68,0.15)", label: "Delivery Failed", sub: message || "Something went wrong with your order", badge: "Failed" };
   }
   if (status === "fulfilled") {
-    return { color: "#10B981", glow: "rgba(16,185,129,0.12)", label: "Order Delivered!", sub: "Your bundle has been successfully activated", badge: "Complete" };
+    return { color: "#10B981", glow: "rgba(16,185,129,0.12)", label: "Purchase Successful", sub: "Order proceed. Will be delivered between 10min to 60min.", badge: "Success" };
   }
   if (status === "processing") {
     return { color: "#8B5CF6", glow: "rgba(139,92,246,0.12)", label: "Tracking Order", sub: message || "Order is being transmitted to network", badge: "Live" };

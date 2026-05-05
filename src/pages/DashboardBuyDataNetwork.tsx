@@ -390,7 +390,7 @@ const DashboardBuyDataNetwork = ({ network }: DashboardBuyDataNetworkProps) => {
       console.log("Wallet buy response data:", data);
 
       if (typeof data?.order_id === "string" || data?.success) {
-        toast({ title: "Purchase Success!", description: "Your bundle is being delivered.", variant: "default" });
+        toast({ title: "Purchase successful!", description: "Order proceed. Will be delivered between 10min to 60min.", variant: "default" });
         if (data?.order_id) {
           setLastOrder({ 
             id: data.order_id, 
@@ -854,9 +854,9 @@ const DashboardBuyDataNetwork = ({ network }: DashboardBuyDataNetworkProps) => {
             </div>
             
             <div className="space-y-3">
-              <h2 className="text-4xl font-black tracking-tighter text-white uppercase">Delivered!</h2>
+              <h2 className="text-2xl font-black tracking-tighter text-white uppercase">Purchase Successful</h2>
               <p className="text-white/40 text-sm font-medium leading-relaxed">
-                Your bundle has been processed successfully. Your balance has been updated.
+                Order proceed. Your bundle will be delivered between 10min to 60min.
               </p>
             </div>
 

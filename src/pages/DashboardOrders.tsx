@@ -43,8 +43,8 @@ function getDisplayStatus(status: string, orderType?: string): DisplayStatus {
   switch (status) {
     case "fulfilled":
       return {
-        label: orderType === "utility" ? "Payment Successful" : orderType === "airtime" ? "Airtime Delivered" : "Delivered Successfully",
-        shortLabel: orderType === "utility" ? "Success ✓" : "Delivered ✓",
+        label: "Purchase Successful",
+        shortLabel: "Success ✓",
         icon: CheckCircle2,
         dot: "bg-green-500",
         badge: "bg-green-500/12 border-green-500/25 text-green-600 dark:text-green-400",
@@ -451,7 +451,7 @@ const DashboardOrders = () => {
                     spinning: order.status === "processing" || order.status === "paid" 
                   },
                   {
-                    label: order.status === "fulfillment_failed" ? "Failed" : isUtility ? "Success" : "Delivered",
+                    label: order.status === "fulfillment_failed" ? "Failed" : "Success",
                     done: order.status === "fulfilled" || order.status === "fulfillment_failed",
                     failed: order.status === "fulfillment_failed",
                     time: (order.status === "fulfilled" || order.status === "fulfillment_failed") && order.updated_at
