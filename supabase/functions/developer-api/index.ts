@@ -287,7 +287,7 @@ serve(async (req: Request) => {
     // ── 8. Execute Logic via RPCs ──────────────────────────────────────────────
     
     if (finalAction === "balance") {
-      const { data: wallet } = await supabase.from("api.v_wallets").select("balance, api_balance").eq("agent_id", currentUserId).maybeSingle();
+      const { data: wallet } = await supabase.schema("api").from("v_wallets").select("balance, api_balance").eq("agent_id", currentUserId).maybeSingle();
       return json({
         success: true,
         balance: Number(wallet?.balance ?? 0),
@@ -297,7 +297,7 @@ serve(async (req: Request) => {
     }
 
     if (finalAction === "wallets") {
-      const { data: wallet } = await supabase.from("api.v_wallets").select("balance, api_balance").eq("agent_id", currentUserId).maybeSingle();
+      const { data: wallet } = await supabase.schema("api").from("v_wallets").select("balance, api_balance").eq("agent_id", currentUserId).maybeSingle();
       return json({
         success: true,
         wallets: {
@@ -333,7 +333,7 @@ serve(async (req: Request) => {
     }
 
     if (finalAction === "account") {
-      const { data: wallet } = await supabase.from("api.v_wallets").select("balance").eq("agent_id", currentUserId).maybeSingle();
+      const { data: wallet } = await supabase.schema("api").from("v_wallets").select("balance").eq("agent_id", currentUserId).maybeSingle();
       return json({
         success: true,
         name: profile.full_name || profile.name || "User",
@@ -343,7 +343,7 @@ serve(async (req: Request) => {
     }
 
     if (finalAction === "plans") {
-      const { data: plans } = await supabase.from("api.v_plans").select("*").eq("is_unavailable", false).order("network").order("package_size");
+      const { data: plans } = await supabase.schema("api").from("v_plans").select("*").eq("is_unavailable", false).order("network").order("package_size");
       return json({ success: true, plans: plans ?? [] });
     }
 
@@ -426,7 +426,7 @@ serve(async (req: Request) => {
 
     if (finalAction === "orders") {
       const limit = Math.min(parseInt(url.searchParams.get("limit") ?? "20", 10), 100);
-      const { data: orders } = await supabase.from("api.v_orders").select("*").eq("agent_id", currentUserId).order("created_at", { ascending: false }).limit(limit);
+      const { data: orders } = await supabase.schema("api").from("v_orders").select("*").eq("agent_id", currentUserId).order("created_at", { ascending: false }).limit(limit);
       return json({ success: true, orders: orders ?? [] });
     }
 
@@ -434,7 +434,7 @@ serve(async (req: Request) => {
       const orderId = url.searchParams.get("order_id") || url.searchParams.get("id");
       if (!orderId) return json({ success: false, error: "Missing order_id" }, 400);
       
-      const { data: order, error } = await supabase.from("api.v_orders").select("*").eq("agent_id", currentUserId).eq("id", orderId).maybeSingle();
+      const { data: order, error } = await supabase.schema("api").from("v_orders").select("*").eq("agent_id", currentUserId).eq("id", orderId).maybeSingle();
       if (error || !order) return json({ success: false, error: "Order not found" }, 404);
       
       return json({ success: true, order });
