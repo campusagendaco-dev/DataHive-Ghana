@@ -22,7 +22,7 @@ function mapDataNetworkKey(network: string): string {
   const n = (network || "").trim().toUpperCase();
   if (n === "AIRTELTIGO" || n === "AIRTEL TIGO" || n === "AIRTEL-TIGO" || n === "AT") return "AT_PREMIUM";
   if (n === "TELECEL" || n === "VODAFONE" || n === "VOD") return "TELECEL";
-  if (n === "MTN" || n === "YELLO") return "YELLO";
+  if (n === "MTN" || n === "YELLO" || n === "MTN_XPRESS") return "YELLO";
   return n;
 }
 
@@ -101,9 +101,11 @@ function buildProviderUrls(baseUrl: string, endpoint: string = "purchase", handl
     if (endpoint === "status") aliases = ["order-status"];
     else if (endpoint === "purchase") aliases = ["purchase"];
     else aliases = [endpoint];
+  } else if (handlerType === "datahub") {
+    aliases = endpoint === "purchase" ? ["data-purchase"] : [endpoint];
   } else {
-    aliases = endpoint === "purchase" 
-      ? ["purchase", "order", "airtime", "buy", "topup", "recharge"] 
+    aliases = endpoint === "purchase"
+      ? ["purchase", "order", "airtime", "buy", "topup", "recharge"]
       : (endpoint === "status" ? ["status", "query", "check", "query-order"] : [endpoint]);
   }
 
@@ -161,7 +163,7 @@ function parseProviderResponse(body: string, contentType: string | null): { ok: 
     const message = typeof parsed?.message === "string" ? parsed.message : undefined;
     
     // DataMart uses purchaseId or orderReference
-    const orderId = String(data?.purchaseId ?? data?.orderReference ?? parsed?.transaction_id ?? parsed?.order_id ?? parsed?.id ?? parsed?.reference ?? "");
+    const orderId = String(data?.orderNumber ?? data?.reference ?? data?.purchaseId ?? data?.orderReference ?? parsed?.transaction_id ?? parsed?.order_id ?? parsed?.id ?? parsed?.reference ?? "");
 
     const ok = technicalStatus === "success" || technicalStatus === "true" || technicalStatus === "1" || parsed?.success === true || parsed?.ok === true;
 
@@ -613,16 +615,23 @@ serve(async (req) => {
         : mapDataNetworkKey(network);
 
       const dataPayload = handlerType === "datamart"
-        ? { 
-            phoneNumber: recipient, 
-            network: networkKey, 
+        ? {
+            phoneNumber: recipient,
+            network: networkKey,
             planId: packageSize, // DataMart legacy
             plan: packageSize,   // DataMart standard
             bundle: packageSize, // Alias
-            capacity: String(parseCapacity(packageSize)), 
-            orderReference: targetReference, 
-            gateway: "wallet", 
-            reference: targetReference 
+            capacity: String(parseCapacity(packageSize)),
+            orderReference: targetReference,
+            gateway: "wallet",
+            reference: targetReference
+          }
+        : handlerType === "datahub"
+        ? {
+            networkKey,
+            recipient,
+            capacity: String(parseCapacity(packageSize)),
+            reference: targetReference,
           }
         : requestBody;
 

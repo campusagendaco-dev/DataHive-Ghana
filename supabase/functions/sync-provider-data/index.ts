@@ -32,9 +32,9 @@ serve(async (req) => {
 
     if (handlerType === "datamart" || handlerType === "standard") {
       console.log(`Syncing ${handlerType} provider: ${provider.name}`);
-      
+
       const cleanBase = baseUrl.trim().replace(/\/+$/, "");
-      
+
       // 1. Sync Packages
       const packageUrlVariations = [
         `${cleanBase}/data-packages`,
@@ -61,10 +61,10 @@ serve(async (req) => {
         const rawData = result.data || result.packages || result;
         if (rawData && typeof rawData === "object") {
           const allPackages = [];
-          
+
           // Handle both DataMart (nested by network) and Standard (array or object)
           const networks = handlerType === "datamart" ? Object.keys(rawData) : ["MTN", "Telecel", "AirtelTigo"];
-          
+
           for (const netKey of networks) {
             const netPackages = handlerType === "datamart" ? rawData[netKey] : (Array.isArray(rawData) ? rawData : []);
             if (!Array.isArray(netPackages)) continue;
@@ -112,7 +112,7 @@ serve(async (req) => {
         const balanceRes = await fetch(url, {
           headers: { "X-API-Key": apiKey, "Accept": "application/json" }
         });
-        
+
         if (balanceRes.ok) {
           const bResult = await balanceRes.json();
           const rawBal = bResult.data?.rawBalance || bResult.data?.balance || bResult.balance;
@@ -123,6 +123,79 @@ serve(async (req) => {
             break;
           }
         }
+      }
+    } else if (handlerType === "datahub") {
+      console.log(`Syncing DataHub Ghana provider: ${provider.name}`);
+
+      // DataHub bundles live at /api/bundles (not under /api/external)
+      const origin = new URL(baseUrl).origin;
+      const bundlesUrl = `${origin}/api/bundles`;
+
+      console.log(`[sync:datahub] Fetching bundles from: ${bundlesUrl}`);
+      const bundlesRes = await fetch(bundlesUrl, {
+        headers: { "X-API-Key": apiKey, "Accept": "application/json" }
+      });
+
+      if (bundlesRes.ok) {
+        const result = await bundlesRes.json();
+        const networks: any[] = result.networks || [];
+        const allPackages = [];
+
+        const networkKeyToDb: Record<string, string> = {
+          YELLO: "MTN",
+          TELECEL: "Telecel",
+          AT_PREMIUM: "AirtelTigo",
+          AT_BIGTIME: "AirtelTigo",
+        };
+
+        for (const network of networks) {
+          if (!network.isActive) continue;
+          const dbNetwork = networkKeyToDb[network.networkKey] || network.networkKey;
+          const bundles: any[] = network.bundles || [];
+
+          for (const bundle of bundles) {
+            if (!bundle.isActive) continue;
+            const capacityGb = (bundle.sizeInMB || 0) / 1024;
+
+            allPackages.push({
+              provider_id: provider.id,
+              network: dbNetwork,
+              package_name: bundle.size,
+              capacity_gb: capacityGb,
+              cost_price: bundle.price,
+              external_id: bundle.id,
+              raw_data: { ...bundle, networkKey: network.networkKey },
+              is_active: true,
+            });
+          }
+        }
+
+        if (allPackages.length > 0) {
+          const { error: upsertError } = await supabaseAdmin
+            .from("provider_packages")
+            .upsert(allPackages, { onConflict: "provider_id,network,package_name" });
+          if (upsertError) console.error("[sync:datahub] Package upsert error:", upsertError);
+          packagesSynced = allPackages.length;
+          console.log(`[sync:datahub] Synced ${packagesSynced} packages`);
+        }
+      } else {
+        console.error(`[sync:datahub] Bundles fetch failed: ${bundlesRes.status}`);
+      }
+
+      // Sync Balance — GET /api/external/balance
+      const balanceRes = await fetch(`${baseUrl}/balance`, {
+        headers: { "X-API-Key": apiKey, "Accept": "application/json" }
+      });
+
+      if (balanceRes.ok) {
+        const bResult = await balanceRes.json();
+        const rawBal = bResult.data?.balance ?? bResult.balance;
+        if (rawBal !== undefined) {
+          balance = typeof rawBal === "string" ? parseFloat(rawBal.replace(/[^\d.]/g, "")) : Number(rawBal);
+          console.log(`[sync:datahub] Balance: GHS ${balance}`);
+        }
+      } else {
+        console.warn(`[sync:datahub] Balance fetch failed: ${balanceRes.status}`);
       }
     } else {
       throw new Error(`Sync not implemented for handler type: ${handlerType}`);

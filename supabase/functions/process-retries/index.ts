@@ -17,7 +17,7 @@ function buildProviderUrls(baseUrl: string, endpoint: string): string[] {
   const clean = baseUrl.trim().replace(/\/+$/, "");
   if (!clean) return [];
   const urls = new Set<string>();
-  const aliases = endpoint === "purchase" ? ["purchase", "order", "airtime", "buy"] : [endpoint];
+  const aliases = endpoint === "purchase" ? ["purchase", "order", "airtime", "buy", "data-purchase"] : [endpoint];
   let rootUrl = "";
   try { const parsed = new URL(clean); rootUrl = parsed.origin; } catch { rootUrl = ""; }
   for (const alias of aliases) {

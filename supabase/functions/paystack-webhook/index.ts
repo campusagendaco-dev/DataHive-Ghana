@@ -111,7 +111,7 @@ function buildProviderUrls(baseUrl: string, endpoint: string): string[] {
   if (!clean) return [];
 
   const urls = new Set<string>();
-  const endpointAliases = endpoint === "purchase" ? ["purchase", "order", "airtime", "buy"] : [endpoint];
+  const endpointAliases = endpoint === "purchase" ? ["purchase", "order", "airtime", "buy", "data-purchase"] : [endpoint];
   let rootUrl = "";
 
   try {
@@ -156,18 +156,18 @@ function parseProviderResponse(body: string, contentType: string | null): { ok: 
     const status = String(rawStatus || "").toLowerCase();
     const statusCode = Number(parsed?.statusCode);
     const message = typeof parsed?.message === "string" ? parsed.message : undefined;
-    const orderId = parsed?.transaction_id || parsed?.order_id || parsed?.reference || parsed?.id;
+    const orderId = parsed?.data?.orderNumber || parsed?.data?.reference || parsed?.transaction_id || parsed?.order_id || parsed?.reference || parsed?.id;
     const deliveryStatus = String(parsed?.delivery_status || parsed?.status_message || "").toLowerCase();
 
     // Determine if it's actually delivered
     const isActuallyDelivered = !deliveryStatus || deliveryStatus === "delivered" || deliveryStatus === "success" || deliveryStatus === "fulfilled" || deliveryStatus === "true";
 
-    if (rawStatus === true || status === "true" || status === "success") {
+    if (rawStatus === true || status === "true" || status === "success" || parsed?.success === true) {
       return { ok: true, id: orderId, status: isActuallyDelivered ? "delivered" : deliveryStatus };
     }
-    
-    if (rawStatus === false || status === "false" || status === "error" || status === "failed" || status === "failure") {
-      return { ok: false, reason: message || "Provider rejected this order." };
+
+    if (rawStatus === false || parsed?.success === false || status === "false" || status === "error" || status === "failed" || status === "failure") {
+      return { ok: false, reason: message || parsed?.error || "Provider rejected this order." };
     }
 
     if (Number.isFinite(statusCode) && statusCode >= 400) {
@@ -1231,7 +1231,7 @@ serve(async (req) => {
         networkRaw: network,
         networkKey: mapDataNetworkKey(network),
         recipient: normalizeRecipient(customerPhone),
-        capacity: parseCapacity(packageSize),
+        capacity: String(parseCapacity(packageSize)),
         amount: existingOrder?.amount || verifiedAmount,
         order_type: "data",
         description: `Data: ${packageSize} for ${customerPhone}`

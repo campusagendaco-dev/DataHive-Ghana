@@ -15,7 +15,7 @@ function getEnv(...keys: string[]): string {
 
 function mapNetworkKey(network: string): string {
   const n = network.trim().toUpperCase();
-  if (n === "MTN" || n === "YELLO") return "YELLO";
+  if (n === "MTN" || n === "YELLO" || n === "MTN_XPRESS") return "YELLO";
   if (n === "VOD" || n === "VODAFONE" || n === "TELECEL") return "TELECEL";
   if (n === "AT" || n === "AIRTELTIGO" || n === "AIRTEL TIGO") return "AT_PREMIUM";
   if (n === "GLO") return "GLO";
@@ -49,6 +49,8 @@ function buildProviderUrls(baseUrl: string, endpoint: string = "purchase", handl
     if (endpoint === "status") aliases = ["order-status"];
     else if (endpoint === "purchase") aliases = ["purchase"];
     else aliases = [endpoint];
+  } else if (handlerType === "datahub") {
+    aliases = endpoint === "purchase" ? ["data-purchase"] : [endpoint];
   } else {
     aliases = endpoint === "purchase" ? ["purchase", "order", "airtime", "buy", "topup", "recharge"] : (endpoint === "status" ? ["status", "query", "check"] : [endpoint]);
   }
@@ -102,7 +104,7 @@ async function callProviderApi(
           const p = JSON.parse(text);
           const s = String(p?.status ?? p?.success ?? "").toLowerCase();
           const ok = p?.success === true || s === "success" || s === "true" || p?.status === true;
-          if (ok) return { ok: true, reason: "", id: String(p?.data?.purchaseId ?? p?.transaction_id ?? p?.id ?? "") };
+          if (ok) return { ok: true, reason: "", id: String(p?.data?.orderNumber ?? p?.data?.reference ?? p?.data?.purchaseId ?? p?.transaction_id ?? p?.id ?? "") };
           lastReason = p?.message || p?.error || "Provider rejected the order";
         } catch { return { ok: true, reason: "" }; }
       } else {
@@ -385,15 +387,23 @@ serve(async (req: Request) => {
 
       if (providers.length > 0) {
         for (const provider of providers) {
-          const dataPayload = {
-            networkRaw: network,
-            recipient: normalizeRecipient(phone),
-            capacity: amount || parseCapacity(package_size),
-            plan: package_size,
-            amount: amount,
-            orderReference: orderId,
-            webhook_url: profile.webhook_url
-          };
+          const handlerType = provider.handler_type || "standard";
+          const dataPayload = handlerType === "datahub"
+            ? {
+                networkKey: mapNetworkKey(network),
+                recipient: normalizeRecipient(phone),
+                capacity: String(parseCapacity(package_size)),
+                reference: orderId,
+              }
+            : {
+                networkRaw: network,
+                recipient: normalizeRecipient(phone),
+                capacity: amount || parseCapacity(package_size),
+                plan: package_size,
+                amount: amount,
+                orderReference: orderId,
+                webhook_url: profile.webhook_url
+              };
 
           const res = await callProviderApi(provider, dataPayload, "purchase");
           if (res.ok) {
