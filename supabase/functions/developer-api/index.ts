@@ -335,6 +335,8 @@ serve(async (req: Request) => {
         balance: Number(wallet?.balance ?? 0),
         active: profile.access_enabled
       });
+    }
+
     if (finalAction === "plans") {
       const { data: plans } = await supabase.from("api.v_plans").select("*").eq("is_unavailable", false).order("network").order("package_size");
       return json({ success: true, plans: plans ?? [] });
