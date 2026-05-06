@@ -84,29 +84,16 @@ const DashboardDeveloperAPI = () => {
     setGenerating(true);
     setConfirmRegen(false);
 
-    const newKey = `swft_live_${crypto.randomUUID().replace(/-/g, "")}`;
-    const keyHash = await sha256Hex(newKey);
-    const prefix = newKey.slice(0, 12);
-    
-    // Generate a new Secret Signing Key (Used for HMAC verification in production)
-    const newSecret = crypto.randomUUID().replace(/-/g, "");
-
-    const { error } = await supabase
-      .from("profiles")
-      .update({ 
-        api_key_hash: keyHash, 
-        api_key_prefix: prefix, 
-        api_secret_key_hash: newSecret 
-      })
-      .eq("user_id", user.id);
-
+    const { data, error } = await supabase.rpc("rotate_api_key");
 
     if (error) {
       toast({ title: "Failed to generate keys", description: error.message, variant: "destructive" });
+    } else if (data && !data.success) {
+      toast({ title: "Failed to generate keys", description: data.error, variant: "destructive" });
     } else {
-      setPlaintextKey(newKey);
-      setPlaintextSecret(newSecret); 
-      setApiKeyPrefix(prefix);
+      setPlaintextKey(data.api_key);
+      setPlaintextSecret(data.secret); 
+      setApiKeyPrefix(data.prefix);
       setHasKey(true);
       setRevealed(true);
       toast({ title: "✅ New API Credentials generated", description: "Copy and store them securely — they will not be shown again." });
