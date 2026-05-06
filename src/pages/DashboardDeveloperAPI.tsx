@@ -84,7 +84,7 @@ const DashboardDeveloperAPI = () => {
     setGenerating(true);
     setConfirmRegen(false);
 
-    const { data, error } = await supabase.rpc("rotate_api_key");
+    const { data, error } = await supabase.schema("api").rpc("rotate_api_key");
 
     if (error) {
       toast({ title: "Failed to generate keys", description: error.message, variant: "destructive" });
