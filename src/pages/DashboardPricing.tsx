@@ -51,7 +51,7 @@ const getProfileAssignedPrice = (
 };
 
 const DashboardPricing = () => {
-  const { user, profile, refreshProfile } = useAuth();
+  const { user, profile, refreshProfile, isAdmin } = useAuth();
   const { toast } = useToast();
   const isSubAgent = Boolean(profile?.is_sub_agent);
   const [prices, setPrices] = useState<AgentPrices>({});
@@ -74,16 +74,21 @@ const DashboardPricing = () => {
 
       const { data } = await supabase
         .from("global_package_settings")
-        .select("network, package_size, agent_price, sub_agent_price");
+        .select("network, package_size, agent_price, sub_agent_price, cost_price");
 
       (data || []).forEach((row: any) => {
         const numericAgentPrice = Number(row?.agent_price);
         const numericSubAgentPrice = Number(row?.sub_agent_price);
+        const numericCostPrice = Number(row?.cost_price);
         
+        // For admins, the base price is the cost_price
         // For sub-agents, we default to the sub_agent_price if available
-        const priceToUse = (profile?.is_sub_agent && Number.isFinite(numericSubAgentPrice) && numericSubAgentPrice > 0)
-          ? numericSubAgentPrice
-          : numericAgentPrice;
+        // For normal agents, we use agent_price
+        const priceToUse = isAdmin && Number.isFinite(numericCostPrice) && numericCostPrice > 0
+          ? numericCostPrice
+          : (profile?.is_sub_agent && Number.isFinite(numericSubAgentPrice) && numericSubAgentPrice > 0)
+            ? numericSubAgentPrice
+            : numericAgentPrice;
 
         if (!Number.isFinite(priceToUse) || priceToUse <= 0) return;
         if (!nextBasePrices[row.network]) nextBasePrices[row.network] = {};
@@ -127,7 +132,7 @@ const DashboardPricing = () => {
     };
 
     loadBasePrices();
-  }, [profile]);
+  }, [profile, isAdmin]);
 
   useEffect(() => {
     const defaults = buildDefaultPrices(packageBasePrices);
@@ -183,7 +188,7 @@ const DashboardPricing = () => {
       for (const pkg of pkgs) {
         const numericPrice = Number(prices?.[network]?.[pkg.size]);
         const basePrice = getBasePrice(network, pkg.size);
-        if (!Number.isFinite(numericPrice) || numericPrice < basePrice) {
+        if (!isAdmin && (!Number.isFinite(numericPrice) || numericPrice < basePrice)) {
           toast({
             title: "Price Too Low",
             description: `${network} ${pkg.size}: Your selling price (GH₵ ${Number.isFinite(numericPrice) ? numericPrice.toFixed(2) : "0.00"}) is below your base cost (GH₵ ${basePrice.toFixed(2)}). Please increase it to save.`,
@@ -278,7 +283,7 @@ const DashboardPricing = () => {
                         className="w-24 h-8 text-center bg-secondary text-sm"
                         type="number"
                         step="0.50"
-                        min={basePrice}
+                        min={isAdmin ? undefined : basePrice}
                       />
                     </div>
                   </td>
