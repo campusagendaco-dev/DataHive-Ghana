@@ -209,7 +209,7 @@ serve(async (req: Request) => {
       console.log(`[AUTH] Key Prefix: ${prefix} | Hash: ${incomingHash}`);
       
       // Use secure RPC for authentication (bypasses RLS safely)
-      const { data: profileData, error: authError } = await supabase.rpc("authenticate_client", {
+      const { data: profileData, error: authError } = await supabase.rpc("api.authenticate_client", {
         p_prefix: prefix,
         p_hash: incomingHash
       });
