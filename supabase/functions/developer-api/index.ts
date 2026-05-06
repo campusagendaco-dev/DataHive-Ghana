@@ -287,8 +287,13 @@ serve(async (req: Request) => {
     // ── 8. Execute Logic via RPCs ──────────────────────────────────────────────
     
     if (finalAction === "balance") {
-      const { data: wallet } = await supabase.from("api.v_wallets").select("api_balance").eq("agent_id", currentUserId).maybeSingle();
-      return json({ success: true, balance: Number(wallet?.api_balance ?? 0), currency: "GHS" });
+      const { data: wallet } = await supabase.from("api.v_wallets").select("balance, api_balance").eq("agent_id", currentUserId).maybeSingle();
+      return json({
+        success: true,
+        balance: Number(wallet?.balance ?? 0),
+        api_balance: Number(wallet?.api_balance ?? 0),
+        currency: "GHS"
+      });
     }
 
     if (finalAction === "wallets") {
