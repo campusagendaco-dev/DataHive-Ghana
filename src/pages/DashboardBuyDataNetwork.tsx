@@ -109,6 +109,7 @@ const DashboardBuyDataNetwork = ({ network }: DashboardBuyDataNetworkProps) => {
   const [showCustomers, setShowCustomers] = useState(false);
   const [resolvedName, setResolvedName] = useState<string | null>(null);
   const [resolvingName, setResolvingName] = useState(false);
+  const [activationFee, setActivationFee] = useState(50);
 
   const isPaidAgent = Boolean(profile?.agent_approved || profile?.sub_agent_approved);
 
@@ -167,6 +168,17 @@ const DashboardBuyDataNetwork = ({ network }: DashboardBuyDataNetworkProps) => {
       }
     };
     void loadPricing();
+
+    supabase
+      .from("system_settings")
+      .select("agent_activation_fee")
+      .eq("id", 1)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (data?.agent_activation_fee) {
+          setActivationFee(Number(data.agent_activation_fee));
+        }
+      });
   }, [profile?.is_sub_agent, profile?.parent_agent_id, user]);
 
   const packages = useMemo(() => {
@@ -508,7 +520,7 @@ const DashboardBuyDataNetwork = ({ network }: DashboardBuyDataNetworkProps) => {
       {!isPaidAgent && (
         <div className="rounded-xl border border-primary/25 bg-primary/5 p-4 flex flex-col sm:flex-row sm:items-center gap-3">
           <div className="flex-1 text-sm">
-            Activate your agent access for <span className="font-bold">GHS 50</span> to unlock cheaper prices &amp; your own store.
+            Activate your agent access for <span className="font-bold">GHS {activationFee}</span> to unlock cheaper prices &amp; your own store.
           </div>
           <Button size="sm" onClick={() => navigate("/agent-program")} className="shrink-0 gap-1.5">
             Become an Agent <ArrowRight className="w-3.5 h-3.5" />

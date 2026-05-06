@@ -4,7 +4,8 @@ import { createHmac, timingSafeEqual } from "node:crypto";
 import { corsHeaders } from "../_shared/cors.ts";
 import { normalizePhone, getSmsConfig, sendSmsViaTxtConnect, formatTemplate, sendPaymentSms } from "../_shared/sms.ts";
 import { sendWhatsAppMessage } from "../_shared/whatsapp.ts";
-import { notifyApiClient } from "../_shared/webhooks.ts";
+import { notifyApiClient, notifyWalletCredit } from "../_shared/webhooks.ts";
+
 
 function getFirstEnvValue(keys: string[]): string {
   for (const key of keys) {
@@ -1008,9 +1009,12 @@ serve(async (req) => {
       const parentAgentId = metadata?.parent_agent_id;
       const activationAmount = Number(metadata?.activation_fee || existingOrder?.amount || verifiedAmount || 0);
       
+      const { data: settings } = await supabaseAdmin.from("system_settings").select("sub_agent_base_fee").eq("id", 1).maybeSingle();
+      const baseFee = Number(settings?.sub_agent_base_fee || 5); // Default to 5 if DB missing
+
       // Security: Never trust client-supplied profit metadata. 
-      // Activation fee base is GHS 80. Anything above that is agent profit.
-      const agentProfit = Math.max(0, parseFloat((activationAmount - 80).toFixed(2)));
+      // Activation fee base is dynamic. Anything above that is agent profit.
+      const agentProfit = Math.max(0, parseFloat((activationAmount - baseFee).toFixed(2)));
       
       if (subAgentId) {
         // Fetch parent's sub_agent_prices to copy as the sub agent's agent_prices
@@ -1056,10 +1060,18 @@ serve(async (req) => {
     }
 
     if (orderType === "wallet_topup") {
-      const { data: order } = await supabaseAdmin.from("orders").select("amount, agent_id").eq("id", orderId).maybeSingle();
+      const { data: order } = await supabaseAdmin.from("orders").select("amount, agent_id, metadata").eq("id", orderId).maybeSingle();
       if (order) {
-        await supabaseAdmin.rpc("credit_wallet", { p_agent_id: order.agent_id, p_amount: order.amount });
+        const walletType = order.metadata?.wallet_type === "api" ? "api" : "main";
+        if (walletType === "api") {
+          await supabaseAdmin.rpc("api.credit_api_wallet", { p_user_id: order.agent_id, p_amount: order.amount });
+        } else {
+          await supabaseAdmin.rpc("credit_wallet", { p_agent_id: order.agent_id, p_amount: order.amount });
+        }
         await supabaseAdmin.from("orders").update({ status: "fulfilled", failure_reason: null }).eq("id", orderId);
+        
+        // Notify API client about wallet funding
+        await notifyWalletCredit(supabaseAdmin, order.agent_id, order.amount, walletType);
       }
       return new Response(JSON.stringify({ received: true, fulfilled: true }), {
         status: 200,

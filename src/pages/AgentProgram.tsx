@@ -9,17 +9,17 @@ import { getAppBaseUrl } from "@/lib/app-base-url";
 import { invokePublicFunction } from "@/lib/public-function-client";
 import SEO from "@/components/SEO";
 
-const benefits = [
+const benefits = (fee: number) => [
   { icon: TrendingUp, title: "Set Your Own Profit", desc: "Set your reseller prices above our wholesale base and keep the margin." },
   { icon: Globe, title: "Your Own Website", desc: "Get a branded reseller website to sell data under your name." },
-  { icon: Users, title: "Manual Approval", desc: "Pay GHS 50 and get approved by our team — usually within 1-2 hours." },
+  { icon: Users, title: "Manual Approval", desc: `Pay GHS ${fee} and get approved by our team — usually within 1-2 hours.` },
   { icon: Layers, title: "Full Dashboard", desc: "Track orders, profits, and manage your reseller business in one place." },
 ];
 
-const steps = [
+const steps = (fee: number) => [
   "Create or sign in to your SwiftData account",
   "Click Request Approval below",
-  "Pay GHS 50 activation fee via Paystack (MoMo or Card)",
+  `Pay GHS ${fee} activation fee via Paystack (MoMo or Card)`,
   "Your account is reviewed and approved after payment",
   "Complete your reseller store setup",
   "Set your prices and share your store link",
@@ -31,6 +31,20 @@ const AgentProgram = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
   const [submitting, setSubmitting] = useState(false);
+  const [activationFee, setActivationFee] = useState(50);
+
+  useEffect(() => {
+    supabase
+      .from("system_settings")
+      .select("agent_activation_fee")
+      .eq("id", 1)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (data?.agent_activation_fee) {
+          setActivationFee(Number(data.agent_activation_fee));
+        }
+      });
+  }, []);
 
   const cta = !user
     ? {
@@ -61,13 +75,13 @@ const AgentProgram = () => {
             type: "link" as const,
             to: "/agent/pending",
             title: "Complete Activation",
-            description: "Pay GHS 50 to activate your reseller account instantly.",
+            description: `Pay GHS ${activationFee} to activate your reseller account instantly.`,
             label: "Pay & Request Approval",
           }
       : {
           type: "action" as const,
           title: "Become a Reseller",
-          description: "Submit your request and pay GHS 50 to activate your reseller account.",
+          description: `Submit your request and pay GHS ${activationFee} to activate your reseller account.`,
           label: "Request Approval",
         };
 
@@ -91,17 +105,6 @@ const AgentProgram = () => {
 
     await refreshProfile();
     
-    // Fetch dynamic activation fee from system_settings
-    let activationFee = 50;
-    try {
-      const { data: settings } = await supabase.from("system_settings").select("agent_activation_fee").eq("id", 1).maybeSingle();
-      if (settings?.agent_activation_fee) {
-        activationFee = Number(settings.agent_activation_fee);
-      }
-    } catch (e) {
-      console.error("Error fetching fee:", e);
-    }
-
     const PAYSTACK_FEE_RATE = 0.03;
     const PAYSTACK_FEE_CAP = 100;
     const paystackFee = Math.min(activationFee * PAYSTACK_FEE_RATE, PAYSTACK_FEE_CAP);
@@ -152,19 +155,21 @@ const AgentProgram = () => {
             Become a <span className="text-gradient">SwiftData Reseller</span>
           </h1>
           <p className="text-lg text-muted-foreground max-w-xl mx-auto">
-            Start your own data reselling business. Pay GHS 50 for activation, set your own prices, run a branded store, and earn from each order after a quick manual review.
+            Start your own data reselling business. Pay GHS {activationFee} for activation, set your own prices, run a branded store, and earn from each order after a quick manual review.
           </p>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-16">
-          {benefits.map((b) => (
+          {benefits(activationFee).map((b) => (
             <div key={b.title} className="flex gap-4 p-6 rounded-2xl glass-card hover:border-primary/30 transition-all">
               <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0">
                 <b.icon className="w-6 h-6 text-primary" />
               </div>
               <div>
                 <h3 className="font-display font-bold mb-1">{b.title}</h3>
-                <p className="text-sm text-muted-foreground">{b.desc}</p>
+                <p className="text-sm text-muted-foreground">
+                  {b.desc}
+                </p>
               </div>
             </div>
           ))}
@@ -173,12 +178,14 @@ const AgentProgram = () => {
         <div className="mb-16">
           <h2 className="font-display text-2xl font-black text-center mb-8">How It Works</h2>
           <div className="space-y-4 max-w-lg mx-auto">
-            {steps.map((step, i) => (
+            {steps(activationFee).map((step, i) => (
               <div key={i} className="flex items-start gap-3">
                 <div className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0 mt-0.5">
                   <span className="text-xs font-bold text-primary">{i + 1}</span>
                 </div>
-                <p className="text-foreground">{step}</p>
+                <p className="text-foreground">
+                  {step}
+                </p>
               </div>
             ))}
           </div>

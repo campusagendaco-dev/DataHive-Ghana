@@ -48,3 +48,43 @@ export async function notifyApiClient(supabaseAdmin: any, orderId: string, statu
     console.error(`[Webhook] Failed to notify client for order ${orderId}:`, err.message);
   }
 }
+
+export async function notifyWalletCredit(supabaseAdmin: any, userId: string, amount: number, walletType: "main" | "api" = "api") {
+  try {
+    const { data: profile } = await supabaseAdmin
+      .from("profiles")
+      .select("api_webhook_url, api_secret_key_hash")
+      .eq("user_id", userId)
+      .maybeSingle();
+
+    if (profile?.api_webhook_url && profile?.api_secret_key_hash) {
+      const payload = JSON.stringify({
+        event: "wallet.funded",
+        data: {
+          wallet: walletType,
+          amount: amount,
+          currency: "GHS",
+          updated_at: new Date().toISOString()
+        }
+      });
+
+      const signature = createHmac("sha256", profile.api_secret_key_hash)
+        .update(payload)
+        .digest("hex");
+
+      await fetch(profile.api_webhook_url, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Swift-Signature": signature,
+          "User-Agent": "SwiftData-Webhook/1.0"
+        },
+        body: payload
+      });
+      
+      console.log(`[Webhook] Notified client at ${profile.api_webhook_url} for wallet credit of ${amount} to ${walletType}`);
+    }
+  } catch (err) {
+    console.error(`[Webhook] Failed to notify client for wallet credit:`, err.message);
+  }
+}

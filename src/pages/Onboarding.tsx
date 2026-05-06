@@ -63,7 +63,16 @@ const Onboarding = () => {
       toast({ title: "Error saving details", description: error.message, variant: "destructive" });
     } else {
       await refreshProfile();
-      toast({ title: "Details saved!", description: "Now pay GHS 50 and contact admin on WhatsApp for reseller approval." });
+      
+      let activationFee = 50;
+      try {
+        const { data: settings } = await supabase.from("system_settings").select("agent_activation_fee").eq("id", 1).maybeSingle();
+        if (settings?.agent_activation_fee) {
+          activationFee = Number(settings.agent_activation_fee);
+        }
+      } catch (e) {}
+
+      toast({ title: "Details saved!", description: `Now pay GHS ${activationFee} and contact admin on WhatsApp for reseller approval.` });
       navigate("/agent/pending");
     }
     setLoading(false);

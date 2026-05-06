@@ -23,6 +23,21 @@ const DashboardMyStore = () => {
   const { toast } = useToast();
   const qrRef = useRef<HTMLDivElement>(null);
   const [copied, setCopied] = useState(false);
+  const [activationFee, setActivationFee] = useState(50);
+
+  useEffect(() => {
+    supabase
+      .from("system_settings")
+      .select("agent_activation_fee")
+      .eq("id", 1)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (data?.agent_activation_fee) {
+          setActivationFee(Number(data.agent_activation_fee));
+        }
+      });
+  }, []);
+
   const isPaidAgent = Boolean(profile?.agent_approved || profile?.sub_agent_approved);
   const storeUrl = profile?.slug ? `${window.location.origin}/store/${profile.slug}` : null;
 
@@ -70,10 +85,10 @@ const DashboardMyStore = () => {
           </div>
           <h2 className="font-black text-xl">Unlock Your Store</h2>
           <p className="text-sm text-muted-foreground max-w-xs mx-auto">
-            Pay GHS 50 once to become a reseller and get your own branded store, cheaper prices, and more.
+            Pay GHS {activationFee} once to become a reseller and get your own branded store, cheaper prices, and more.
           </p>
           <Button asChild className="rounded-2xl">
-            <Link to="/agent-program">Become a Reseller (GHS 50)</Link>
+            <Link to="/agent-program">Become a Reseller (GHS {activationFee})</Link>
           </Button>
         </div>
       </div>

@@ -60,6 +60,7 @@ const DashboardSubAgents = () => {
   const [loadingSubAgents, setLoadingSubAgents] = useState(true);
   const [selectedNetwork, setSelectedNetwork] = useState(networks[0].name);
   const [priceMultiplier, setPriceMultiplier] = useState(1);
+  const [platformBaseFee, setPlatformBaseFee] = useState(50);
 
   const fetchAll = useCallback(async () => {
     if (!user) return;
@@ -109,6 +110,18 @@ const DashboardSubAgents = () => {
 
   useEffect(() => {
     fetchApiPricingContext().then((ctx) => setPriceMultiplier(ctx.multiplier));
+    
+    // Fetch dynamic sub-agent base fee
+    supabase
+      .from("system_settings")
+      .select("sub_agent_base_fee")
+      .eq("id", 1)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (data?.sub_agent_base_fee) {
+          setPlatformBaseFee(Number(data.sub_agent_base_fee));
+        }
+      });
   }, []);
 
   const getParentAgentBasePrice = useCallback((network: string, size: string): number | null => {
@@ -218,7 +231,7 @@ const DashboardSubAgents = () => {
   };
 
   const totalFee = activationFee;
-  const agentShare = Math.max(0, parseFloat((totalFee - 50).toFixed(2)));
+  const agentShare = Math.max(0, parseFloat((totalFee - platformBaseFee).toFixed(2)));
   const swiftDataShare = parseFloat((totalFee - agentShare).toFixed(2));
 
   const TABS: { id: Tab; label: string; icon: typeof Users2 }[] = [
@@ -344,7 +357,7 @@ const DashboardSubAgents = () => {
             <div className="rounded-lg bg-amber-400/10 border border-amber-400/30 p-3 text-sm">
               <p className="font-medium mb-1">How it works</p>
               <p className="text-muted-foreground text-xs">
-                Set the full activation price your sub agents will pay. SwiftData keeps a base fee of GH₵ 50 and you receive the remainder on your profit dashboard.
+                Set the full activation price your sub agents will pay. SwiftData keeps a base fee of GH₵ {platformBaseFee.toFixed(2)} and you receive the remainder on your profit dashboard.
               </p>
             </div>
 

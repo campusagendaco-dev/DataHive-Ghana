@@ -3,6 +3,8 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { corsHeaders } from "../_shared/cors.ts";
 import { normalizePhone, sendSmsViaTxtConnect, getSmsConfig } from "../_shared/sms.ts";
 import { getActiveProviders, logProviderError } from "../_shared/providers.ts";
+import { notifyWalletCredit } from "../_shared/webhooks.ts";
+
 
 declare const Deno: any;
 
@@ -273,28 +275,66 @@ serve(async (req: Request) => {
     else if (p.endsWith("/sms")) finalAction = "sms";
     else if (p.endsWith("/orders")) finalAction = "orders";
     else if (p.endsWith("/status")) finalAction = "status";
+    else if (p.endsWith("/wallets")) finalAction = "wallets";
+    else if (p.endsWith("/wallet/transfer")) finalAction = "wallet_transfer";
     else if (p === "" || p === "/" || p.endsWith("/developer-api")) finalAction = action || "index";
 
-    const allowedActions: string[] = profile.allowed_actions || ["balance", "plans", "account", "orders", "status"];
-    if (!allowedActions.includes(finalAction) && !["index", "account", "balance", "plans", "orders", "status"].includes(finalAction)) {
+    const allowedActions: string[] = profile.allowed_actions || ["balance", "plans", "account", "orders", "status", "wallets", "wallet_transfer"];
+    if (!allowedActions.includes(finalAction) && !["index", "account", "balance", "plans", "orders", "status", "wallets", "wallet_transfer"].includes(finalAction)) {
       return json({ success: false, error: `Action '${finalAction}' not permitted.` }, 403);
     }
 
     // ── 8. Execute Logic via RPCs ──────────────────────────────────────────────
     
     if (finalAction === "balance") {
-      const { data: wallet } = await supabase.from("api.v_wallets").select("balance").eq("agent_id", currentUserId).maybeSingle();
-      return json({ success: true, balance: Number(wallet?.balance ?? 0), currency: "GHS" });
+      const { data: wallet } = await supabase.from("api.v_wallets").select("api_balance").eq("agent_id", currentUserId).maybeSingle();
+      return json({ success: true, balance: Number(wallet?.api_balance ?? 0), currency: "GHS" });
     }
 
-    if (finalAction === "account") {
+    if (finalAction === "wallets") {
+      const { data: wallet } = await supabase.from("api.v_wallets").select("balance, api_balance").eq("agent_id", currentUserId).maybeSingle();
       return json({
         success: true,
-        name: profile.full_name,
-        active: profile.access_enabled
+        wallets: {
+          main: { balance: Number(wallet?.balance ?? 0), currency: "GHS" },
+          api: { balance: Number(wallet?.api_balance ?? 0), currency: "GHS" }
+        }
       });
     }
 
+    if (finalAction === "wallet_transfer" && req.method === "POST") {
+      const payload = await req.json().catch(() => null);
+      if (!payload) return json({ success: false, error: "Invalid JSON body" }, 400);
+
+      const { amount, from, to } = payload;
+      if (!amount || !from || !to) return json({ success: false, error: "Missing amount, from, or to." }, 400);
+
+      const { data: result, error: rpcError } = await supabase.rpc("api.transfer_funds", {
+        p_user_id: currentUserId,
+        p_amount: Number(amount),
+        p_from: from,
+        p_to: to
+      });
+
+      if (rpcError) throw rpcError;
+      if (!result.success) return json(result, 400);
+
+      // Trigger webhook if API wallet was funded
+      if (to === "api") {
+        await notifyWalletCredit(supabase, currentUserId, Number(amount), "api");
+      }
+
+      return json(result);
+    }
+
+    if (finalAction === "account") {
+      const { data: wallet } = await supabase.from("api.v_wallets").select("balance").eq("agent_id", currentUserId).maybeSingle();
+      return json({
+        success: true,
+        name: profile.full_name || profile.name || "User",
+        balance: Number(wallet?.balance ?? 0),
+        active: profile.access_enabled
+      });
     if (finalAction === "plans") {
       const { data: plans } = await supabase.from("api.v_plans").select("*").eq("is_unavailable", false).order("network").order("package_size");
       return json({ success: true, plans: plans ?? [] });
