@@ -496,7 +496,7 @@ const AdminSettings = () => {
                   onChange={(e) => setSettings({ ...settings, agent_activation_fee: e.target.value })}
                 />
                 <p className="text-xs text-muted-foreground mt-1">
-                  Users pay this amount once to unlock the agent dashboard and cheaper prices.
+                  Users pay this amount once to unlock the agent dashboard and agent prices.
                 </p>
               </div>
 

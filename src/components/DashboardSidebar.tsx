@@ -58,7 +58,7 @@ const userNavItems = [
 ];
 
 const agentNavItems = [
-  { to: "/dashboard/cheaper-prices", label: "Cheaper Prices", icon: CreditCard },
+  { to: "/dashboard/agent-prices", label: "Agent Prices", icon: CreditCard },
   { to: "/dashboard/withdrawals", label: "Withdrawals", icon: HandCoins },
   { to: "/dashboard/store-settings", label: "Store Settings", icon: Settings },
   { to: "/dashboard/subagents", label: "Subagents", icon: Users2 },

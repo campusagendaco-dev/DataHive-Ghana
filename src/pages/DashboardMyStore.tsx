@@ -85,7 +85,7 @@ const DashboardMyStore = () => {
           </div>
           <h2 className="font-black text-xl">Unlock Your Store</h2>
           <p className="text-sm text-muted-foreground max-w-xs mx-auto">
-            Pay GHS {activationFee} once to become a reseller and get your own branded store, cheaper prices, and more.
+            Pay GHS {activationFee} once to become a reseller and get your own branded store, agent prices, and more.
           </p>
           <Button asChild className="rounded-2xl">
             <Link to="/agent-program">Become a Reseller (GHS {activationFee})</Link>

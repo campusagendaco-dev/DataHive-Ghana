@@ -350,7 +350,7 @@ const AppContent = () => {
           <Route path="schedule" element={<DashboardSchedule />} />
 
           {/* Paid agent-only pages */}
-          <Route path="cheaper-prices" element={<AgentFeatureGuard><DashboardPricing /></AgentFeatureGuard>} />
+          <Route path="agent-prices" element={<AgentFeatureGuard><DashboardPricing /></AgentFeatureGuard>} />
           <Route path="withdrawals" element={<AgentFeatureGuard><DashboardWithdraw /></AgentFeatureGuard>} />
           <Route path="store-settings" element={<AgentFeatureGuard><DashboardSettings /></AgentFeatureGuard>} />
           <Route path="subagents" element={<ParentAgentOnlyGuard><DashboardSubAgents /></ParentAgentOnlyGuard>} />
@@ -365,7 +365,8 @@ const AppContent = () => {
           {/* Legacy aliases */}
           <Route path="orders" element={<Navigate to="/dashboard/transactions" replace />} />
           <Route path="withdraw" element={<Navigate to="/dashboard/withdrawals" replace />} />
-          <Route path="pricing" element={<Navigate to="/dashboard/cheaper-prices" replace />} />
+          <Route path="pricing" element={<Navigate to="/dashboard/agent-prices" replace />} />
+          <Route path="cheaper-prices" element={<Navigate to="/dashboard/agent-prices" replace />} />
           <Route path="sub-agents" element={<Navigate to="/dashboard/subagents" replace />} />
           <Route path="result-checkers" element={<Navigate to="/dashboard/result-checker" replace />} />
           <Route path="settings" element={<Navigate to="/dashboard/store-settings" replace />} />

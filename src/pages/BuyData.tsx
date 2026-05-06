@@ -428,7 +428,7 @@ const BuyData = () => {
         {/* Footer promo */}
         <div className="mt-10 rounded-2xl border border-border bg-card p-5 flex flex-col sm:flex-row sm:items-center gap-4">
           <div className="flex-1">
-            <p className="font-semibold text-sm mb-0.5">Want cheaper bundle prices?</p>
+            <p className="font-semibold text-sm mb-0.5">Want agent prices?</p>
             <p className="text-muted-foreground text-xs">Agents unlock wholesale rates + their own Paystack-powered store.</p>
           </div>
           <Link
