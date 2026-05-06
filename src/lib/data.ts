@@ -1,6 +1,6 @@
 export const basePackages: Record<string, { size: string; price: number; validity: string; popular?: boolean }[]> = {
   MTN: [
-    { size: "1GB", price: 4.45, validity: "Non-expiry" },
+    { size: "1GB", price: 4.00, validity: "Non-expiry" },
     { size: "2GB", price: 8.9, validity: "Non-expiry" },
     { size: "3GB", price: 13.1, validity: "Non-expiry" },
     { size: "4GB", price: 17.3, validity: "Non-expiry" },
