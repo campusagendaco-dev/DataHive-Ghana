@@ -157,10 +157,10 @@ function parseProviderResponse(body: string, contentType: string | null): { ok: 
     const statusCode = Number(parsed?.statusCode);
     const message = typeof parsed?.message === "string" ? parsed.message : undefined;
     const orderId = parsed?.data?.orderNumber || parsed?.data?.reference || parsed?.transaction_id || parsed?.order_id || parsed?.reference || parsed?.id;
-    const deliveryStatus = String(parsed?.delivery_status || parsed?.status_message || "").toLowerCase();
+    const deliveryStatus = String(parsed?.data?.status || parsed?.data?.orderStatus || parsed?.delivery_status || parsed?.status_message || "").toLowerCase();
 
     // Determine if it's actually delivered
-    const isActuallyDelivered = !deliveryStatus || deliveryStatus === "delivered" || deliveryStatus === "success" || deliveryStatus === "fulfilled" || deliveryStatus === "true";
+    const isActuallyDelivered = !deliveryStatus || deliveryStatus === "delivered" || deliveryStatus === "success" || deliveryStatus === "successful" || deliveryStatus === "completed" || deliveryStatus === "fulfilled" || deliveryStatus === "true" || deliveryStatus === "sent";
 
     if (rawStatus === true || status === "true" || status === "success" || parsed?.success === true) {
       return { ok: true, id: orderId, status: isActuallyDelivered ? "delivered" : deliveryStatus };

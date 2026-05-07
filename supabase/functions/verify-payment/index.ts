@@ -158,7 +158,7 @@ function parseProviderResponse(body: string, contentType: string | null): { ok: 
     const parsed = JSON.parse(body);
     const technicalStatus = String(parsed?.status ?? parsed?.success ?? "").toLowerCase();
     const data = parsed?.data || {};
-    const deliveryStatus = String(data?.orderStatus ?? parsed?.delivery_status ?? parsed?.status_message ?? "").toLowerCase();
+    const deliveryStatus = String(data?.status ?? data?.orderStatus ?? parsed?.delivery_status ?? parsed?.status_message ?? "").toLowerCase();
     const effectiveStatus = deliveryStatus || technicalStatus;
     const message = typeof parsed?.message === "string" ? parsed.message : undefined;
     
