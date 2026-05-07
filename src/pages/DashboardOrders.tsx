@@ -5,7 +5,8 @@ import { invokePublicFunctionAsUser } from "@/lib/public-function-client";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ClipboardList, RefreshCw, CheckCircle2, XCircle, Clock, Loader2, Wallet, ChevronDown, Phone, Package, Calendar, Receipt, Copy, Check, Smartphone, Zap, Download } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { ClipboardList, RefreshCw, CheckCircle2, XCircle, Clock, Loader2, Wallet, ChevronDown, Phone, Package, Calendar, Receipt, Copy, Check, Smartphone, Zap, Download, Search } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAppTheme } from "@/contexts/ThemeContext";
 
@@ -106,6 +107,7 @@ const DashboardOrders = () => {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState("all");
+  const [search, setSearch] = useState("");
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [retryingIds, setRetryingIds] = useState<Set<string>>(new Set());
   const [copiedId, setCopiedId] = useState<string | null>(null);
@@ -147,6 +149,16 @@ const DashboardOrders = () => {
       }
     }
 
+    if (search.trim()) {
+      const term = search.trim();
+      const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(term);
+      if (isUuid) {
+        q = q.eq("id", term);
+      } else {
+        q = q.or(`customer_phone.ilike.%${term}%,network.ilike.%${term}%,package_size.ilike.%${term}%`);
+      }
+    }
+
     const { data, count } = await q;
     
     if (data) {
@@ -156,11 +168,14 @@ const DashboardOrders = () => {
     }
     
     setLoading(false);
-  }, [filter, page, profile?.id, profile?.user_id, user]);
+  }, [filter, search, page, profile?.id, profile?.user_id, user]);
 
   useEffect(() => {
-    fetchOrders(false);
-  }, [filter, user, profile?.id, fetchOrders]);
+    const timer = setTimeout(() => {
+      fetchOrders(false);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [filter, search, user, profile?.id, fetchOrders]);
 
   // Live realtime updates for all current orders
   useEffect(() => {
@@ -358,9 +373,18 @@ const DashboardOrders = () => {
             Live delivery status for all your orders &mdash; updates instantly.
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto">
+          <div className="relative flex-1 sm:w-60 min-w-[200px]">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <Input
+              placeholder="Search phone, network, size..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="pl-9 h-9 text-sm bg-background border-border"
+            />
+          </div>
           <Select value={filter} onValueChange={setFilter}>
-            <SelectTrigger className="w-40 h-9 text-sm">
+            <SelectTrigger className="w-full sm:w-40 h-9 text-sm">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -373,7 +397,7 @@ const DashboardOrders = () => {
               <SelectItem value="fulfillment_failed">Failed</SelectItem>
             </SelectContent>
           </Select>
-          <Button variant="outline" size="icon" className="h-9 w-9" onClick={() => fetchOrders(false)} disabled={loading}>
+          <Button variant="outline" size="icon" className="h-9 w-9 shrink-0" onClick={() => fetchOrders(false)} disabled={loading}>
             <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
           </Button>
         </div>
