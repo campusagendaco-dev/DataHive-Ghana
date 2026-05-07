@@ -45,6 +45,7 @@ async function callProvider(
   webhookUrl: string,
 ): Promise<{ ok: boolean; reason: string }> {
   const clean = baseUrl.trim().replace(/\/+$/, "");
+  const candidates = new Set<string>();
   const aliases = ["purchase", "order", "airtime", "buy"];
   let rootUrl = "";
   try {

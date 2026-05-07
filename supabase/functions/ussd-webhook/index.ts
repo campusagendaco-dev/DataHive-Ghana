@@ -24,7 +24,6 @@ function getMomoProviderCode(phone: string, inputProvider: string): string {
   if (p === "AT" || p === "3") return "atl";
   
   // Auto-detect based on Ghanaian phone prefix
-  const prefix = phone.trim().substring(0, 3);
   const mtnPrefixes = ["024", "025", "053", "054", "055", "059", "23324", "23325", "23353", "23354", "23355", "23359"];
   const telecelPrefixes = ["020", "050", "23320", "23350"];
   const atPrefixes = ["026", "027", "056", "057", "23326", "23327", "23356", "23357"];
@@ -53,7 +52,7 @@ function getPackageSizeBySelection(network: string, selection: string): string {
 
 // Format phone number to standard Ghana format (0XXXXXXXXX)
 function formatLocalPhone(phone: string): string {
-  let clean = phone.replace(/\D+/g, "");
+  const clean = phone.replace(/\D+/g, "");
   if (clean.startsWith("233") && clean.length === 12) {
     return `0${clean.slice(3)}`;
   }
@@ -86,7 +85,7 @@ serve(async (req) => {
 
   try {
     const payload = await req.json();
-    const { sessionID, userID, newSession, msisdn, userData, network: cellNetwork } = payload;
+    const { sessionID, userID, newSession, msisdn, userData } = payload;
     const callerPhone = formatLocalPhone(msisdn);
 
     let message = "";
@@ -239,7 +238,7 @@ serve(async (req) => {
 
         } else if (currentStep === "ENTER_PAY_PHONE") {
           const payPhone = input === "0" ? callerPhone : formatLocalPhone(input);
-          const updatedOrder = { ...orderData, pay_phone: payPhone };
+          const updatedOrder: Record<string, any> = { ...orderData, pay_phone: payPhone };
 
           await supabaseAdmin.from("ussd_sessions").update({
             current_step: "CONFIRM_ORDER",
@@ -286,7 +285,7 @@ serve(async (req) => {
             const finalChargedAmount = parseFloat((retailPrice + paystackFee).toFixed(2));
 
             // Generate unique reference
-            const orderReference = `ussd_${Math.random().toString(36).substring(2, 10).toUpperCase()}`;
+            const orderReference = `ussd_${crypto.randomUUID().replace(/-/g, "").slice(0, 8).toUpperCase()}`;
 
             // Fetch agent profile details
             const { data: agent } = await supabaseAdmin

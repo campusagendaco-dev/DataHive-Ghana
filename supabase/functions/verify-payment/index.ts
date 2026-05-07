@@ -666,11 +666,9 @@ serve(async (req) => {
     console.error("[verify-payment] CRITICAL ERROR:", error);
     // Extract the most useful error message
     const errorMsg = error?.message || (typeof error === 'string' ? error : "Internal fulfillment error");
-    return new Response(JSON.stringify({ 
+    return new Response(JSON.stringify({
       error: errorMsg,
-      stack: error?.stack,
-      hint: "Check environment variables and database RLS policies."
-    }), { 
+    }), {
       status: 500, 
       headers: { ...corsHeaders, "Content-Type": "application/json" } 
     });

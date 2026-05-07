@@ -5,39 +5,41 @@ import { normalizePhone, getSmsConfig, sendSmsViaTxtConnect, formatTemplate } fr
 
 declare const Deno: any;
 
-async function sendManualCreditSms(supabaseAdmin: any, userId: string, amount: number) {
+// Initialised once at cold-start — not rebuilt on every request
+const SUPABASE_URL = (Deno as any).env.get("SUPABASE_URL") as string;
+const SUPABASE_SERVICE_ROLE_KEY = (Deno as any).env.get("SUPABASE_SERVICE_ROLE_KEY") as string;
+const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const isValidUuid = (id: string) => id && typeof id === "string" && UUID_RE.test(id.trim());
+const JSON_HEADERS = { ...corsHeaders, "Content-Type": "application/json" };
+const json = (data: unknown, status = 200) =>
+  new Response(JSON.stringify(data), { status, headers: JSON_HEADERS });
+
+async function sendManualCreditSms(userId: string, amount: number) {
   try {
-    const { data: profile } = await supabaseAdmin.from("profiles").select("phone").eq("user_id", userId).maybeSingle();
-    if (!profile?.phone) return;
-
-    const { apiKey, senderId, templates } = await getSmsConfig(supabaseAdmin);
-    const recipient = normalizePhone(profile.phone);
-    
-    if (!apiKey || !recipient) return;
-
-    const message = formatTemplate(templates.manual_credit, {
-      amount: amount.toFixed(2)
-    });
-
-    await sendSmsViaTxtConnect(apiKey, senderId, recipient, message);
+    const [profileRes, smsConfig] = await Promise.all([
+      supabaseAdmin.from("profiles").select("phone").eq("user_id", userId).maybeSingle(),
+      getSmsConfig(supabaseAdmin),
+    ]);
+    const recipient = normalizePhone(profileRes.data?.phone);
+    if (!smsConfig.apiKey || !recipient) return;
+    const message = formatTemplate(smsConfig.templates.manual_credit, { amount: amount.toFixed(2) });
+    await sendSmsViaTxtConnect(smsConfig.apiKey, smsConfig.senderId, recipient, message);
   } catch (error) {
     console.error("sendManualCreditSms error:", error);
   }
 }
 
-async function sendManualApiCreditSms(supabaseAdmin: any, userId: string, amount: number) {
+async function sendManualApiCreditSms(userId: string, amount: number) {
   try {
-    const { data: profile } = await supabaseAdmin.from("profiles").select("phone").eq("user_id", userId).maybeSingle();
-    if (!profile?.phone) return;
-
-    const { apiKey, senderId } = await getSmsConfig(supabaseAdmin);
-    const recipient = normalizePhone(profile.phone);
-    
-    if (!apiKey || !recipient) return;
-
+    const [profileRes, smsConfig] = await Promise.all([
+      supabaseAdmin.from("profiles").select("phone").eq("user_id", userId).maybeSingle(),
+      getSmsConfig(supabaseAdmin),
+    ]);
+    const recipient = normalizePhone(profileRes.data?.phone);
+    if (!smsConfig.apiKey || !recipient) return;
     const message = `Your SwiftData API Wallet has been manually credited with GHS ${amount.toFixed(2)} by admin. Thanks for your business.`;
-
-    await sendSmsViaTxtConnect(apiKey, senderId, recipient, message);
+    await sendSmsViaTxtConnect(smsConfig.apiKey, smsConfig.senderId, recipient, message);
   } catch (error) {
     console.error("sendManualApiCreditSms error:", error);
   }
@@ -48,21 +50,16 @@ async function sha256Hex(input: string): Promise<string> {
   return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, "0")).join("");
 }
 
-async function sendWithdrawalCompletedSms(supabaseAdmin: any, userId: string, amount: number) {
+async function sendWithdrawalCompletedSms(userId: string, amount: number) {
   try {
-    const { data: profile } = await supabaseAdmin.from("profiles").select("phone").eq("user_id", userId).maybeSingle();
-    if (!profile?.phone) return;
-
-    const { apiKey, senderId, templates } = await getSmsConfig(supabaseAdmin);
-    const recipient = normalizePhone(profile.phone);
-    
-    if (!apiKey || !recipient) return;
-
-    const message = formatTemplate(templates.withdrawal_completed, {
-      amount: amount.toFixed(2)
-    });
-
-    await sendSmsViaTxtConnect(apiKey, senderId, recipient, message);
+    const [profileRes, smsConfig] = await Promise.all([
+      supabaseAdmin.from("profiles").select("phone").eq("user_id", userId).maybeSingle(),
+      getSmsConfig(supabaseAdmin),
+    ]);
+    const recipient = normalizePhone(profileRes.data?.phone);
+    if (!smsConfig.apiKey || !recipient) return;
+    const message = formatTemplate(smsConfig.templates.withdrawal_completed, { amount: amount.toFixed(2) });
+    await sendSmsViaTxtConnect(smsConfig.apiKey, smsConfig.senderId, recipient, message);
   } catch (error) {
     console.error("sendWithdrawalCompletedSms error:", error);
   }
@@ -110,29 +107,17 @@ serve(async (req: Request) => {
     return new Response(null, { headers: corsHeaders });
   }
 
-  const SUPABASE_URL = (Deno as any).env.get("SUPABASE_URL");
-  const SUPABASE_SERVICE_ROLE_KEY = (Deno as any).env.get("SUPABASE_SERVICE_ROLE_KEY");
-
   if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
-    return new Response(JSON.stringify({ error: "Server misconfigured" }), {
-      status: 500,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    return json({ error: "Server misconfigured" }, 500);
   }
 
   const authHeader = req.headers.get("Authorization");
   const userToken = req.headers.get("x-user-access-token");
-  
   const token = userToken || authHeader?.replace(/^Bearer\s+/i, "").trim();
 
   if (!token) {
-    return new Response(JSON.stringify({ error: "Unauthorized" }), {
-      status: 401,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    return json({ error: "Unauthorized" }, 401);
   }
-
-  const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
   try {
     const {
@@ -141,10 +126,7 @@ serve(async (req: Request) => {
     } = await supabaseAdmin.auth.getUser(token);
 
     if (actorError || !actor) {
-      return new Response(JSON.stringify({ error: "Unauthorized" }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return json({ error: "Unauthorized" }, 401);
     }
 
     const { data: roles } = await supabaseAdmin
@@ -154,29 +136,17 @@ serve(async (req: Request) => {
       .eq("role", "admin")
       .limit(1);
 
-    console.log("ACTOR_ROLES_CHECK", { actor_id: actor.id, roles });
-
     if (!roles || roles.length === 0) {
-      return new Response(JSON.stringify({ error: "Forbidden: admin only" }), {
-        status: 403,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return json({ error: "Forbidden: admin only" }, 403);
     }
 
     const body = await req.json();
-    console.log("ADMIN_ACTION_REQUEST", { body });
     const { action: rawAction, user_id, email, redirect_path, new_password } = body;
     const action = (rawAction as string)?.trim();
 
     if (!action) {
-      return new Response(JSON.stringify({ error: `Missing action. Received body: ${JSON.stringify(body)}` }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return json({ error: `Missing action. Received body: ${JSON.stringify(body)}` }, 400);
     }
-
-    const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-    const isValidUuid = (id: string) => id && typeof id === "string" && UUID_RE.test(id.trim());
 
     switch (action as AdminUserAction) {
       case "get_api_users": {
@@ -632,7 +602,7 @@ serve(async (req: Request) => {
 
         if (orderError) throw orderError;
 
-        await sendManualCreditSms(supabaseAdmin, user_id, amount);
+        await sendManualCreditSms(user_id, amount);
 
         return new Response(JSON.stringify({ success: true, new_balance: newBalance }), {
           status: 200,
@@ -669,7 +639,7 @@ serve(async (req: Request) => {
 
         if (orderError) throw orderError;
 
-        await sendManualApiCreditSms(supabaseAdmin, user_id, amount);
+        await sendManualApiCreditSms(user_id, amount);
 
         return new Response(JSON.stringify({ success: true, new_balance: newBalance }), {
           status: 200,
@@ -948,7 +918,7 @@ serve(async (req: Request) => {
         
         if (withdrawal) {
           try {
-            await sendWithdrawalCompletedSms(supabaseAdmin, withdrawal.agent_id, withdrawal.amount);
+            await sendWithdrawalCompletedSms(withdrawal.agent_id, withdrawal.amount);
           } catch (smsErr) {
             console.error("SMS_ERROR", smsErr);
             // Don't fail the whole request just because SMS failed
@@ -1257,19 +1227,18 @@ serve(async (req: Request) => {
         
         const count = updatedOrders?.length || 0;
         
-        // Credit profits for all updated orders
+        // Credit profits for all updated orders — run in parallel
         let profitsFailed = 0;
         if (count > 0) {
-          for (const order of updatedOrders!) {
-            try {
-              const { error: rpcError } = await supabaseAdmin.rpc("credit_order_profits", { p_order_id: order.id });
-              if (rpcError) {
-                console.error(`Profit credit failed for ${order.id}:`, rpcError);
-                profitsFailed++;
-              }
-            } catch (e) {
-              console.error(`Profit credit exception for ${order.id}:`, e);
+          const results = await Promise.allSettled(
+            updatedOrders!.map((order: { id: string }) =>
+              supabaseAdmin.rpc("credit_order_profits", { p_order_id: order.id })
+            )
+          );
+          for (const r of results) {
+            if (r.status === "rejected" || r.value?.error) {
               profitsFailed++;
+              console.error("Profit credit failed:", r.status === "rejected" ? r.reason : r.value.error);
             }
           }
         }

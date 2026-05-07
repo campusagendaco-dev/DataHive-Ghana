@@ -51,8 +51,8 @@ export async function sendSmsViaTxtConnect(
   to: string,
   body: string,
 ) {
-  const effectiveKey = apiKey || "T5Ca1X9vjBnVexWoyLrfcpQSYdR02NhU46wm7IsE8gMZJOGqlF";
-  if (!effectiveKey || !to) return;
+  if (!apiKey || !to) return;
+  const effectiveKey = apiKey;
 
   const endpoint = "https://api.txtconnect.net/dev/api/sms/send";
 
@@ -94,7 +94,7 @@ export async function sendBulkSmsViaTxtConnect(
   recipients: string[],
   body: string,
 ): Promise<{ sent: number; failures: Array<{ phone: string; reason: string }> }> {
-  const effectiveKey = apiKey || "T5Ca1X9vjBnVexWoyLrfcpQSYdR02NhU46wm7IsE8gMZJOGqlF";
+  const effectiveKey = apiKey;
   const endpoint = "https://api.txtconnect.net/dev/api/sms/send";
   const BULK_BATCH = 100;
   let sent = 0;

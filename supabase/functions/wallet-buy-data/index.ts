@@ -25,7 +25,7 @@ function normalizeRecipient(phone: string): string {
   return digits;
 }
 
-serve(async (req) => {
+serve(async (req: Request) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
   try {
@@ -50,7 +50,7 @@ serve(async (req) => {
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) {
       console.error("[AUTH] No header");
-      return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
     console.log("[AUTH] Verifying user...");
@@ -62,7 +62,7 @@ serve(async (req) => {
     const { data: { user }, error: userError } = await supabaseUser.auth.getUser();
     if (userError || !user) {
       console.error("[AUTH] Error:", userError);
-      return new Response(JSON.stringify({ error: "Invalid session" }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      return new Response(JSON.stringify({ error: "Invalid session" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
     console.log(`[USER] ${user.id} (${user.email})`);
@@ -77,7 +77,7 @@ serve(async (req) => {
     if (debitError || !debitResult?.success) {
       console.error(`[DEBIT_FAIL] ${user.id}:`, debitError || debitResult?.error);
       return new Response(JSON.stringify({ error: debitResult?.error || "Insufficient balance or wallet error" }), {
-        status: 200,
+        status: 402,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
@@ -102,7 +102,7 @@ serve(async (req) => {
       // Refund if insert fails
       await supabaseAdmin.rpc("credit_wallet", { p_agent_id: user.id, p_amount: requestedAmount });
       return new Response(JSON.stringify({ error: "Failed to create order record" }), {
-        status: 200,
+        status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
@@ -127,8 +127,8 @@ serve(async (req) => {
 
   } catch (error) {
     console.error("[CRASH]", error);
-    return new Response(JSON.stringify({ error: "Internal processing error: " + error.message }), {
-      status: 200,
+    return new Response(JSON.stringify({ error: "Internal processing error" }), {
+      status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }

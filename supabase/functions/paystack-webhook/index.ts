@@ -467,7 +467,7 @@ serve(async (req) => {
   const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
   let PAYSTACK_SECRET_KEY = Deno.env.get("PAYSTACK_SECRET_KEY");
-  
+
   if (!PAYSTACK_SECRET_KEY) {
     const { data: settings } = await supabaseAdmin
       .from("system_settings")
@@ -513,8 +513,6 @@ serve(async (req) => {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
-
-  const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
   try {
     const providerConfig = await getProviderCredentials(supabaseAdmin);

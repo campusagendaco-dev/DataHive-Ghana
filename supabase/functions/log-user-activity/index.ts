@@ -32,7 +32,7 @@ async function resolveLocation(ip: string): Promise<string | null> {
   }
 }
 
-serve(async (req) => {
+serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
@@ -40,7 +40,7 @@ serve(async (req) => {
   const authHeader = req.headers.get("Authorization");
   if (!authHeader) {
     return new Response(JSON.stringify({ error: "Unauthorized" }), {
-      status: 200,
+      status: 401,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }

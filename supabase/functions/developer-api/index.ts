@@ -234,7 +234,6 @@ serve(async (req: Request) => {
       
       const prefix = rawApiKey.slice(0, 12);
       const incomingHash = await sha256Hex(rawApiKey);
-      console.log(`[AUTH] Key Prefix: ${prefix} | Hash: ${incomingHash}`);
       
       // Use secure RPC for authentication (bypasses RLS safely)
       const { data: profileData, error: authError } = await supabase.rpc("authenticate_client", {

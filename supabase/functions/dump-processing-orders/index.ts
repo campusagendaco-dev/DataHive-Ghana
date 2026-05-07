@@ -21,7 +21,7 @@ serve(async (req) => {
 
   if (error) return new Response(JSON.stringify({ error: error.message }), { status: 500, headers: corsHeaders });
 
-  return new Response(JSON.stringify({ orders }), {
+  return new Response(JSON.stringify({ orders: order ? [order] : [] }), {
     headers: { ...corsHeaders, "Content-Type": "application/json" },
   });
 });

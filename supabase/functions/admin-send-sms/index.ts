@@ -212,14 +212,14 @@ serve(async (req: Request) => {
 
   if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY || !SUPABASE_ANON_KEY) {
     return new Response(JSON.stringify({ error: "Server misconfigured" }), {
-      status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
 
   const authHeader = req.headers.get("Authorization");
   if (!authHeader) {
     return new Response(JSON.stringify({ error: "Unauthorized" }), {
-      status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
 
@@ -232,14 +232,14 @@ serve(async (req: Request) => {
   if (!txtApiKey || !txtSenderId) {
     return new Response(JSON.stringify({
       error: "SMS not configured. Please add your TxtConnect API Key in Admin → Settings.",
-    }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }), { status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" } });
   }
 
   try {
     const { data: { user: actor }, error: actorError } = await supabaseUser.auth.getUser();
     if (actorError || !actor) {
       return new Response(JSON.stringify({ error: "Unauthorized" }), {
-        status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
@@ -247,7 +247,7 @@ serve(async (req: Request) => {
       .from("user_roles").select("role").eq("user_id", actor.id).eq("role", "admin").limit(1);
     if (!roles || roles.length === 0) {
       return new Response(JSON.stringify({ error: "Forbidden: admin only" }), {
-        status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 

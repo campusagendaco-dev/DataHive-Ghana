@@ -14,7 +14,7 @@ serve(async (req: Request) => {
 
   if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
     return new Response(JSON.stringify({ error: "Server misconfigured" }), {
-      status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
 
@@ -40,7 +40,7 @@ serve(async (req: Request) => {
 
     if (!txtApiKey) {
       return new Response(JSON.stringify({ error: "TxtConnect API Key missing." }), {
-        status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
