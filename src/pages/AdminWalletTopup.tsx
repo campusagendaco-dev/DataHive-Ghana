@@ -30,6 +30,8 @@ const AdminWalletTopup = () => {
   const [searchResults, setSearchResults] = useState<AgentResult[]>([]);
   const [agent, setAgent] = useState<AgentResult | null>(null);
   const [walletBalance, setWalletBalance] = useState<number>(0);
+  const [apiBalance, setApiBalance] = useState<number>(0);
+  const [walletType, setWalletType] = useState<"main" | "api">("main");
   const [creditAmount, setCreditAmount] = useState("");
   const [crediting, setCrediting] = useState(false);
 
@@ -69,13 +71,14 @@ const AdminWalletTopup = () => {
     // Fetch full profile and wallet details
     const [profileRes, walletRes] = await Promise.all([
       supabase.from("profiles").select("*").eq("user_id", selected.user_id).single(),
-      supabase.from("wallets").select("balance").eq("agent_id", selected.user_id).maybeSingle()
+      supabase.from("wallets").select("balance, api_balance").eq("agent_id", selected.user_id).maybeSingle()
     ]);
 
     if (profileRes.data) {
       setAgent(profileRes.data as AgentResult);
     }
     setWalletBalance(walletRes.data?.balance || 0);
+    setApiBalance(walletRes.data?.api_balance || 0);
   };
 
   const handleCredit = async (overrideAmount?: number) => {
@@ -87,15 +90,16 @@ const AdminWalletTopup = () => {
     }
 
     setCrediting(true);
+    const action = walletType === "api" ? "manual_api_topup" : "manual_topup";
     const { data, error } = await supabase.functions.invoke("admin-user-actions", {
-      body: { action: "manual_topup", user_id: agent.user_id, amount },
+      body: { action, user_id: agent.user_id, amount },
     });
 
     if (error || data?.error) {
-      toast({ title: "Failed to credit wallet", description: data?.error || error?.message, variant: "destructive" });
+      toast({ title: `Failed to credit ${walletType === "api" ? "API " : ""}wallet`, description: data?.error || error?.message, variant: "destructive" });
     } else {
       if (currentUser) {
-        await logAudit(currentUser.id, "manual_wallet_topup", {
+        await logAudit(currentUser.id, walletType === "api" ? "manual_api_wallet_topup" : "manual_wallet_topup", {
           target_agent_id: agent.user_id,
           target_agent_name: agent.full_name,
           amount: amount,
@@ -103,8 +107,12 @@ const AdminWalletTopup = () => {
         });
       }
 
-      toast({ title: `Successfully credited GH₵${amount.toFixed(2)} to ${agent.full_name}'s wallet!` });
-      setWalletBalance(data.new_balance);
+      toast({ title: `Successfully credited GH₵${amount.toFixed(2)} to ${agent.full_name}'s ${walletType === "api" ? "API" : "Main"} wallet!` });
+      if (walletType === "api") {
+        setApiBalance(data.new_balance);
+      } else {
+        setWalletBalance(data.new_balance);
+      }
       setCreditAmount("");
     }
     setCrediting(false);
@@ -231,14 +239,16 @@ const AdminWalletTopup = () => {
                 </div>
              </div>
 
-             <div className="bg-gradient-to-br from-blue-500/10 to-indigo-500/10 border border-blue-500/20 rounded-3xl p-6 backdrop-blur-md relative overflow-hidden group">
-                <Wallet className="absolute -right-4 -bottom-4 w-24 h-24 text-blue-500/5 group-hover:scale-110 transition-transform duration-700" />
-                <p className="text-[10px] uppercase font-black tracking-widest text-blue-400/60 mb-2">Current Balance</p>
-                <p className="text-4xl font-black text-white">GH₵{walletBalance.toFixed(2)}</p>
-                <div className="mt-4 flex items-center gap-2 text-[10px] text-white/30 font-medium">
-                   <CheckCircle className="w-3 h-3 text-emerald-500" /> Verified Agent Account
+              <div className="grid grid-cols-2 gap-4">
+                <div className="bg-gradient-to-br from-blue-500/10 to-indigo-500/10 border border-blue-500/20 rounded-3xl p-5 backdrop-blur-md relative overflow-hidden group">
+                   <p className="text-[10px] uppercase font-black tracking-widest text-blue-400/60 mb-2">Main Balance</p>
+                   <p className="text-2xl font-black text-white">GH₵{walletBalance.toFixed(2)}</p>
                 </div>
-             </div>
+                <div className="bg-gradient-to-br from-sky-500/10 to-teal-500/10 border border-sky-500/20 rounded-3xl p-5 backdrop-blur-md relative overflow-hidden group">
+                   <p className="text-[10px] uppercase font-black tracking-widest text-sky-400/60 mb-2">API Balance</p>
+                   <p className="text-2xl font-black text-white">GH₵{apiBalance.toFixed(2)}</p>
+                </div>
+              </div>
           </div>
 
           {/* Right: Topup Action */}
@@ -248,6 +258,23 @@ const AdminWalletTopup = () => {
                    <ArrowRight className="w-4 h-4 text-amber-400" />
                    Credit Agent Wallet
                 </h3>
+
+                 <div className="flex gap-2 p-1 bg-white/5 rounded-2xl border border-white/5 mb-6">
+                   <button
+                     type="button"
+                     onClick={() => setWalletType("main")}
+                     className={`flex-1 py-3 text-xs font-black uppercase tracking-wider rounded-xl transition-all ${walletType === "main" ? "bg-amber-400 text-black shadow-lg shadow-amber-400/10" : "text-white/40 hover:text-white/60"}`}
+                   >
+                     Main Wallet
+                   </button>
+                   <button
+                     type="button"
+                     onClick={() => setWalletType("api")}
+                     className={`flex-1 py-3 text-xs font-black uppercase tracking-wider rounded-xl transition-all ${walletType === "api" ? "bg-sky-400 text-black shadow-lg shadow-sky-400/10" : "text-white/40 hover:text-white/60"}`}
+                   >
+                     API Wallet
+                   </button>
+                 </div>
 
                 <div className="grid grid-cols-3 gap-2 mb-8">
                    {QUICK_AMOUNTS.map((amt) => (

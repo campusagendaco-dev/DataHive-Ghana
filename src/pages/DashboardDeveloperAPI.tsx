@@ -31,6 +31,9 @@ const DashboardDeveloperAPI = () => {
   const [hasKey, setHasKey] = useState(false);
   const [logs, setLogs] = useState<any[]>([]);
 
+  const [walletBalance, setWalletBalance] = useState<number>(0);
+  const [apiBalance, setApiBalance] = useState<number>(0);
+
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
   const [revealed, setRevealed] = useState(false);
@@ -45,18 +48,34 @@ const DashboardDeveloperAPI = () => {
   const fetchApiKey = useCallback(async () => {
     if (!user) return;
     setLoading(true);
-    const { data } = await supabase
-      .from("profiles")
-      .select("api_key_prefix, api_access_enabled, api_rate_limit, api_secret_key_hash, api_test_mode")
-      .eq("user_id", user.id)
-      .maybeSingle();
     
-    if (data) {
-      setApiKeyPrefix(data.api_key_prefix ?? null);
-      setHasKey(!!data.api_key_prefix);
-      setAccessEnabled(data.api_access_enabled ?? true);
-      setRateLimit(data.api_rate_limit ?? 30);
-      setTestMode(data.api_test_mode ?? false);
+    const [profileRes, walletRes] = await Promise.all([
+      supabase
+        .from("profiles")
+        .select("api_key_prefix, api_access_enabled, api_rate_limit, api_secret_key_hash, api_test_mode")
+        .eq("user_id", user.id)
+        .maybeSingle(),
+      supabase
+        .from("wallets")
+        .select("balance, api_balance")
+        .eq("agent_id", user.id)
+        .maybeSingle()
+    ]);
+    
+    if (profileRes.data) {
+      setApiKeyPrefix(profileRes.data.api_key_prefix ?? null);
+      setHasKey(!!profileRes.data.api_key_prefix);
+      setAccessEnabled(profileRes.data.api_access_enabled ?? true);
+      setRateLimit(profileRes.data.api_rate_limit ?? 30);
+      setTestMode(profileRes.data.api_test_mode ?? false);
+    }
+
+    if (walletRes.data) {
+      setWalletBalance(walletRes.data.balance ?? 0);
+      setApiBalance(walletRes.data.api_balance ?? 0);
+    } else {
+      setWalletBalance(0);
+      setApiBalance(0);
     }
     
     // Fetch recent logs
@@ -154,6 +173,28 @@ const DashboardDeveloperAPI = () => {
         <div className={`flex items-center gap-3 px-4 py-3 rounded-xl border text-sm font-medium ${accessEnabled ? "border-emerald-500/20 bg-emerald-500/5 text-emerald-400" : "border-red-500/20 bg-red-500/5 text-red-400"}`}>
           {accessEnabled ? <CheckCircle className="w-4 h-4 shrink-0" /> : <AlertTriangle className="w-4 h-4 shrink-0" />}
           {accessEnabled ? "API access is active. Use your API key to start integrating." : "API access disabled. Please contact support."}
+        </div>
+      )}
+
+      {/* Wallet Balances Grid */}
+      {!loading && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="bg-gradient-to-br from-indigo-500/10 to-blue-500/10 border border-indigo-500/20 rounded-3xl p-6 backdrop-blur-md relative overflow-hidden group">
+            <div className="absolute top-0 right-0 p-4 opacity-[0.03] group-hover:opacity-[0.08] transition-opacity">
+              <Wallet className="w-24 h-24 text-white" />
+            </div>
+            <p className="text-[10px] uppercase font-black tracking-widest text-indigo-400 mb-2">Main Wallet Balance</p>
+            <p className="text-3xl font-black text-white">GH₵{walletBalance.toFixed(2)}</p>
+            <p className="text-[10px] text-white/40 mt-1">Used for manual portal purchases</p>
+          </div>
+          <div className="bg-gradient-to-br from-sky-500/10 to-teal-500/10 border border-sky-500/20 rounded-3xl p-6 backdrop-blur-md relative overflow-hidden group">
+            <div className="absolute top-0 right-0 p-4 opacity-[0.03] group-hover:opacity-[0.08] transition-opacity">
+              <Zap className="w-24 h-24 text-white" />
+            </div>
+            <p className="text-[10px] uppercase font-black tracking-widest text-sky-400 mb-2">API Wallet Balance</p>
+            <p className="text-3xl font-black text-white">GH₵{apiBalance.toFixed(2)}</p>
+            <p className="text-[10px] text-white/40 mt-1">Deducted automatically for API-fulfilled orders</p>
+          </div>
         </div>
       )}
 

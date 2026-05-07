@@ -75,6 +75,7 @@ const DashboardWallet = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
   const [balance, setBalance] = useState(0);
+  const [apiBalance, setApiBalance] = useState(0);
   const [availableProfit, setAvailableProfit] = useState(0);
   const [loyaltyBalance, setLoyaltyBalance] = useState(0);
   const [convertingPoints, setConvertingPoints] = useState(false);
@@ -149,13 +150,14 @@ const DashboardWallet = () => {
     if (!user) return;
 
     const [walletRes, ordersRes, parentProfitRes, withdrawalsRes] = await Promise.all([
-      supabase.from("wallets").select("balance, loyalty_balance").eq("agent_id", user.id).maybeSingle(),
+      supabase.from("wallets").select("balance, loyalty_balance, api_balance").eq("agent_id", user.id).maybeSingle(),
       supabase.from("orders").select("profit").eq("agent_id", user.id).eq("status", "fulfilled"),
       supabase.from("orders").select("parent_profit").eq("parent_agent_id", user.id).eq("status", "fulfilled"),
       supabase.from("withdrawals").select("amount, status").eq("agent_id", user.id).in("status", ["completed", "pending", "processing"]),
     ]);
 
     const walletBalance = walletRes.data?.balance || 0;
+    const apiBal = walletRes.data?.api_balance || 0;
     const totalProfit = (ordersRes.data || []).reduce((sum, row: any) => sum + Number(row.profit || 0), 0);
     const parentProfitRows = (parentProfitRes.data || []) as Array<{ parent_profit?: number }>;
     const totalParentProfit = parentProfitRows.reduce((sum, row) => sum + Number(row.parent_profit || 0), 0);
@@ -163,6 +165,7 @@ const DashboardWallet = () => {
     const profitBalance = parseFloat(((totalProfit + totalParentProfit) - withdrawnProfit).toFixed(2));
 
     setBalance(walletBalance);
+    setApiBalance(apiBal);
     setLoyaltyBalance(Number(walletRes.data?.loyalty_balance || 0));
     setAvailableProfit(Math.max(0, profitBalance));
     setLoading(false);
@@ -410,6 +413,12 @@ const DashboardWallet = () => {
                <p className="text-[10px] font-bold text-white/60 uppercase">Available Profit</p>
                <p className="text-sm font-black text-white">GHS {availableProfit.toFixed(2)}</p>
             </div>
+            {(profile?.is_agent || profile?.sub_agent_approved || apiBalance > 0) && (
+              <div className="pt-2 flex justify-between items-center">
+                 <p className="text-[10px] font-bold text-white/60 uppercase">API Wallet Balance</p>
+                 <p className="text-sm font-black text-white">GHS {apiBalance.toFixed(2)}</p>
+              </div>
+            )}
           </CardContent>
         </Card>
 

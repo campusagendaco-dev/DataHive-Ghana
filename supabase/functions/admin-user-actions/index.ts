@@ -25,6 +25,24 @@ async function sendManualCreditSms(supabaseAdmin: any, userId: string, amount: n
   }
 }
 
+async function sendManualApiCreditSms(supabaseAdmin: any, userId: string, amount: number) {
+  try {
+    const { data: profile } = await supabaseAdmin.from("profiles").select("phone").eq("user_id", userId).maybeSingle();
+    if (!profile?.phone) return;
+
+    const { apiKey, senderId } = await getSmsConfig(supabaseAdmin);
+    const recipient = normalizePhone(profile.phone);
+    
+    if (!apiKey || !recipient) return;
+
+    const message = `Your SwiftData API Wallet has been manually credited with GHS ${amount.toFixed(2)} by admin. Thanks for your business.`;
+
+    await sendSmsViaTxtConnect(apiKey, senderId, recipient, message);
+  } catch (error) {
+    console.error("sendManualApiCreditSms error:", error);
+  }
+}
+
 async function sha256Hex(input: string): Promise<string> {
   const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(input));
   return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, "0")).join("");
@@ -62,6 +80,7 @@ type AdminUserAction =
   | "revoke_agent" 
   | "approve_sub_agent" 
   | "manual_topup"
+  | "manual_api_topup"
   | "update_system_settings"
   | "confirm_withdrawal"
   | "get_provider_balance"
@@ -586,7 +605,7 @@ serve(async (req: Request) => {
       case "manual_topup": {
         if (!isValidUuid(user_id)) throw new Error("Invalid or missing user_id");
         const { amount } = body;
-        if (typeof amount !== "number" || amount <= 0) {
+        if (typeof amount !== "number" || amount === 0) {
           return new Response(JSON.stringify({ error: "Invalid amount" }), {
             status: 400,
             headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -614,6 +633,43 @@ serve(async (req: Request) => {
         if (orderError) throw orderError;
 
         await sendManualCreditSms(supabaseAdmin, user_id, amount);
+
+        return new Response(JSON.stringify({ success: true, new_balance: newBalance }), {
+          status: 200,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      case "manual_api_topup": {
+        if (!isValidUuid(user_id)) throw new Error("Invalid or missing user_id");
+        const { amount } = body;
+        if (typeof amount !== "number" || amount === 0) {
+          return new Response(JSON.stringify({ error: "Invalid amount" }), {
+            status: 400,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+        const { data: result, error: rpcError } = await supabaseAdmin.rpc("api.credit_api_wallet", {
+          p_user_id: user_id,
+          p_amount: amount,
+        });
+
+        if (rpcError) throw rpcError;
+        const newBalance = result?.new_balance || 0;
+
+        const { error: orderError } = await supabaseAdmin
+          .from("orders")
+          .insert({
+            agent_id: user_id,
+            order_type: "wallet_topup",
+            amount,
+            profit: 0,
+            status: "fulfilled",
+          });
+
+        if (orderError) throw orderError;
+
+        await sendManualApiCreditSms(supabaseAdmin, user_id, amount);
 
         return new Response(JSON.stringify({ success: true, new_balance: newBalance }), {
           status: 200,

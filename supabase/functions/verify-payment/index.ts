@@ -324,8 +324,8 @@ serve(async (req) => {
       const fortyEightHoursAgo = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString();
       const { data: latestOrder, error: searchError } = await supabaseAdmin
         .from("orders")
-        .select("id, phone")
-        .or(`phone.ilike.%${last9},phone.eq.${sanitized}`)
+        .select("id, customer_phone")
+        .or(`customer_phone.ilike.%${last9},customer_phone.eq.${sanitized}`)
         .gte("created_at", fortyEightHoursAgo)
         .order("created_at", { ascending: false })
         .limit(1)
