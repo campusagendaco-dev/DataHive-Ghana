@@ -1,6 +1,40 @@
+-- Recreate public_system_settings view to ensure it includes free_data_claims_count and other safe settings columns.
+DROP VIEW IF EXISTS public.public_system_settings;
+
+CREATE VIEW public.public_system_settings AS
+ SELECT 
+    id,
+    auto_api_switch,
+    holiday_mode_enabled,
+    holiday_message,
+    disable_ordering,
+    dark_mode_enabled,
+    store_visitor_popup_enabled,
+    customer_service_number,
+    support_channel_link,
+    mtn_markup_percentage,
+    telecel_markup_percentage,
+    at_markup_percentage,
+    show_announcement,
+    announcement_title,
+    announcement_message,
+    free_data_enabled,
+    free_data_network,
+    free_data_package_size,
+    free_data_max_claims,
+    free_data_claims_count,
+    home_page_video_url,
+    home_page_video_muted,
+    agent_activation_fee,
+    sub_agent_base_fee,
+    show_scrolling_ad,
+    scrolling_ad_text,
+    scrolling_ad_image_url,
+    updated_at
+   FROM public.system_settings;
+
 -- Grant SELECT permissions on all non-sensitive columns of system_settings to anon and authenticated.
 -- This ensures that the public_system_settings view can be queried successfully by the frontend without permission errors.
-
 GRANT SELECT (
   id,
   disable_ordering,
@@ -32,3 +66,5 @@ GRANT SELECT (
   scrolling_ad_text,
   scrolling_ad_image_url
 ) ON public.system_settings TO anon, authenticated;
+
+GRANT SELECT ON public.public_system_settings TO anon, authenticated;
