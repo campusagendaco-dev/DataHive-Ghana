@@ -358,7 +358,7 @@ serve(async (req: Request) => {
         return json({ success: false, error: "Missing required fields." }, 400);
 
       // CALL SECURE RPC
-      const { data: result, error: rpcError } = await supabase.rpc("api.create_order_rpc", {
+      const { data: result, error: rpcError } = await supabase.schema("api").rpc("create_order_rpc", {
         p_user_id: currentUserId,
         p_network: network,
         p_package_size: package_size || "AIRTIME",
@@ -463,7 +463,7 @@ serve(async (req: Request) => {
       p_user_id: currentUserId,
       p_endpoint: endpoint,
       p_method: req.method,
-      p_payload: req.method === "POST" ? await req.clone().json().catch(() => ({})) : {},
+      p_payload: {},
       p_error: err.message || String(err),
       p_stack: err.stack || ""
     });

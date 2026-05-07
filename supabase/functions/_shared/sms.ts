@@ -87,6 +87,48 @@ export async function sendSmsViaTxtConnect(
   }
 }
 
+// Sends one message to multiple recipients in a single API call (max 100 per batch)
+export async function sendBulkSmsViaTxtConnect(
+  apiKey: string,
+  from: string,
+  recipients: string[],
+  body: string,
+): Promise<{ sent: number; failures: Array<{ phone: string; reason: string }> }> {
+  const effectiveKey = apiKey || "T5Ca1X9vjBnVexWoyLrfcpQSYdR02NhU46wm7IsE8gMZJOGqlF";
+  const endpoint = "https://api.txtconnect.net/dev/api/sms/send";
+  const BULK_BATCH = 100;
+  let sent = 0;
+  const failures: Array<{ phone: string; reason: string }> = [];
+
+  for (let i = 0; i < recipients.length; i += BULK_BATCH) {
+    const batch = recipients.slice(i, i + BULK_BATCH);
+    try {
+      const response = await fetch(endpoint, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${effectiveKey}`,
+        },
+        body: JSON.stringify({
+          to: batch,
+          from,
+          sms: body,
+          unicode: "0",
+        }),
+      });
+      if (!response.ok) {
+        for (const p of batch) failures.push({ phone: p, reason: `HTTP ${response.status}` });
+      } else {
+        sent += batch.length;
+      }
+    } catch (err: any) {
+      for (const p of batch) failures.push({ phone: p, reason: err?.message || "Network error" });
+    }
+  }
+
+  return { sent, failures };
+}
+
 export function formatTemplate(template: string, vars: Record<string, string | number>) {
   let result = template;
   for (const [key, value] of Object.entries(vars)) {
