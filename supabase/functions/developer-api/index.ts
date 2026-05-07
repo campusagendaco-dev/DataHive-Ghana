@@ -43,7 +43,9 @@ function isHtmlBody(ct: string | null, body: string): boolean {
 function buildProviderUrls(baseUrl: string, endpoint: string = "purchase", handlerType?: string): string[] {
   const clean = baseUrl.trim().replace(/\/+$/, "");
   if (!clean) return [];
+
   const urls = new Set<string>();
+  
   let aliases: string[] = [];
   if (handlerType === "datamart") {
     if (endpoint === "status") aliases = ["order-status"];
@@ -52,19 +54,43 @@ function buildProviderUrls(baseUrl: string, endpoint: string = "purchase", handl
   } else if (handlerType === "datahub") {
     aliases = endpoint === "purchase" ? ["data-purchase"] : [endpoint];
   } else {
-    aliases = endpoint === "purchase" ? ["purchase", "order", "airtime", "buy", "topup", "recharge"] : (endpoint === "status" ? ["status", "query", "check"] : [endpoint]);
+    aliases = endpoint === "purchase"
+      ? ["purchase", "order", "airtime", "buy", "topup", "recharge"]
+      : (endpoint === "status" ? ["status", "query", "check", "query-order"] : [endpoint]);
   }
-  for (const alias of aliases) {
-    urls.add(`${clean}/api/${alias}`);
-    urls.add(`${clean}/${alias}`);
-  }
+
+  let rootUrl = "";
   try {
-    const root = new URL(clean).origin;
-    for (const alias of aliases) {
-      urls.add(`${root}/api/${alias}`);
-      urls.add(`${root}/${alias}`);
-    }
+    rootUrl = new URL(clean).origin;
   } catch { /* ignore */ }
+
+  // If the configured URL already ends with an alias, use it directly
+  for (const alias of aliases) {
+    if (clean.endsWith(`/${alias}`) || clean.endsWith(`/api/${alias}`)) {
+      urls.add(clean);
+    }
+  }
+
+  // Build /api/<alias> and /<alias> variants from the configured base
+  for (const alias of aliases) {
+    if (clean.endsWith("/api")) {
+      urls.add(`${clean}/${alias}`);
+      urls.add(`${clean.replace(/\/api$/, "")}/api/${alias}`);
+    } else {
+      urls.add(`${clean}/api/${alias}`);
+      urls.add(`${clean}/${alias}`);
+    }
+  }
+
+  // Also try from the root origin in case the base URL has an extra path segment
+  if (rootUrl) {
+    for (const alias of aliases) {
+      urls.add(`${rootUrl}/api/${alias}`);
+      urls.add(`${rootUrl}/${alias}`);
+      urls.add(`${rootUrl}/functions/v1/developer-api/${alias}`);
+    }
+  }
+
   return Array.from(urls);
 }
 
