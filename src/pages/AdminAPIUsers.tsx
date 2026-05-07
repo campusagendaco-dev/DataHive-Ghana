@@ -46,6 +46,9 @@ interface APIUser {
   agent_approved: boolean;
   sub_agent_approved: boolean;
   stats?: { total_sales_volume: number }[];
+  api_test_mode?: boolean;
+  wallet_balance?: number;
+  api_wallet_balance?: number;
 }
 
 interface APIOrder {
@@ -113,6 +116,24 @@ const AdminAPIUsers = () => {
       toast({ title: "Error loading API users", description: fnData?.error ?? error?.message, variant: "destructive" });
     } else {
       const rows = (fnData?.users ?? []) as unknown as APIUser[];
+      
+      const userIds = rows.map((u) => u.user_id);
+      if (userIds.length > 0) {
+        const { data: wallets } = await supabase
+          .from("wallets")
+          .select("agent_id, balance, api_balance")
+          .in("agent_id", userIds);
+        
+        if (wallets) {
+          const walletMap = new Map(wallets.map((w) => [w.agent_id, w]));
+          rows.forEach((u) => {
+            const w = walletMap.get(u.user_id);
+            u.wallet_balance = w?.balance ?? 0;
+            u.api_wallet_balance = w?.api_balance ?? 0;
+          });
+        }
+      }
+
       setUsers(rows);
       // Seed edit state from DB values
       const rl: Record<string, number> = {};
@@ -451,6 +472,18 @@ const AdminAPIUsers = () => {
                           ) : (
                             <span className="text-xs text-white/30 italic">No key generated</span>
                           )}
+                        </div>
+                      </div>
+                      
+                      {/* Wallet Balances */}
+                      <div className="flex gap-4 shrink-0 text-center border-l border-white/5 pl-4">
+                        <div>
+                          <p className="text-sm font-black text-cyan-400">GH₵{(user.wallet_balance ?? 0).toFixed(2)}</p>
+                          <p className="text-[10px] text-white/30 uppercase tracking-widest font-bold">Main Bal</p>
+                        </div>
+                        <div>
+                          <p className="text-sm font-black text-emerald-400">GH₵{(user.api_wallet_balance ?? 0).toFixed(2)}</p>
+                          <p className="text-[10px] text-white/30 uppercase tracking-widest font-bold">API Bal</p>
                         </div>
                       </div>
 
