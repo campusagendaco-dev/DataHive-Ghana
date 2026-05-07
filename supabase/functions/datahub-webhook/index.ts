@@ -13,9 +13,14 @@ const DATAHUB_USER_AGENT = "DatahubGHMainServer-Webhook/1.0";
 function mapDatahubStatus(status: string): "processing" | "fulfilled" | "fulfillment_failed" | null {
   switch (status.toUpperCase()) {
     case "SUCCESSFUL":
+    case "SUCCESS":
+    case "DELIVERED":
+    case "COMPLETED":
       return "fulfilled";
     case "FAILED":
     case "CANCELLED":
+    case "REFUNDED":
+    case "REJECTED":
       return "fulfillment_failed";
     case "INITIATED":
     case "PENDING":
