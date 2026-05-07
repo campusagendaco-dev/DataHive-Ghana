@@ -75,7 +75,7 @@ const STEPS = [
   {
     step: "03",
     title: "Receive Instantly",
-    desc: "Data lands on the recipient's line in under 5 seconds. No app, no account, no delays.",
+    desc: "Data lands on the recipient's line in 10 to 60 minutes. No app, no account, no delays.",
     color: "text-sky-500",
     border: "border-sky-400/25",
     bg: "bg-sky-400/8",
@@ -119,7 +119,7 @@ const FEATURES = [
 
 const TRUST_STATS = [
   { value: "3 Networks", label: "MTN, Telecel & AirtelTigo" },
-  { value: "< 5 sec", label: "Average delivery time" },
+  { value: "10-60 min", label: "Average delivery time" },
   { value: "24 / 7", label: "Always available" },
   { value: "100%", label: "Paystack secured" },
 ];
@@ -140,7 +140,7 @@ const FAQS = [
   },
   {
     q: "How fast is data delivery on SwiftData Ghana?",
-    a: "Most orders are delivered in under 5 seconds after Paystack confirms payment. Available 24 hours a day, 7 days a week.",
+    a: "Most orders are delivered in 10 to 60 minutes after Paystack confirms payment. Available 24 hours a day, 7 days a week.",
   },
   {
     q: "Can I pay for data bundles with Mobile Money (MoMo) in Ghana?",
@@ -267,7 +267,7 @@ const Index = () => {
     <div className="min-h-screen bg-gray-50 dark:bg-[#030305] text-gray-900 dark:text-white">
       <SEO 
         title="SwiftData Ghana | Cheapest MTN, Telecel & AirtelTigo Data Bundles — Instant Delivery"
-        description="Buy cheap non-expiry MTN, Telecel & AirtelTigo data bundles in Ghana. Instant delivery in 5 seconds, no account needed. Best prices guaranteed."
+        description="Buy cheap non-expiry MTN, Telecel & AirtelTigo data bundles in Ghana. Safe delivery in 10 to 60 minutes, no account needed. Best prices guaranteed."
         keywords="SwiftData Ghana, buy data Ghana, cheap MTN data, cheap Telecel data, cheap AirtelTigo data, non-expiry bundles Ghana"
         canonical="https://swiftdatagh.shop/"
 
@@ -350,7 +350,7 @@ const Index = () => {
             Buy <strong className="text-white/90 font-bold">MTN</strong>,{" "}
             <strong className="text-white/90 font-bold">Telecel</strong> and{" "}
             <strong className="text-white/90 font-bold">AirtelTigo</strong> data online.
-            Instant delivery in under 5 seconds — secured by Paystack. No account needed.
+            Safe delivery in 10 to 60 minutes — secured by Paystack. No account needed.
           </p>
 
           {/* CTA buttons */}
@@ -376,7 +376,7 @@ const Index = () => {
           >
             {[
               { icon: ShieldCheck, text: "Paystack secured", color: "text-emerald-400" },
-              { icon: Zap, text: "Delivery under 5 s", color: "text-amber-400" },
+              { icon: Zap, text: "Delivery in 10-60 min", color: "text-amber-400" },
               { icon: CheckCircle2, text: "Non-expiry bundles", color: "text-sky-400" },
               { icon: Clock, text: "Available 24/7", color: "text-purple-400" },
             ].map(({ icon: Icon, text, color }) => (
@@ -408,7 +408,7 @@ const Index = () => {
               <p className="text-gray-400 dark:text-white/30 text-xs mt-1">Delivery success rate</p>
             </div>
             <div>
-              <p className="font-black text-2xl md:text-3xl text-amber-500">&lt; 5 sec</p>
+              <p className="font-black text-2xl md:text-3xl text-amber-500">10-60 min</p>
               <p className="text-gray-400 dark:text-white/30 text-xs mt-1">Average delivery time</p>
             </div>
             <div>
