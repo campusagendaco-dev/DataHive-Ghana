@@ -270,6 +270,8 @@ serve(async (req: Request) => {
     // ── 4. Access and IP Checks ─────────────────────────────────────────────────
     if (!profile.access_enabled) return json({ success: false, error: "API access is disabled." }, 403);
     
+    // IP Whitelisting is turned off as requested
+    /*
     const whitelist: string[] = Array.isArray(profile.ip_whitelist) ? profile.ip_whitelist : [];
     if (whitelist.length > 0 && !isMasterKey) {
       const clientIp = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || req.headers.get("cf-connecting-ip") || "";
@@ -277,6 +279,7 @@ serve(async (req: Request) => {
         return json({ success: false, error: `IP ${clientIp} not whitelisted.` }, 403);
       }
     }
+    */
 
     // ── 5. Idempotency Check (Optional for client, mandatory for DB) ────────────
     const idemKey = req.headers.get("X-Idempotency-Key") || crypto.randomUUID();
