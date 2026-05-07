@@ -649,7 +649,7 @@ serve(async (req: Request) => {
             headers: { ...corsHeaders, "Content-Type": "application/json" },
           });
         }
-        const { data: result, error: rpcError } = await supabaseAdmin.rpc("api.credit_api_wallet", {
+        const { data: result, error: rpcError } = await supabaseAdmin.rpc("credit_api_wallet", {
           p_user_id: user_id,
           p_amount: amount,
         });
