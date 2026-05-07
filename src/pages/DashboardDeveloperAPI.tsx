@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
   Key, Copy, RefreshCw, Loader2, ExternalLink,
-  Shield, AlertTriangle, CheckCircle, Eye, EyeOff, Zap,
+  Shield, AlertTriangle, CheckCircle, Eye, EyeOff, Zap, Wallet,
   Terminal, History, Bug, Users2, MessageCircle, Share2, Code2
 } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
