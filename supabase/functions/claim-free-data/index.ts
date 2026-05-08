@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { corsHeaders } from "../_shared/cors.ts";
+import { getActiveProviders } from "../_shared/providers.ts";
 
 function getEnv(...keys: string[]): string {
   for (const k of keys) {
@@ -267,9 +268,13 @@ serve(async (req) => {
       .eq("promo_code_id", claimResult.promo_id)
       .eq("claimed_by_phone", phone);
 
-    // Trigger data provider
-    const DATA_PROVIDER_API_KEY = getEnv("PRIMARY_DATA_PROVIDER_API_KEY", "DATA_PROVIDER_API_KEY");
-    const DATA_PROVIDER_BASE_URL = getEnv("PRIMARY_DATA_PROVIDER_BASE_URL", "DATA_PROVIDER_BASE_URL").replace(/\/+$/, "");
+    // Trigger data provider - fetch dynamically from providers table first
+    const activeProviders = await getActiveProviders(supabase, "data");
+    const primaryProvider = activeProviders[0];
+
+    const DATA_PROVIDER_API_KEY = primaryProvider?.api_key || getEnv("PRIMARY_DATA_PROVIDER_API_KEY", "DATA_PROVIDER_API_KEY");
+    let DATA_PROVIDER_BASE_URL = primaryProvider?.base_url || getEnv("PRIMARY_DATA_PROVIDER_BASE_URL", "DATA_PROVIDER_BASE_URL");
+    DATA_PROVIDER_BASE_URL = (DATA_PROVIDER_BASE_URL || "").replace(/\/+$/, "");
     const WEBHOOK_URL = getEnv("DATA_PROVIDER_WEBHOOK_URL", "PRIMARY_DATA_PROVIDER_WEBHOOK_URL");
 
     if (!DATA_PROVIDER_API_KEY || !DATA_PROVIDER_BASE_URL) {
