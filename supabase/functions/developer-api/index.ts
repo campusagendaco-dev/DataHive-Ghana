@@ -438,35 +438,33 @@ serve(async (req: Request) => {
       let finalResult = { ok: false, reason: "No active providers", body: "" };
       let successfulProviderId = null;
 
-      if (providers.length > 0) {
-        for (const provider of providers) {
-          const handlerType = provider.handler_type || "standard";
-          const dataPayload = handlerType === "datahub"
-            ? {
-                networkKey: mapNetworkKey(network),
-                recipient: normalizeRecipient(phone),
-                capacity: String(parseCapacity(package_size)),
-                reference: orderId,
-              }
-            : {
-                networkRaw: network,
-                recipient: normalizeRecipient(phone),
-                capacity: amount || parseCapacity(package_size),
-                plan: package_size,
-                amount: amount,
-                orderReference: orderId,
-                webhook_url: profile.webhook_url
-              };
+      const primaryProvider = providers[0];
+      if (primaryProvider) {
+        const handlerType = primaryProvider.handler_type || "standard";
+        const dataPayload = handlerType === "datahub"
+          ? {
+              networkKey: mapNetworkKey(network),
+              recipient: normalizeRecipient(phone),
+              capacity: String(parseCapacity(package_size)),
+              reference: orderId,
+            }
+          : {
+              networkRaw: network,
+              recipient: normalizeRecipient(phone),
+              capacity: amount || parseCapacity(package_size),
+              plan: package_size,
+              amount: amount,
+              orderReference: orderId,
+              webhook_url: profile.webhook_url
+            };
 
-          const res = await callProviderApi(provider, dataPayload, "purchase");
-          if (res.ok) {
-            finalResult = res;
-            successfulProviderId = provider.id;
-            break;
-          } else {
-            await logProviderError(supabase, provider.id, orderId, res.reason);
-            finalResult = res;
-          }
+        const res = await callProviderApi(primaryProvider, dataPayload, "purchase");
+        if (res.ok) {
+          finalResult = res;
+          successfulProviderId = primaryProvider.id;
+        } else {
+          await logProviderError(supabase, primaryProvider.id, orderId, res.reason);
+          finalResult = res;
         }
       }
 
@@ -477,9 +475,20 @@ serve(async (req: Request) => {
           provider_order_id: finalResult.id
         }).eq("id", orderId);
       } else {
+        const reasonLower = (finalResult.reason || "").toLowerCase();
+        const isPermanentError = reasonLower.includes("number") || 
+                                 reasonLower.includes("recipient") || 
+                                 reasonLower.includes("invalid") ||
+                                 reasonLower.includes("unsupported network") ||
+                                 reasonLower.includes("package not found");
+
+        const isQueued = finalResult.reason === "No active providers" || !isPermanentError;
+
         await supabase.from("orders").update({ 
-          status: "failed",
-          failure_reason: finalResult.reason
+          status: isQueued ? "processing" : "failed",
+          failure_reason: isQueued 
+            ? `Queued: ${finalResult.reason === "No active providers" ? "No active API providers configured" : `Temporary error: ${finalResult.reason}`}`
+            : finalResult.reason
         }).eq("id", orderId);
       }
       // BACKGROUND FULFILLMENT END

@@ -697,8 +697,9 @@ serve(async (req) => {
     let result: any = { ok: false, reason: "No providers" };
     let successfulProviderId = null;
 
-    for (const provider of activeProviders) {
-      const handlerType = provider.handler_type || "standard";
+    const primaryProvider = activeProviders[0];
+    if (primaryProvider) {
+      const handlerType = primaryProvider.handler_type || "standard";
       const networkKey = handlerType === "datamart" 
         ? (network.toUpperCase() === "MTN" ? "YELLO" : (network.toUpperCase() === "TELECEL" ? "TELECEL" : "AT_PREMIUM"))
         : mapDataNetworkKey(network);
@@ -724,39 +725,45 @@ serve(async (req) => {
           }
         : requestBody;
 
-      result = await callProviderApi(provider, dataPayload, "purchase");
+      result = await callProviderApi(primaryProvider, dataPayload, "purchase");
       if (result.ok) {
-        successfulProviderId = provider.id;
-        break;
+        successfulProviderId = primaryProvider.id;
       } else {
-        await logProviderError(supabaseAdmin, provider.id, targetReference, result.reason);
+        await logProviderError(supabaseAdmin, primaryProvider.id, targetReference, result.reason);
       }
     }
 
     if (result.ok) {
-      const isDelivered = false; // Do not fast-track as fulfilled immediately; keep as processing until API status confirms delivery
-      const patch: any = { provider_id: successfulProviderId, provider_order_id: result.id, status: "processing" };
-      
+      const patch: any = { provider_id: successfulProviderId, provider_order_id: result.id, status: "fulfilled" };
       await supabaseAdmin.from("orders").update(patch).eq("id", targetReference);
-      if (isDelivered) {
-        try {
-          await supabaseAdmin.rpc("credit_order_profits", { p_order_id: targetReference });
-        } catch (e) {
-          console.error("[verify-payment] Profit credit failed:", e);
-        }
+      try {
+        await supabaseAdmin.rpc("credit_order_profits", { p_order_id: targetReference });
+      } catch (e) {
+        console.error("[verify-payment] Profit credit failed:", e);
       }
-      
-      return new Response(JSON.stringify({ status: patch.status || "processing", provider_order_id: result.id }), { headers: corsHeaders });
+      return new Response(JSON.stringify({ status: "fulfilled", provider_order_id: result.id }), { headers: corsHeaders });
     } else {
-      const isQueued = result.reason === "No providers";
+      const reasonLower = (result.reason || "").toLowerCase();
+      const isPermanentError = reasonLower.includes("number") || 
+                               reasonLower.includes("recipient") || 
+                               reasonLower.includes("invalid") ||
+                               reasonLower.includes("unsupported network") ||
+                               reasonLower.includes("package not found");
+
+      const isQueued = result.reason === "No providers" || !isPermanentError;
+
       await supabaseAdmin.from("orders").update({ 
         status: isQueued ? "processing" : "fulfillment_failed", 
-        failure_reason: isQueued ? "Queued: No active API providers configured" : result.reason 
+        failure_reason: isQueued 
+          ? `Queued: ${result.reason === "No providers" ? "No active API providers configured" : `Temporary error: ${result.reason}`}`
+          : result.reason 
       }).eq("id", targetReference);
       
       return new Response(JSON.stringify({ 
         status: isQueued ? "processing" : "failed", 
-        reason: isQueued ? "Queued: No active API providers configured" : result.reason 
+        reason: isQueued 
+          ? `Queued: ${result.reason === "No providers" ? "No active API providers configured" : `Temporary error: ${result.reason}`}`
+          : result.reason 
       }), { headers: corsHeaders });
     }
   } catch (error: any) {
