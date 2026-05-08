@@ -580,7 +580,7 @@ serve(async (req) => {
         updated_at: new Date().toISOString()
       })
       .eq("id", targetReference)
-      .in("status", ["pending", "paid", "processing", "fulfillment_failed"])
+      .in("status", ["pending", "paid", "fulfillment_failed"])
       .select("*")
       .maybeSingle();
 

@@ -166,7 +166,7 @@ serve(async (req: Request) => {
     const { data: ordersToRetry, error: fetchError } = await supabaseAdmin
       .from("orders")
       .select("*, profiles:agent_id(api_access_enabled)")
-      .in("status", ["fulfillment_failed", "processing", "paid"])
+      .in("status", ["fulfillment_failed", "paid"])
       .lt("retry_count", 50) // High limit for everyone, we'll filter in JS
       .or(`last_retry_at.is.null,last_retry_at.lt.${twoMinutesAgo}`)
       .order("created_at", { ascending: true })
