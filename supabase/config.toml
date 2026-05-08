@@ -56,6 +56,12 @@ verify_jwt = false
 [functions.whatsapp-webhook]
 verify_jwt = false
 
+[functions.bossu-webhook]
+verify_jwt = false
+
+[functions.datahub-webhook]
+verify_jwt = false
+
 
 [functions.process-retries]
 verify_jwt = false
