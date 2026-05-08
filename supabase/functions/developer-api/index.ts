@@ -46,6 +46,10 @@ function buildProviderUrls(baseUrl: string, endpoint: string = "purchase", handl
 
   const urls = new Set<string>();
   
+  if (handlerType === "bossu") {
+    return [clean];
+  }
+
   let aliases: string[] = [];
   if (handlerType === "datamart") {
     if (endpoint === "status") aliases = ["order-status"];
@@ -100,6 +104,24 @@ async function callProviderApi(
   endpoint: string = "purchase"
 ): Promise<{ ok: boolean; reason: string; id?: string; body?: string }> {
   const handlerType = provider.handler_type || "standard";
+  let payload = { ...data };
+  if (handlerType === "bossu") {
+    if (endpoint === "status") {
+      payload = {
+        action: "order_status",
+        order_id: String(data.transaction_id || data.reference || data.order_id || ""),
+      };
+    } else {
+      payload = {
+        action: "create_order",
+        network: String(data.networkRaw || data.network || "").toLowerCase(),
+        package_key: String(data.package_size || data.plan || data.package_key || "").replace(/\s+/g, "").toLowerCase(),
+        recipient_phone: String(data.recipient || data.phoneNumber || data.recipient_phone || ""),
+        external_reference: String(data.orderReference || data.reference || ""),
+      };
+    }
+  }
+
   const urls = buildProviderUrls(provider.base_url, endpoint, handlerType);
   let lastBody = "";
   let lastReason = "Provider error";
@@ -117,7 +139,7 @@ async function callProviderApi(
       const res = await fetch(url, {
         method: "POST",
         headers,
-        body: JSON.stringify(data),
+        body: JSON.stringify(payload),
         signal: ctrl.signal,
       });
       clearTimeout(tid);
@@ -129,8 +151,8 @@ async function callProviderApi(
         try {
           const p = JSON.parse(text);
           const s = String(p?.status ?? p?.success ?? "").toLowerCase();
-          const ok = p?.success === true || s === "success" || s === "true" || p?.status === true;
-          if (ok) return { ok: true, reason: "", id: String(p?.data?.orderNumber ?? p?.data?.reference ?? p?.data?.purchaseId ?? p?.transaction_id ?? p?.id ?? "") };
+          const ok = p?.success === true || s === "success" || s === "true" || p?.status === true || s === "completed" || s === "pending";
+          if (ok) return { ok: true, reason: "", id: String(p?.data?.orderNumber ?? p?.data?.reference ?? p?.data?.purchaseId ?? p?.transaction_id ?? p?.id ?? p?.order_id ?? "") };
           lastReason = p?.message || p?.error || "Provider rejected the order";
         } catch { return { ok: true, reason: "" }; }
       } else {
