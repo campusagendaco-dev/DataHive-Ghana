@@ -231,6 +231,9 @@ serve(async (req) => {
 
           if (res.ok) {
             const result = await res.json();
+            if (result.success === false || result.status === "error" || result.message === "Access denied" || result.message === "Unauthorized") {
+              throw new Error(result.message || "API error");
+            }
             const pkgs = result.packages || result.data || [];
             if (Array.isArray(pkgs)) {
               for (const pkg of pkgs) {
@@ -250,8 +253,9 @@ serve(async (req) => {
               }
             }
           }
-        } catch (err) {
+        } catch (err: any) {
           console.error(`[sync:bossu] Error fetching packages for ${net}:`, err);
+          throw err;
         }
       }
 
@@ -279,6 +283,9 @@ serve(async (req) => {
 
         if (balanceRes.ok) {
           const bResult = await balanceRes.json();
+          if (bResult.success === false || bResult.status === "error" || bResult.message === "Access denied" || bResult.message === "Unauthorized") {
+            throw new Error(bResult.message || "API error");
+          }
           const rawBal = bResult.balance ?? bResult.data?.balance;
           if (rawBal !== undefined) {
             balance = typeof rawBal === "string" ? parseFloat(rawBal.replace(/[^\d.]/g, "")) : Number(rawBal);
