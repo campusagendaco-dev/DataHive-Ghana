@@ -77,7 +77,7 @@ serve(async (req) => {
 
     console.log("[datahub-webhook] Received event:", event, JSON.stringify(data));
 
-    if (event !== "order.status_updated" || !data) {
+    if (event !== "order.status_updated" && event !== "order.status.changed" || !data) {
       return new Response(JSON.stringify({ received: true, skipped: true }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
