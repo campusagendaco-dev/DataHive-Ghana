@@ -421,7 +421,7 @@ serve(async (req) => {
 
         if (checkResult.ok) {
           foundOnProvider = true;
-          const isDelivered = checkResult.status === "delivered" || checkResult.status === "success" || checkResult.status === "fulfilled" || checkResult.status === "completed" || checkResult.status === "sent";
+          const isDelivered = checkResult.status === "delivered" || checkResult.status === "success" || checkResult.status === "successful" || checkResult.status === "fulfilled" || checkResult.status === "completed" || checkResult.status === "sent";
           if (isDelivered) {
             await supabaseAdmin.from("orders").update({ status: "fulfilled", provider_id: provider.id }).eq("id", targetReference);
             await supabaseAdmin.rpc("credit_order_profits", { p_order_id: targetReference });
@@ -465,7 +465,7 @@ serve(async (req) => {
         }, "status");
         
         if (checkResult.ok) {
-          const isDelivered = checkResult.status === "delivered" || checkResult.status === "success" || checkResult.status === "fulfilled" || checkResult.status === "completed" || checkResult.status === "sent";
+          const isDelivered = checkResult.status === "delivered" || checkResult.status === "success" || checkResult.status === "successful" || checkResult.status === "fulfilled" || checkResult.status === "completed" || checkResult.status === "sent";
           if (isDelivered) {
             console.log(`[verify-payment] Found fulfilled order ${targetReference} at ${provider.name} during pre-check.`);
             await supabaseAdmin.from("orders").update({ status: "fulfilled", provider_id: provider.id }).eq("id", targetReference);
