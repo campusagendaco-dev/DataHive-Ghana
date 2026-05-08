@@ -723,8 +723,16 @@ serve(async (req) => {
       
       return new Response(JSON.stringify({ status: patch.status || "processing", provider_order_id: result.id }), { headers: corsHeaders });
     } else {
-      await supabaseAdmin.from("orders").update({ status: "fulfillment_failed", failure_reason: result.reason }).eq("id", targetReference);
-      return new Response(JSON.stringify({ status: "failed", reason: result.reason }), { headers: corsHeaders });
+      const isQueued = result.reason === "No providers";
+      await supabaseAdmin.from("orders").update({ 
+        status: isQueued ? "processing" : "fulfillment_failed", 
+        failure_reason: isQueued ? "Queued: No active API providers configured" : result.reason 
+      }).eq("id", targetReference);
+      
+      return new Response(JSON.stringify({ 
+        status: isQueued ? "processing" : "failed", 
+        reason: isQueued ? "Queued: No active API providers configured" : result.reason 
+      }), { headers: corsHeaders });
     }
   } catch (error: any) {
     console.error("[verify-payment] CRITICAL ERROR:", error);
