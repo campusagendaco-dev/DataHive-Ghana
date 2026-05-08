@@ -229,28 +229,30 @@ serve(async (req) => {
             body: JSON.stringify({ action: "packages", network: net, api_key: apiKey })
           });
 
-          if (res.ok) {
-            const result = await res.json();
-            if (result.success === false || result.status === "error" || result.message === "Access denied" || result.message === "Unauthorized") {
-              throw new Error(result.message || "API error");
-            }
-            const pkgs = result.packages || result.data || [];
-            if (Array.isArray(pkgs)) {
-              for (const pkg of pkgs) {
-                const dbNetwork = net === "mtn" ? "MTN" : (net === "telecel" ? "Telecel" : "AirtelTigo");
-                const capacityGb = Number(pkg.capacity || parseCapacity(pkg.package_name || pkg.package_key || ""));
-                
-                allPackages.push({
-                  provider_id: provider.id,
-                  network: dbNetwork,
-                  package_name: pkg.package_name || pkg.name || `${pkg.package_key || pkg.id}`,
-                  capacity_gb: capacityGb,
-                  cost_price: Number(pkg.price || pkg.cost || 0),
-                  external_id: String(pkg.package_key || pkg.id || `${dbNetwork}_${capacityGb}`),
-                  raw_data: pkg,
-                  is_active: true
-                });
-              }
+          if (!res.ok) {
+            const bodyText = await res.text().catch(() => "");
+            throw new Error(`HTTP ${res.status}: ${bodyText || res.statusText}`);
+          }
+          const result = await res.json();
+          if (result.success === false || result.status === "error" || result.message === "Access denied" || result.message === "Unauthorized") {
+            throw new Error(result.message || "API error");
+          }
+          const pkgs = result.packages || result.data || [];
+          if (Array.isArray(pkgs)) {
+            for (const pkg of pkgs) {
+              const dbNetwork = net === "mtn" ? "MTN" : (net === "telecel" ? "Telecel" : "AirtelTigo");
+              const capacityGb = Number(pkg.capacity || parseCapacity(pkg.package_name || pkg.package_key || ""));
+              
+              allPackages.push({
+                provider_id: provider.id,
+                network: dbNetwork,
+                package_name: pkg.package_name || pkg.name || `${pkg.package_key || pkg.id}`,
+                capacity_gb: capacityGb,
+                cost_price: Number(pkg.price || pkg.cost || 0),
+                external_id: String(pkg.package_key || pkg.id || `${dbNetwork}_${capacityGb}`),
+                raw_data: pkg,
+                is_active: true
+              });
             }
           }
         } catch (err: any) {
@@ -281,16 +283,18 @@ serve(async (req) => {
           body: JSON.stringify({ action: "balance", api_key: apiKey })
         });
 
-        if (balanceRes.ok) {
-          const bResult = await balanceRes.json();
-          if (bResult.success === false || bResult.status === "error" || bResult.message === "Access denied" || bResult.message === "Unauthorized") {
-            throw new Error(bResult.message || "API error");
-          }
-          const rawBal = bResult.balance ?? bResult.data?.balance;
-          if (rawBal !== undefined) {
-            balance = typeof rawBal === "string" ? parseFloat(rawBal.replace(/[^\d.]/g, "")) : Number(rawBal);
-            console.log(`[sync:bossu] Balance: GHS ${balance}`);
-          }
+        if (!balanceRes.ok) {
+          const bText = await balanceRes.text().catch(() => "");
+          throw new Error(`HTTP ${balanceRes.status}: ${bText || balanceRes.statusText}`);
+        }
+        const bResult = await balanceRes.json();
+        if (bResult.success === false || bResult.status === "error" || bResult.message === "Access denied" || bResult.message === "Unauthorized") {
+          throw new Error(bResult.message || "API error");
+        }
+        const rawBal = bResult.balance ?? bResult.data?.balance;
+        if (rawBal !== undefined) {
+          balance = typeof rawBal === "string" ? parseFloat(rawBal.replace(/[^\d.]/g, "")) : Number(rawBal);
+          console.log(`[sync:bossu] Balance: GHS ${balance}`);
         }
       } catch (err) {
         console.error("[sync:bossu] Balance fetch error:", err);
