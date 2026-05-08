@@ -106,7 +106,7 @@ function buildProviderUrls(baseUrl: string, endpoint: string = "purchase", handl
     else if (endpoint === "purchase") aliases = ["purchase"];
     else aliases = [endpoint];
   } else if (handlerType === "datahub") {
-    aliases = endpoint === "purchase" ? ["data-purchase"] : [endpoint];
+    aliases = endpoint === "purchase" ? ["data-purchase"] : (endpoint === "status" ? ["order-status"] : [endpoint]);
   } else {
     aliases = endpoint === "purchase"
       ? ["purchase", "order", "airtime", "buy", "topup", "recharge"]
@@ -225,6 +225,10 @@ async function callProviderApi(
         api_key: apiKey,
       };
     }
+  } else if (handlerType === "datahub" && endpoint === "status") {
+    payload = {
+      reference: String(data.reference || data.transaction_id || data.order_id || ""),
+    };
   }
 
   const urls = buildProviderUrls(baseUrl, endpoint, handlerType);
