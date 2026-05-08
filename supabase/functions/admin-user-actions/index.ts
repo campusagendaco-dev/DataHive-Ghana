@@ -1029,77 +1029,85 @@ serve(async (req: Request) => {
       }
 
       case "get_provider_balance": {
-        // Fetch from DB if available
-        const { data: dbSettings } = await supabaseAdmin.from("system_settings").select("*").eq("id", 1).maybeSingle();
-        
-        const apiKey = (Deno as any).env.get("DATA_PROVIDER_API_KEY") || (Deno as any).env.get("PRIMARY_DATA_PROVIDER_API_KEY") || dbSettings?.data_provider_api_key || "";
-        const baseUrl = ((Deno as any).env.get("DATA_PROVIDER_BASE_URL") || (Deno as any).env.get("PRIMARY_DATA_PROVIDER_BASE_URL") || dbSettings?.data_provider_base_url || "").replace(/\/+$/, "");
-        
-        const airtimeKey = (Deno as any).env.get("AIRTIME_PROVIDER_API_KEY") || dbSettings?.airtime_provider_api_key || apiKey;
-        
-        if (!apiKey || !baseUrl) {
-          return new Response(JSON.stringify({
-            error: "Provider not configured",
-            diagnostics: {
-              DATA_PROVIDER_API_KEY: (Deno as any).env.get("DATA_PROVIDER_API_KEY") ? "configured" : "not set",
-              PRIMARY_DATA_PROVIDER_API_KEY: (Deno as any).env.get("PRIMARY_DATA_PROVIDER_API_KEY") ? "configured" : "not set",
-              baseUrl: baseUrl ? "configured" : "not set",
-            }
+        const { data: activeProviders, error: providersError } = await supabaseAdmin
+          .from("providers")
+          .select("*")
+          .eq("is_active", true);
 
-          }), {
-            status: 200,
+        if (providersError) {
+          return new Response(JSON.stringify({ error: providersError.message }), {
+            status: 500,
             headers: { ...corsHeaders, "Content-Type": "application/json" },
           });
         }
 
-        const balanceUrls = [
-          `${baseUrl}/api/balance`,
-          `${baseUrl}/balance`,
-          `${baseUrl}/api/user/balance`,
-          `${baseUrl}/user/balance`,
-        ];
+        const results = [];
 
-        let lastError = "Could not fetch balance";
-        for (const url of balanceUrls) {
-          try {
-            console.log("Checking provider balance at:", url);
-            const res = await fetch(url, {
-              headers: {
-                "X-API-Key": apiKey,
-                "Authorization": `Bearer ${apiKey}`,
-                "Accept": "application/json",
-              }
-            });
-            const text = await res.text();
-            if (res.ok) {
-              try {
-                const data = JSON.parse(text);
-                const balance = data.balance ?? data.data?.balance ?? data.wallet_balance;
-                if (balance !== undefined) {
-                  return new Response(JSON.stringify({
-                    success: true,
-                    balance: Number(balance),
-                    diagnostics: {
-                      DATA_PROVIDER_API_KEY: (Deno as any).env.get("DATA_PROVIDER_API_KEY") ? "configured" : "not set",
-                      PRIMARY_DATA_PROVIDER_API_KEY: (Deno as any).env.get("PRIMARY_DATA_PROVIDER_API_KEY") ? "configured" : "not set",
-                      AIRTIME_PROVIDER_API_KEY: (Deno as any).env.get("AIRTIME_PROVIDER_API_KEY") ? "configured" : "not set",
-                      baseUrl: baseUrl ? "configured" : "not set",
-                    }
-                  }), {
-                    status: 200,
-                    headers: { ...corsHeaders, "Content-Type": "application/json" },
-                  });
+        for (const p of activeProviders || []) {
+          const apiKey = p.api_key || "";
+          const baseUrl = (p.base_url || "").replace(/\/+$/, "");
+          if (!apiKey || !baseUrl) continue;
+
+          let balanceUrls = [
+            `${baseUrl}/balance`,
+            `${baseUrl}/api/balance`,
+            `${baseUrl}/user/balance`,
+          ];
+
+          // Specific overrides for known providers
+          if (baseUrl.includes("spendless.top")) {
+            balanceUrls = [`${baseUrl}/balance`].concat(balanceUrls);
+          }
+
+          let fetchedBalance: number | null = null;
+          let lastError = "";
+
+          for (const url of balanceUrls) {
+            try {
+              const res = await fetch(url, {
+                method: "GET",
+                headers: {
+                  "X-API-Key": apiKey,
+                  "Authorization": `Bearer ${apiKey}`,
+                  "Accept": "application/json",
+                  "User-Agent": "SwiftDataGH/2.0",
+                },
+              });
+
+              const text = await res.text();
+              if (res.ok) {
+                const parsed = JSON.parse(text);
+                const bal = parsed.balance ?? parsed.data?.balance ?? parsed.wallet_balance ?? parsed.walletBalance;
+                if (bal !== undefined) {
+                  fetchedBalance = Number(bal);
+                  break;
                 }
-              } catch { /* ignore parse error */ }
+              } else {
+                lastError = `HTTP ${res.status}: ${text.slice(0, 100)}`;
+              }
+            } catch (err: any) {
+              lastError = err.message || "Network error";
             }
-            lastError = `Provider returned ${res.status}: ${text.slice(0, 100)}`;
-          } catch (e) {
-            lastError = e instanceof Error ? e.message : "Network error";
+          }
+
+          if (fetchedBalance !== null) {
+            // Persist the synced balance in the database
+            await supabaseAdmin
+              .from("providers")
+              .update({ balance: fetchedBalance, last_balance_check: new Date().toISOString() })
+              .eq("id", p.id);
+
+            results.push({ id: p.id, name: p.name, balance: fetchedBalance, status: "synced" });
+          } else {
+            results.push({ id: p.id, name: p.name, status: "failed_to_sync", reason: lastError });
           }
         }
 
-        return new Response(JSON.stringify({ error: lastError }), {
-          status: 400,
+        return new Response(JSON.stringify({
+          success: true,
+          results,
+        }), {
+          status: 200,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
