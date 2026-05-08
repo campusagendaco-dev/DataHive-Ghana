@@ -197,6 +197,97 @@ serve(async (req) => {
       } else {
         console.warn(`[sync:datahub] Balance fetch failed: ${balanceRes.status}`);
       }
+    } else if (handlerType === "bossu") {
+      console.log(`Syncing Bossu Data Hub provider: ${provider.name}`);
+
+      const allPackages = [];
+      const networks = ["mtn", "telecel", "airteltigo"];
+
+      const parseCapacity = (packageSize: string): number => {
+        if (!packageSize) return 0;
+        const match = packageSize.replace(/\s+/g, "").toLowerCase().match(/(\d+(?:\.\d+)?)\s*(gb|mb)/);
+        if (match) {
+          const val = parseFloat(match[1]);
+          const unit = match[2];
+          return unit === "gb" ? val : val / 1024;
+        }
+        const fallbackMatch = packageSize.replace(/\s+/g, "").match(/(\d+(?:\.\d+)?)/);
+        return fallbackMatch ? parseFloat(fallbackMatch[1]) : 0;
+      };
+
+      // 1. Sync Packages
+      for (const net of networks) {
+        try {
+          const res = await fetch(baseUrl, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "Accept": "application/json",
+              "X-API-Key": apiKey,
+              "Authorization": `Bearer ${apiKey}`
+            },
+            body: JSON.stringify({ action: "packages", network: net })
+          });
+
+          if (res.ok) {
+            const result = await res.json();
+            const pkgs = result.packages || result.data || [];
+            if (Array.isArray(pkgs)) {
+              for (const pkg of pkgs) {
+                const dbNetwork = net === "mtn" ? "MTN" : (net === "telecel" ? "Telecel" : "AirtelTigo");
+                const capacityGb = Number(pkg.capacity || parseCapacity(pkg.package_name || pkg.package_key || ""));
+                
+                allPackages.push({
+                  provider_id: provider.id,
+                  network: dbNetwork,
+                  package_name: pkg.package_name || pkg.name || `${pkg.package_key || pkg.id}`,
+                  capacity_gb: capacityGb,
+                  cost_price: Number(pkg.price || pkg.cost || 0),
+                  external_id: String(pkg.package_key || pkg.id || `${dbNetwork}_${capacityGb}`),
+                  raw_data: pkg,
+                  is_active: true
+                });
+              }
+            }
+          }
+        } catch (err) {
+          console.error(`[sync:bossu] Error fetching packages for ${net}:`, err);
+        }
+      }
+
+      if (allPackages.length > 0) {
+        const { error: upsertError } = await supabaseAdmin
+          .from("provider_packages")
+          .upsert(allPackages, { onConflict: "provider_id,network,package_name" });
+        if (upsertError) console.error("[sync:bossu] Package upsert error:", upsertError);
+        packagesSynced = allPackages.length;
+        console.log(`[sync:bossu] Synced ${packagesSynced} packages`);
+      }
+
+      // 2. Sync Balance
+      try {
+        const balanceRes = await fetch(baseUrl, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+            "X-API-Key": apiKey,
+            "Authorization": `Bearer ${apiKey}`
+          },
+          body: JSON.stringify({ action: "balance" })
+        });
+
+        if (balanceRes.ok) {
+          const bResult = await balanceRes.json();
+          const rawBal = bResult.balance ?? bResult.data?.balance;
+          if (rawBal !== undefined) {
+            balance = typeof rawBal === "string" ? parseFloat(rawBal.replace(/[^\d.]/g, "")) : Number(rawBal);
+            console.log(`[sync:bossu] Balance: GHS ${balance}`);
+          }
+        }
+      } catch (err) {
+        console.error("[sync:bossu] Balance fetch error:", err);
+      }
     } else {
       throw new Error(`Sync not implemented for handler type: ${handlerType}`);
     }
