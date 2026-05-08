@@ -1005,6 +1005,10 @@ const AdminSettings = () => {
                                   const errorBody = await error.context?.json();
                                   throw new Error(errorBody?.error || error.message);
                                 }
+
+                                if (data && data.success === false) {
+                                  throw new Error(data.error || "Unknown sync error");
+                                }
                                 
                                 toast({ 
                                   title: "Sync Successful", 
