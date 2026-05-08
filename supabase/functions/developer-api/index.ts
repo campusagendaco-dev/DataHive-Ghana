@@ -410,6 +410,30 @@ serve(async (req: Request) => {
       if (!network || !phone || (!amount && !package_size))
         return json({ success: false, error: "Missing required fields." }, 400);
 
+      // Anti-Duplicate Protection (60 Minutes)
+      const sixtyMinutesAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+      const normalizedPhone = normalizeRecipient(phone);
+
+      const { data: duplicateOrder } = await supabase
+        .from("orders")
+        .select("id, created_at")
+        .eq("customer_phone", normalizedPhone)
+        .eq("network", network)
+        .eq("package_size", package_size || "AIRTIME")
+        .in("status", ["paid", "processing", "fulfilled", "completed"])
+        .gte("created_at", sixtyMinutesAgo)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (duplicateOrder) {
+        console.warn(`[DUPLICATE] Rejected developer duplicate order for ${normalizedPhone} within 60 minutes`);
+        return json({ 
+          success: false, 
+          error: "Duplicate order detected. Please wait 60 minutes before placing the same order again." 
+        }, 409);
+      }
+
       // CALL SECURE RPC
       const { data: result, error: rpcError } = await supabase.schema("api").rpc("create_order_rpc", {
         p_user_id: currentUserId,

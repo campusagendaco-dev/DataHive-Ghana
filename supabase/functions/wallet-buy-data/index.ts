@@ -67,6 +67,33 @@ serve(async (req: Request) => {
 
     console.log(`[USER] ${user.id} (${user.email})`);
 
+    // Anti-Duplicate Protection (60 Minutes)
+    const sixtyMinutesAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+    const normalizedPhone = normalizeRecipient(customer_phone);
+    const normalizedNet = normalizeNetworkForPricing(networkRaw);
+
+    const { data: duplicateOrder } = await supabaseAdmin
+      .from("orders")
+      .select("id, created_at")
+      .eq("customer_phone", normalizedPhone)
+      .eq("network", normalizedNet)
+      .eq("package_size", package_size)
+      .in("status", ["paid", "processing", "fulfilled", "completed"])
+      .gte("created_at", sixtyMinutesAgo)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (duplicateOrder) {
+      console.warn(`[DUPLICATE] Rejected duplicate order for ${normalizedPhone} within 60 minutes`);
+      return new Response(JSON.stringify({ 
+        error: "Duplicate order detected. Please wait 60 minutes before placing the same order again." 
+      }), {
+        status: 409,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     // 1. ATOMIC DEBIT (FOREGROUND)
     console.log(`[DEBIT] Starting debit for ${requestedAmount}...`);
     const { data: debitResult, error: debitError } = await supabaseAdmin.rpc("debit_wallet", {
