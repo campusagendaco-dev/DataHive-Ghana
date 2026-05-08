@@ -430,8 +430,8 @@ serve(async (req) => {
         console.log(`[verify-payment] Checking status for ${targetReference} at ${provider.name}`);
         const checkResult = await callProviderApi(provider, {
           transaction_id: existingOrder.provider_order_id,
-          reference: targetReference, 
-          order_id: targetReference,
+          order_id: existingOrder.provider_order_id || targetReference,
+          reference: targetReference,
         }, "status");
 
         if (checkResult.ok) {
@@ -455,15 +455,14 @@ serve(async (req) => {
     }
 
     // --- 1.2. AGE CHECK FALLBACK ---
-    if (existingOrder && (existingOrder.status === "processing" || existingOrder.status === "paid")) {
+    // If processing for >20 min with no provider confirmation, reset to paid so retries pick it up
+    if (existingOrder && existingOrder.status === "processing") {
       const orderCreatedAt = new Date(existingOrder.created_at).getTime();
       const ageInMinutes = (Date.now() - orderCreatedAt) / 60000;
       if (ageInMinutes > 20) {
-        console.log(`[verify-payment] Order ${targetReference} is ${ageInMinutes.toFixed(1)} mins old. Auto-fulfilling.`);
-        await supabaseAdmin.from("orders").update({ status: "fulfilled" }).eq("id", targetReference);
-        // Also credit profits if not already done
-        await supabaseAdmin.rpc("credit_order_profits", { p_order_id: targetReference });
-        return new Response(JSON.stringify({ status: "fulfilled", message: "Order fulfilled (Timeline threshold met)" }), { headers: corsHeaders });
+        console.log(`[verify-payment] Order ${targetReference} stuck processing for ${ageInMinutes.toFixed(1)} mins. Resetting to paid for retry.`);
+        await supabaseAdmin.from("orders").update({ status: "paid", failure_reason: "Re-queued after 20min processing timeout" }).eq("id", targetReference);
+        return new Response(JSON.stringify({ status: "processing", message: "Order re-queued for retry" }), { headers: corsHeaders });
       }
     }
 
@@ -763,11 +762,16 @@ serve(async (req) => {
       return new Response(JSON.stringify({ status: targetStatus, provider_order_id: result.id }), { headers: corsHeaders });
     } else {
       const reasonLower = (result.reason || "").toLowerCase();
-      const isPermanentError = reasonLower.includes("number") || 
-                               reasonLower.includes("recipient") || 
+      const isPermanentError = reasonLower.includes("number") ||
+                               reasonLower.includes("recipient") ||
                                reasonLower.includes("invalid") ||
                                reasonLower.includes("unsupported network") ||
-                               reasonLower.includes("package not found");
+                               reasonLower.includes("package not found") ||
+                               reasonLower.includes("401") ||
+                               reasonLower.includes("403") ||
+                               reasonLower.includes("access denied") ||
+                               reasonLower.includes("unauthorized") ||
+                               reasonLower.includes("api key");
 
       const isQueued = result.reason === "No providers" || !isPermanentError;
 
