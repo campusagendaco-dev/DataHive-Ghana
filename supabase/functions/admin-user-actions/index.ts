@@ -1103,8 +1103,13 @@ serve(async (req: Request) => {
           }
         }
 
+        const primaryBalance = results.find(r => r.status === "synced" && r.name.toLowerCase().includes("datahub"))?.balance 
+          ?? results.find(r => r.status === "synced")?.balance 
+          ?? 0;
+
         return new Response(JSON.stringify({
           success: true,
+          balance: Number(primaryBalance),
           results,
         }), {
           status: 200,
