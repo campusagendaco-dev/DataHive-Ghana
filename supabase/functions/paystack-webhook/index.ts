@@ -1283,11 +1283,19 @@ serve(async (req) => {
     }
 
     const reasonLower = (result.reason || "").toLowerCase();
-    const isPermanentError = reasonLower.includes("number") || 
-                             reasonLower.includes("recipient") || 
+    const isPermanentError = reasonLower.includes("number") ||
+                             reasonLower.includes("recipient") ||
                              reasonLower.includes("invalid") ||
                              reasonLower.includes("unsupported network") ||
-                             reasonLower.includes("package not found");
+                             reasonLower.includes("package not found") ||
+                             reasonLower.includes("no bundle") ||
+                             reasonLower.includes("bundle not found") ||
+                             reasonLower.includes("not available") ||
+                             reasonLower.includes("401") ||
+                             reasonLower.includes("403") ||
+                             reasonLower.includes("access denied") ||
+                             reasonLower.includes("unauthorized") ||
+                             reasonLower.includes("api key");
 
     const isQueued = !isPermanentError;
 

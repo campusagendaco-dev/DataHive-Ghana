@@ -56,7 +56,9 @@ function buildProviderUrls(baseUrl: string, endpoint: string = "purchase", handl
     else if (endpoint === "purchase") aliases = ["purchase"];
     else aliases = [endpoint];
   } else if (handlerType === "datahub") {
-    aliases = endpoint === "purchase" ? ["data-purchase"] : (endpoint === "status" ? ["order-status"] : [endpoint]);
+    // DataHub has a fixed URL structure — always just append the alias directly
+    const alias = endpoint === "purchase" ? "data-purchase" : (endpoint === "status" ? "order-status" : endpoint);
+    return [`${clean}/${alias}`];
   } else {
     aliases = endpoint === "purchase"
       ? ["purchase", "order", "airtime", "buy", "topup", "recharge"]
@@ -525,11 +527,19 @@ serve(async (req: Request) => {
         }
       } else {
         const reasonLower = (finalResult.reason || "").toLowerCase();
-        const isPermanentError = reasonLower.includes("number") || 
-                                 reasonLower.includes("recipient") || 
+        const isPermanentError = reasonLower.includes("number") ||
+                                 reasonLower.includes("recipient") ||
                                  reasonLower.includes("invalid") ||
                                  reasonLower.includes("unsupported network") ||
-                                 reasonLower.includes("package not found");
+                                 reasonLower.includes("package not found") ||
+                                 reasonLower.includes("no bundle") ||
+                                 reasonLower.includes("bundle not found") ||
+                                 reasonLower.includes("not available") ||
+                                 reasonLower.includes("401") ||
+                                 reasonLower.includes("403") ||
+                                 reasonLower.includes("access denied") ||
+                                 reasonLower.includes("unauthorized") ||
+                                 reasonLower.includes("api key");
 
         const isQueued = finalResult.reason === "No active providers" || !isPermanentError;
 
