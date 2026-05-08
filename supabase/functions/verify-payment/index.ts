@@ -582,6 +582,70 @@ serve(async (req) => {
       return new Response(JSON.stringify({ status: "fulfilled" }), { headers: corsHeaders });
     }
 
+    if (currentOrderType === "agent_activation") {
+      const agentId = claimedOrder.agent_id || metadata?.agent_id;
+      if (agentId) {
+        await supabaseAdmin.from("profiles").update({ 
+          is_agent: true, 
+          agent_approved: true,
+          onboarding_complete: true,
+          is_sub_agent: false,
+          parent_agent_id: null
+        }).eq("user_id", agentId);
+        await supabaseAdmin.from("orders").update({ status: "fulfilled", failure_reason: null }).eq("id", targetReference);
+        console.log("Agent activated via verify-payment:", agentId);
+      }
+      return new Response(JSON.stringify({ status: "fulfilled" }), { headers: corsHeaders });
+    }
+
+    if (currentOrderType === "sub_agent_activation") {
+      const subAgentId = claimedOrder.agent_id || metadata?.sub_agent_id;
+      const parentAgentId = metadata?.parent_agent_id;
+      const activationAmount = Number(metadata?.activation_fee || claimedOrder.amount || verifiedAmount || 0);
+      
+      const { data: settings } = await supabaseAdmin.from("system_settings").select("sub_agent_base_fee").eq("id", 1).maybeSingle();
+      const baseFee = Number(settings?.sub_agent_base_fee || 5);
+
+      const agentProfit = Math.max(0, parseFloat((activationAmount - baseFee).toFixed(2)));
+      
+      if (subAgentId) {
+        const { data: parentProfile } = await supabaseAdmin
+          .from("profiles")
+          .select("sub_agent_prices")
+          .eq("user_id", parentAgentId)
+          .maybeSingle();
+        const subAgentPrices = parentProfile?.sub_agent_prices || {};
+
+        await supabaseAdmin.from("profiles").update({
+          is_agent: true,
+          agent_approved: true,
+          sub_agent_approved: true,
+          onboarding_complete: true,
+          is_sub_agent: true,
+          parent_agent_id: parentAgentId || null,
+          agent_prices: subAgentPrices,
+        }).eq("user_id", subAgentId);
+
+        await supabaseAdmin
+          .from("orders")
+          .update({
+            status: "fulfilled",
+            failure_reason: null,
+            profit: 0,
+            parent_profit: agentProfit,
+            parent_agent_id: parentAgentId || null,
+          })
+          .eq("id", targetReference);
+
+        if (parentAgentId && agentProfit > 0) {
+          await supabaseAdmin.rpc("credit_order_profits", { p_order_id: targetReference });
+        }
+        console.log("Sub agent activated via verify-payment:", subAgentId, "parent:", parentAgentId);
+      }
+      return new Response(JSON.stringify({ status: "fulfilled" }), { headers: corsHeaders });
+    }
+
+
     // Standard Data/Airtime Fulfillment
     const activeProviders = await getActiveProviders(supabaseAdmin, currentOrderType === "airtime" ? "airtime" : "data");
     const network = claimedOrder.network || metadata?.network || "";
