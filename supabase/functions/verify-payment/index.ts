@@ -96,6 +96,10 @@ function buildProviderUrls(baseUrl: string, endpoint: string = "purchase", handl
 
   const urls = new Set<string>();
   
+  if (handlerType === "bossu") {
+    return [clean];
+  }
+
   let aliases: string[] = [];
   if (handlerType === "datamart") {
     if (endpoint === "status") aliases = ["order-status"];
@@ -165,7 +169,7 @@ function parseProviderResponse(body: string, contentType: string | null): { ok: 
     // DataMart uses purchaseId or orderReference
     const orderId = String(data?.orderNumber ?? data?.reference ?? data?.purchaseId ?? data?.orderReference ?? parsed?.transaction_id ?? parsed?.order_id ?? parsed?.id ?? parsed?.reference ?? "");
 
-    const ok = technicalStatus === "success" || technicalStatus === "true" || technicalStatus === "1" || parsed?.success === true || parsed?.ok === true;
+    const ok = technicalStatus === "success" || technicalStatus === "true" || technicalStatus === "1" || technicalStatus === "completed" || technicalStatus === "pending" || parsed?.success === true || parsed?.ok === true;
 
     if (ok) {
       return { ok: true, id: orderId, status: effectiveStatus };
@@ -202,6 +206,24 @@ async function callProviderApi(
   const baseUrl = provider.base_url;
   const apiKey = provider.api_key;
   
+  let payload = { ...data };
+  if (handlerType === "bossu") {
+    if (endpoint === "status") {
+      payload = {
+        action: "order_status",
+        order_id: String(data.transaction_id || data.reference || data.order_id || ""),
+      };
+    } else {
+      payload = {
+        action: "create_order",
+        network: String(data.networkRaw || data.network || "").toLowerCase(),
+        package_key: String(data.package_size || data.plan || data.package_key || "").replace(/\s+/g, "").toLowerCase(),
+        recipient_phone: String(data.recipient || data.phoneNumber || data.recipient_phone || ""),
+        external_reference: String(data.orderReference || data.reference || ""),
+      };
+    }
+  }
+
   const urls = buildProviderUrls(baseUrl, endpoint, handlerType);
   let lastReason = "Provider error";
 
@@ -237,7 +259,7 @@ async function callProviderApi(
         const res = await fetch(url, {
           method: isGet ? "GET" : "POST",
           headers,
-          body: isGet ? undefined : JSON.stringify(data),
+          body: isGet ? undefined : JSON.stringify(payload),
           signal: controller.signal,
         });
 
@@ -709,8 +731,8 @@ serve(async (req) => {
     }
 
     if (result.ok) {
-      const isDelivered = true; // Fast-track: Mark as fulfilled immediately if DataMart accepts the order
-      const patch: any = { provider_id: successfulProviderId, provider_order_id: result.id, status: "fulfilled" };
+      const isDelivered = false; // Do not fast-track as fulfilled immediately; keep as processing until API status confirms delivery
+      const patch: any = { provider_id: successfulProviderId, provider_order_id: result.id, status: "processing" };
       
       await supabaseAdmin.from("orders").update(patch).eq("id", targetReference);
       if (isDelivered) {
