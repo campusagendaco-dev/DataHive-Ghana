@@ -763,35 +763,14 @@ serve(async (req) => {
       }
       return new Response(JSON.stringify({ status: targetStatus, provider_order_id: result.id }), { headers: corsHeaders });
     } else {
-      const reasonLower = (result.reason || "").toLowerCase();
-      const isPermanentError = reasonLower.includes("number") ||
-                               reasonLower.includes("recipient") ||
-                               reasonLower.includes("invalid") ||
-                               reasonLower.includes("unsupported network") ||
-                               reasonLower.includes("package not found") ||
-                               reasonLower.includes("no bundle") ||
-                               reasonLower.includes("bundle not found") ||
-                               reasonLower.includes("not available") ||
-                               reasonLower.includes("401") ||
-                               reasonLower.includes("403") ||
-                               reasonLower.includes("access denied") ||
-                               reasonLower.includes("unauthorized") ||
-                               reasonLower.includes("api key");
-
-      const isQueued = result.reason === "No providers" || !isPermanentError;
-
-      await supabaseAdmin.from("orders").update({ 
-        status: isQueued ? "processing" : "fulfillment_failed", 
-        failure_reason: isQueued 
-          ? `Queued: ${result.reason === "No providers" ? "No active API providers configured" : `Temporary error: ${result.reason}`}`
-          : result.reason 
+      await supabaseAdmin.from("orders").update({
+        status: "fulfillment_failed",
+        failure_reason: result.reason || "Provider error"
       }).eq("id", targetReference);
-      
-      return new Response(JSON.stringify({ 
-        status: isQueued ? "processing" : "failed", 
-        reason: isQueued 
-          ? `Queued: ${result.reason === "No providers" ? "No active API providers configured" : `Temporary error: ${result.reason}`}`
-          : result.reason 
+
+      return new Response(JSON.stringify({
+        status: "failed",
+        reason: result.reason || "Provider error"
       }), { headers: corsHeaders });
     }
   } catch (error: any) {

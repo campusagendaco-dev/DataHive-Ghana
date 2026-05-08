@@ -1282,35 +1282,6 @@ serve(async (req) => {
       });
     }
 
-    const reasonLower = (result.reason || "").toLowerCase();
-    const isPermanentError = reasonLower.includes("number") ||
-                             reasonLower.includes("recipient") ||
-                             reasonLower.includes("invalid") ||
-                             reasonLower.includes("unsupported network") ||
-                             reasonLower.includes("package not found") ||
-                             reasonLower.includes("no bundle") ||
-                             reasonLower.includes("bundle not found") ||
-                             reasonLower.includes("not available") ||
-                             reasonLower.includes("401") ||
-                             reasonLower.includes("403") ||
-                             reasonLower.includes("access denied") ||
-                             reasonLower.includes("unauthorized") ||
-                             reasonLower.includes("api key");
-
-    const isQueued = !isPermanentError;
-
-    if (isQueued) {
-      await supabaseAdmin.from("orders").update({ 
-        status: "processing", 
-        failure_reason: `Queued: Temporary error: ${result.reason}` 
-      }).eq("id", orderId);
-      
-      return new Response(JSON.stringify({ received: true, status: "processing", reason: result.reason }), {
-        status: 200,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
     await supabaseAdmin.from("orders").update({ status: "fulfillment_failed", failure_reason: result.reason }).eq("id", orderId);
     await notifyFailureAndRefund(supabaseAdmin, customerPhone, verifiedAmount, packageSize || "Data", reference, PAYSTACK_SECRET_KEY);
     return new Response(JSON.stringify({ received: true, fulfilled: false, failure_reason: result.reason }), {
