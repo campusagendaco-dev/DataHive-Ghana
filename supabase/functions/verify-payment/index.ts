@@ -148,6 +148,17 @@ function buildProviderUrls(baseUrl: string, endpoint: string = "purchase", handl
   return Array.from(urls);
 }
 
+function mapFulfillmentStatus(providerStatus: string | null | undefined): "fulfilled" | "processing" | "fulfillment_failed" {
+  const s = String(providerStatus || "").trim().toLowerCase();
+  if (s === "fulfilled" || s === "delivered" || s === "successful" || s === "success" || s === "completed" || s === "true" || s === "1") {
+    return "fulfilled";
+  }
+  if (s === "failed" || s === "failure" || s === "error" || s === "cancelled" || s === "rejected") {
+    return "fulfillment_failed";
+  }
+  return "processing";
+}
+
 function isHtmlResponse(contentType: string | null, body: string): boolean {
   const preview = body.trim().slice(0, 200).toLowerCase();
   return Boolean(
@@ -738,14 +749,18 @@ serve(async (req) => {
     }
 
     if (result.ok) {
-      const patch: any = { provider_id: successfulProviderId, provider_order_id: result.id, status: "fulfilled" };
+      const targetStatus = mapFulfillmentStatus(result.status);
+      const patch: any = { provider_id: successfulProviderId, provider_order_id: result.id, status: targetStatus };
       await supabaseAdmin.from("orders").update(patch).eq("id", targetReference);
-      try {
-        await supabaseAdmin.rpc("credit_order_profits", { p_order_id: targetReference });
-      } catch (e) {
-        console.error("[verify-payment] Profit credit failed:", e);
+      
+      if (targetStatus === "fulfilled") {
+        try {
+          await supabaseAdmin.rpc("credit_order_profits", { p_order_id: targetReference });
+        } catch (e) {
+          console.error("[verify-payment] Profit credit failed:", e);
+        }
       }
-      return new Response(JSON.stringify({ status: "fulfilled", provider_order_id: result.id }), { headers: corsHeaders });
+      return new Response(JSON.stringify({ status: targetStatus, provider_order_id: result.id }), { headers: corsHeaders });
     } else {
       const reasonLower = (result.reason || "").toLowerCase();
       const isPermanentError = reasonLower.includes("number") || 

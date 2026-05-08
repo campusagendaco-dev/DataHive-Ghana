@@ -159,9 +159,10 @@ async function callProviderApi(
           const p = JSON.parse(text);
           const s = String(p?.status ?? p?.success ?? "").toLowerCase();
           const ok = p?.success === true || s === "success" || s === "true" || p?.status === true || s === "completed" || s === "pending";
-          if (ok) return { ok: true, reason: "", id: String(p?.data?.orderNumber ?? p?.data?.reference ?? p?.data?.purchaseId ?? p?.transaction_id ?? p?.id ?? p?.order_id ?? "") };
+          const pStatus = String(p?.data?.status ?? p?.delivery_status ?? p?.status ?? "");
+          if (ok) return { ok: true, reason: "", id: String(p?.data?.orderNumber ?? p?.data?.reference ?? p?.data?.purchaseId ?? p?.transaction_id ?? p?.id ?? p?.order_id ?? ""), status: pStatus };
           lastReason = p?.message || p?.error || "Provider rejected the order";
-        } catch { return { ok: true, reason: "" }; }
+        } catch { return { ok: true, reason: "", status: "" }; }
       } else {
         lastReason = `HTTP ${res.status}`;
       }
@@ -214,6 +215,17 @@ function isSafeWebhookUrl(url: string): boolean {
     if (parsed.hostname === "localhost") return false;
     return true;
   } catch { return false; }
+}
+
+function mapFulfillmentStatus(providerStatus: string | null | undefined): "fulfilled" | "processing" | "fulfillment_failed" {
+  const s = String(providerStatus || "").trim().toLowerCase();
+  if (s === "fulfilled" || s === "delivered" || s === "successful" || s === "success" || s === "completed" || s === "true" || s === "1") {
+    return "fulfilled";
+  }
+  if (s === "failed" || s === "failure" || s === "error" || s === "cancelled" || s === "rejected") {
+    return "fulfillment_failed";
+  }
+  return "processing";
 }
 
 function json(data: unknown, status = 200) {
@@ -497,11 +509,20 @@ serve(async (req: Request) => {
       }
 
       if (finalResult.ok) {
+        const targetStatus = mapFulfillmentStatus(finalResult.status);
         await supabase.from("orders").update({ 
-          status: "fulfilled", 
+          status: targetStatus, 
           provider_id: successfulProviderId,
           provider_order_id: finalResult.id
         }).eq("id", orderId);
+
+        if (targetStatus === "fulfilled") {
+          try {
+            await supabase.rpc("credit_order_profits", { p_order_id: orderId });
+          } catch (e) {
+            console.error("[developer-api] Profit credit failed:", e);
+          }
+        }
       } else {
         const reasonLower = (finalResult.reason || "").toLowerCase();
         const isPermanentError = reasonLower.includes("number") || 
