@@ -57,25 +57,55 @@ serve(async (req) => {
     }
 
     const body = await req.json().catch(() => ({}));
-    const { action, format = "text", status = "processing", limit = 100, order_ids } = body;
+    const { action, format = "text", limit = 100, order_ids } = body;
 
     if (!action) return json({ error: "Missing action parameter (extract or bulk_fulfill)" }, 400);
+
+    // ── VALIDATE API IS OFF (disable_ordering = true) ─────────────────────────
+    const { data: settings } = await supabaseAdmin
+      .from("system_settings")
+      .select("disable_ordering")
+      .eq("id", 1)
+      .maybeSingle();
+
+    const isApiOff = settings?.disable_ordering === true;
+
+    if (!isApiOff) {
+      return json({ 
+        error: "Fulfillment API is currently active. Manual extraction and bulk processing can only happen when the API/Ordering is turned OFF in System Settings to prevent race conditions." 
+      }, 400);
+    }
 
     // ── ACTION 1: EXTRACT ORDERS FOR EXCEL OR TEXT ───────────────────────────
     if (action === "extract") {
       const { data: orders, error: fetchError } = await supabaseAdmin
         .from("orders")
         .select("id, customer_phone, network, package_size, amount, created_at")
-        .eq("status", status)
+        .eq("status", "pending")
         .order("created_at", { ascending: true })
         .limit(limit);
 
       if (fetchError) return json({ error: fetchError.message }, 500);
 
+      if (!orders || orders.length === 0) {
+        return json({ message: "No pending orders found to extract" }, 200);
+      }
+
+      // Mark the extracted pending orders as 'processing' instantly
+      const orderIdsToUpdate = orders.map(o => o.id);
+      const { error: updateStatusError } = await supabaseAdmin
+        .from("orders")
+        .update({ status: "processing", failure_reason: "Manual processing in progress" })
+        .in("id", orderIdsToUpdate);
+
+      if (updateStatusError) {
+        return json({ error: `Failed to transition orders to processing: ${updateStatusError.message}` }, 500);
+      }
+
       if (format === "csv") {
         // Excel/CSV Format
         const csvHeader = "OrderID,Phone,Network,Package,AmountGHS,CreatedAt\n";
-        const csvRows = (orders || []).map(o => {
+        const csvRows = orders.map(o => {
           return `"${o.id}","${o.customer_phone}","${o.network}","${o.package_size}",${o.amount},"${o.created_at}"`;
         }).join("\n");
 
@@ -84,12 +114,12 @@ serve(async (req) => {
           headers: {
             ...corsHeaders,
             "Content-Type": "text/csv",
-            "Content-Disposition": `attachment; filename="orders_extract_${status}.csv"`,
+            "Content-Disposition": `attachment; filename="orders_extract_pending.csv"`,
           },
         });
       } else {
         // Text Format: e.g., "0540000000 1"
-        const textLines = (orders || []).map(o => {
+        const textLines = orders.map(o => {
           const phone = o.customer_phone || "";
           const gig = parseGigValue(o.package_size);
           return `${phone} ${gig}`;
