@@ -226,7 +226,7 @@ serve(async (req) => {
               "X-API-Key": apiKey,
               "Authorization": `Bearer ${apiKey}`
             },
-            body: JSON.stringify({ action: "packages", network: net })
+            body: JSON.stringify({ action: "packages", network: net, api_key: apiKey })
           });
 
           if (res.ok) {
@@ -274,7 +274,7 @@ serve(async (req) => {
             "X-API-Key": apiKey,
             "Authorization": `Bearer ${apiKey}`
           },
-          body: JSON.stringify({ action: "balance" })
+          body: JSON.stringify({ action: "balance", api_key: apiKey })
         });
 
         if (balanceRes.ok) {

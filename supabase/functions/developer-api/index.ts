@@ -110,6 +110,7 @@ async function callProviderApi(
       payload = {
         action: "order_status",
         order_id: String(data.transaction_id || data.reference || data.order_id || ""),
+        api_key: provider.api_key,
       };
     } else {
       payload = {
@@ -118,6 +119,7 @@ async function callProviderApi(
         package_key: String(data.package_size || data.plan || data.package_key || "").replace(/\s+/g, "").toLowerCase(),
         recipient_phone: String(data.recipient || data.phoneNumber || data.recipient_phone || ""),
         external_reference: String(data.orderReference || data.reference || ""),
+        api_key: provider.api_key,
       };
     }
   }
