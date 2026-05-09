@@ -5,6 +5,7 @@ import { corsHeaders } from "../_shared/cors.ts";
 import { normalizePhone, getSmsConfig, sendSmsViaTxtConnect, formatTemplate, sendPaymentSms } from "../_shared/sms.ts";
 import { sendWhatsAppMessage } from "../_shared/whatsapp.ts";
 import { notifyApiClient, notifyWalletCredit } from "../_shared/webhooks.ts";
+import { getActiveProviders } from "../_shared/providers.ts";
 
 
 function getFirstEnvValue(keys: string[]): string {
@@ -506,8 +507,8 @@ serve(async (req) => {
 
   try {
     const providerConfig = await getProviderCredentials(supabaseAdmin);
-    const DATA_PROVIDER_API_KEY = providerConfig.apiKey;
-    const DATA_PROVIDER_BASE_URL = providerConfig.baseUrl;
+    let DATA_PROVIDER_API_KEY = providerConfig.apiKey;
+    let DATA_PROVIDER_BASE_URL = providerConfig.baseUrl;
 
     const body = JSON.parse(rawBody);
 
@@ -1067,6 +1068,34 @@ serve(async (req) => {
       });
     }
 
+    // --- ACTIVE PROVIDER CHECK / PAUSE GATE ---
+    // Fetch active providers from the central 'providers' table database. 
+    // If all providers are toggled OFF by the admin, gracefully PAUSE automatic execution.
+    const activeProviders = await getActiveProviders(supabaseAdmin, orderType === "airtime" ? "airtime" : "data");
+    
+    if (!activeProviders || activeProviders.length === 0) {
+      console.log(`[Webhook] ALL APIs OFF for type '${orderType}'. Halting auto-fulfillment for order ${orderId}. Queueing for manual processing.`);
+      await supabaseAdmin.from("orders").update({ 
+        status: "paid", 
+        failure_reason: "Queued for manual fulfillment (All APIs toggled OFF by admin)" 
+      }).eq("id", orderId);
+      
+      return new Response(JSON.stringify({ 
+        received: true, 
+        fulfilled: false, 
+        status: "paid", 
+        message: "Provider APIs currently OFF. Enqueued for manual review." 
+      }), {
+        status: 200,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // Dynamic Resolution: Override default credentials with the selected active provider's live configs
+    const primaryProvider = activeProviders[0];
+    if (primaryProvider.api_key) DATA_PROVIDER_API_KEY = primaryProvider.api_key;
+    if (primaryProvider.base_url) DATA_PROVIDER_BASE_URL = primaryProvider.base_url.replace(/\/+$/, "");
+
     if (!DATA_PROVIDER_API_KEY || !DATA_PROVIDER_BASE_URL) {
       console.error("Data provider not configured for fulfillment");
       await supabaseAdmin.from("orders").update({
@@ -1154,7 +1183,9 @@ serve(async (req) => {
       }
 
       // Use Airtime-specific credentials and format
-      const { apiKey: AIRTIME_KEY, baseUrl: AIRTIME_BASE } = await getAirtimeCredentials(supabaseAdmin);
+      const { apiKey: fallbackKey, baseUrl: fallbackBase } = await getAirtimeCredentials(supabaseAdmin);
+      const AIRTIME_KEY = activeProviders[0]?.api_key || fallbackKey;
+      const AIRTIME_BASE = (activeProviders[0]?.base_url || fallbackBase || "").replace(/\/+$/, "");
       
       const airtimeNetworkKey = mapAirtimeNetworkKey(network);
       const airtimeRecipient = normalizeRecipient(customerPhone);
