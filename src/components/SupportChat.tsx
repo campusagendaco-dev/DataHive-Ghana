@@ -1,14 +1,13 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
-import { 
-  MessageCircle, X, Send, User, 
-  Loader2, ShieldCheck, Zap, Minus, 
-  Maximized2, ExternalLink
+import {
+  MessageCircle, X, Send, Loader2, Zap, Minus,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { motion } from "framer-motion";
 
 interface Message {
   id: string;
@@ -16,8 +15,6 @@ interface Message {
   content: string;
   created_at: string;
 }
-
-import { motion } from "framer-motion";
 
 const SupportChat = () => {
   const { user, profile } = useAuth();
@@ -28,86 +25,124 @@ const SupportChat = () => {
   const [loading, setLoading] = useState(false);
   const [sending, setSending] = useState(false);
   const [conversationId, setConversationId] = useState<string | null>(null);
+  const [unreadCount, setUnreadCount] = useState(0);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
+  const lastSeenRef = useRef<string | null>(null);
 
-  useEffect(() => {
-    if (isOpen && user) {
-      initChat();
-    }
-  }, [isOpen, user]);
-
+  // Auto-scroll to bottom on new messages
   useEffect(() => {
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
   }, [messages]);
 
-  const initChat = async () => {
+  // Clear unread count when chat is opened / not minimized
+  useEffect(() => {
+    if (isOpen && !isMinimized) {
+      setUnreadCount(0);
+      lastSeenRef.current = messages[messages.length - 1]?.id ?? null;
+    }
+  }, [isOpen, isMinimized, messages]);
+
+  const subscribeToMessages = useCallback((convId: string) => {
+    // Clean up any existing channel first
+    if (channelRef.current) {
+      supabase.removeChannel(channelRef.current);
+      channelRef.current = null;
+    }
+
+    const ch = supabase
+      .channel(`support-${convId}`)
+      .on(
+        "postgres_changes" as any,
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "support_messages",
+          filter: `conversation_id=eq.${convId}`,
+        },
+        (payload: any) => {
+          const msg = payload.new as Message;
+          setMessages((prev) => {
+            // Avoid duplicates (optimistic insert already added it)
+            if (prev.some((m) => m.id === msg.id)) return prev;
+            return [...prev, msg];
+          });
+          // Increment unread if chat is closed or minimized and message is from support
+          if (msg.sender_id !== user?.id) {
+            setUnreadCount((n) => (isOpen && !isMinimized ? 0 : n + 1));
+          }
+        },
+      )
+      .subscribe();
+
+    channelRef.current = ch;
+  }, [user?.id, isOpen, isMinimized]);
+
+  const initChat = useCallback(async () => {
     if (!user) return;
     setLoading(true);
-    
-    // 1. Find or create conversation
-    const { data: conv, error: convError } = await supabase
+
+    // Find or create conversation
+    let { data: conv } = await supabase
       .from("support_conversations")
       .select("id")
       .eq("user_id", user.id)
       .maybeSingle();
 
-    if (convError) {
-      console.error("Error fetching conversation:", convError);
-      setLoading(false);
-      return;
-    }
-
-    let activeConv = conv;
-
-    if (!activeConv) {
-      const { data: newConv, error: createError } = await supabase
+    if (!conv) {
+      const { data: newConv, error } = await supabase
         .from("support_conversations")
         .insert([{ user_id: user.id }])
         .select()
         .single();
-      
-      if (createError) {
-        console.error("Error creating conversation:", createError);
+      if (error) {
+        console.error("[SupportChat] create conv error:", error);
         setLoading(false);
         return;
       }
-      activeConv = newConv;
+      conv = newConv;
     }
 
-    if (activeConv) {
-      setConversationId(activeConv.id);
-      // 2. Fetch messages
-      const { data: msgs, error: msgError } = await supabase
-        .from("support_messages")
-        .select("*")
-        .eq("conversation_id", activeConv.id)
-        .order("created_at", { ascending: true });
-      
-      if (msgError) console.error("Error fetching messages:", msgError);
-      setMessages(msgs || []);
+    if (!conv) { setLoading(false); return; }
 
-      // 3. Subscribe to new messages
-      const channel = supabase
-        .channel(`support-${activeConv.id}`)
-        .on("postgres_changes", { 
-          event: "INSERT", 
-          schema: "public", 
-          table: "support_messages", 
-          filter: `conversation_id=eq.${activeConv.id}` 
-        }, (payload: any) => {
-          setMessages(prev => [...prev, payload.new as Message]);
-        })
-        .subscribe();
+    setConversationId(conv.id);
 
-      return () => {
-        supabase.removeChannel(channel);
-      };
-    }
+    // Fetch existing messages
+    const { data: msgs } = await supabase
+      .from("support_messages")
+      .select("*")
+      .eq("conversation_id", conv.id)
+      .order("created_at", { ascending: true });
 
+    setMessages(msgs || []);
     setLoading(false);
-  };
+
+    // Subscribe to live messages
+    subscribeToMessages(conv.id);
+  }, [user, subscribeToMessages]);
+
+  // Open / close chat
+  useEffect(() => {
+    if (isOpen && user && !conversationId) {
+      initChat();
+    }
+    if (!isOpen && channelRef.current) {
+      supabase.removeChannel(channelRef.current);
+      channelRef.current = null;
+    }
+  }, [isOpen, user, conversationId, initChat]);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (channelRef.current) {
+        supabase.removeChannel(channelRef.current);
+        channelRef.current = null;
+      }
+    };
+  }, []);
 
   const handleSend = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -117,28 +152,34 @@ const SupportChat = () => {
     const content = newMessage.trim();
     setNewMessage("");
 
-    const { error } = await supabase
+    // Optimistic insert
+    const optimistic: Message = {
+      id: `opt-${Date.now()}`,
+      sender_id: user.id,
+      content,
+      created_at: new Date().toISOString(),
+    };
+    setMessages((prev) => [...prev, optimistic]);
+
+    const { data: inserted, error } = await supabase
       .from("support_messages")
-      .insert([
-        {
-          conversation_id: conversationId,
-          sender_id: user.id,
-          content
-        }
-      ]);
+      .insert([{ conversation_id: conversationId, sender_id: user.id, content }])
+      .select()
+      .single();
 
     if (error) {
-      console.error("Error sending message:", error);
-    } else {
-      // Update last_message in conversation
+      // Roll back optimistic insert
+      setMessages((prev) => prev.filter((m) => m.id !== optimistic.id));
+      console.error("[SupportChat] send error:", error);
+    } else if (inserted) {
+      // Replace optimistic with real row
+      setMessages((prev) => prev.map((m) => m.id === optimistic.id ? inserted : m));
       await supabase
         .from("support_conversations")
-        .update({ 
-          last_message: content, 
-          last_message_at: new Date().toISOString()
-        })
+        .update({ last_message: content, last_message_at: new Date().toISOString() })
         .eq("id", conversationId);
     }
+
     setSending(false);
   };
 
@@ -148,12 +189,12 @@ const SupportChat = () => {
     <div className="fixed bottom-6 right-6 z-[100] flex flex-col items-end gap-4 pointer-events-none">
       {/* Chat Window */}
       {isOpen && (
-        <motion.div 
+        <motion.div
           initial={{ opacity: 0, scale: 0.9, y: 20 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
           className={cn(
             "w-[380px] max-w-[calc(100vw-48px)] bg-[#0d140d] border border-white/10 rounded-[2.5rem] shadow-[0_20px_50px_rgba(0,0,0,0.5)] overflow-hidden flex flex-col pointer-events-auto transition-all duration-300 origin-bottom-right",
-            isMinimized ? "h-16" : "h-[500px]"
+            isMinimized ? "h-16" : "h-[500px]",
           )}
         >
           {/* Header */}
@@ -196,14 +237,14 @@ const SupportChat = () => {
                       <div key={m.id} className={cn("flex flex-col", isMe ? "items-end" : "items-start")}>
                         <div className={cn(
                           "max-w-[85%] px-4 py-3 rounded-2xl text-sm leading-relaxed",
-                          isMe 
-                            ? "bg-primary text-black font-medium rounded-tr-none shadow-lg shadow-primary/10" 
-                            : "bg-white/5 text-white/80 rounded-tl-none border border-white/5"
+                          isMe
+                            ? "bg-primary text-black font-medium rounded-tr-none shadow-lg shadow-primary/10"
+                            : "bg-white/5 text-white/80 rounded-tl-none border border-white/5",
                         )}>
                           {m.content}
                         </div>
                         <span className="text-[9px] font-black text-white/20 uppercase tracking-widest mt-1.5 px-1">
-                          {new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                          {new Date(m.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
                         </span>
                       </div>
                     );
@@ -216,7 +257,7 @@ const SupportChat = () => {
                     <div className="space-y-1">
                       <p className="text-white font-black">Hello {profile?.full_name?.split(" ")[0]}! 👋</p>
                       <p className="text-white/30 text-xs leading-relaxed">
-                        Need help with a payment or have a question? Message us below and an agent will assist you instantly.
+                        Need help with a payment or have a question? Message us below and a support agent will assist you instantly.
                       </p>
                     </div>
                   </div>
@@ -240,7 +281,7 @@ const SupportChat = () => {
         </motion.div>
       )}
 
-      {/* Floating Trigger Button - NOW DRAGGABLE */}
+      {/* Floating Trigger Button */}
       {!isOpen && (
         <motion.button
           drag
@@ -251,8 +292,12 @@ const SupportChat = () => {
         >
           <div className="absolute -inset-2 bg-primary/20 rounded-[2.5rem] blur-xl opacity-0 group-hover:opacity-100 transition duration-500" />
           <MessageCircle className="w-7 h-7 relative z-10" />
-          {/* Notification dot */}
-          <span className="absolute top-0 right-0 w-4 h-4 bg-red-500 rounded-full border-2 border-[#030703] animate-bounce" />
+          {/* Unread badge — only shown when there are actual unread messages */}
+          {unreadCount > 0 && (
+            <span className="absolute -top-1 -right-1 min-w-[20px] h-5 bg-red-500 text-white text-[10px] font-black rounded-full border-2 border-[#030703] flex items-center justify-center px-1 animate-bounce">
+              {unreadCount > 9 ? "9+" : unreadCount}
+            </span>
+          )}
         </motion.button>
       )}
     </div>
