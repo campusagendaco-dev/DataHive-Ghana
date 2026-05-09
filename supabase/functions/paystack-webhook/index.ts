@@ -409,24 +409,8 @@ function amountMatches(expected: number, actual: number, tolerance = 0.05): bool
 }
 
 async function initiatePaystackRefund(reference: string, amountGhs: number, paystackKey: string): Promise<void> {
-  try {
-    const res = await fetch("https://api.paystack.co/refund", {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${paystackKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ transaction: reference, amount: Math.round(amountGhs * 100) }),
-    });
-    const data = await res.json();
-    if (data.status) {
-      console.log(`[Refund] Initiated for ${reference}, id: ${data.data?.id}`);
-    } else {
-      console.error(`[Refund] Failed for ${reference}: ${data.message}`);
-    }
-  } catch (err) {
-    console.error(`[Refund] Error for ${reference}:`, err);
-  }
+  // Auto-refunds disabled by Admin Request
+  console.log(`[Refund] Automatic refund bypassed for reference ${reference} (Admin Request).`);
 }
 
 async function notifyFailureAndRefund(
@@ -439,11 +423,12 @@ async function notifyFailureAndRefund(
 ): Promise<void> {
   if (phone) {
     try {
-      await sendPaymentSms(supabaseAdmin, phone, "order_failed", {
-        package: packageLabel,
-        phone,
-        amount: amountGhs.toFixed(2),
-      });
+      const { apiKey, senderId } = await getSmsConfig(supabaseAdmin);
+      const recipient = normalizePhone(phone);
+      if (apiKey && recipient) {
+        const msg = `Notice: Your order for ${packageLabel} failed automatic delivery. Please contact SwiftData support with reference: ${reference.slice(0, 8)}`;
+        await sendSmsViaTxtConnect(apiKey, senderId, recipient, msg);
+      }
     } catch (e) {
       console.error("[Failure SMS] Error:", e);
     }
