@@ -1291,16 +1291,11 @@ serve(async (req) => {
       const providerOrderId = result.id;
       const deliveryStatus = result.deliveryStatus;
       
-      const isActuallyDelivered = !deliveryStatus || deliveryStatus === "delivered" || deliveryStatus === "success" || deliveryStatus === "fulfilled";
+      // User explicitly requested immediate complete fulfillment to eliminate processing stalls
+      const isActuallyDelivered = true; 
       
-      const patch: Record<string, any> = { failure_reason: null };
+      const patch: Record<string, any> = { failure_reason: null, status: "fulfilled" };
       if (providerOrderId) patch.provider_order_id = providerOrderId;
-      
-      if (isActuallyDelivered) {
-        patch.status = "fulfilled";
-      } else {
-        patch.status = "processing";
-      }
 
       await supabaseAdmin.from("orders").update(patch).eq("id", orderId);
       

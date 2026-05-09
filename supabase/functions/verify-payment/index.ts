@@ -761,7 +761,8 @@ serve(async (req) => {
     }
 
     if (result.ok) {
-      const targetStatus = mapFulfillmentStatus(result.status);
+      // User requested fix: Treat ALL successful API pushes as fulfilled immediately to bypass unreliable status checks
+      const targetStatus = "fulfilled";
       const patch: any = { provider_id: successfulProviderId, provider_order_id: result.id, status: targetStatus, failure_reason: null };
       await supabaseAdmin.from("orders").update(patch).eq("id", targetReference);
       
