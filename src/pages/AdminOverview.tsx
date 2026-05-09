@@ -993,9 +993,9 @@ const AdminOverview = () => {
                   <XAxis dataKey="date" tick={{ fill: axisColor, fontSize: 11 }} axisLine={false} tickLine={false} />
                   <YAxis tick={{ fill: axisColor, fontSize: 11 }} axisLine={false} tickLine={false} />
                   <Tooltip content={(props: any) => <DailySalesTooltip {...props} isDark={isDark} />} />
-                  <Bar dataKey="Customers"  stackId="seg" fill="#0ea5e9" radius={[0, 0, 0, 0]} />
-                  <Bar dataKey="Agents"     stackId="seg" fill="#f59e0b" radius={[0, 0, 0, 0]} />
-                  <Bar dataKey="Sub-Agents" stackId="seg" fill="#a855f7" radius={[6, 6, 0, 0]} />
+                  <Bar dataKey="Customers"  stackId="seg" fill="#0ea5e9" radius={[0, 0, 0, 0]} minPointSize={2} background={{ fill: isDark ? "rgba(255,255,255,0.03)" : "rgba(0,0,0,0.04)", radius: 6 }} />
+                  <Bar dataKey="Agents"     stackId="seg" fill="#f59e0b" radius={[0, 0, 0, 0]} minPointSize={2} />
+                  <Bar dataKey="Sub-Agents" stackId="seg" fill="#a855f7" radius={[6, 6, 0, 0]} minPointSize={2} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
