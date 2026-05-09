@@ -2,18 +2,22 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import {
-  MessageCircle, X, Send, Loader2, Zap, Minus,
+  MessageCircle, X, Send, Loader2, Zap, Minus, Bot,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { motion } from "framer-motion";
 
+// Fixed bot sender ID — matches the one in the support-bot edge function
+const BOT_SENDER_ID = "00000000-0000-0000-0000-000000000001";
+
 interface Message {
   id: string;
   sender_id: string;
   content: string;
   created_at: string;
+  is_bot?: boolean;
 }
 
 const SupportChat = () => {
@@ -24,6 +28,7 @@ const SupportChat = () => {
   const [newMessage, setNewMessage] = useState("");
   const [loading, setLoading] = useState(false);
   const [sending, setSending] = useState(false);
+  const [botTyping, setBotTyping] = useState(false);
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [unreadCount, setUnreadCount] = useState(0);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -112,7 +117,7 @@ const SupportChat = () => {
     // Fetch existing messages
     const { data: msgs } = await supabase
       .from("support_messages")
-      .select("*")
+      .select("id, sender_id, content, created_at, is_bot")
       .eq("conversation_id", conv.id)
       .order("created_at", { ascending: true });
 
@@ -171,7 +176,11 @@ const SupportChat = () => {
       // Roll back optimistic insert
       setMessages((prev) => prev.filter((m) => m.id !== optimistic.id));
       console.error("[SupportChat] send error:", error);
-    } else if (inserted) {
+      setSending(false);
+      return;
+    }
+
+    if (inserted) {
       // Replace optimistic with real row
       setMessages((prev) => prev.map((m) => m.id === optimistic.id ? inserted : m));
       await supabase
@@ -181,6 +190,18 @@ const SupportChat = () => {
     }
 
     setSending(false);
+
+    // Trigger AI bot reply
+    setBotTyping(true);
+    try {
+      await supabase.functions.invoke("support-bot", {
+        body: { conversation_id: conversationId },
+      });
+    } catch (botErr) {
+      console.error("[SupportChat] bot error:", botErr);
+    } finally {
+      setBotTyping(false);
+    }
   };
 
   if (!user) return null;
@@ -231,24 +252,49 @@ const SupportChat = () => {
                     <p className="text-white/20 text-xs font-black uppercase tracking-widest">Connecting to Support...</p>
                   </div>
                 ) : messages.length > 0 ? (
-                  messages.map((m) => {
-                    const isMe = m.sender_id === user.id;
-                    return (
-                      <div key={m.id} className={cn("flex flex-col", isMe ? "items-end" : "items-start")}>
-                        <div className={cn(
-                          "max-w-[85%] px-4 py-3 rounded-2xl text-sm leading-relaxed",
-                          isMe
-                            ? "bg-primary text-black font-medium rounded-tr-none shadow-lg shadow-primary/10"
-                            : "bg-white/5 text-white/80 rounded-tl-none border border-white/5",
-                        )}>
-                          {m.content}
+                  <>
+                    {messages.map((m) => {
+                      const isMe = m.sender_id === user.id && !m.is_bot;
+                      const isBot = m.is_bot || m.sender_id === BOT_SENDER_ID;
+                      return (
+                        <div key={m.id} className={cn("flex flex-col", isMe ? "items-end" : "items-start")}>
+                          {isBot && (
+                            <div className="flex items-center gap-1 mb-1 px-1">
+                              <Bot className="w-3 h-3 text-primary/60" />
+                              <span className="text-[9px] font-black text-primary/60 uppercase tracking-widest">SwiftBot</span>
+                            </div>
+                          )}
+                          <div className={cn(
+                            "max-w-[85%] px-4 py-3 rounded-2xl text-sm leading-relaxed",
+                            isMe
+                              ? "bg-primary text-black font-medium rounded-tr-none shadow-lg shadow-primary/10"
+                              : isBot
+                              ? "bg-primary/10 text-white/90 rounded-tl-none border border-primary/20"
+                              : "bg-white/5 text-white/80 rounded-tl-none border border-white/5",
+                          )}>
+                            {m.content}
+                          </div>
+                          <span className="text-[9px] font-black text-white/20 uppercase tracking-widest mt-1.5 px-1">
+                            {new Date(m.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                          </span>
                         </div>
-                        <span className="text-[9px] font-black text-white/20 uppercase tracking-widest mt-1.5 px-1">
-                          {new Date(m.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-                        </span>
+                      );
+                    })}
+                    {/* Typing indicator while bot is generating */}
+                    {botTyping && (
+                      <div className="flex flex-col items-start">
+                        <div className="flex items-center gap-1 mb-1 px-1">
+                          <Bot className="w-3 h-3 text-primary/60" />
+                          <span className="text-[9px] font-black text-primary/60 uppercase tracking-widest">SwiftBot</span>
+                        </div>
+                        <div className="bg-primary/10 border border-primary/20 rounded-2xl rounded-tl-none px-4 py-3 flex items-center gap-1.5">
+                          <span className="w-1.5 h-1.5 bg-primary/60 rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
+                          <span className="w-1.5 h-1.5 bg-primary/60 rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
+                          <span className="w-1.5 h-1.5 bg-primary/60 rounded-full animate-bounce" style={{ animationDelay: "300ms" }} />
+                        </div>
                       </div>
-                    );
-                  })
+                    )}
+                  </>
                 ) : (
                   <div className="h-full flex flex-col items-center justify-center text-center space-y-4 px-6">
                     <div className="w-16 h-16 rounded-[2rem] bg-white/5 flex items-center justify-center border border-white/10 shadow-2xl">

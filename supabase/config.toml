@@ -63,6 +63,9 @@ verify_jwt = false
 verify_jwt = false
 
 
+[functions.support-bot]
+verify_jwt = false
+
 [functions.process-retries]
 verify_jwt = false
 import_map = "./functions/process-retries/deno.json"
