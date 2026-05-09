@@ -375,13 +375,75 @@ const AdminOverview = () => {
     }
   }, [fetchData]);
 
+  // Lightweight chart-only refresh — only re-runs the RPC + recent orders.
+  // Used for realtime triggers so the chart updates instantly without re-running all 13 queries.
+  const refreshChart = useCallback(async () => {
+    const now = new Date();
+    let startDate = new Date();
+    if (timeRange === "7d") startDate.setDate(now.getDate() - 6);
+    else if (timeRange === "30d") startDate.setDate(now.getDate() - 29);
+    else if (timeRange === "1y") startDate.setFullYear(now.getFullYear() - 1);
+    else startDate = new Date(2024, 0, 1);
+    startDate.setHours(0, 0, 0, 0);
+    const todayStr = now.toISOString().slice(0, 10);
+    const PURCHASE_TYPES = ["data", "airtime", "utility", "afa", "api"];
+
+    try {
+      const [rpcRes, recentRes, todayRes] = await Promise.all([
+        supabase.rpc("get_admin_sales_stats_v2", { p_start_date: startDate.toISOString() }),
+        supabase.from("orders").select("id, network, package_size, customer_phone, amount, status, created_at").order("created_at", { ascending: false }).limit(8),
+        supabase.from("orders").select("id, amount, agent_id, status, order_type, paystack_verified_amount, created_at").gte("created_at", `${todayStr}T00:00:00`),
+      ]);
+
+      const rpcStats = rpcRes.data;
+      if (rpcStats && Array.isArray(rpcStats)) {
+        const daysCount = timeRange === "7d" ? 7 : timeRange === "30d" ? 30 : 90;
+        const dateMap: Record<string, DailySalesPoint> = {};
+        for (let i = daysCount - 1; i >= 0; i--) {
+          const d = new Date(now);
+          d.setDate(now.getDate() - i);
+          const key = d.toISOString().slice(0, 10);
+          dateMap[key] = { date: d.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" }), Customers: 0, Agents: 0, "Sub-Agents": 0, Deposits: 0, Purchases: 0 };
+        }
+        for (const r of rpcStats) {
+          const key = String(r.bucket_date || "").slice(0, 10);
+          if (dateMap[key]) {
+            dateMap[key].Customers = Number(r.customer_sales) || 0;
+            dateMap[key].Agents = Number(r.agent_sales) || 0;
+            dateMap[key]["Sub-Agents"] = Number(r.sub_agent_sales) || 0;
+            dateMap[key].Deposits = Number(r.deposit_volume) || 0;
+            dateMap[key].Purchases = dateMap[key].Customers + dateMap[key].Agents + dateMap[key]["Sub-Agents"];
+          }
+        }
+        setDailySales(Object.values(dateMap));
+      }
+
+      if (recentRes.data) setRecentOrders(recentRes.data as RecentOrder[]);
+
+      const todayOrders = todayRes.data || [];
+      const todayFulfilled = todayOrders.filter((o: any) => o.status === "fulfilled" && PURCHASE_TYPES.includes(o.order_type));
+      const todayAmt = (o: any) => o.order_type === "api" ? (Number(o.amount) || 0) : (Number(o.paystack_verified_amount) || Number(o.amount) || 0);
+      setTodaySales((prev) => ({
+        ...prev,
+        total: todayFulfilled.reduce((s: number, o: any) => s + todayAmt(o), 0),
+        successCount: todayOrders.filter((o: any) => o.status === "fulfilled").length,
+        failedCount: todayOrders.filter((o: any) => o.status === "fulfillment_failed").length,
+        pendingCount: todayOrders.filter((o: any) => o.status === "pending").length,
+      }));
+
+      setLastUpdated(new Date());
+    } catch (err) {
+      console.error("[AdminOverview] refreshChart error:", err);
+    }
+  }, [timeRange]);
+
   useEffect(() => {
     safeFetchData();
 
     const ordersChannel = supabase
       .channel("admin-live-orders")
       .on("postgres_changes", { event: "*", table: "orders", schema: "public" }, (payload) => {
-        safeFetchData();
+        refreshChart(); // Fast: only updates chart + recent orders + today's stats
         if (payload.eventType === "INSERT") {
           toast({
             title: "New Order Received!",
@@ -409,7 +471,7 @@ const AdminOverview = () => {
       supabase.removeChannel(profilesChannel);
       clearInterval(interval);
     };
-  }, [timeRange, safeFetchData, toast]);
+  }, [timeRange, safeFetchData, refreshChart, toast]);
 
   const saveMaintenance = async () => {
     if (!maintenanceTableReady) {
