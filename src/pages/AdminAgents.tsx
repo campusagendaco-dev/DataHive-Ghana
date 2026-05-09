@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback } from "react";
+import { useRealtimeRefresh } from "@/hooks/useRealtimeRefresh";
 import { Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -173,10 +174,13 @@ const AdminAgents = () => {
     setLoading(false);
   }, [filter, page, search]);
 
-  useEffect(() => { 
+  useEffect(() => {
     const timer = setTimeout(() => fetchAgents(false), 300);
     return () => clearTimeout(timer);
   }, [fetchAgents]);
+
+  // Live updates — refresh when profiles or wallets change (approvals, topups)
+  useRealtimeRefresh({ tables: ["profiles", "wallets"], onRefresh: () => fetchAgents(false) });
 
   const handleApprove = async (userId: string) => {
     setApprovingId(userId);

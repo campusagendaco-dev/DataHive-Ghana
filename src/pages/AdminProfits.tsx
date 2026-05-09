@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
+import { useRealtimeRefresh } from "@/hooks/useRealtimeRefresh";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -79,6 +80,9 @@ const AdminProfits = () => {
   }, []);
 
   useEffect(() => { fetchData(); }, [fetchData]);
+
+  // Live updates — refresh profit leaderboard when orders are fulfilled
+  useRealtimeRefresh({ tables: ["orders"], onRefresh: fetchData });
 
   // Filter by date range
   const filteredOrders = useMemo(() => {

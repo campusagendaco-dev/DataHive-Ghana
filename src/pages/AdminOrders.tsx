@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback } from "react";
+import { useRealtimeRefresh } from "@/hooks/useRealtimeRefresh";
 import { useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Badge } from "@/components/ui/badge";
@@ -9,7 +10,7 @@ import {
   Search, RotateCcw, Loader2, RefreshCw,
   TrendingUp, ShoppingCart, AlertTriangle, Clock,
   ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight,
-  CheckCircle2, PlayCircle, UserCheck,
+  CheckCircle2, PlayCircle, UserCheck, Download,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { getFunctionErrorMessage } from "@/lib/function-errors";
@@ -78,6 +79,17 @@ const AdminOrders = () => {
   const [networkFilter, setNetworkFilter] = useState("all");
   const [orderTypeFilter, setOrderTypeFilter] = useState("all");
   const [page, setPage] = useState(1);
+  const [providers, setProviders] = useState<any[]>([]);
+
+  useEffect(() => {
+    const fetchProviders = async () => {
+      const { data } = await supabase.from("providers").select("*");
+      setProviders(data || []);
+    };
+    fetchProviders();
+  }, []);
+
+  const allApisOff = providers.length === 0 || providers.every(p => !p.is_active);
 
   // Reset to page 1 when any filter changes
   useEffect(() => { setPage(1); }, [search, typeFilter, statusFilter, networkFilter, orderTypeFilter]);
@@ -149,10 +161,13 @@ const AdminOrders = () => {
     setLoading(false);
   }, [page, search, statusFilter, networkFilter, orderTypeFilter, profiles, toast]);
 
-  useEffect(() => { 
+  useEffect(() => {
     const timer = setTimeout(() => fetchOrders(), 300);
     return () => clearTimeout(timer);
   }, [fetchOrders]);
+
+  // Live updates — re-fetch current page whenever any order changes
+  useRealtimeRefresh({ tables: ["orders"], onRefresh: fetchOrders });
 
   const handleRetry = async (orderId: string) => {
     setRetrying(orderId);
@@ -292,6 +307,80 @@ const AdminOrders = () => {
     }
   };
 
+  const handleExportCSV = () => {
+    if (allOrders.length === 0) {
+      toast({ title: "No orders to export", variant: "destructive" });
+      return;
+    }
+    const headers = [
+      "Order ID", "Date", "Type", "Network", "Size/Details", 
+      "Recipient Phone", "Customer Name", "Agent Name", "Agent Email",
+      "Amount (GHS)", "Profit", "Status", "Failure Reason"
+    ];
+    const csvContent = [
+      headers.join(","),
+      ...allOrders.map(o => [
+        o.id,
+        new Date(o.created_at).toLocaleString(),
+        o.order_type,
+        o.network || "N/A",
+        o.package_size || "N/A",
+        o.customer_phone || "N/A",
+        o.customer_name || "Guest",
+        o.agent_name || "N/A",
+        o.agent_email || "N/A",
+        o.amount,
+        o.profit,
+        o.status,
+        o.failure_reason || "None"
+      ].map(val => JSON.stringify(val ?? "")).join(","))
+    ].join("\n");
+
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", `orders_export_${new Date().toISOString().split("T")[0]}.csv`);
+    link.style.visibility = "hidden";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    toast({ title: "Export Complete", description: `Exported ${allOrders.length} orders to CSV.` });
+  };
+
+  const handleExportSimpleCSV = () => {
+    if (allOrders.length === 0) {
+      toast({ title: "No orders to export", variant: "destructive" });
+      return;
+    }
+    const headers = ["Recipient Phone", "Network", "Size/Details"];
+    const csvContent = [
+      headers.join(","),
+      ...allOrders.map(o => {
+        const rawSize = o.package_size || "";
+        const match = rawSize.replace(/\s+/g, "").match(/(\d+(?:\.\d+)?)/);
+        const numericSize = match ? match[1] : "0";
+
+        return [
+          o.customer_phone || "N/A",
+          o.network || "N/A",
+          numericSize
+        ].map(val => JSON.stringify(val ?? "")).join(",");
+      })
+    ].join("\n");
+
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", `simple_orders_export_${new Date().toISOString().split("T")[0]}.csv`);
+    link.style.visibility = "hidden";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    toast({ title: "Simple Export Complete", description: `Exported ${allOrders.length} simple orders.` });
+  };
+
   // Client-side filtering
   const filtered = allOrders;
   const paginated = allOrders;
@@ -342,6 +431,16 @@ const AdminOrders = () => {
           <Button variant="outline" size="sm" className="gap-2" onClick={fetchOrders}>
             <RefreshCw className="w-4 h-4" /> Refresh
           </Button>
+          {allApisOff && (
+            <>
+              <Button variant="outline" size="sm" className="gap-2 bg-white/5 border-white/10 hover:bg-white/10" onClick={handleExportCSV} disabled={allOrders.length === 0}>
+                <Download className="w-4 h-4" /> Export CSV
+              </Button>
+              <Button variant="outline" size="sm" className="gap-2 bg-white/5 border-white/10 hover:bg-white/10 text-amber-400 border-amber-500/20" onClick={handleExportSimpleCSV} disabled={allOrders.length === 0}>
+                <Download className="w-4 h-4" /> Export Simple
+              </Button>
+            </>
+          )}
           <Button
             size="sm"
             className="gap-2 bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/20"

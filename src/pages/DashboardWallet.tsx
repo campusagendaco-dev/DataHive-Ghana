@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import { useRealtimeRefresh } from "@/hooks/useRealtimeRefresh";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -185,6 +186,13 @@ const DashboardWallet = () => {
 
   useEffect(() => { fetchBalance(); }, [fetchBalance]);
   useEffect(() => { fetchRecentTopups(); }, [fetchRecentTopups]);
+
+  // Live updates — refresh balance and topups whenever wallet or orders change
+  useRealtimeRefresh({
+    tables: ["wallets", "orders"],
+    onRefresh: () => { fetchBalance(); fetchRecentTopups(); },
+    filters: user ? { wallets: `agent_id=eq.${user.id}`, orders: `agent_id=eq.${user.id}` } : {},
+  });
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
