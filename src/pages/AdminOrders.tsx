@@ -228,42 +228,39 @@ const AdminOrders = () => {
     await fetchOrders();
   };
 
-  const handleForceFulfillApiOrders = async () => {
-    const actionableApi = allOrders.filter(
-      (o) => o.order_type === "api" && (o.status === "paid" || o.status === "processing" || o.status === "fulfillment_failed")
-    );
+  const handleForceFulfillAllProcessing = async () => {
+    const actionable = allOrders.filter(o => o.status === "processing");
     
-    if (actionableApi.length === 0) {
-      toast({ title: "No actionable API orders", description: "All API orders are already fulfilled." });
+    if (actionable.length === 0) {
+      toast({ title: "No processing orders", description: "There are no orders currently stuck in processing." });
       return;
     }
 
-    if (!confirm(`Are you sure you want to FORCE fulfill ${actionableApi.length} API orders? This will mark them as successful and credit profits without checking the provider.`)) {
+    if (!confirm(`Are you sure you want to FORCE fulfill ${actionable.length} orders? This will immediately mark them as Successful without talking to provider.`)) {
       return;
     }
 
     setForcingFulfill(true);
-    toast({ title: "Forcing fulfillment…", description: `Processing ${actionableApi.length} API orders…` });
+    toast({ title: "Executing mass fulfillment…", description: `Updating ${actionable.length} orders…` });
 
     try {
-      const { data, error } = await supabase.functions.invoke("admin-user-actions", {
-        body: { action: "bulk_fulfill_api_orders" },
-      });
+      const { error } = await supabase
+        .from("orders")
+        .update({ 
+          status: "fulfilled", 
+          failure_reason: "Forced fulfillment via direct admin override" 
+        })
+        .eq("status", "processing");
 
-      if (error) {
-        const description = await getFunctionErrorMessage(error, "The action could not be completed. Check if the Edge Function is deployed.");
-        toast({ title: "Action failed", description, variant: "destructive" });
-      } else {
-        toast({ 
-          title: "Done", 
-          description: data?.message || `Successfully fulfilled ${data?.fulfilled || 0} API orders.` 
-        });
-        if (currentUser) {
-          await logAudit(currentUser.id, "force_fulfill_api_orders", { attempted: actionableApi.length, fulfilled: data?.fulfilled || 0 });
-        }
+      if (error) throw error;
+      
+      toast({ title: "Task Success", description: `Successfully updated all ${actionable.length} processing orders.` });
+      
+      if (currentUser) {
+        await logAudit(currentUser.id, "mass_fulfill_processing", { count: actionable.length });
       }
-    } catch (e) {
-      toast({ title: "Error", description: "An unexpected error occurred.", variant: "destructive" });
+    } catch (e: any) {
+      toast({ title: "Execution Failed", description: e.message, variant: "destructive" });
     }
 
     setForcingFulfill(false);
@@ -454,11 +451,11 @@ const AdminOrders = () => {
             size="sm"
             variant="destructive"
             className="gap-2"
-            onClick={handleForceFulfillApiOrders}
+            onClick={handleForceFulfillAllProcessing}
             disabled={forcingFulfill}
           >
             {forcingFulfill ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
-            {forcingFulfill ? "Forcing…" : "Force Fulfill API Orders"}
+            {forcingFulfill ? "Executing…" : `Force Fulfill All Processing (${allOrders.filter(o => o.status === "processing").length})`}
           </Button>
         </div>
       </div>

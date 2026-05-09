@@ -62,6 +62,9 @@ verify_jwt = false
 [functions.datahub-webhook]
 verify_jwt = false
 
+[functions.dump-processing-orders]
+verify_jwt = false
+
 
 [functions.support-bot]
 verify_jwt = false

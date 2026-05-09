@@ -13,15 +13,31 @@ serve(async (req) => {
   const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
   const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
-  const { data: order, error } = await supabase
+  console.log("[Admin-Task] Beginning forced mass fulfillment of all processing orders...");
+
+  // 1. Update all stuck processing orders directly to fulfilled
+  const { data, count, error } = await supabase
     .from("orders")
-    .select("id, created_at, status, agent_id")
-    .eq("id", "849c1362-5f5e-4948-8014-a37399734b71")
-    .maybeSingle();
+    .update({ 
+      status: "fulfilled", 
+      failure_reason: "Mass fulfilled via direct admin command" 
+    })
+    .eq("status", "processing")
+    .select("id", { count: "exact" });
 
-  if (error) return new Response(JSON.stringify({ error: error.message }), { status: 500, headers: corsHeaders });
+  if (error) {
+    console.error("[Admin-Task] Direct database update failed:", error);
+    return new Response(JSON.stringify({ success: false, error: error.message }), { status: 500, headers: corsHeaders });
+  }
 
-  return new Response(JSON.stringify({ orders: order ? [order] : [] }), {
+  console.log(`[Admin-Task] SUCCESS! Fulfilled ${count || 0} orders!`);
+
+  return new Response(JSON.stringify({ 
+    success: true, 
+    message: `Successfully mass-fulfilled ${count || 0} stuck processing orders.`, 
+    count: count || 0,
+    affected_ids: (data || []).map(o => o.id)
+  }), {
     headers: { ...corsHeaders, "Content-Type": "application/json" },
   });
 });
