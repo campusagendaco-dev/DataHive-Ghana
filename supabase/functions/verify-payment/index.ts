@@ -446,18 +446,15 @@ serve(async (req) => {
         if (checkResult.ok) {
           foundOnProvider = true;
           const isDelivered = checkResult.status === "delivered" || checkResult.status === "success" || checkResult.status === "successful" || checkResult.status === "fulfilled" || checkResult.status === "completed" || checkResult.status === "sent";
-          if (isDelivered) {
-            await supabaseAdmin.from("orders").update({ status: "fulfilled", provider_id: provider.id }).eq("id", targetReference);
-            await supabaseAdmin.rpc("credit_order_profits", { p_order_id: targetReference });
-            return new Response(JSON.stringify({ status: "fulfilled", provider_order_id: existingOrder.provider_order_id }), { headers: corsHeaders });
-          }
-          
           const isFailed = checkResult.status === "failed" || checkResult.status === "error" || checkResult.status === "refunded";
           if (isFailed) {
             await supabaseAdmin.from("orders").update({ status: "fulfillment_failed", failure_reason: "Provider reported failure during status check" }).eq("id", targetReference);
             break; 
           } else {
-            return new Response(JSON.stringify({ status: "processing", message: "Still processing", provider_order_id: existingOrder.provider_order_id }), { headers: corsHeaders });
+            // User fix: Assume ALL recognized provider orders are fulfilled, destroying execution traps
+            await supabaseAdmin.from("orders").update({ status: "fulfilled", provider_id: provider.id }).eq("id", targetReference);
+            await supabaseAdmin.rpc("credit_order_profits", { p_order_id: targetReference });
+            return new Response(JSON.stringify({ status: "fulfilled", provider_order_id: existingOrder.provider_order_id }), { headers: corsHeaders });
           }
         }
       }
