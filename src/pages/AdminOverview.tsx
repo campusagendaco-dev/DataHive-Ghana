@@ -131,15 +131,15 @@ const AdminOverview = () => {
     if (timeRange === "7d") startDate.setDate(now.getDate() - 6);
     else if (timeRange === "30d") startDate.setDate(now.getDate() - 29);
     else if (timeRange === "1y") startDate.setFullYear(now.getFullYear() - 1);
-    else startDate = new Date(2024, 0, 1); // Earliest possible date
-    
+    else startDate = new Date(2024, 0, 1);
+
     startDate.setHours(0, 0, 0, 0);
     const todayStr = now.toISOString().slice(0, 10);
-    
+
     const DEPOSIT_TYPES = new Set(["wallet_topup", "agent_activation", "sub_agent_activation"]);
     const SALE_TYPES    = new Set(["data", "airtime", "utility", "afa", "api"]);
 
-    const [ordersRes, profilesRes, maintenanceRes, recentRes, rangeOrdersRes, providerRes, withdrawalsRes, ticketsRes, topupsRes, auditRes, walletsRes, salesStatsRes, rpcStatsRes] = await Promise.all([
+    const settled = await Promise.allSettled([
       supabase.from("orders").select("id, amount, status, order_type, profit, parent_profit, cost_price, paystack_fee, paystack_verified_amount"),
       supabase.from("profiles").select("user_id, is_agent, is_sub_agent, agent_approved, sub_agent_approved, onboarding_complete, created_at"),
       supabase.functions.invoke("maintenance-mode", { body: { action: "get" } }),
@@ -154,6 +154,10 @@ const AdminOverview = () => {
       supabase.from("user_sales_stats").select("total_sales_volume, total_own_profit, total_commissions_paid"),
       supabase.rpc("get_admin_sales_stats_v2", { p_start_date: startDate.toISOString() }),
     ]);
+
+    // Safely unwrap allSettled results — failed queries default to empty/null
+    const unwrap = (r: PromiseSettledResult<any>) => r.status === "fulfilled" ? r.value : { data: null, error: null };
+    const [ordersRes, profilesRes, maintenanceRes, recentRes, rangeOrdersRes, providerRes, withdrawalsRes, ticketsRes, topupsRes, auditRes, walletsRes, salesStatsRes, rpcStatsRes] = settled.map(unwrap);
 
     const orders = ordersRes?.data || [];
     const profiles = profilesRes?.data || [];
@@ -209,15 +213,30 @@ const AdminOverview = () => {
     let dailySalesData: DailySalesPoint[] = [];
 
     if (rpcStats && Array.isArray(rpcStats)) {
-      // Use RPC results if available (Perfect accuracy)
-      dailySalesData = rpcStats.map((r: any) => ({
-        date: new Date(r.bucket_date).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" }),
-        Customers: Number(r.customer_sales),
-        Agents: Number(r.agent_sales),
-        "Sub-Agents": Number(r.sub_agent_sales),
-        Deposits: Number(r.deposit_volume),
-        Purchases: Number(r.customer_sales) + Number(r.agent_sales) + Number(r.sub_agent_sales),
-      }));
+      // Build a full date range with zeros first so every day is represented
+      const daysCount = timeRange === "7d" ? 7 : timeRange === "30d" ? 30 : 90;
+      const dateMap: Record<string, DailySalesPoint> = {};
+      for (let i = daysCount - 1; i >= 0; i--) {
+        const d = new Date(now);
+        d.setDate(now.getDate() - i);
+        const key = d.toISOString().slice(0, 10);
+        dateMap[key] = {
+          date: d.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" }),
+          Customers: 0, Agents: 0, "Sub-Agents": 0, Deposits: 0, Purchases: 0,
+        };
+      }
+      // Overlay RPC data — use string slice to avoid timezone shifts
+      for (const r of rpcStats) {
+        const key = String(r.bucket_date || "").slice(0, 10);
+        if (dateMap[key]) {
+          dateMap[key].Customers = Number(r.customer_sales) || 0;
+          dateMap[key].Agents = Number(r.agent_sales) || 0;
+          dateMap[key]["Sub-Agents"] = Number(r.sub_agent_sales) || 0;
+          dateMap[key].Deposits = Number(r.deposit_volume) || 0;
+          dateMap[key].Purchases = dateMap[key].Customers + dateMap[key].Agents + dateMap[key]["Sub-Agents"];
+        }
+      }
+      dailySalesData = Object.values(dateMap);
     } else {
       // Fallback to browser-side aggregation if RPC is missing/failed
       console.warn("Sales stats RPC failed or not found, falling back to local calculation.");
@@ -343,16 +362,26 @@ const AdminOverview = () => {
       setMaintenanceMessage(maintenanceRow.message?.trim() || "We are performing scheduled maintenance. Please check back soon.");
     }
     setLastUpdated(new Date());
-    setLoading(false);
   }, [timeRange]);
 
+  // Wrap fetchData in a stable function that always clears loading and never crashes the page
+  const safeFetchData = useCallback(async () => {
+    try {
+      await fetchData();
+    } catch (err) {
+      console.error("[AdminOverview] fetchData error:", err);
+    } finally {
+      setLoading(false);
+    }
+  }, [fetchData]);
+
   useEffect(() => {
-    fetchData();
+    safeFetchData();
 
     const ordersChannel = supabase
       .channel("admin-live-orders")
       .on("postgres_changes", { event: "*", table: "orders", schema: "public" }, (payload) => {
-        fetchData();
+        safeFetchData();
         if (payload.eventType === "INSERT") {
           toast({
             title: "New Order Received!",
@@ -367,20 +396,20 @@ const AdminOverview = () => {
     const profilesChannel = supabase
       .channel("admin-live-profiles")
       .on("postgres_changes", { event: "*", table: "profiles", schema: "public" }, () => {
-        fetchData();
+        safeFetchData();
         setUpdatedKeys(new Set(["Pending Agents", "Active Users"]));
         setTimeout(() => setUpdatedKeys(new Set()), 1500);
       })
       .subscribe();
 
-    const interval = setInterval(fetchData, 60_000);
+    const interval = setInterval(safeFetchData, 60_000);
 
     return () => {
       supabase.removeChannel(ordersChannel);
       supabase.removeChannel(profilesChannel);
       clearInterval(interval);
     };
-  }, [timeRange, fetchData, toast]);
+  }, [timeRange, safeFetchData, toast]);
 
   const saveMaintenance = async () => {
     if (!maintenanceTableReady) {
@@ -417,7 +446,7 @@ const AdminOverview = () => {
     } else {
       const count = data?.approved ?? 0;
       toast({ title: count > 0 ? `Approved ${count} agent${count !== 1 ? "s" : ""}` : "No pending agents to approve" });
-      await fetchData();
+      await safeFetchData();
     }
     setApprovingPending(false);
   };
@@ -499,7 +528,7 @@ const AdminOverview = () => {
           )}
         </div>
         <Button
-          onClick={fetchData}
+          onClick={safeFetchData}
           className={`gap-2 rounded-xl border font-semibold text-sm transition-all ${
             isDark ? "bg-white/5 hover:bg-white/10 text-white border-white/10" : "bg-white hover:bg-gray-50 text-gray-700 border-gray-200 shadow-sm"
           }`}
@@ -574,7 +603,7 @@ const AdminOverview = () => {
                   try {
                     await supabase.functions.invoke("datamart-sync");
                     toast({ title: "Sync Complete", description: "All orders recovered and fulfilled." });
-                    fetchData();
+                    safeFetchData();
                   } catch (e) {
                     toast({ title: "Sync Failed", variant: "destructive" });
                   }
@@ -731,9 +760,9 @@ const AdminOverview = () => {
                   <h3 className={`font-black text-lg tracking-tight ${isDark ? "text-white" : "text-gray-900"}`}>Provider Health</h3>
                   <span className={`w-2 h-2 rounded-full animate-pulse ${providerBalance !== null && providerBalance < 50 ? "bg-red-500" : "bg-emerald-500"}`} />
                   {providerBalance !== null && providerBalance < 50 && (
-                    <a 
-                      href={providerDiagnostics.baseUrl} 
-                      target="_blank" 
+                    <a
+                      href={providerDiagnostics?.baseUrl || "#"}
+                      target="_blank"
                       rel="noopener noreferrer"
                       className="ml-2 px-2 py-0.5 rounded-md bg-red-500 text-white text-[10px] font-black uppercase tracking-tighter hover:bg-red-600 transition-colors"
                     >
@@ -745,7 +774,7 @@ const AdminOverview = () => {
                   <Badge variant="outline" className={`text-[10px] font-black tracking-widest px-2 py-0.5 uppercase border ${
                     isDark ? "border-white/10 bg-white/5 text-white/40" : "border-gray-200 bg-gray-50 text-gray-400"
                   }`}>
-                    {providerDiagnostics.baseUrl.replace(/https?:\/\//, "")}
+                    {(providerDiagnostics?.baseUrl || "").replace(/https?:\/\//, "")}
                   </Badge>
                   {providerBalance !== null && (
                     <span className={`text-[10px] font-bold ${providerBalance < 50 ? "text-red-500" : "text-emerald-500"}`}>
