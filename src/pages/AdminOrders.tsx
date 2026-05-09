@@ -229,35 +229,48 @@ const AdminOrders = () => {
   };
 
   const handleForceFulfillAllProcessing = async () => {
-    const actionable = allOrders.filter(o => o.status === "processing");
-    
-    if (actionable.length === 0) {
-      toast({ title: "No processing orders", description: "There are no orders currently stuck in processing." });
-      return;
-    }
-
-    if (!confirm(`Are you sure you want to FORCE fulfill ${actionable.length} orders? This will immediately mark them as Successful without talking to provider.`)) {
-      return;
-    }
-
     setForcingFulfill(true);
-    toast({ title: "Executing mass fulfillment…", description: `Updating ${actionable.length} orders…` });
-
     try {
+      // 1. Pre-flight Check: Count EVERYTHING across the entire database
+      const { count, error: countErr } = await supabase
+        .from("orders")
+        .select("id", { count: "exact", head: true })
+        .eq("status", "processing");
+
+      if (countErr) throw countErr;
+      const totalCount = count || 0;
+
+      if (totalCount === 0) {
+        toast({ 
+          title: "Verification Complete", 
+          description: "Checked the entire database. There are exactly 0 orders in processing." 
+        });
+        setForcingFulfill(false);
+        return;
+      }
+
+      if (!confirm(`WARNING: Found ${totalCount} processing orders across the WHOLE database. Force fulfill them ALL immediately?`)) {
+        setForcingFulfill(false);
+        return;
+      }
+
+      toast({ title: "Executing database update…", description: `Transitioning ${totalCount} orders globally…` });
+
+      // 2. Execute unrestricted atomic update across whole orders table
       const { error } = await supabase
         .from("orders")
         .update({ 
           status: "fulfilled", 
-          failure_reason: "Forced fulfillment via direct admin override" 
+          failure_reason: "Forced global fulfillment via admin dashboard" 
         })
         .eq("status", "processing");
 
       if (error) throw error;
       
-      toast({ title: "Task Success", description: `Successfully updated all ${actionable.length} processing orders.` });
+      toast({ title: "Task Success", description: `Successfully fulfilled ${totalCount} orders database-wide.` });
       
       if (currentUser) {
-        await logAudit(currentUser.id, "mass_fulfill_processing", { count: actionable.length });
+        await logAudit(currentUser.id, "mass_fulfill_processing_global", { count: totalCount });
       }
     } catch (e: any) {
       toast({ title: "Execution Failed", description: e.message, variant: "destructive" });
@@ -455,7 +468,7 @@ const AdminOrders = () => {
             disabled={forcingFulfill}
           >
             {forcingFulfill ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
-            {forcingFulfill ? "Executing…" : `Force Fulfill All Processing (${allOrders.filter(o => o.status === "processing").length})`}
+            {forcingFulfill ? "Analyzing DB…" : "Force Fulfill ALL (Whole Database)"}
           </Button>
         </div>
       </div>
