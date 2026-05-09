@@ -344,6 +344,11 @@ async function callProviderApi(
           }
 
           const reason = semantic.reason || "Provider rejected this order.";
+          const isAlreadyPlaced = /already placed/i.test(reason) || /currently being processed/i.test(reason);
+          if (isAlreadyPlaced) {
+            return { ok: true, status: 200, body: text, reason: "", url, deliveryStatus: "processing" };
+          }
+
           lastFailure = { ok: false, status: response.status, body: text, reason, url, id: semantic.id, deliveryStatus: semantic.status };
           return lastFailure;
         }
