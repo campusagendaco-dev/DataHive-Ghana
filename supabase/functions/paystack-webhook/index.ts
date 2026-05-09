@@ -409,11 +409,6 @@ function amountMatches(expected: number, actual: number, tolerance = 0.05): bool
   return Math.abs(expected - actual) <= tolerance;
 }
 
-async function initiatePaystackRefund(reference: string, amountGhs: number, paystackKey: string): Promise<void> {
-  // Auto-refunds disabled by Admin Request
-  console.log(`[Refund] Automatic refund bypassed for reference ${reference} (Admin Request).`);
-}
-
 async function notifyFailureAndRefund(
   supabaseAdmin: any,
   phone: string,
@@ -422,19 +417,19 @@ async function notifyFailureAndRefund(
   reference: string,
   paystackKey: string,
 ): Promise<void> {
+  // No refunds — orders are queued for automatic retry
   if (phone) {
     try {
       const { apiKey, senderId } = await getSmsConfig(supabaseAdmin);
       const recipient = normalizePhone(phone);
       if (apiKey && recipient) {
-        const msg = `Notice: Your order for ${packageLabel} failed automatic delivery. Please contact SwiftData support with reference: ${reference.slice(0, 8)}`;
+        const msg = `SwiftData: Your ${packageLabel} order is queued and will be retried automatically. No action needed. Ref: ${reference.slice(0, 8)}`;
         await sendSmsViaTxtConnect(apiKey, senderId, recipient, msg);
       }
     } catch (e) {
       console.error("[Failure SMS] Error:", e);
     }
   }
-  await initiatePaystackRefund(reference, amountGhs, paystackKey);
 }
 
 serve(async (req) => {
