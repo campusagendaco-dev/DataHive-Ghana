@@ -252,10 +252,6 @@ function getProviderFailureReason(status: number, body: string, contentType: str
 
   const normalized = `${parsedMessage || stripHtml(body)}`.toLowerCase();
 
-  if ((normalized.includes("insufficient") || normalized.includes("low")) && normalized.includes("balance")) {
-    return "Provider balance is too low. Refill the API source and retry this order.";
-  }
-
   if (normalized.includes("cloudflare")) {
     return "Provider blocked the server request. Ask the data source to allow this server and retry.";
   }
@@ -353,6 +349,10 @@ async function callProviderApi(
         }
 
         const reason = getProviderFailureReason(response.status, text, contentType);
+        const isAlreadyPlaced = /already placed/i.test(reason) || /currently being processed/i.test(reason);
+        if (isAlreadyPlaced) {
+          return { ok: true, status: 200, body: text, reason: "", url, deliveryStatus: "processing" };
+        }
         lastFailure = { ok: false, status: response.status, body: text, reason, url };
 
         const retryable = response.status >= 500 || response.status === 429;
@@ -1221,19 +1221,46 @@ serve(async (req) => {
       });
     }
 
+    const baseUrlToLower = DATA_PROVIDER_BASE_URL.toLowerCase();
+    const handlerType = baseUrlToLower.includes("datamart") ? "datamart" : baseUrlToLower.includes("datahub") ? "datahub" : "standard";
+    const networkKey = handlerType === "datamart" 
+      ? (network.toUpperCase() === "MTN" ? "YELLO" : (network.toUpperCase() === "TELECEL" ? "TELECEL" : "AT_PREMIUM"))
+      : mapDataNetworkKey(network);
+    
+    const dataPayload = handlerType === "datamart"
+      ? {
+          phoneNumber: normalizeRecipient(customerPhone),
+          network: networkKey,
+          planId: packageSize,
+          plan: packageSize,
+          bundle: packageSize,
+          capacity: String(parseCapacity(packageSize)),
+          orderReference: orderId,
+          gateway: "wallet",
+          reference: orderId
+        }
+      : handlerType === "datahub"
+      ? {
+          networkKey,
+          recipient: normalizeRecipient(customerPhone),
+          capacity: String(parseCapacity(packageSize)),
+          reference: orderId,
+        }
+      : {
+          networkRaw: network,
+          networkKey,
+          recipient: normalizeRecipient(customerPhone),
+          capacity: String(parseCapacity(packageSize)),
+          amount: existingOrder?.amount || verifiedAmount,
+          order_type: "data",
+          description: `Data: ${packageSize} for ${customerPhone}`
+        };
+
     const result = await callProviderApi(
       DATA_PROVIDER_BASE_URL,
       DATA_PROVIDER_API_KEY,
       "purchase",
-      {
-        networkRaw: network,
-        networkKey: mapDataNetworkKey(network),
-        recipient: normalizeRecipient(customerPhone),
-        capacity: String(parseCapacity(packageSize)),
-        amount: existingOrder?.amount || verifiedAmount,
-        order_type: "data",
-        description: `Data: ${packageSize} for ${customerPhone}`
-      },
+      dataPayload,
       DATA_PROVIDER_WEBHOOK_URL,
     );
 

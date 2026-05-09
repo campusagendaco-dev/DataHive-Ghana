@@ -156,6 +156,14 @@ async function callProviderApi(
       const text = await res.text();
       lastBody = text;
 
+      let parsedMsg = "";
+      try { parsedMsg = JSON.parse(text)?.message || JSON.parse(text)?.error || ""; } catch { /* ignore */ }
+      
+      const isAlreadyPlaced = /already placed/i.test(parsedMsg) || /currently being processed/i.test(parsedMsg);
+      if (isAlreadyPlaced) {
+        return { ok: true, reason: "", status: "processing" };
+      }
+
       if (res.ok && !isHtmlBody(ct, text)) {
         try {
           const p = JSON.parse(text);
@@ -163,10 +171,10 @@ async function callProviderApi(
           const ok = p?.success === true || s === "success" || s === "true" || p?.status === true || s === "completed" || s === "pending";
           const pStatus = String(p?.data?.status ?? p?.delivery_status ?? p?.status ?? "");
           if (ok) return { ok: true, reason: "", id: String(p?.data?.orderNumber ?? p?.data?.reference ?? p?.data?.purchaseId ?? p?.transaction_id ?? p?.id ?? p?.order_id ?? ""), status: pStatus };
-          lastReason = p?.message || p?.error || "Provider rejected the order";
+          lastReason = parsedMsg || "Provider rejected the order";
         } catch { return { ok: true, reason: "", status: "" }; }
       } else {
-        lastReason = `HTTP ${res.status}`;
+        lastReason = parsedMsg || `HTTP ${res.status}`;
       }
       if (res.status === 404 || isHtmlBody(ct, text)) continue;
       break;
@@ -483,17 +491,34 @@ serve(async (req: Request) => {
       const primaryProvider = providers[0];
       if (primaryProvider) {
         const handlerType = primaryProvider.handler_type || "standard";
-        const dataPayload = handlerType === "datahub"
+        const networkKey = handlerType === "datamart" 
+          ? (network?.toUpperCase() === "MTN" ? "YELLO" : (network?.toUpperCase() === "TELECEL" ? "TELECEL" : "AT_PREMIUM"))
+          : mapNetworkKey(network || "");
+
+        const dataPayload = handlerType === "datamart"
           ? {
-              networkKey: mapNetworkKey(network),
+              phoneNumber: normalizeRecipient(phone),
+              network: networkKey,
+              planId: package_size,
+              plan: package_size,
+              bundle: package_size,
+              capacity: String(parseCapacity(package_size || "")),
+              orderReference: orderId,
+              gateway: "wallet",
+              reference: orderId
+            }
+          : handlerType === "datahub"
+          ? {
+              networkKey,
               recipient: normalizeRecipient(phone),
-              capacity: String(parseCapacity(package_size)),
+              capacity: String(parseCapacity(package_size || "")),
               reference: orderId,
             }
           : {
               networkRaw: network,
+              networkKey,
               recipient: normalizeRecipient(phone),
-              capacity: amount || parseCapacity(package_size),
+              capacity: amount || parseCapacity(package_size || ""),
               plan: package_size,
               amount: amount,
               orderReference: orderId,
@@ -515,7 +540,8 @@ serve(async (req: Request) => {
         await supabase.from("orders").update({ 
           status: targetStatus, 
           provider_id: successfulProviderId,
-          provider_order_id: finalResult.id
+          provider_order_id: finalResult.id,
+          failure_reason: null
         }).eq("id", orderId);
 
         if (targetStatus === "fulfilled") {

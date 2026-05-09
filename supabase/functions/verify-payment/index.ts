@@ -295,8 +295,13 @@ async function callProviderApi(
         }
 
         let parsedMsg = "";
-        try { parsedMsg = JSON.parse(text)?.message || ""; } catch { /* ignore */ }
+        try { parsedMsg = JSON.parse(text)?.message || JSON.parse(text)?.error || ""; } catch { /* ignore */ }
         lastReason = parsedMsg || `Provider returned ${res.status}`;
+
+        const isAlreadyPlaced = /already placed/i.test(lastReason) || /currently being processed/i.test(lastReason);
+        if (isAlreadyPlaced) {
+          return { ok: true, reason: "", status: "processing" };
+        }
 
         if (res.status === 401 || res.status === 403) return { ok: false, reason: lastReason };
         if (res.status === 404 || isHtmlResponse(contentType, text)) break;
@@ -422,10 +427,12 @@ serve(async (req) => {
     const paystackSecretKey = credentials.paystackSecretKey;
     const orderType = (existingOrder?.order_type || "data") as string;
 
+    const isQueuedError = /queued/i.test(String(existingOrder?.failure_reason || ""));
+
     // --- 1. STATUS CHECK (For orders already being processed) ---
     // We check status for ALL processing orders, even if provider_order_id is missing,
-    // because DataMart allows querying by our internal reference (UUID).
-    if (existingOrder?.status === "processing") {
+    // EXCEPT orders that were queued locally due to low balance / errors
+    if (existingOrder?.status === "processing" && !isQueuedError) {
       const providers = await getActiveProviders(supabaseAdmin, orderType === "airtime" ? "airtime" : "data");
       let foundOnProvider = false;
       for (const provider of providers) {
@@ -459,12 +466,16 @@ serve(async (req) => {
     // --- 1.2. AGE CHECK FALLBACK ---
     // If processing for >20 min with no provider confirmation, reset to paid so retries pick it up
     if (existingOrder && existingOrder.status === "processing") {
+      const isQueuedError = /queued/i.test(String(existingOrder.failure_reason || ""));
       const orderCreatedAt = new Date(existingOrder.created_at).getTime();
       const ageInMinutes = (Date.now() - orderCreatedAt) / 60000;
-      if (ageInMinutes > 20) {
-        console.log(`[verify-payment] Order ${targetReference} stuck processing for ${ageInMinutes.toFixed(1)} mins. Resetting to paid for retry.`);
-        await supabaseAdmin.from("orders").update({ status: "paid", failure_reason: "Re-queued after 20min processing timeout" }).eq("id", targetReference);
-        return new Response(JSON.stringify({ status: "processing", message: "Order re-queued for retry" }), { headers: corsHeaders });
+      
+      if (isQueuedError || ageInMinutes > 20) {
+        console.log(`[verify-payment] Order ${targetReference} was queued or stuck for ${ageInMinutes.toFixed(1)} mins. Instantly resuming purchase.`);
+        // We do NOT return early! We let the execution fall through to the purchase logic below!
+      } else {
+        // Normal processing lock: wait for webhook
+        return new Response(JSON.stringify({ status: "processing", message: "Still processing on provider" }), { headers: corsHeaders });
       }
     }
 
@@ -596,7 +607,7 @@ serve(async (req) => {
         updated_at: new Date().toISOString()
       })
       .eq("id", targetReference)
-      .in("status", ["pending", "paid", "fulfillment_failed"])
+      .in("status", ["pending", "paid", "fulfillment_failed", "processing"])
       .select("*")
       .maybeSingle();
 
@@ -751,7 +762,7 @@ serve(async (req) => {
 
     if (result.ok) {
       const targetStatus = mapFulfillmentStatus(result.status);
-      const patch: any = { provider_id: successfulProviderId, provider_order_id: result.id, status: targetStatus };
+      const patch: any = { provider_id: successfulProviderId, provider_order_id: result.id, status: targetStatus, failure_reason: null };
       await supabaseAdmin.from("orders").update(patch).eq("id", targetReference);
       
       if (targetStatus === "fulfilled") {
