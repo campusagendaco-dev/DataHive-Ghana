@@ -442,7 +442,7 @@ const App = () => {
           <UpdatePrompt needRefresh={needRefresh} onUpdate={() => updateServiceWorker(true)} />
           <Toaster />
           <Sonner />
-          <BrowserRouter>
+          <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
             <AuthProvider>
               <SecurityGuard>
                 <AppContent />
