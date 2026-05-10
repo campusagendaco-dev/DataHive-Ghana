@@ -64,7 +64,7 @@ const DashboardLayout = () => {
     <div className={cn("flex min-h-screen w-full transition-colors duration-300 bg-transparent")}>
       <DashboardSidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
       
-      <div className="flex-1 flex flex-col min-w-0 h-screen overflow-hidden">
+      <div className="flex-1 flex flex-col min-w-0 h-[100dvh] overflow-hidden">
         {/* ── Premium Glass Header ── */}
         <header className={cn(
           "h-16 flex items-center px-4 sm:px-6 gap-4 shrink-0 sticky top-0 z-40 backdrop-blur-xl border-b transition-all duration-300",

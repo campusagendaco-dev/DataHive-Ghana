@@ -116,7 +116,7 @@ const DashboardSidebar = ({ open, onClose }: DashboardSidebarProps) => {
 
       <aside
         className={cn(
-          "fixed md:sticky top-0 left-0 z-50 w-72 h-screen flex flex-col transition-all duration-300 ease-in-out md:translate-x-0 border-r shadow-2xl",
+          "fixed md:sticky top-0 left-0 z-50 w-72 h-[100dvh] flex flex-col transition-all duration-300 ease-in-out md:translate-x-0 border-r shadow-2xl",
           isDark ? "bg-[#0d140d]/95 backdrop-blur-xl border-white/5" : "bg-white border-gray-200",
           open ? "translate-x-0" : "-translate-x-full"
         )}

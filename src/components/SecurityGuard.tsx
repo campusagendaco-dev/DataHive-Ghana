@@ -162,7 +162,7 @@ export function SecurityGuard({ children }: { children: React.ReactNode }) {
   return (
     <div className="relative min-h-screen w-full overflow-hidden selection:bg-primary selection:text-black">
       {/* Main Application Layer */}
-      <div className={`transition-all duration-300 ${isCurrentlyShielded ? "blur-xl grayscale scale-[0.98]" : "blur-0"}`}>
+      <div className={`transition-all duration-300 ${isCurrentlyShielded ? "md:blur-xl blur-lg grayscale scale-[0.99] md:scale-[0.98]" : "blur-0"}`}>
         {children}
       </div>
 
@@ -174,7 +174,7 @@ export function SecurityGuard({ children }: { children: React.ReactNode }) {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.2 }}
-            className="fixed inset-0 z-[99999] flex flex-col items-center justify-center bg-background/95 backdrop-blur-2xl"
+            className="fixed inset-0 z-[99999] flex flex-col items-center justify-center bg-background/98 md:bg-background/95 backdrop-blur-lg md:backdrop-blur-2xl"
           >
             <motion.div 
               initial={{ scale: 0.9, y: 10 }}
