@@ -225,16 +225,24 @@ const Index = () => {
   const [liveStats, setLiveStats] = useState({ totalDelivered: 0, successRate: 99.4, totalAgents: 0 });
   const [currentTime, setCurrentTime] = useState(new Date());
   const [activeMessageIndex, setActiveMessageIndex] = useState(0);
+  const [latency, setLatency] = useState(24);
 
   useEffect(() => {
     const tick = setInterval(() => setCurrentTime(new Date()), 1000);
+    
     const messageCycle = setInterval(() => {
-      setActiveMessageIndex((prev) => (prev + 1) % 3);
+      setActiveMessageIndex((prev) => (prev + 1) % 4);
     }, 4000);
+    
+    // Simulate micro-variations in network latency for ultra-realism
+    const latencyCycle = setInterval(() => {
+      setLatency(Math.floor(Math.random() * 9) + 18);
+    }, 3000);
     
     return () => {
       clearInterval(tick);
       clearInterval(messageCycle);
+      clearInterval(latencyCycle);
     };
   }, []);
 
@@ -347,6 +355,9 @@ const Index = () => {
             <span className="flex items-center gap-1.5 text-white/60 text-[10px] sm:text-xs font-mono font-medium">
               <Clock className="w-3 h-3 text-amber-400/80" />
               {format(currentTime, "hh:mm:ss a")}
+              <span className="text-[9px] text-emerald-500/80 ml-1 hidden sm:inline font-bold">
+                {latency}ms
+              </span>
             </span>
 
             <span className="w-px h-3 bg-white/15" />
@@ -360,7 +371,13 @@ const Index = () => {
                 {[
                   "#1 Bundle Store",
                   "Instant Delivery",
-                  "Paystack Secured"
+                  "Paystack Secured",
+                  <div className="flex items-center gap-1.5" key="networks">
+                    <span className="text-[9px] text-white/50 uppercase tracking-widest mr-0.5 font-black">APIs</span>
+                    <div className="w-1.5 h-1.5 rounded-full bg-amber-400 shadow-[0_0_4px_rgba(251,191,36,0.5)]" title="MTN Online" />
+                    <div className="w-1.5 h-1.5 rounded-full bg-red-500 shadow-[0_0_4px_rgba(239,68,68,0.5)]" title="Telecel Online" />
+                    <div className="w-1.5 h-1.5 rounded-full bg-blue-500 shadow-[0_0_4px_rgba(59,130,246,0.5)]" title="AirtelTigo Online" />
+                  </div>
                 ][activeMessageIndex]}
               </div>
             </div>
