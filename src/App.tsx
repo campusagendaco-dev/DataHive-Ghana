@@ -296,8 +296,9 @@ const AppContent = () => {
   return (
     <>
       {location.pathname !== "/" && <TraditionalBackground />}
-      {!isDashboard && !isAgentStore && !isAdmin && <Navbar />}
-      <Suspense fallback={<LoadingScreen />}>
+      <div className="relative z-10 min-h-screen flex flex-col">
+        {!isDashboard && !isAgentStore && !isAdmin && <Navbar />}
+        <Suspense fallback={<LoadingScreen />}>
       <Routes>
         {/* Public pages */}
         <Route path="/" element={<Index />} />
@@ -404,9 +405,10 @@ const AppContent = () => {
       </Routes>
       </Suspense>
       {!isDashboard && !isAgentStore && !isAdmin && <Footer />}
-      {!isDashboard && !isAdmin && <TutorialModal />}
-      <AudioUnlocker />
-      <NotificationPopup />
+        {!isDashboard && !isAdmin && <TutorialModal />}
+        <AudioUnlocker />
+        <NotificationPopup />
+      </div>
     </>
   );
 };

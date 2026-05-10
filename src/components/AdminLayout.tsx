@@ -194,7 +194,7 @@ const AdminLayout = () => {
   );
 
   return (
-    <div className={`min-h-screen flex selection:bg-amber-400/30 ${isDark ? "bg-[#030305] text-white" : "bg-gray-50 text-gray-900"}`}>
+    <div className={`min-h-screen flex selection:bg-amber-400/30 bg-transparent ${isDark ? "text-white" : "text-gray-900"}`}>
       <AdminNotifications />
 
       {/* Desktop Sidebar */}

@@ -59,7 +59,7 @@ const DashboardLayout = () => {
   }, [user]);
 
   return (
-    <div className={cn("flex min-h-screen w-full transition-colors duration-300", isDark ? "bg-[#030703]" : "bg-gray-50")}>
+    <div className={cn("flex min-h-screen w-full transition-colors duration-300 bg-transparent")}>
       <DashboardSidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
       
       <div className="flex-1 flex flex-col min-w-0 h-screen overflow-hidden">
@@ -211,7 +211,7 @@ const DashboardLayout = () => {
 
         <main className={cn(
           "flex-1 overflow-y-auto overflow-x-hidden transition-all duration-300",
-          isDark ? "bg-gradient-to-br from-[#030703] to-[#0d140d]" : "bg-white"
+          isDark ? "bg-black/40 backdrop-blur-sm" : "bg-white/40 backdrop-blur-sm"
         )}>
           <div className="max-w-7xl mx-auto w-full">
             <Outlet />
