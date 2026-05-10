@@ -5,6 +5,7 @@ import {
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useState, useEffect, useRef } from "react";
+import { format } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
 import PhoneOrderTracker from "@/components/PhoneOrderTracker";
 import StoreVisitorPopup from "@/components/StoreVisitorPopup";
@@ -222,6 +223,12 @@ const Index = () => {
   const [videoUrl, setVideoUrl] = useState("/assets/videos/ai_video.mp4");
   const videoRef = useRef<HTMLVideoElement>(null);
   const [liveStats, setLiveStats] = useState({ totalDelivered: 0, successRate: 99.4, totalAgents: 0 });
+  const [currentTime, setCurrentTime] = useState(new Date());
+
+  useEffect(() => {
+    const tick = setInterval(() => setCurrentTime(new Date()), 1000);
+    return () => clearInterval(tick);
+  }, []);
 
   useEffect(() => {
     const fetchSettings = async () => {
@@ -324,11 +331,22 @@ const Index = () => {
           >
             <span className="flex items-center gap-1.5">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-              <span className="text-emerald-400 text-xs font-bold">Live</span>
+              <span className="text-emerald-400 text-xs font-bold tracking-wide">Live</span>
             </span>
+            
             <span className="w-px h-3 bg-white/15" />
-            <img src="/logo.png" alt="SwiftData Ghana" className="w-4 h-4 rounded-full" />
-            <span className="text-white/70 text-xs font-medium">Ghana's #1 Data Bundle Store</span>
+            
+            <span className="flex items-center gap-1.5 text-white/60 text-[10px] sm:text-xs font-mono font-medium">
+              <Clock className="w-3 h-3 text-amber-400/80" />
+              {format(currentTime, "hh:mm:ss a")}
+            </span>
+
+            <span className="w-px h-3 bg-white/15" />
+            
+            <div className="flex items-center gap-2">
+              <img src="/logo.png" alt="SwiftData Ghana" className="w-4 h-4 rounded-full hidden sm:block" />
+              <span className="text-white/70 text-xs font-medium">#1 Store</span>
+            </div>
           </div>
 
           {/* Headline */}
