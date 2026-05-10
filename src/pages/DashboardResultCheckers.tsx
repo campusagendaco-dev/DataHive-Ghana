@@ -13,7 +13,7 @@ import { WifiOff } from "lucide-react";
 
 type VoucherType = "WASSCE" | "BECE";
 
-const VOUCHERS = [
+const DEFAULT_VOUCHERS = [
   { id: "WASSCE" as VoucherType, label: "WAEC / WASSCE", price: 18.00, description: "Valid for checking WASSCE Results" },
   { id: "BECE" as VoucherType,   label: "BECE Result",    price: 15.00, description: "Valid for checking BECE Results" },
 ];
@@ -23,11 +23,31 @@ const DashboardResultCheckers = () => {
   const { toast } = useToast();
   const { isOnline } = useConnectivity();
 
+  const [vouchers, setVouchers] = useState(DEFAULT_VOUCHERS);
+  const [pricesLoading, setPricesLoading] = useState(true);
   const [voucherType, setVoucherType] = useState<VoucherType | null>(null);
   const [quantity, setQuantity] = useState("1");
   const [recipient, setRecipient] = useState("");
   const [loading, setLoading] = useState(false);
   const [successData, setSuccessData] = useState<any | null>(null);
+
+  // Fetch live prices from system settings
+  React.useEffect(() => {
+    supabase
+      .from("public_system_settings")
+      .select("wassce_price, bece_price")
+      .eq("id", 1)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (data) {
+          setVouchers([
+            { id: "WASSCE", label: "WAEC / WASSCE", price: Number(data.wassce_price || 18.00), description: "Valid for checking WASSCE Results" },
+            { id: "BECE",   label: "BECE Result",    price: Number(data.bece_price || 15.00), description: "Valid for checking BECE Results" },
+          ]);
+        }
+      })
+      .finally(() => setPricesLoading(false));
+  }, []);
 
   const reset = () => {
     setVoucherType(null);
@@ -37,6 +57,7 @@ const DashboardResultCheckers = () => {
   };
 
   const handlePurchase = async () => {
+
     if (!voucherType) {
       toast({ title: "Select a checker type", variant: "destructive" });
       return;
@@ -81,7 +102,7 @@ const DashboardResultCheckers = () => {
     }
   };
 
-  const activePrice = voucherType ? VOUCHERS.find(v => v.id === voucherType)?.price || 0 : 0;
+  const activePrice = voucherType ? vouchers.find(v => v.id === voucherType)?.price || 0 : 0;
   const qtyNum = parseInt(quantity, 10) || 0;
   const totalCost = activePrice * qtyNum;
   const canSubmit = voucherType && qtyNum > 0 && recipient.replace(/\D/g, "").length === 10 && isOnline;
@@ -180,7 +201,7 @@ const DashboardResultCheckers = () => {
               Select Checker Type
             </p>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {VOUCHERS.map((v) => (
+              {vouchers.map((v) => (
                 <button
                   key={v.id}
                   onClick={() => setVoucherType(v.id)}

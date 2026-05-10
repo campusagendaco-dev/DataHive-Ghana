@@ -2,10 +2,8 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { corsHeaders } from "../_shared/cors.ts";
 
-const VOUCHER_PRICES: Record<string, number> = {
-  WASSCE: 18.00, // GHS 18.00 per voucher (DataHub cost is 17.00, GHS 1.00 profit)
-  BECE: 15.00,   // GHS 15.00 per voucher (DataHub cost is 14.00, GHS 1.00 profit)
-};
+// Dynamic price resolution now performed inside execution handler from database
+
 
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
@@ -83,11 +81,25 @@ serve(async (req) => {
       });
     }
 
-    // 4. Calculate pricing & Debit Wallet
-    const itemPrice = VOUCHER_PRICES[typeUpper];
-    const totalCost = itemPrice * qty;
+    // 4. Resolve dynamic prices from Admin Settings
+    const { data: sysSettings } = await supabaseAdmin
+      .from("system_settings")
+      .select("wassce_price, bece_price, wassce_cost_price, bece_cost_price")
+      .eq("id", 1)
+      .maybeSingle();
 
-    console.log(`[Vouchers] Starting debit of GHS ${totalCost} for user ${currentUserId}`);
+    const userPrice = typeUpper === "WASSCE" 
+      ? Number(sysSettings?.wassce_price || 18.00) 
+      : Number(sysSettings?.bece_price || 15.00);
+    
+    const costPrice = typeUpper === "WASSCE" 
+      ? Number(sysSettings?.wassce_cost_price || 17.00) 
+      : Number(sysSettings?.bece_cost_price || 14.00);
+
+    const totalCost = userPrice * qty;
+    const profitValue = (userPrice - costPrice) * qty;
+
+    console.log(`[Vouchers] Dynamic resolution - Total cost: GHS ${totalCost}, Profit: GHS ${profitValue} for user ${currentUserId}`);
     const { data: debitResult, error: debitError } = await supabaseAdmin.rpc("debit_wallet", {
       p_agent_id: currentUserId,
       p_amount: totalCost,
@@ -150,7 +162,8 @@ serve(async (req) => {
     if (response.ok && resData.success) {
       // 7. Save Order and return vouchers successfully
       const orderId = crypto.randomUUID();
-      const profitValue = qty * 1.00; // GHS 1.00 profit per voucher sold
+      // uses dynamic profitValue calculated earlier
+
 
       await supabaseAdmin.from("orders").insert({
         id: orderId,
