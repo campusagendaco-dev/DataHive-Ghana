@@ -414,18 +414,31 @@ const AppContent = () => {
 };
 
 const App = () => {
-  useRegisterSW({
+  const {
+    needRefresh: [needRefresh, setNeedRefresh],
+    updateServiceWorker,
+  } = useRegisterSW({
     onRegistered(r) {
       console.log("SW Registered");
+      // Auto check for updates every 5 minutes even if user leaves app open
+      if (r) {
+        setInterval(() => {
+          r.update().catch(console.error);
+        }, 5 * 60 * 1000);
+      }
     },
     onRegisterError(error) {
       console.error("SW registration error", error);
     },
-    onNeedRefresh() {
-      // New version available — reload immediately so stale cached bundles never run
-      window.location.reload();
-    },
   });
+
+  // Watch for update trigger
+  useEffect(() => {
+    if (needRefresh) {
+      // Explicitly trigger service worker bypass to skip waiting and activate new version
+      updateServiceWorker(true);
+    }
+  }, [needRefresh, updateServiceWorker]);
 
   return (
     <QueryClientProvider client={queryClient}>
