@@ -3,8 +3,9 @@ import { useNavigate } from "react-router-dom";
 import {
   Wallet, ShoppingCart, TrendingUp, ArrowDownToLine, ArrowUpRight,
   Users2, Zap, Store, ClipboardList, ChevronRight, RefreshCw, CloudOff,
-  Gift, Sparkles, Activity,
+  Gift, Sparkles, Activity, Clock,
 } from "lucide-react";
+import { format } from "date-fns";
 
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
@@ -43,6 +44,12 @@ const Dashboard = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [currentTime, setCurrentTime] = useState(new Date());
+
+  useEffect(() => {
+    const t = setInterval(() => setCurrentTime(new Date()), 1000);
+    return () => clearInterval(t);
+  }, []);
   const [stats, setStats] = useState<DashboardStats>({
     walletBalance: 0,
     totalOrders: 0,
@@ -149,14 +156,28 @@ const Dashboard = () => {
           <p className="text-white/35 text-xs font-medium">{getGreeting()} 👋</p>
           <h1 className="text-xl font-black text-white tracking-tight">{firstName}</h1>
         </div>
-        <button
-          type="button"
-          onClick={() => fetchData(true)}
-          aria-label="Refresh dashboard"
-          className={`w-9 h-9 rounded-xl border border-white/10 bg-white/5 flex items-center justify-center text-white/40 hover:text-white transition-all ${refreshing ? "animate-spin" : ""}`}
-        >
-          <RefreshCw className="w-4 h-4" />
-        </button>
+        
+        <div className="flex items-center gap-2">
+          {/* Live Premium Clock */}
+          <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-xl border border-white/5 bg-white/[0.02] backdrop-blur-md shadow-lg">
+            <div className="relative flex items-center justify-center">
+              <Clock className="w-3.5 h-3.5 text-amber-400/80" />
+              <span className="absolute inset-0 rounded-full bg-amber-400/20 animate-ping pointer-events-none" />
+            </div>
+            <span className="text-xs font-bold text-white/60 font-mono tracking-tight">
+              {format(currentTime, "hh:mm:ss a")}
+            </span>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => fetchData(true)}
+            aria-label="Refresh dashboard"
+            className={`w-9 h-9 rounded-xl border border-white/10 bg-white/5 flex items-center justify-center text-white/40 hover:text-white hover:border-white/20 transition-all ${refreshing ? "animate-spin" : ""}`}
+          >
+            <RefreshCw className="w-4 h-4" />
+          </button>
+        </div>
       </div>
 
       <DailyCheckIn />
