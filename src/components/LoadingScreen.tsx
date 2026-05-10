@@ -1,5 +1,6 @@
 import { ShieldCheck, RefreshCw, WifiOff } from "lucide-react";
 import { useState, useEffect } from "react";
+import { TraditionalBackground } from "./TraditionalBackground";
 
 const LoadingScreen = () => {
   const [showSlowMessage, setShowSlowMessage] = useState(false);
@@ -16,13 +17,16 @@ const LoadingScreen = () => {
 
   return (
     <div className="fixed inset-0 z-[9999] flex flex-col items-center justify-center bg-[#020402]">
+      {/* ── Cultural Grounding Background ── */}
+      <TraditionalBackground className="absolute inset-0 z-0 opacity-[0.08] dark:opacity-[0.12]" />
+
       {/* ── Premium Evening Glow ── */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+      <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
         <div className="absolute top-[40%] left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-primary/10 rounded-full blur-[140px] animate-pulse-gentle" />
       </div>
 
       {/* ── Signature Activation Animation ── */}
-      <div className="relative flex items-center justify-center mb-10">
+      <div className="relative z-10 flex items-center justify-center mb-10">
         {/* Outer Orbit - High Precision */}
         <div className="absolute w-[120px] h-[120px] rounded-full border border-white/5" />
         <div className="absolute w-[120px] h-[120px] rounded-full border-t border-primary/40 animate-spin" style={{ animationDuration: '3s' }} />
@@ -31,7 +35,7 @@ const LoadingScreen = () => {
         <div className="absolute w-[100px] h-[100px] rounded-full border-r border-primary/60 animate-spin" style={{ animationDuration: '2s', animationDirection: 'reverse' }} />
 
         {/* Logo Container with Gold Pulse */}
-        <div className="relative z-10 w-24 h-24 rounded-full bg-[#020402] border border-white/10 backdrop-blur-sm shadow-2xl flex items-center justify-center overflow-hidden">
+        <div className="relative z-20 w-24 h-24 rounded-full bg-[#020402] border border-white/10 backdrop-blur-sm shadow-2xl flex items-center justify-center overflow-hidden">
           <div className="absolute inset-0 rounded-full bg-primary/5 animate-ping opacity-20" />
           <img
             src="/logo.png"
@@ -45,7 +49,7 @@ const LoadingScreen = () => {
       </div>
 
       {/* ── Elite Brand Text ── */}
-      <div className="text-center space-y-6 px-6 animate-in fade-in slide-in-from-bottom-4 duration-1000">
+      <div className="relative z-10 text-center space-y-6 px-6 animate-in fade-in slide-in-from-bottom-4 duration-1000">
         <div className="flex flex-col items-center gap-1">
           <h2 className="text-white font-black text-2xl tracking-[0.2em] uppercase">
             SwiftData <span className="text-primary drop-shadow-[0_0_8px_rgba(245,158,11,0.4)]">GH</span>
