@@ -13,7 +13,6 @@ export function SecurityGuard({ children }: { children: React.ReactNode }) {
   const { user, signOut, profile } = useAuth();
   
   // Security Blocker States
-  const [isBlurred, setIsBlurred] = useState(false);
   const [isEnabled, setIsEnabled] = useState(true);
   const [isInitialReveal, setIsInitialReveal] = useState(true);
   
@@ -118,31 +117,15 @@ export function SecurityGuard({ children }: { children: React.ReactNode }) {
     // 🚫 2. Block Right Click Context Menu
     const handleContextMenu = (e: MouseEvent) => e.preventDefault();
 
-    // 🚫 3. Intercept Critical Keyboard Combinations
+    // 🚫 3. Intercept Critical Keyboard Combinations (Optional but kept developer interceptor if present earlier, removing PrintScreen)
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "PrintScreen") {
-        navigator.clipboard.writeText(""); // Clean clipboard
-      }
       if ((e.ctrlKey || e.metaKey) && (e.key === 'p' || e.key === 's' || e.key === 'u')) {
         e.preventDefault();
       }
-      if (e.key === "F12" || ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'I')) {
-        e.preventDefault();
-      }
-    };
-
-    // 🛡️ 4. Anti-Preview Shield
-    const handleBlur = () => setIsBlurred(true);
-    const handleFocus = () => setIsBlurred(false);
-    const handleVisibilityChange = () => {
-      setIsBlurred(document.visibilityState === 'hidden');
     };
 
     window.addEventListener("contextmenu", handleContextMenu);
     window.addEventListener("keydown", handleKeyDown);
-    window.addEventListener("blur", handleBlur);
-    window.addEventListener("focus", handleFocus);
-    document.addEventListener("visibilitychange", handleVisibilityChange);
 
     return () => {
       activityEvents.forEach(event => window.removeEventListener(event, resetIdleTimer));
@@ -150,14 +133,11 @@ export function SecurityGuard({ children }: { children: React.ReactNode }) {
       
       window.removeEventListener("contextmenu", handleContextMenu);
       window.removeEventListener("keydown", handleKeyDown);
-      window.removeEventListener("blur", handleBlur);
-      window.removeEventListener("focus", handleFocus);
-      document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
   }, [isEnabled, resetIdleTimer, clearTimers]);
 
-  // Consolidated Visual State
-  const isCurrentlyShielded = (isBlurred || isInitialReveal) && isEnabled;
+  // Consolidated Visual State (Removed passive blurred state, keeping cinematic reveal)
+  const isCurrentlyShielded = isInitialReveal && isEnabled;
 
   return (
     <div className="relative min-h-screen w-full overflow-hidden selection:bg-primary selection:text-black">
