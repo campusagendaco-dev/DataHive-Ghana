@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import { Link } from "react-router-dom";
 import { ShieldCheck, Zap, Loader2, AlertTriangle, X, CreditCard, Gift, Tag, CheckCircle2 } from "lucide-react";
 import { basePackages, getPublicPrice } from "@/lib/data";
@@ -120,6 +121,13 @@ const BuyData = () => {
   useEffect(() => {
     setResolvedName(null);
   }, [phone]);
+
+  // Auto-focus phone input on modal open for blazing fast speeds
+  useEffect(() => {
+    if (selectedPkg) {
+      setTimeout(() => phoneInputRef.current?.focus(), 100);
+    }
+  }, [selectedPkg]);
 
   // Auto-resolve recipient name
   useEffect(() => {
@@ -440,168 +448,362 @@ const BuyData = () => {
         </div>
       </div>
 
-      {/* ── Sticky Purchase Bar ── */}
-      {selectedPkg && (
-        <div
-          className="fixed bottom-0 left-0 right-0 z-50 border-t border-white/10"
-          style={{ background: "rgba(8,8,18,0.98)", backdropFilter: "blur(12px)", WebkitBackdropFilter: "blur(12px)" }}
-        >
-          <div className="container mx-auto max-w-5xl px-4 pt-3 pb-4 sm:pb-5 space-y-2.5">
-            {/* Package summary row */}
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2 flex-wrap text-sm">
-                <span className="text-white font-black">{selectedNetwork} {selectedPkg.size}</span>
-                {isFreePromo ? (
-                  <span className="bg-green-500/20 text-green-400 text-[10px] font-black px-2 py-0.5 rounded-full border border-green-500/30">FREE</span>
-                ) : (
-                  <>
-                    <span className="text-white/30">·</span>
-                    <span className="text-white/50 text-xs">
-                      {validPromo ? <><s className="text-white/25">GH₵{selectedPkg.price.toFixed(2)}</s> GH₵{discountedPkgPrice.toFixed(2)}</> : `GH₵${selectedPkg.price.toFixed(2)}`}
-                      {" "}+ GH₵{fee.toFixed(2)} fee
-                    </span>
-                    <span className="text-white/30">·</span>
-                    <span className="font-bold" style={{ color: `hsl(${theme.primary})` }}>Total GH₵{total.toFixed(2)}</span>
-                  </>
-                )}
-              </div>
-              <button onClick={() => { setSelectedPkg(null); setPhone(""); setEmail(""); setPromoCode(""); setPromoResult(null); setPromoOpen(false); }}
-                className="text-white/35 hover:text-white/80 transition-colors p-1.5 rounded-lg hover:bg-white/10 ml-2 shrink-0">
-                <X className="w-4 h-4" />
-              </button>
-            </div>
+      {/* ── Pro Level Transaction Modal ── */}
+      <AnimatePresence>
+        {selectedPkg && (
+          <div className="fixed inset-0 z-[999] flex items-center justify-center p-4 sm:p-6 overflow-y-auto">
+            {/* High Definition Backdrop */}
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => { setSelectedPkg(null); setPhone(""); setEmail(""); setPromoCode(""); setPromoResult(null); setPromoOpen(false); }}
+              className="absolute inset-0 bg-[#030407]/90 backdrop-blur-[6px] cursor-pointer"
+            />
+            
+            {/* Premium Modal Enclosure */}
+            <motion.div
+              initial={{ opacity: 0, scale: 0.96, y: 30 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.97, y: 20 }}
+              transition={{ 
+                type: "spring", 
+                damping: 25, 
+                stiffness: 300,
+                mass: 0.8 
+              }}
+              className="relative w-full max-w-[400px] bg-[#0b0d13] border border-white/[0.06] shadow-[0_32px_80px_-20px_rgba(0,0,0,0.8)] rounded-[2.5rem] overflow-hidden flex flex-col my-auto select-none"
+            >
+              {/* Dynamic Header Section */}
+              <div className="relative w-full pt-10 pb-8 text-center rounded-b-[3rem] overflow-hidden z-10">
+                {/* Thematic Ambient Glow Vector */}
+                <div 
+                  className="absolute inset-0 opacity-40 blur-2xl"
+                  style={{ 
+                    background: `radial-gradient(circle at 50% 20%, hsl(${theme.primary}), transparent 70%)`
+                  }} 
+                />
+                
+                {/* Absolute Background Shell */}
+                <div className="absolute inset-0 bg-gradient-to-b from-white/[0.03] to-transparent z-0" />
 
-            {/* Phone + action button */}
-            <div className="flex gap-2 sm:gap-3">
-              <input
-                ref={phoneInputRef}
-                type="tel" inputMode="numeric"
-                placeholder="Recipient number (0XXXXXXXXX)"
-                value={phone} onChange={(e) => setPhone(e.target.value)}
-                maxLength={12}
-                className="flex-1 min-w-0 border border-white/15 rounded-xl px-4 py-3 text-white placeholder-white/30 text-sm focus:outline-none focus:border-white/45 transition-colors"
-                style={{ background: resolvedName ? "rgba(16,185,129,0.1)" : "rgba(255,255,255,0.07)", borderColor: resolvedName ? "rgba(16,185,129,0.3)" : "rgba(255,255,255,0.15)" }}
-              />
-              {isPhoneValid && !resolvedName && (
-                <button
-                  onClick={async () => {
-                    setResolvingName(true);
-                    try {
-                      let bankCode = "MTN";
-                      const net = selectedNetwork.toUpperCase();
-                      if (net.includes("VODA") || net.includes("TELECEL")) bankCode = "VOD";
-                      if (net.includes("AIRTEL") || net.includes("TIGO") || net.includes("AT")) bankCode = "ATL";
-
-                      const { data, error } = await supabase.functions.invoke("paystack-resolve", {
-                        body: { account_number: phoneDigits, bank_code: bankCode }
-                      });
-                      if (error || !data?.success) throw new Error(data?.error || "Could not resolve name");
-                      setResolvedName(data.account_name);
-                    } catch (e: any) {
-                      toast({ title: "Verification Failed", description: e.message, variant: "destructive" });
-                    } finally {
-                      setResolvingName(false);
-                    }
-                  }}
-                  disabled={resolvingName}
-                  className="shrink-0 px-3 flex items-center justify-center rounded-xl bg-white/5 border border-white/10 text-white/50 hover:text-white hover:bg-white/10 transition-all"
-                  title="Verify Name"
+                {/* Close Vector */}
+                <button 
+                  onClick={() => { setSelectedPkg(null); setPhone(""); setEmail(""); setPromoCode(""); setPromoResult(null); setPromoOpen(false); }}
+                  className="absolute top-4 right-4 z-30 p-2 rounded-full bg-white/5 hover:bg-white/10 border border-white/5 text-white/40 hover:text-white transition-all active:scale-90"
                 >
-                  {resolvingName ? <Loader2 className="w-4 h-4 animate-spin" /> : <ShieldCheck className="w-4 h-4" />}
+                  <X className="w-4 h-4" />
                 </button>
-              )}
-              {isFreePromo ? (
-                <button onClick={handleClaimFree} disabled={claiming || !isPhoneValid || !resolvedName}
-                  className="shrink-0 font-black px-5 py-3 rounded-xl text-sm bg-green-500 hover:bg-green-400 text-black transition-all hover:scale-105 active:scale-95 disabled:opacity-40 disabled:grayscale disabled:cursor-not-allowed flex items-center gap-1.5 whitespace-nowrap">
-                  {claiming ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Claiming...</> : <><Gift className="w-3.5 h-3.5" /> Claim Free Data</>}
-                </button>
-              ) : (
-                <button onClick={handlePay} disabled={buying || !resolvedName}
-                  className="shrink-0 font-black px-5 py-3 rounded-xl text-sm transition-all hover:scale-105 active:scale-95 disabled:opacity-40 disabled:grayscale disabled:cursor-not-allowed flex items-center gap-1.5 whitespace-nowrap"
-                  style={{ background: `hsl(${theme.primary})`, color: "#000" }}>
-                  {buying ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Processing...</> : <><CreditCard className="w-3.5 h-3.5" /> Pay GH₵{total.toFixed(2)}</>}
-                </button>
-              )}
-            </div>
 
-            {/* Validation hint / Resolved name */}
-            {resolvedName ? (
-              <p className="text-[11px] font-bold text-emerald-400 flex items-center gap-1 uppercase tracking-wider animate-in fade-in slide-in-from-top-1">
-                <CheckCircle2 className="w-3 h-3" />
-                Verified: {resolvedName}
-              </p>
-            ) : phone.length > 0 && !isPhoneValid ? (
-              <p className="text-xs text-red-400">Enter a valid 10-digit Ghana number</p>
-            ) : phone.length === 0 ? (
-              <p className="text-[11px] text-white/35">Enter the recipient's phone number then tap {isFreePromo ? "Claim" : "Pay"}</p>
-            ) : null}
-
-            {/* Optional email for receipt */}
-            {isPhoneValid && !isFreePromo && (
-              <input
-                type="email"
-                inputMode="email"
-                placeholder="Email for receipt (optional)"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                autoComplete="email"
-                className="w-full border border-white/10 rounded-xl px-4 py-2.5 text-white placeholder-white/25 text-sm focus:outline-none focus:border-white/35 transition-colors"
-                style={{ background: "rgba(255,255,255,0.05)" }}
-              />
-            )}
-
-            {/* Promo code section */}
-            {!promoOpen && !validPromo ? (
-              <button onClick={() => { setPromoOpen(true); setTimeout(() => promoInputRef.current?.focus(), 80); }}
-                className="flex items-center gap-1.5 text-xs text-white/35 hover:text-amber-400 transition-colors">
-                <Tag className="w-3 h-3" /> Have a promo code?
-              </button>
-            ) : (
-              <div className="space-y-1.5">
-                {validPromo ? (
-                  <div className={`flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold border ${validPromo.is_free ? "bg-green-500/10 border-green-500/30 text-green-400" : "bg-amber-500/10 border-amber-500/30 text-amber-400"}`}>
-                    <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
-                    {validPromo.is_free
-                      ? `Code ${validPromo.code}: 100% FREE — tap Claim Free Data!`
-                      : `Code ${validPromo.code}: ${validPromo.discount_percentage}% off applied`}
-                    <button onClick={() => { setPromoResult(null); setPromoCode(""); setPromoOpen(true); }}
-                      className="ml-auto text-white/30 hover:text-white/70">
-                      <X className="w-3 h-3" />
-                    </button>
+                {/* Content Group */}
+                <motion.div 
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.1 }}
+                  className="relative z-20 flex flex-col items-center px-6"
+                >
+                  {/* Network Indicator Pill */}
+                  <div 
+                    className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-[10px] font-black uppercase tracking-[0.15em] shadow-[0_4px_12px_rgba(0,0,0,0.2)] border border-white/10 mb-4"
+                    style={{
+                      background: "rgba(255,255,255,0.04)",
+                      color: `hsl(${theme.primary})`,
+                      backdropFilter: "blur(10px)"
+                    }}
+                  >
+                    <div className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: `hsl(${theme.primary})` }} />
+                    {selectedNetwork} Network
                   </div>
-                ) : (
-                  <div className="flex gap-2">
-                    <input
-                      ref={promoInputRef}
-                      type="text"
-                      placeholder="Type promo code"
-                      value={promoCode}
-                      onChange={(e) => { setPromoCode(e.target.value.toUpperCase()); setPromoResult(null); }}
-                      onPaste={(e) => e.preventDefault()}
-                      onDrop={(e) => e.preventDefault()}
-                      autoComplete="off" autoCorrect="off" spellCheck={false}
-                      maxLength={24}
-                      className="flex-1 border border-white/15 rounded-xl px-3 py-2 text-white placeholder-white/25 text-xs font-mono uppercase focus:outline-none focus:border-amber-400/50 transition-colors"
-                      style={{ background: "rgba(255,255,255,0.06)" }}
-                    />
-                    <button onClick={handleApplyPromo} disabled={promoValidating || !promoCode.trim()}
-                      className="px-4 py-2 rounded-xl text-xs font-bold bg-amber-400 text-black hover:bg-amber-300 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-1">
-                      {promoValidating ? <Loader2 className="w-3 h-3 animate-spin" /> : "Apply"}
-                    </button>
-                    <button onClick={() => { setPromoOpen(false); setPromoCode(""); setPromoResult(null); }}
-                      className="p-2 rounded-xl text-white/30 hover:text-white/70 hover:bg-white/8 transition-colors">
-                      <X className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                )}
-                {promoResult && !promoResult.valid && (
-                  <p className="text-xs text-red-400 pl-1">{promoResult.error || "Invalid promo code"}</p>
-                )}
+
+                  {/* Magnitude Display */}
+                  <h3 className="text-4xl sm:text-5xl font-black tracking-tighter text-white mb-2 drop-shadow-[0_4px_10px_rgba(0,0,0,0.3)]">
+                    {selectedPkg.size}
+                  </h3>
+
+                  {/* Pricing Metrics */}
+                  {isFreePromo ? (
+                    <div className="flex items-center gap-2 px-4 py-1.5 rounded-full bg-green-500 text-black text-xs font-black uppercase tracking-wider shadow-lg shadow-green-500/30 animate-bounce-subtle">
+                      <Gift className="w-3.5 h-3.5" /> Free Reward
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2 text-white/70 text-sm font-bold bg-white/5 border border-white/5 rounded-full px-4 py-1 backdrop-blur-sm">
+                      {validPromo ? (
+                        <>
+                          <span className="opacity-40 line-through font-medium">GH₵{selectedPkg.price.toFixed(2)}</span> 
+                          <span style={{ color: `hsl(${theme.primary})` }} className="font-black">GH₵{discountedPkgPrice.toFixed(2)}</span>
+                        </>
+                      ) : (
+                        <span className="font-black">GH₵{selectedPkg.price.toFixed(2)}</span>
+                      )}
+                      <span className="w-1 h-1 rounded-full bg-white/20" />
+                      <span className="text-[11px] opacity-60 font-medium">+GH₵{fee.toFixed(2)} fee</span>
+                    </div>
+                  )}
+                </motion.div>
               </div>
-            )}
+
+              {/* Interactive Surface */}
+              <div className="p-6 pb-8 space-y-6 bg-[#0b0d13] relative z-20">
+                
+                {/* Sequential Entrance Group */}
+                <motion.div
+                  initial={{ opacity: 0, y: 15 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.2 }}
+                  className="space-y-4"
+                >
+                  {/* Field Header */}
+                  <div className="flex items-center justify-between px-1">
+                    <label className="text-[10px] font-black uppercase tracking-[0.2em] text-white/30">
+                      Direct Delivery To
+                    </label>
+                  </div>
+
+                  {/* High Fidelity Input Nest */}
+                  <div className="relative group">
+                    <input
+                      ref={phoneInputRef}
+                      type="tel" inputMode="numeric"
+                      placeholder="Enter Phone (0XX XXXXXXX)"
+                      value={phone} onChange={(e) => setPhone(e.target.value)}
+                      maxLength={12}
+                      className="w-full h-[60px] bg-white/[0.02] border border-white/[0.08] rounded-2xl pl-5 pr-14 text-white placeholder-white/15 text-xl font-bold tracking-wide focus:outline-none focus:border-white/20 focus:bg-white/[0.04] focus:shadow-[0_0_0_4px_rgba(255,255,255,0.02)] transition-all duration-300 selection:bg-primary/30"
+                      style={resolvedName ? { 
+                        borderColor: "rgba(52, 211, 153, 0.4)",
+                        background: "rgba(16, 185, 129, 0.04)",
+                        boxShadow: "0 0 20px -5px rgba(16, 185, 129, 0.15)"
+                      } : undefined}
+                    />
+                    
+                    <div className="absolute right-4 top-1/2 -translate-y-1/2 flex items-center justify-center w-8 h-8">
+                      <AnimatePresence mode="wait">
+                        {resolvingName ? (
+                          <motion.div key="loading" initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0 }}>
+                            <Loader2 className="w-5 h-5 animate-spin text-white/40" />
+                          </motion.div>
+                        ) : resolvedName ? (
+                          <motion.div key="done" initial={{ opacity: 0, scale: 0.5 }} animate={{ opacity: 1, scale: 1, rotate: [0, -10, 10, 0] }} transition={{ type: "spring" }}>
+                            <div className="bg-emerald-500 rounded-full p-1 shadow-lg shadow-emerald-500/30">
+                              <CheckCircle2 className="w-4 h-4 text-black" />
+                            </div>
+                          </motion.div>
+                        ) : (
+                          <motion.div key="idle" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+                            <ShieldCheck className="w-5 h-5 text-white/10 group-hover:text-white/20 transition-colors" />
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                    </div>
+                  </div>
+
+                  {/* Reactive Identity Banner */}
+                  <AnimatePresence>
+                    {resolvedName && (
+                      <motion.div 
+                        initial={{ opacity: 0, height: 0, y: -10 }}
+                        animate={{ opacity: 1, height: "auto", y: 0 }}
+                        exit={{ opacity: 0, height: 0 }}
+                        className="overflow-hidden"
+                      >
+                        <div className="flex items-center gap-2.5 bg-emerald-500/5 border border-emerald-500/10 rounded-xl p-3 shadow-sm">
+                          <div className="shrink-0 w-7 h-7 rounded-lg bg-emerald-500/10 flex items-center justify-center text-emerald-400 font-bold text-sm">
+                            {resolvedName.charAt(0)}
+                          </div>
+                          <div className="min-w-0">
+                            <p className="text-[9px] font-black uppercase tracking-widest text-emerald-500/60 leading-none mb-1">Verified Owner</p>
+                            <p className="text-xs font-black text-emerald-300 uppercase truncate leading-tight">
+                              {resolvedName}
+                            </p>
+                          </div>
+                        </div>
+                      </motion.div>
+                    )}
+
+                    {phone.length > 0 && !isPhoneValid && (
+                      <motion.p 
+                        initial={{ opacity: 0 }} animate={{ opacity: 1 }}
+                        className="text-xs text-red-400/90 font-bold px-2 flex items-center gap-1.5"
+                      >
+                        <AlertTriangle className="w-3.5 h-3.5" /> Must be a valid network number
+                      </motion.p>
+                    )}
+                  </AnimatePresence>
+                </motion.div>
+
+                {/* Tertiary Settings Nest */}
+                <motion.div
+                  initial={{ opacity: 0, y: 15 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.3 }}
+                  className="space-y-3"
+                >
+                  {/* Animated Email Collapse */}
+                  <AnimatePresence>
+                    {isPhoneValid && !isFreePromo && (
+                      <motion.div 
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: "auto" }}
+                        exit={{ opacity: 0, height: 0 }}
+                        className="space-y-2 overflow-hidden border-t border-white/[0.04] pt-3"
+                      >
+                        <label className="text-[10px] font-black uppercase tracking-[0.2em] text-white/30 px-1 block">
+                          Email Receipt <span className="text-white/15 normal-case font-medium">(Optional)</span>
+                        </label>
+                        <input
+                          type="email" inputMode="email"
+                          placeholder="Drop your email for safe storage"
+                          value={email} onChange={(e) => setEmail(e.target.value)}
+                          autoComplete="email"
+                          className="w-full h-[44px] bg-white/[0.01] border border-white/[0.06] rounded-xl px-4 text-white placeholder-white/10 text-sm focus:outline-none focus:border-white/10 focus:bg-white/[0.02] transition-all"
+                        />
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+
+                  {/* Dynamic Promo Component */}
+                  <div className="pt-1">
+                    {!promoOpen && !validPromo ? (
+                      <button 
+                        onClick={() => { setPromoOpen(true); setTimeout(() => promoInputRef.current?.focus(), 80); }}
+                        className="inline-flex items-center gap-1.5 text-[11px] font-black uppercase tracking-wider text-white/30 hover:text-amber-400 hover:bg-white/[0.03] px-3 py-1.5 rounded-lg transition-all group"
+                      >
+                        <Tag className="w-3.5 h-3.5 group-hover:rotate-12 transition-transform" /> Enter Promo Code
+                      </button>
+                    ) : (
+                      <motion.div 
+                        initial={{ opacity: 0, scale: 0.98 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        className="space-y-2"
+                      >
+                        {validPromo ? (
+                          <div className={`flex items-center justify-between gap-3 px-3 py-2 rounded-xl text-xs font-black border ${validPromo.is_free ? "bg-green-500/10 border-green-500/20 text-green-400" : "bg-amber-500/10 border-amber-500/20 text-amber-400"} shadow-sm`}>
+                            <div className="flex items-center gap-2 truncate uppercase tracking-wide">
+                              <Tag className="w-3.5 h-3.5 shrink-0" />
+                              <span className="truncate">{validPromo.is_free ? "100% OFF ACTIVATED" : `${validPromo.discount_percentage}% SAVINGS APPLIED`}</span>
+                            </div>
+                            <button onClick={() => { setPromoResult(null); setPromoCode(""); setPromoOpen(true); }} className="p-1.5 hover:bg-white/10 rounded-lg transition-colors text-current opacity-60 hover:opacity-100">
+                              <X className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="flex gap-2">
+                            <input
+                              ref={promoInputRef}
+                              type="text" placeholder="TYPE CODE"
+                              value={promoCode} onChange={(e) => { setPromoCode(e.target.value.toUpperCase()); setPromoResult(null); }}
+                              className="flex-1 h-10 bg-white/[0.02] border border-white/[0.08] rounded-xl px-3 text-white placeholder-white/10 text-xs font-mono font-black tracking-widest uppercase focus:outline-none focus:border-amber-400/30 transition-colors"
+                            />
+                            <button 
+                              onClick={handleApplyPromo} disabled={promoValidating || !promoCode.trim()}
+                              className="h-10 px-4 rounded-xl text-[11px] font-black bg-amber-400 text-black hover:bg-amber-300 disabled:opacity-30 disabled:cursor-not-allowed transition-all shadow-lg shadow-amber-500/10 active:scale-95"
+                            >
+                              {promoValidating ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : "APPLY"}
+                            </button>
+                            <button onClick={() => { setPromoOpen(false); setPromoCode(""); setPromoResult(null); }} className="h-10 w-10 flex items-center justify-center rounded-xl bg-white/5 text-white/40 hover:text-white hover:bg-white/10 transition-all">
+                              <X className="w-4 h-4" />
+                            </button>
+                          </div>
+                        )}
+                        {promoResult && !promoResult.valid && (
+                          <p className="text-xs font-bold text-red-400/80 px-2 tracking-tight">{promoResult.error || "Code not recognized"}</p>
+                        )}
+                      </motion.div>
+                    )}
+                  </div>
+                </motion.div>
+
+                {/* Prime Execution Node */}
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.4, type: "spring", bounce: 0.3 }}
+                  className="pt-2 relative"
+                >
+                  {isFreePromo ? (
+                    <button 
+                      onClick={handleClaimFree} 
+                      disabled={claiming || !isPhoneValid || !resolvedName}
+                      className="w-full h-[68px] font-black text-base tracking-wider rounded-2xl bg-green-500 hover:bg-green-400 text-black shadow-[0_12px_24px_-8px_rgba(34,197,94,0.5)] transition-all active:scale-[0.97] hover:-translate-y-0.5 disabled:opacity-30 disabled:grayscale disabled:transform-none flex items-center justify-center gap-2.5"
+                    >
+                      {claiming ? (
+                        <><Loader2 className="w-6 h-6 animate-spin" /> UNLOCKING...</>
+                      ) : (
+                        <><Gift className="w-6 h-6" /> UNLOCK FREE DATA</>
+                      )}
+                    </button>
+                  ) : (
+                    <div className="relative group">
+                      {/* Kinetic Dynamic Pulsating Ring behind button */}
+                      <div 
+                        className="absolute -inset-1 opacity-20 rounded-2xl blur-xl transition-all duration-500 group-hover:opacity-40 group-hover:blur-2xl pointer-events-none"
+                        style={{ background: `hsl(${theme.primary})` }}
+                      />
+                      
+                      <button 
+                        onClick={handlePay} 
+                        disabled={buying || !resolvedName}
+                        className="w-full h-[76px] relative overflow-hidden rounded-2xl shadow-[0_12px_32px_-8px_rgba(0,0,0,0.5)] transition-all active:scale-[0.97] hover:-translate-y-0.5 disabled:opacity-30 disabled:grayscale disabled:transform-none flex items-center justify-center"
+                        style={{ 
+                          background: `linear-gradient(135deg, hsl(${theme.primary}) 0%, #F59E0B 100%)`,
+                          color: "#000"
+                        }}
+                      >
+                        {/* Internal Light Shimmer */}
+                        <div className="absolute inset-0 bg-white/10 transform -translate-x-full group-hover:animate-shimmer pointer-events-none" style={{ width: '50%', skewX: '-20deg' }} />
+
+                        <div className="relative z-10 flex flex-col items-center justify-center leading-none">
+                          {buying ? (
+                            <div className="flex items-center gap-3 font-black text-base uppercase tracking-widest">
+                              <Loader2 className="w-6 h-6 animate-spin" />
+                              <span>Establishing Secure Tunnel...</span>
+                            </div>
+                          ) : (
+                            <>
+                              <div className="flex items-center gap-2 text-[11px] font-black uppercase tracking-[0.25em] mb-1.5 opacity-75">
+                                <CreditCard className="w-3.5 h-3.5" />
+                                Secure Deposit
+                              </div>
+                              <div className="flex items-baseline gap-1 font-black text-3xl tracking-tight">
+                                <span className="text-lg font-black align-top opacity-70">GH₵</span>
+                                {total.toFixed(2)}
+                              </div>
+                            </>
+                          )}
+                        </div>
+                      </button>
+                    </div>
+                  )}
+                  
+                  {/* Final Verification Anchor */}
+                  <div className="flex items-center justify-center gap-1.5 mt-5 opacity-25 group-hover:opacity-40 transition-opacity duration-500">
+                    <ShieldCheck className="w-3 h-3 text-white" />
+                    <p className="text-[9px] font-black uppercase tracking-[0.2em] text-white">
+                      Tier 1 Bank Encryption
+                    </p>
+                  </div>
+                </motion.div>
+              </div>
+            </motion.div>
           </div>
-        </div>
-      )}
+        )}
+      </AnimatePresence>
+
+      <style>{`
+        @keyframes shimmer {
+          0% { transform: translateX(-150%) skewX(-20deg); }
+          100% { transform: translateX(300%) skewX(-20deg); }
+        }
+        .group-hover\\:animate-shimmer {
+          animation: shimmer 1.5s ease-out infinite;
+        }
+        @keyframes bounce-subtle {
+          0%, 100% { transform: translateY(0); }
+          50% { transform: translateY(-3px); }
+        }
+        .animate-bounce-subtle {
+          animation: bounce-subtle 2s infinite ease-in-out;
+        }
+      `}</style>
     </div>
   );
 };
