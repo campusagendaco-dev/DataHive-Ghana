@@ -13,8 +13,8 @@ import { Button } from "@/components/ui/button";
 
 const LOW_BALANCE_THRESHOLD = 10; // GHS
 
-import { useConnectivity } from "@/hooks/useConnectivity";
-import { Wifi, WifiOff, CloudOff } from "lucide-react";
+import { Wifi, WifiOff, CloudOff, Eye, EyeOff } from "lucide-react";
+import { useMaskedBalance } from "@/hooks/useMaskedBalance";
 
 const DashboardLayout = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -24,6 +24,7 @@ const DashboardLayout = () => {
   const { theme, isDark, toggleDark } = useAppTheme();
   const [walletBalance, setWalletBalance] = useState<number>(0);
   const { isOnline, quality } = useConnectivity();
+  const { isMasked, toggleMask, maskValue } = useMaskedBalance();
 
   const isPaidAgent = Boolean(profile?.agent_approved || profile?.sub_agent_approved);
   const showLowBalanceAlert = isPaidAgent && !alertDismissed && walletBalance < LOW_BALANCE_THRESHOLD && walletBalance >= 0;
@@ -118,7 +119,15 @@ const DashboardLayout = () => {
               </div>
               <div className="flex flex-col mr-1">
                 <span className={cn("text-[9px] font-black uppercase tracking-widest leading-none mb-0.5", isDark ? "text-white/30" : "text-gray-400")}>Wallet</span>
-                <span className={cn("text-sm font-black leading-none", isDark ? "text-white" : "text-gray-900")}>₵{walletBalance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                <span className={cn("text-sm font-black leading-none flex items-center gap-1", isDark ? "text-white" : "text-gray-900")}>
+                  ₵{maskValue(walletBalance)}
+                  <button 
+                    onClick={(e) => { e.stopPropagation(); toggleMask(); }}
+                    className="p-0.5 opacity-40 hover:opacity-100 hover:bg-white/10 rounded transition-all ml-1"
+                  >
+                    {isMasked ? <EyeOff className="w-2.5 h-2.5" /> : <Eye className="w-2.5 h-2.5" />}
+                  </button>
+                </span>
               </div>
               <button
                 onClick={() => navigate("/dashboard/wallet")}
@@ -189,7 +198,7 @@ const DashboardLayout = () => {
             <div className="flex items-center gap-2.5">
               <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0" />
               <p className={cn("text-xs font-bold transition-colors", isDark ? "text-amber-300" : "text-amber-800")}>
-                Low wallet balance — ₵{walletBalance.toFixed(2)} remaining.{" "}
+                Low wallet balance — ₵{maskValue(walletBalance)} remaining.{" "}
                 <button
                   onClick={() => navigate("/dashboard/wallet")}
                   className={cn("underline underline-offset-2 transition-colors", isDark ? "hover:text-amber-200" : "hover:text-amber-900")}

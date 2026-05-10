@@ -3,9 +3,10 @@ import { useNavigate } from "react-router-dom";
 import {
   Wallet, ShoppingCart, TrendingUp, ArrowDownToLine, ArrowUpRight,
   Users2, Zap, Store, ClipboardList, ChevronRight, RefreshCw, CloudOff,
-  Gift, Sparkles, Activity, Clock,
+  Gift, Sparkles, Activity, Clock, Eye, EyeOff
 } from "lucide-react";
 import { format } from "date-fns";
+import { useMaskedBalance } from "@/hooks/useMaskedBalance";
 
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
@@ -40,6 +41,7 @@ const Dashboard = () => {
   const { theme } = useAppTheme();
   const isPaidAgent = Boolean(profile?.agent_approved || profile?.sub_agent_approved);
   const firstName = profile?.full_name?.split(" ")[0] || "there";
+  const { isMasked, toggleMask, maskValue } = useMaskedBalance();
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
@@ -209,11 +211,23 @@ const Dashboard = () => {
 
             {loading
               ? <Skeleton className="h-12 w-48 bg-white/10 rounded-xl" />
-              : <p className="text-5xl sm:text-6xl font-black leading-none tracking-tight">
-                  GH₵ <span>{stats.walletBalance.toFixed(2)}</span>
+              : <p className="text-5xl sm:text-6xl font-black leading-none tracking-tight flex items-baseline flex-wrap gap-2">
+                  <span>GH₵</span>
+                  <span className={isMasked ? "font-mono opacity-80" : ""}>
+                    {maskValue(stats.walletBalance)}
+                  </span>
                 </p>}
 
-            <p className="text-white/35 text-xs mt-2">Available for data bundles</p>
+            <div className="flex items-center gap-2 mt-2">
+              <p className="text-white/35 text-xs">Available for data bundles</p>
+              <button
+                onClick={toggleMask}
+                className="p-1 rounded-full hover:bg-white/10 text-white/50 hover:text-white transition-colors"
+                title={isMasked ? "Show Balance" : "Hide Balance"}
+              >
+                {isMasked ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+              </button>
+            </div>
 
             {/* SwiftPoints pill */}
             <button
@@ -254,7 +268,7 @@ const Dashboard = () => {
             <p className="text-white/35 text-[10px] uppercase tracking-widest font-bold">Deposited</p>
             {loading
               ? <Skeleton className="h-5 w-24 mt-1 bg-white/10" />
-              : <p className="text-white font-black text-base mt-0.5">GH₵ {stats.totalDeposited.toFixed(2)}</p>}
+              : <p className="text-white font-black text-base mt-0.5">GH₵ {maskValue(stats.totalDeposited)}</p>}
           </div>
           <div>
             <p className="text-white/35 text-[10px] uppercase tracking-widest font-bold">Orders</p>
@@ -268,7 +282,7 @@ const Dashboard = () => {
               {loading
                 ? <Skeleton className="h-5 w-24 mt-1 bg-white/10" />
                 : <p className="font-black text-base mt-0.5" style={{ color: primary }}>
-                    GH₵ {stats.totalProfit.toFixed(2)}
+                    GH₵ {maskValue(stats.totalProfit)}
                   </p>}
             </div>
           )}
