@@ -12,6 +12,8 @@ import StoreVisitorPopup from "@/components/StoreVisitorPopup";
 import PromoCarousel from "@/components/PromoCarousel";
 import { useAuth } from "@/hooks/useAuth";
 import SEO from "@/components/SEO";
+import { LiveActivityToast } from "@/components/LiveActivityToast";
+import { WelcomePromoModal } from "@/components/WelcomePromoModal";
 
 // ─── Data ─────────────────────────────────────────────────────────────────────
 const NETWORK_CARDS = [
@@ -20,10 +22,10 @@ const NETWORK_CARDS = [
     accent: "bg-amber-400",
     iconText: "text-black",
     samples: [
-      { size: "1 GB", price: "GH₵ 4.98" },
-      { size: "5 GB", price: "GH₵ 21.20" },
-      { size: "10 GB", price: "GH₵ 42.50" },
-      { size: "50 GB", price: "GH₵ 199.30" },
+      { size: "1 GB", price: "GH₵ 4.98", savings: "Save 50%" },
+      { size: "5 GB", price: "GH₵ 21.20", savings: "Save 45%" },
+      { size: "10 GB", price: "GH₵ 42.50", savings: "Hot" },
+      { size: "50 GB", price: "GH₵ 199.30", savings: "Best Value" },
     ],
     glow: "group-hover:shadow-amber-400/10 dark:group-hover:shadow-amber-400/10",
     top: "bg-amber-400",
@@ -33,10 +35,10 @@ const NETWORK_CARDS = [
     accent: "bg-red-600",
     iconText: "text-white",
     samples: [
-      { size: "5 GB", price: "GH₵ 23.00" },
-      { size: "10 GB", price: "GH₵ 41.80" },
-      { size: "15 GB", price: "GH₵ 58.99" },
-      { size: "30 GB", price: "GH₵ 125.50" },
+      { size: "5 GB", price: "GH₵ 23.00", savings: "Save 40%" },
+      { size: "10 GB", price: "GH₵ 41.80", savings: "Hot" },
+      { size: "15 GB", price: "GH₵ 58.99", savings: "Save 35%" },
+      { size: "30 GB", price: "GH₵ 125.50", savings: "Save 40%" },
     ],
     glow: "group-hover:shadow-red-500/10",
     top: "bg-red-600",
@@ -46,10 +48,10 @@ const NETWORK_CARDS = [
     accent: "bg-blue-600",
     iconText: "text-white",
     samples: [
-      { size: "1 GB", price: "GH₵ 4.30" },
-      { size: "5 GB", price: "GH₵ 19.85" },
-      { size: "8 GB", price: "GH₵ 30.59" },
-      { size: "9 GB", price: "GH₵ 34.20" },
+      { size: "1 GB", price: "GH₵ 4.30", savings: "Cheapest" },
+      { size: "5 GB", price: "GH₵ 19.85", savings: "Save 45%" },
+      { size: "8 GB", price: "GH₵ 30.59", savings: "Hot" },
+      { size: "9 GB", price: "GH₵ 34.20", savings: "Save 38%" },
     ],
     glow: "group-hover:shadow-blue-500/10",
     top: "bg-blue-600",
@@ -525,13 +527,20 @@ const Index = () => {
 
                   {/* Price list */}
                   <div className="space-y-0 mb-6 rounded-xl border border-gray-100 dark:border-white/6 overflow-hidden">
-                    {net.samples.map(({ size, price }, j) => (
+                    {net.samples.map(({ size, price, savings }, j) => (
                       <div
                         key={size}
                         className={`flex items-center justify-between px-4 py-2.5 text-sm ${j % 2 === 0 ? "bg-gray-50 dark:bg-white/[0.02]" : ""
-                          } border-b border-gray-100 dark:border-white/5 last:border-0`}
+                          } border-b border-gray-100 dark:border-white/5 last:border-0 group/row`}
                       >
-                        <span className="font-semibold text-gray-700 dark:text-white/70">{size}</span>
+                        <div className="flex items-center gap-2">
+                          <span className="font-semibold text-gray-700 dark:text-white/70">{size}</span>
+                          {savings && (
+                            <span className="text-[8px] font-black uppercase tracking-wide px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 scale-95 origin-left group-hover/row:scale-100 transition-transform">
+                              {savings}
+                            </span>
+                          )}
+                        </div>
                         <span className="font-black text-amber-500">{price}</span>
                       </div>
                     ))}
@@ -837,6 +846,9 @@ const Index = () => {
         </div>
       </section>
 
+      {/* Conversion Boosters */}
+      <LiveActivityToast />
+      {!user && <WelcomePromoModal />}
     </div>
   );
 };
