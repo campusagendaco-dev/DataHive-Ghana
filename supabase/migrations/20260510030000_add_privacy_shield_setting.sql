@@ -9,6 +9,7 @@ BEGIN
         DROP VIEW IF EXISTS public_system_settings;
         CREATE VIEW public_system_settings AS
         SELECT 
+            id,
             holiday_mode_enabled,
             holiday_message,
             disable_ordering,
