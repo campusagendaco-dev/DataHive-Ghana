@@ -370,6 +370,37 @@
   }
 }
 
-.animate-text-flow {
-  animation: gradient-x 5s ease infinite;
+
+/* ── Secure Shield: Anti-Print & Anti-Snapshot Overrides ─── */
+@media print {
+  body * {
+    display: none !important;
+  }
+  body {
+    background: #000000 !important;
+  }
+  body::before {
+    content: "THIS CONTENT IS PROTECTED BY SWIFTDATA SECURE SHIELD. EXPORTING IS PROHIBITED.";
+    display: flex !important;
+    position: fixed;
+    inset: 0;
+    align-items: center;
+    justify-content: center;
+    font-family: sans-serif;
+    font-weight: bold;
+    color: white;
+    background: black;
+    font-size: 24px;
+    text-align: center;
+    padding: 40px;
+  }
 }
+
+/* Deter default text copy operations on non-input elements */
+.secure-area {
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+}
+

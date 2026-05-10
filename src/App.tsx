@@ -24,6 +24,7 @@ import LoadingScreen from "@/components/LoadingScreen";
 import { TraditionalBackground } from "@/components/TraditionalBackground";
 import IpBlocked from "./pages/IpBlocked";
 import Maintenance from "./pages/Maintenance";
+import { SecurityGuard } from "@/components/SecurityGuard";
 
 // Route-level code splitting — each page chunk loads only when first visited
 const Index = lazy(() => import("./pages/Index"));
@@ -449,7 +450,9 @@ const App = () => {
           <Sonner />
           <BrowserRouter>
             <AuthProvider>
-              <AppContent />
+              <SecurityGuard>
+                <AppContent />
+              </SecurityGuard>
               <ThemeSelector />
               <WhatsAppButton />
               <FreeDataButton />
