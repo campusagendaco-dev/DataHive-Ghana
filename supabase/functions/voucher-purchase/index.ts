@@ -163,6 +163,10 @@ serve(async (req) => {
         provider_id: provider.id,
         profit: profitValue,
         failure_reason: null,
+        metadata: {
+          vouchers: resData.vouchers || [],
+          api_response_message: resData.message,
+        }
       });
 
       // Credit profit
