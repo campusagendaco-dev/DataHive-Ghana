@@ -386,11 +386,17 @@ const Index = () => {
           {/* Headline */}
           <h1
             className="text-5xl sm:text-6xl md:text-7xl font-black leading-[1.04] tracking-tight mb-6 text-white"
-            style={{ animation: "fade-in 0.6s cubic-bezier(0.22,1,0.36,1) 0.1s both" }}
           >
-            Cheapest Non-Expiry
-            <br />
-            <span className="bg-gradient-to-r from-amber-400 via-orange-400 to-amber-500 bg-clip-text text-transparent">
+            <span 
+              className="block" 
+              style={{ animation: "fade-in 0.7s cubic-bezier(0.22,1,0.36,1) 0.1s both" }}
+            >
+              Cheapest Non-Expiry
+            </span>
+            <span 
+              className="block bg-gradient-to-r from-amber-400 via-orange-400 to-amber-500 bg-clip-text text-transparent animate-text-flow"
+              style={{ animation: "fade-in 0.8s cubic-bezier(0.22,1,0.36,1) 0.3s both" }}
+            >
               Data Bundles Ghana
             </span>
           </h1>
