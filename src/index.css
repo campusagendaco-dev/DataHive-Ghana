@@ -327,3 +327,18 @@
 .animate-marquee:hover {
   animation-play-state: paused;
 }
+
+/* ── Custom Premium Micro-Animations ───────────────────────── */
+@keyframes element-float {
+  0%, 100% { transform: translateY(0); }
+  50%       { transform: translateY(-4px); }
+}
+
+@keyframes element-shimmer {
+  0%   { transform: translateX(-200%) skewX(-30deg); }
+  20%, 100% { transform: translateX(200%) skewX(-30deg); }
+}
+
+.animate-pulse-slow {
+  animation: pulse 4s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}

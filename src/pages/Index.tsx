@@ -409,9 +409,11 @@ const Index = () => {
           <div className="flex flex-col sm:flex-row gap-3 justify-center mb-12">
             <Link
               to="/buy-data"
-              className="inline-flex items-center justify-center gap-2.5 rounded-2xl bg-amber-400 hover:bg-amber-300 text-black font-black text-base px-8 py-4 transition-all duration-200 hover:scale-[1.02] active:scale-[0.98] shadow-xl shadow-amber-400/20"
+              className="relative overflow-hidden group inline-flex items-center justify-center gap-2.5 rounded-2xl bg-amber-400 hover:bg-amber-300 text-black font-black text-base px-8 py-4 transition-all duration-200 hover:scale-[1.02] active:scale-[0.98] shadow-xl shadow-amber-400/20 after:absolute after:inset-0 after:w-full after:bg-gradient-to-r after:from-transparent after:via-white/60 after:to-transparent after:animate-[element-shimmer_3.5s_infinite]"
             >
-              Buy Data <ArrowRight className="w-5 h-5" />
+              <span className="relative z-10 flex items-center gap-2.5">
+                Buy Data <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+              </span>
             </Link>
             <Link
               to="/agent-program"
@@ -431,12 +433,13 @@ const Index = () => {
               { icon: Zap, text: "Delivery in 10-60 min", color: "text-amber-400" },
               { icon: CheckCircle2, text: "Non-expiry bundles", color: "text-sky-400" },
               { icon: Clock, text: "Available 24/7", color: "text-purple-400" },
-            ].map(({ icon: Icon, text, color }) => (
+            ].map(({ icon: Icon, text, color }, i) => (
               <span
                 key={text}
-                className="inline-flex items-center gap-1.5 bg-white/5 border border-white/10 rounded-full px-3.5 py-2 text-xs text-white/50 shadow-sm backdrop-blur-md"
+                className="inline-flex items-center gap-1.5 bg-white/5 border border-white/10 rounded-full px-3.5 py-2 text-xs text-white/50 shadow-sm backdrop-blur-md animate-[element-float_4s_ease-in-out_infinite] hover:bg-white/10 transition-colors duration-300"
+                style={{ animationDelay: `${i * 0.6}s` }}
               >
-                <Icon className={`w-3.5 h-3.5 shrink-0 ${color}`} /> {text}
+                <Icon className={`w-3.5 h-3.5 shrink-0 ${color} animate-pulse-slow`} /> {text}
               </span>
             ))}
           </div>
