@@ -224,10 +224,18 @@ const Index = () => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [liveStats, setLiveStats] = useState({ totalDelivered: 0, successRate: 99.4, totalAgents: 0 });
   const [currentTime, setCurrentTime] = useState(new Date());
+  const [activeMessageIndex, setActiveMessageIndex] = useState(0);
 
   useEffect(() => {
     const tick = setInterval(() => setCurrentTime(new Date()), 1000);
-    return () => clearInterval(tick);
+    const messageCycle = setInterval(() => {
+      setActiveMessageIndex((prev) => (prev + 1) % 3);
+    }, 4000);
+    
+    return () => {
+      clearInterval(tick);
+      clearInterval(messageCycle);
+    };
   }, []);
 
   useEffect(() => {
@@ -343,9 +351,18 @@ const Index = () => {
 
             <span className="w-px h-3 bg-white/15" />
             
-            <div className="flex items-center gap-2">
-              <img src="/logo.png" alt="SwiftData Ghana" className="w-4 h-4 rounded-full hidden sm:block" />
-              <span className="text-white/70 text-xs font-medium">#1 Store</span>
+            <div className="flex items-center gap-2 min-w-[85px] justify-start overflow-hidden">
+              <img src="/logo.png" alt="SwiftData Ghana" className="w-4 h-4 rounded-full hidden sm:block shrink-0" />
+              <div 
+                key={activeMessageIndex} 
+                className="text-white/70 text-xs font-bold tracking-tight animate-in slide-in-from-bottom-1 fade-in duration-300 fill-mode-both whitespace-nowrap"
+              >
+                {[
+                  "#1 Bundle Store",
+                  "Instant Delivery",
+                  "Paystack Secured"
+                ][activeMessageIndex]}
+              </div>
             </div>
           </div>
 
