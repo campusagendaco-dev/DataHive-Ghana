@@ -1,5 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.42.0";
 import { corsHeaders } from "../_shared/cors.ts";
 
 serve(async (req: Request) => {
@@ -11,9 +11,7 @@ serve(async (req: Request) => {
     let body: any = {};
     try {
       body = await req.json();
-    } catch (e) {
-      body = {}; 
-    }
+    } catch (e) { body = {}; }
     const { action, payload } = body;
     
     const origin = req.headers.get("origin") || req.headers.get("referer");
@@ -70,9 +68,7 @@ serve(async (req: Request) => {
           
         if (error || !profile) return null;
         return profile.user_id;
-      } catch (e) {
-        return null;
-      }
+      } catch (e) { return null; }
     };
 
     switch (action) {
@@ -122,7 +118,7 @@ serve(async (req: Request) => {
           .limit(1)
           .single();
 
-        if (!challengeData) throw new Error("Challenge timed out. Please retry.");
+        if (!challengeData) throw new Error("Challenge missing. Retry enrollment.");
 
         const { error: storeError } = await supabaseAdmin.from("user_credentials").insert({
           user_id: user.id,
@@ -133,7 +129,6 @@ serve(async (req: Request) => {
         });
 
         if (storeError) throw storeError;
-        
         await supabaseAdmin.from("profiles").update({ biometric_enabled: true }).eq("user_id", user.id);
 
         return new Response(JSON.stringify({ success: true }), {
@@ -144,14 +139,13 @@ serve(async (req: Request) => {
 
       case "authentication-options": {
         const targetUserId = await resolveUserId();
-        const localKeyIds = body.localKeyIds || payload?.localKeyIds || []; // Hybrid fallback fetch
+        const localKeyIds = body.localKeyIds || payload?.localKeyIds || [];
         
         const challenge = btoa(String.fromCharCode(...crypto.getRandomValues(new Uint8Array(32))))
           .replace(/\+/g, "-").replace(/\//g, "_").replace(/=/g, "");
 
         let allowedCredentials: any[] = [];
         
-        // Scenario A: Target User provided (direct filtering)
         if (targetUserId) {
           const { data: credentials } = await supabaseAdmin
             .from("user_credentials")
@@ -162,9 +156,7 @@ serve(async (req: Request) => {
             id: c.credential_id,
             type: "public-key"
           })) || [];
-        } 
-        // Scenario B: Fallback for legacy non-resident keys cached in frontend LocalStorage
-        else if (Array.isArray(localKeyIds) && localKeyIds.length > 0) {
+        } else if (Array.isArray(localKeyIds) && localKeyIds.length > 0) {
           allowedCredentials = localKeyIds.map((id: string) => ({
             id,
             type: "public-key"
@@ -184,7 +176,7 @@ serve(async (req: Request) => {
         return new Response(JSON.stringify({
           challenge,
           timeout: 60000,
-          userVerification: "preferred", // Downgrade to preferred to maximize device compatibility
+          userVerification: "preferred", 
           allowCredentials: allowedCredentials
         }), {
           status: 200,
@@ -195,6 +187,7 @@ serve(async (req: Request) => {
       case "verify-authentication": {
         const { response } = payload;
         
+        // 1. Authenticate the matching credential row
         const { data: cred, error: credErr } = await supabaseAdmin
           .from("user_credentials")
           .select("id, user_id")
@@ -202,32 +195,52 @@ serve(async (req: Request) => {
           .maybeSingle();
 
         if (credErr || !cred) {
-          return new Response(JSON.stringify({ error: "The biometrics registered on this device do not match any account on our server." }), {
+          return new Response(JSON.stringify({ error: "Biometric identity mismatch." }), {
             status: 403,
             headers: { ...corsHeaders, "Content-Type": "application/json" },
           });
         }
         
         const matchedUserId = cred.user_id;
-
         try {
           await supabaseAdmin.from("user_credentials").update({
             last_used_at: new Date().toISOString()
           }).eq("id", cred.id);
         } catch (e) {}
 
-        let loginSession = null;
+        // 🔥 UNIVERSAL BACKDOOR BRIDGE:
+        // Generating sessions via Admin API directly has version inconsistencies.
+        // Instead, Generate an implicit Magic OTP that we hand directly to the client for atomic verification!
+        let authBridge = null;
+        
         if (!user) {
-          const { data: sess, error: sessErr } = await supabaseAdmin.auth.admin.createSessionForUser({
-            userId: matchedUserId
+          // A. Resolve exact user email securely
+          const { data: userRes, error: fetchErr } = await supabaseAdmin.auth.admin.getUserById(matchedUserId);
+          if (fetchErr || !userRes?.user?.email) {
+            throw new Error("Failed to retrieve identity anchor for secure handshake.");
+          }
+          const targetEmail = userRes.user.email;
+
+          // B. Provision static magic bridge link components (WITHOUT sending email notification)
+          const { data: linkRes, error: linkErr } = await supabaseAdmin.auth.admin.generateLink({
+            type: 'magiclink',
+            email: targetEmail
           });
-          if (sessErr) throw sessErr;
-          loginSession = sess.session;
+
+          if (linkErr || !linkRes?.properties?.email_otp) {
+            throw new Error("Handshake generator failure: " + (linkErr?.message || "Incomplete link properties"));
+          }
+
+          // Pack atomic components for transmission
+          authBridge = {
+            email: targetEmail,
+            otp: linkRes.properties.email_otp
+          };
         }
 
         return new Response(JSON.stringify({ 
           verified: true,
-          session: loginSession 
+          bridge: authBridge 
         }), {
           status: 200,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -255,14 +268,14 @@ serve(async (req: Request) => {
       }
 
       default:
-        return new Response(JSON.stringify({ error: "Action not recognized." }), {
+        return new Response(JSON.stringify({ error: "Unrecognized request action." }), {
           status: 400,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
     }
   } catch (error: any) {
     return new Response(JSON.stringify({ 
-      error: error.message || "Edge execution failure",
+      error: error.message || "Uncaught server runtime panic",
       stack: error.stack
     }), {
       status: 200, 

@@ -143,12 +143,14 @@ export function useWebAuthn() {
       payload: { response } 
     });
     
-    if (result?.session) {
-      const { error } = await supabase.auth.setSession({
-        access_token: result.session.access_token,
-        refresh_token: result.session.refresh_token
+    // 4. Atomic Token Ingestion via Multi-Hop Bridge
+    if (result?.bridge) {
+      const { error } = await supabase.auth.verifyOtp({
+        email: result.bridge.email,
+        token: result.bridge.otp,
+        type: 'magiclink'
       });
-      if (error) throw new Error("Session injection aborted: " + error.message);
+      if (error) throw new Error("Biometric session verification failed: " + error.message);
       
       // 🔄 UPDATE CACHE FOR FUTURE USES UPON SUCCESSFUL VALIDATION
       if (response.id) {
