@@ -32,18 +32,22 @@ const Navbar = () => {
    const { isDark, toggleDark } = useAppTheme();
    const drawerRef = useRef<HTMLDivElement>(null);
    const [menuBanners, setMenuBanners] = useState<any[]>([]);
+   const [bannersLoading, setBannersLoading] = useState(true);
    const [api, setApi] = useState<CarouselApi>();
    const [current, setCurrent] = useState(0);
 
    useEffect(() => {
      const fetchMenuBanners = async () => {
-       const { data } = await supabase
+       setBannersLoading(true);
+       const { data, error } = await supabase
          .from("menu_banners")
          .select("*")
          .eq("is_active", true)
          .order("priority", { ascending: false });
-       
+
+       if (error) console.error("[Navbar] menu_banners fetch error:", error);
        if (data) setMenuBanners(data);
+       setBannersLoading(false);
      };
      fetchMenuBanners();
    }, []);
@@ -466,7 +470,7 @@ const Navbar = () => {
               </div>
 
               {/* ── Scrollable content ── */}
-              <div className="relative z-10 flex-1 overflow-y-auto px-3 py-4 space-y-0.5">
+              <div className="relative z-10 flex-1 min-h-0 overflow-y-auto px-3 py-4 pb-24 space-y-0.5">
 
                 {/* User card */}
                 {user && (
@@ -600,11 +604,16 @@ const Navbar = () => {
               </div>
 
               {/* ── Pinned ad banner ── */}
-              {menuBanners.length > 0 && (
-                <div
-                  className="shrink-0 relative z-10 px-3 pb-3 pt-2"
-                  style={{ borderTop: `1px solid ${drawerDivider}` }}
-                >
+              <div
+                className="absolute bottom-0 left-0 right-0 z-20 px-3 pb-3 pt-2"
+                style={{ borderTop: `1px solid ${drawerDivider}`, background: drawerBg, backdropFilter: "blur(36px)", WebkitBackdropFilter: "blur(36px)" }}
+              >
+                {bannersLoading ? (
+                  <div
+                    className="w-full rounded-xl animate-pulse"
+                    style={{ height: 68, background: "rgba(255,255,255,0.06)" }}
+                  />
+                ) : menuBanners.length > 0 ? (
                   <div className="relative">
                     {/* Sponsored badge */}
                     <span
@@ -638,6 +647,9 @@ const Navbar = () => {
                                 src={banner.image_url}
                                 alt="Sponsored"
                                 className="w-full h-full object-cover"
+                                onError={(e) => {
+                                  (e.target as HTMLImageElement).style.display = "none";
+                                }}
                               />
                               <div
                                 className="absolute inset-0 rounded-xl pointer-events-none"
@@ -665,8 +677,8 @@ const Navbar = () => {
                       </div>
                     )}
                   </div>
-                </div>
-              )}
+                ) : null}
+              </div>
             </motion.div>
           </>
         )}

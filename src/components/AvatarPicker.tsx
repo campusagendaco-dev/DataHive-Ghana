@@ -1,18 +1,7 @@
-import { useState } from "react";
-import { 
-  Dialog, 
-  DialogContent, 
-  DialogHeader, 
-  DialogTitle, 
-  DialogDescription,
-  DialogFooter
-} from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
-import { RefreshCw, Check, Dice5 } from "lucide-react";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useState, useEffect } from "react";
+import { Check, X, Shuffle, ChevronDown } from "lucide-react";
 import { toast } from "sonner";
+import { AnimatePresence, motion } from "framer-motion";
 
 interface AvatarPickerProps {
   isOpen: boolean;
@@ -22,37 +11,58 @@ interface AvatarPickerProps {
 }
 
 const STYLES = [
-  { id: "avataaars", name: "Classic" },
-  { id: "bottts", name: "Robots" },
-  { id: "pixel-art", name: "Pixel Art" },
-  { id: "lorelei", name: "Modern" },
-  { id: "notionists", name: "Minimal" },
-  { id: "big-smile", name: "Happy" },
-  { id: "identicon", name: "Abstract Logo" },
-  { id: "shapes", name: "Geometric" },
-  { id: "initials", name: "Monogram" },
-  { id: "micah", name: "Illustrative" },
-  { id: "miniavs", name: "Miniavs" },
-  { id: "croodles", name: "Doodles" },
-  { id: "adventurer", name: "Adventurer" },
-  { id: "open-peeps", name: "Peeps" }
+  { id: "avataaars",        name: "Classic",       bg: "#eef2ff" },
+  { id: "avataaars-neutral",name: "Neutral",       bg: "#f0fdf4" },
+  { id: "bottts",           name: "Robots",        bg: "#ecfdf5" },
+  { id: "bottts-neutral",   name: "Bots 2",        bg: "#f0f9ff" },
+  { id: "pixel-art",        name: "Pixel Art",     bg: "#fff7ed" },
+  { id: "pixel-art-neutral",name: "Pixel Neutral", bg: "#fefce8" },
+  { id: "lorelei",          name: "Modern",        bg: "#fdf4ff" },
+  { id: "lorelei-neutral",  name: "Modern 2",      bg: "#fff1f2" },
+  { id: "notionists",       name: "Minimal",       bg: "#f0f9ff" },
+  { id: "notionists-neutral",name: "Minimal 2",    bg: "#fafafa" },
+  { id: "big-smile",        name: "Happy",         bg: "#fefce8" },
+  { id: "adventurer",       name: "Adventure",     bg: "#f0fdf4" },
+  { id: "adventurer-neutral",name: "Adventurer 2", bg: "#f5f3ff" },
+  { id: "open-peeps",       name: "Peeps",         bg: "#fff1f2" },
+  { id: "micah",            name: "Illustrative",  bg: "#f5f3ff" },
+  { id: "croodles",         name: "Doodles",       bg: "#eff6ff" },
+  { id: "croodles-neutral", name: "Doodles 2",     bg: "#fdf4ff" },
+  { id: "fun-emoji",        name: "Emoji",         bg: "#fefce8" },
+  { id: "thumbs",           name: "Thumbs",        bg: "#ecfdf5" },
+  { id: "rings",            name: "Rings",         bg: "#f0f9ff" },
+  { id: "shapes",           name: "Shapes",        bg: "#fff7ed" },
+  { id: "identicon",        name: "Identity",      bg: "#eef2ff" },
+  { id: "miniavs",          name: "Mini",          bg: "#fdf4ff" },
+  { id: "personas",         name: "Personas",      bg: "#fff1f2" },
+  { id: "glass",            name: "Glass",         bg: "#f0fdf4" },
+];
+
+const ALL_SEEDS = [
+  "swift","ghana","data","ace","nova","bolt","zara","finn",
+  "luna","koda","rex","mia","jade","sage","leo","ivy",
+  "cole","tara","alex","sam","pat","riley","quinn","drew",
+  "kai","eden","cruz","skye","juno","wren","noor","blaze",
+  "dax","arlo","poet","fern","max","beau","cleo","rome",
 ];
 
 export const AvatarPicker = ({ isOpen, onClose, onSelect, currentAvatarUrl }: AvatarPickerProps) => {
-  const [selectedStyle, setSelectedStyle] = useState("avataaars");
-  const [seed, setSeed] = useState(Math.random().toString(36).substring(7));
-  const [previewUrl, setPreviewUrl] = useState(currentAvatarUrl || `https://api.dicebear.com/7.x/avataaars/svg?seed=${seed}`);
+  const [style, setStyle] = useState(STYLES[0]);
+  const [seed, setSeed]   = useState(ALL_SEEDS[0]);
   const [saving, setSaving] = useState(false);
 
-  const generateRandom = () => {
-    const newSeed = Math.random().toString(36).substring(7);
-    setSeed(newSeed);
-    setPreviewUrl(`https://api.dicebear.com/7.x/${selectedStyle}/svg?seed=${newSeed}`);
-  };
+  const previewUrl = `https://api.dicebear.com/7.x/${style.id}/svg?seed=${seed}`;
 
-  const handleStyleChange = (style: string) => {
-    setSelectedStyle(style);
-    setPreviewUrl(`https://api.dicebear.com/7.x/${style}/svg?seed=${seed}`);
+  // lock body scroll while open
+  useEffect(() => {
+    if (isOpen) document.body.style.overflow = "hidden";
+    else document.body.style.overflow = "";
+    return () => { document.body.style.overflow = ""; };
+  }, [isOpen]);
+
+  const shuffle = () => {
+    const random = Math.random().toString(36).substring(2, 9);
+    setSeed(random);
   };
 
   const handleSave = async () => {
@@ -60,7 +70,7 @@ export const AvatarPicker = ({ isOpen, onClose, onSelect, currentAvatarUrl }: Av
     try {
       await onSelect(previewUrl);
       onClose();
-    } catch (error) {
+    } catch {
       toast.error("Failed to save avatar");
     } finally {
       setSaving(false);
@@ -68,98 +78,171 @@ export const AvatarPicker = ({ isOpen, onClose, onSelect, currentAvatarUrl }: Av
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-md bg-card/95 backdrop-blur-xl border-white/10 shadow-2xl">
-        <DialogHeader>
-          <DialogTitle className="text-2xl font-black">Customize Avatar</DialogTitle>
-          <DialogDescription className="text-muted-foreground font-medium">
-            Express yourself with a unique profile picture.
-          </DialogDescription>
-        </DialogHeader>
+    <AnimatePresence>
+      {isOpen && (
+        <>
+          {/* Backdrop */}
+          <motion.div
+            key="backdrop"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[200]"
+            style={{ background: "rgba(0,0,0,0.75)", backdropFilter: "blur(6px)" }}
+            onClick={onClose}
+          />
 
-        <div className="flex flex-col items-center gap-8 py-6">
-          {/* Main Preview */}
-          <div className="relative group">
-            <div className="absolute -inset-2 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-full blur opacity-40 group-hover:opacity-75 transition duration-500"></div>
-            <Avatar className="w-32 h-32 border-4 border-card relative ring-1 ring-white/10">
-              <AvatarImage src={previewUrl} />
-              <AvatarFallback className="text-2xl bg-primary/10 font-bold">
-                P
-              </AvatarFallback>
-            </Avatar>
-            <Button 
-              size="icon" 
-              variant="secondary" 
-              className="absolute bottom-0 right-0 rounded-full shadow-lg border-2 border-card hover:scale-110 transition-transform"
-              onClick={generateRandom}
-            >
-              <RefreshCw className="w-4 h-4" />
-            </Button>
-          </div>
+          {/* Sheet */}
+          <motion.div
+            key="sheet"
+            initial={{ y: "100%" }}
+            animate={{ y: 0 }}
+            exit={{ y: "100%" }}
+            transition={{ type: "spring", damping: 28, stiffness: 260 }}
+            className="fixed bottom-0 left-0 right-0 z-[201] flex flex-col"
+            style={{
+              background: "#0f0f17",
+              borderRadius: "24px 24px 0 0",
+              maxHeight: "92dvh",
+              boxShadow: "0 -20px 60px rgba(0,0,0,0.6)",
+            }}
+          >
+            {/* Drag handle */}
+            <div className="flex justify-center pt-3 pb-1 shrink-0">
+              <div className="w-9 h-1 rounded-full" style={{ background: "rgba(255,255,255,0.15)" }} />
+            </div>
 
-          {/* Style Selector */}
-          <Tabs defaultValue="avataaars" onValueChange={handleStyleChange} className="w-full">
-            <ScrollArea className="w-full pb-3">
-              <TabsList className="bg-white/5 border border-white/10 p-1 h-auto flex-nowrap w-max min-w-full">
-                {STYLES.map((style) => (
-                  <TabsTrigger 
-                    key={style.id} 
-                    value={style.id}
-                    className="font-bold px-4 py-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
+            {/* Header row */}
+            <div className="flex items-center gap-3 px-4 pb-3 pt-1 shrink-0">
+              {/* Live preview */}
+              <div
+                className="w-12 h-12 rounded-2xl shrink-0 overflow-hidden flex items-center justify-center"
+                style={{ background: style.bg }}
+              >
+                <img src={previewUrl} alt="Preview" className="w-10 h-10 object-contain" />
+              </div>
+
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-black text-white">Choose Avatar</p>
+                <p className="text-[11px] text-white/40">Pick a style and variation below</p>
+              </div>
+
+              <button
+                type="button"
+                onClick={shuffle}
+                aria-label="Shuffle"
+                className="w-9 h-9 rounded-xl flex items-center justify-center border border-amber-400/30 bg-amber-400/10 text-amber-400 hover:bg-amber-400/20 transition-all shrink-0"
+              >
+                <Shuffle className="w-4 h-4" />
+              </button>
+              <button
+                type="button"
+                onClick={onClose}
+                aria-label="Close"
+                className="w-9 h-9 rounded-xl flex items-center justify-center border border-white/10 bg-white/6 text-white/50 hover:text-white hover:bg-white/10 transition-all shrink-0"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Divider */}
+            <div className="shrink-0 mx-4" style={{ height: 1, background: "rgba(255,255,255,0.07)" }} />
+
+            {/* Style pills */}
+            <div className="shrink-0 px-4 pt-3 pb-2">
+              <p className="text-[9px] font-black uppercase tracking-widest text-white/30 mb-2">Style</p>
+              <div
+                className="flex gap-2 overflow-x-auto"
+                style={{ scrollbarWidth: "none", WebkitOverflowScrolling: "touch" }}
+              >
+                {STYLES.map((s) => (
+                  <button
+                    key={s.id}
+                    type="button"
+                    onClick={() => setStyle(s)}
+                    className="shrink-0 px-3 h-7 rounded-full text-[11px] font-bold transition-all whitespace-nowrap"
+                    style={
+                      style.id === s.id
+                        ? { background: "#fbbf24", color: "#000" }
+                        : { background: "rgba(255,255,255,0.07)", color: "rgba(255,255,255,0.5)" }
+                    }
                   >
-                    {style.name}
-                  </TabsTrigger>
+                    {s.name}
+                  </button>
                 ))}
-              </TabsList>
-            </ScrollArea>
-          </Tabs>
+              </div>
+            </div>
 
-          {/* Quick Seeds Grid */}
-          <div className="w-full grid grid-cols-4 gap-3">
-            {[1, 2, 3, 4].map((i) => {
-              const testSeed = `preset-${i}-${selectedStyle}`;
-              const testUrl = `https://api.dicebear.com/7.x/${selectedStyle}/svg?seed=${testSeed}`;
-              return (
-                <button
-                  key={i}
-                  onClick={() => {
-                    setSeed(testSeed);
-                    setPreviewUrl(testUrl);
-                  }}
-                  className={`relative aspect-square rounded-xl overflow-hidden border-2 transition-all hover:scale-105 active:scale-95 ${
-                    previewUrl === testUrl ? 'border-primary shadow-lg shadow-primary/20 bg-primary/5' : 'border-white/10 bg-white/5 hover:border-white/30'
-                  }`}
-                >
-                  <img src={testUrl} alt={`Option ${i}`} className="w-full h-full object-cover" />
-                  {previewUrl === testUrl && (
-                    <div className="absolute top-1 right-1 bg-primary text-white p-0.5 rounded-full">
-                      <Check className="w-2.5 h-2.5" />
-                    </div>
-                  )}
-                </button>
-              );
-            })}
-            <button
-              onClick={generateRandom}
-              className="aspect-square rounded-xl border-2 border-dashed border-white/20 bg-white/5 hover:bg-white/10 hover:border-white/40 transition-all flex flex-col items-center justify-center gap-1 group"
+            {/* Divider */}
+            <div className="shrink-0 mx-4" style={{ height: 1, background: "rgba(255,255,255,0.07)" }} />
+
+            {/* Grid — scrollable */}
+            <div className="flex-1 min-h-0 overflow-y-auto px-4 pt-3 pb-2">
+              <p className="text-[9px] font-black uppercase tracking-widest text-white/30 mb-2">Variation</p>
+              <div className="grid grid-cols-4 gap-2.5">
+                {ALL_SEEDS.map((s) => {
+                  const url  = `https://api.dicebear.com/7.x/${style.id}/svg?seed=${s}`;
+                  const active = seed === s;
+                  return (
+                    <button
+                      key={s}
+                      type="button"
+                      onClick={() => setSeed(s)}
+                      className="relative rounded-2xl overflow-hidden transition-all duration-150 active:scale-95"
+                      style={{
+                        aspectRatio: "1",
+                        background: style.bg,
+                        border: active ? "2.5px solid #fbbf24" : "2.5px solid transparent",
+                        boxShadow: active ? "0 0 0 3px rgba(251,191,36,0.25)" : "none",
+                        transform: active ? "scale(1.06)" : "scale(1)",
+                      }}
+                    >
+                      <img
+                        src={url}
+                        alt={s}
+                        className="w-full h-full object-contain"
+                        style={{ padding: "6px" }}
+                      />
+                      {active && (
+                        <div
+                          className="absolute top-1 right-1 w-4 h-4 rounded-full flex items-center justify-center"
+                          style={{ background: "#fbbf24" }}
+                        >
+                          <Check className="w-2.5 h-2.5 text-black" strokeWidth={3} />
+                        </div>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div
+              className="shrink-0 flex gap-3 px-4 pt-3 pb-6"
+              style={{ borderTop: "1px solid rgba(255,255,255,0.07)" }}
             >
-              <Dice5 className="w-6 h-6 text-muted-foreground group-hover:text-primary group-hover:rotate-12 transition-all" />
-              <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground group-hover:text-primary">More</span>
-            </button>
-          </div>
-        </div>
-
-        <DialogFooter className="gap-2 sm:gap-0">
-          <Button variant="ghost" onClick={onClose} className="font-bold">Cancel</Button>
-          <Button onClick={handleSave} disabled={saving} className="bg-primary hover:bg-primary/90 font-bold px-8 shadow-lg shadow-primary/20">
-            {saving ? (
-              <><RefreshCw className="w-4 h-4 animate-spin mr-2" /> Saving...</>
-            ) : (
-              "Save Avatar"
-            )}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+              <button
+                type="button"
+                onClick={onClose}
+                className="flex-1 h-12 rounded-2xl font-bold text-sm transition-all"
+                style={{ background: "rgba(255,255,255,0.07)", color: "rgba(255,255,255,0.6)" }}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleSave}
+                disabled={saving}
+                className="flex-[2] h-12 rounded-2xl font-black text-sm text-black transition-all disabled:opacity-60"
+                style={{ background: "linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%)" }}
+              >
+                {saving ? "Saving…" : "Save Avatar"}
+              </button>
+            </div>
+          </motion.div>
+        </>
+      )}
+    </AnimatePresence>
   );
 };
