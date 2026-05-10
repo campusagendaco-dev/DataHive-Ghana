@@ -302,26 +302,26 @@ const AdminPackages = () => {
                   {basePackages[n.name]?.map((pkg) => {
                     const s = getSetting(n.name, pkg.size);
                     return (
-                      <div key={pkg.size} className={`flex flex-col md:grid md:grid-cols-12 gap-3 items-start md:items-center p-3 md:p-2 rounded-xl border ${s.is_unavailable ? "bg-red-500/[0.02] border-red-500/10 opacity-60" : "bg-white/[0.01] border-white/5"}`}>
+                      <div key={pkg.size} className={`flex flex-col md:grid md:grid-cols-12 gap-3 items-start md:items-center p-3 md:p-2 rounded-xl border shadow-sm ${s.is_unavailable ? "bg-red-500/[0.05] border-red-500/20 opacity-60" : "bg-card border-border"}`}>
                         {/* Package Info */}
-                        <div className="flex items-center justify-between w-full md:col-span-1">
+                        <div className="flex items-center justify-between w-full md:col-span-2">
                           <div className="flex flex-col">
-                            <span className="font-bold text-sm text-white">{pkg.size}</span>
-                            <span className="text-[10px] text-white/30 uppercase tracking-wider">Default: ₵{pkg.price.toFixed(0)}</span>
+                            <span className="font-bold text-sm text-foreground">{pkg.size}</span>
+                            <span className="text-[10px] text-muted-foreground uppercase tracking-wider">Default: ₵{pkg.price.toFixed(0)}</span>
                           </div>
                           <div className="md:hidden flex items-center gap-2">
-                            <span className="text-[10px] text-white/30">Active</span>
+                            <span className="text-[10px] text-muted-foreground">Active</span>
                             <Switch
                               checked={!s.is_unavailable}
                               onCheckedChange={(checked) => updateSetting(n.name, pkg.size, "is_unavailable", !checked)}
-                              className="scale-75 data-[state=checked]:bg-amber-400"
+                              className="scale-75 data-[state=checked]:bg-amber-500"
                             />
                           </div>
                         </div>
 
                         {/* Cost Price */}
                         <div className="w-full md:col-span-2 space-y-1">
-                          <label className="md:hidden text-[10px] text-white/30 uppercase font-bold tracking-widest">Cost Price (₵)</label>
+                          <label className="md:hidden text-[10px] text-muted-foreground uppercase font-bold tracking-widest">Cost Price (₵)</label>
                           <div className="relative">
                             <Input
                               type="number"
@@ -329,14 +329,14 @@ const AdminPackages = () => {
                               placeholder={pkg.price.toFixed(2)}
                               value={s.cost_price ?? ""}
                               onChange={(e) => updateSetting(n.name, pkg.size, "cost_price", e.target.value ? parseFloat(e.target.value) : null)}
-                              className="h-9 md:h-8 text-sm bg-white/5 border-white/10 rounded-lg md:rounded-md focus:border-red-400/30"
+                              className="h-9 md:h-8 text-sm rounded-lg md:rounded-md"
                             />
                           </div>
                         </div>
 
                         {/* Agent Price */}
                         <div className="w-full md:col-span-2 space-y-1">
-                          <label className="md:hidden text-[10px] text-white/30 uppercase font-bold tracking-widest">Agent Price (₵)</label>
+                          <label className="md:hidden text-[10px] text-muted-foreground uppercase font-bold tracking-widest">Agent Price (₵)</label>
                           <div className="relative">
                             <Input
                               type="number"
@@ -344,14 +344,14 @@ const AdminPackages = () => {
                               placeholder={(s.cost_price || pkg.price).toFixed(2)}
                               value={s.agent_price ?? ""}
                               onChange={(e) => updateSetting(n.name, pkg.size, "agent_price", e.target.value ? parseFloat(e.target.value) : null)}
-                              className="h-9 md:h-8 text-sm bg-white/5 border-white/10 rounded-lg md:rounded-md focus:border-amber-400/30"
+                              className="h-9 md:h-8 text-sm rounded-lg md:rounded-md focus:border-amber-500/30"
                             />
                           </div>
                         </div>
 
                         {/* Sub-Agent Price */}
                         <div className="w-full md:col-span-2 space-y-1">
-                          <label className="md:hidden text-[10px] text-white/30 uppercase font-bold tracking-widest">Sub-Agent Price (₵)</label>
+                          <label className="md:hidden text-[10px] text-muted-foreground uppercase font-bold tracking-widest">Sub-Agent Price (₵)</label>
                           <div className="relative">
                             <Input
                               type="number"
@@ -359,14 +359,14 @@ const AdminPackages = () => {
                               placeholder={(s.agent_price || s.cost_price || pkg.price).toFixed(2)}
                               value={s.sub_agent_price ?? ""}
                               onChange={(e) => updateSetting(n.name, pkg.size, "sub_agent_price", e.target.value ? parseFloat(e.target.value) : null)}
-                              className="h-9 md:h-8 text-sm bg-purple-500/5 border-purple-500/20 text-purple-400 rounded-lg md:rounded-md focus:border-purple-400/40"
+                              className="h-9 md:h-8 text-sm bg-purple-500/5 border-purple-500/20 text-purple-600 dark:text-purple-400 rounded-lg md:rounded-md focus:border-purple-400/40"
                             />
                           </div>
                         </div>
 
                         {/* User Price */}
                         <div className="w-full md:col-span-2 space-y-1">
-                          <label className="md:hidden text-[10px] text-white/30 uppercase font-bold tracking-widest">User Price (₵)</label>
+                          <label className="md:hidden text-[10px] text-muted-foreground uppercase font-bold tracking-widest">User Price (₵)</label>
                           <div className="relative">
                             <Input
                               type="number"
@@ -374,14 +374,14 @@ const AdminPackages = () => {
                               placeholder={((s.cost_price || pkg.price) * 1.12).toFixed(2)}
                               value={s.public_price ?? ""}
                               onChange={(e) => updateSetting(n.name, pkg.size, "public_price", e.target.value ? parseFloat(e.target.value) : null)}
-                              className="h-9 md:h-8 text-sm bg-white/5 border-white/10 rounded-lg md:rounded-md focus:border-blue-400/30"
+                              className="h-9 md:h-8 text-sm rounded-lg md:rounded-md focus:border-blue-500/30"
                             />
                           </div>
                         </div>
 
                         {/* API Price */}
                         <div className="w-full md:col-span-2 space-y-1">
-                          <label className="md:hidden text-[10px] text-white/30 uppercase font-bold tracking-widest">API Price (₵)</label>
+                          <label className="md:hidden text-[10px] text-muted-foreground uppercase font-bold tracking-widest">API Price (₵)</label>
                           <div className="relative">
                             <Input
                               type="number"
@@ -389,7 +389,7 @@ const AdminPackages = () => {
                               placeholder={(s.cost_price || pkg.price).toFixed(2)}
                               value={s.api_price ?? ""}
                               onChange={(e) => updateSetting(n.name, pkg.size, "api_price", e.target.value ? parseFloat(e.target.value) : null)}
-                              className="h-9 md:h-8 text-sm bg-amber-400/5 border-amber-400/20 text-amber-500 rounded-lg md:rounded-md focus:border-amber-400/40"
+                              className="h-9 md:h-8 text-sm bg-amber-400/5 border-amber-400/20 text-amber-600 dark:text-amber-500 rounded-lg md:rounded-md focus:border-amber-500/40"
                             />
                           </div>
                         </div>

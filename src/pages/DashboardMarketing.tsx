@@ -281,7 +281,10 @@ const DashboardMarketing = () => {
             </div>
           </div>
 
-          <div className="rounded-3xl bg-white/5 border border-white/10 p-8 space-y-6">
+          <div className={cn(
+            "rounded-3xl border p-8 space-y-6",
+            isDark ? "bg-white/5 border-white/10" : "bg-white border-gray-100 shadow-sm"
+          )}>
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-xl bg-sky-500/10 flex items-center justify-center">

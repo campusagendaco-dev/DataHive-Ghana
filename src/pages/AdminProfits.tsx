@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
+import { useAppTheme } from "@/contexts/ThemeContext";
 import { useRealtimeRefresh } from "@/hooks/useRealtimeRefresh";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -39,11 +40,11 @@ interface Profile {
   parent_agent_id: string | null;
 }
 
-const CustomTooltip = ({ active, payload, label }: any) => {
+const CustomTooltip = ({ active, payload, label, isDark }: any) => {
   if (!active || !payload?.length) return null;
   return (
-    <div className="bg-[#0d0d18] border border-white/10 rounded-xl p-3 shadow-xl text-xs">
-      <p className="text-white/60 mb-1">{label}</p>
+    <div className={`border rounded-xl p-3 shadow-xl text-xs ${isDark ? "bg-[#0d0d18] border-white/10" : "bg-white border-gray-200"}`}>
+      <p className={`mb-1 font-medium ${isDark ? "text-white/60" : "text-gray-500"}`}>{label}</p>
       {payload.map((p: any, i: number) => (
         <p key={i} style={{ color: p.color }} className="font-bold">
           {p.name}: GH₵{Number(p.value).toFixed(2)}
@@ -54,12 +55,20 @@ const CustomTooltip = ({ active, payload, label }: any) => {
 };
 
 const AdminProfits = () => {
+  const { isDark } = useAppTheme();
   const [loading, setLoading] = useState(true);
   const [orders, setOrders] = useState<OrderRow[]>([]);
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [search, setSearch] = useState("");
   const [expandedAgent, setExpandedAgent] = useState<string | null>(null);
   const [dateRange, setDateRange] = useState<"7" | "30" | "90" | "all">("30");
+
+  const cardBg = isDark ? "bg-white/[0.02] border-white/5" : "bg-white border-gray-200 shadow-sm";
+  const head = isDark ? "text-white" : "text-gray-900";
+  const sub = isDark ? "text-white/40" : "text-gray-500";
+  const muted = isDark ? "text-white/20" : "text-gray-400";
+  const gridColor = isDark ? "rgba(255,255,255,0.05)" : "rgba(0,0,0,0.05)";
+  const tickColor = isDark ? "rgba(255,255,255,0.4)" : "rgba(0,0,0,0.5)";
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -178,29 +187,29 @@ const AdminProfits = () => {
 
   if (loading) return (
     <div className="flex items-center justify-center h-64 gap-3">
-      <Loader2 className="w-6 h-6 text-amber-400 animate-spin" />
-      <span className="text-white/50 text-sm">Loading profit data...</span>
+      <Loader2 className="w-6 h-6 text-amber-500 animate-spin" />
+      <span className={`text-sm font-medium ${sub}`}>Loading profit data...</span>
     </div>
   );
 
   return (
     <div className="space-y-8 pb-10">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 border-b border-white/5 pb-6">
+      <div className={`flex flex-col sm:flex-row sm:items-end justify-between gap-4 border-b pb-6 ${isDark ? "border-white/5" : "border-gray-200"}`}>
         <div>
-          <h1 className="font-display text-3xl font-black tracking-tight bg-gradient-to-r from-white to-white/60 bg-clip-text text-transparent">
+          <h1 className={`font-display text-3xl font-black tracking-tight ${isDark ? "bg-gradient-to-r from-white to-white/60 bg-clip-text text-transparent" : "text-gray-900"}`}>
             Profits & Earnings
           </h1>
-          <p className="text-sm text-white/50 mt-1">Full profit breakdown — agents, sub-agents, and platform revenue.</p>
+          <p className={`text-sm mt-1 ${sub}`}>Full profit breakdown — agents, sub-agents, and platform revenue.</p>
         </div>
         <div className="flex items-center gap-2">
           {(["7", "30", "90", "all"] as const).map(r => (
             <button key={r} onClick={() => setDateRange(r)}
-              className={`px-3 py-1.5 text-xs rounded-lg font-bold transition-all ${dateRange === r ? "bg-amber-400 text-black" : "bg-white/5 text-white/40 hover:text-white"}`}>
+              className={`px-3 py-1.5 text-xs rounded-lg font-bold transition-all ${dateRange === r ? "bg-amber-400 text-black" : isDark ? "bg-white/5 text-white/40 hover:text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}>
               {r === "all" ? "All Time" : `${r}d`}
             </button>
           ))}
-          <Button onClick={fetchData} variant="outline" size="sm" className="gap-2 border-white/10 text-white/60 hover:text-white ml-2">
+          <Button onClick={fetchData} variant="outline" size="sm" className={`gap-2 ml-2 shadow-sm ${isDark ? "border-white/10 text-white/60 hover:text-white" : ""}`}>
             <RefreshCw className="w-3.5 h-3.5" /> Refresh
           </Button>
         </div>
@@ -209,26 +218,26 @@ const AdminProfits = () => {
       {/* Top stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {[
-          { label: "Total Revenue", value: `GH₵${totalRevenue.toFixed(2)}`, icon: DollarSign, color: "text-emerald-400", bg: "bg-emerald-500/10", border: "border-emerald-500/20" },
-          { label: "All Agent Profits", value: `GH₵${totalAllAgentProfits.toFixed(2)}`, icon: TrendingUp, color: "text-amber-400", bg: "bg-amber-500/10", border: "border-amber-500/20" },
-          { label: "From Direct Sales", value: `GH₵${totalAgentProfit.toFixed(2)}`, icon: Users, color: "text-blue-400", bg: "bg-blue-500/10", border: "border-blue-500/20" },
-          { label: "From Sub-Agents", value: `GH₵${totalParentProfit.toFixed(2)}`, icon: Users2, color: "text-purple-400", bg: "bg-purple-500/10", border: "border-purple-500/20" },
+          { label: "Total Revenue", value: `GH₵${totalRevenue.toFixed(2)}`, icon: DollarSign, color: "text-emerald-600 dark:text-emerald-400", bg: "bg-emerald-500/10", border: "border-emerald-500/20" },
+          { label: "All Agent Profits", value: `GH₵${totalAllAgentProfits.toFixed(2)}`, icon: TrendingUp, color: "text-amber-600 dark:text-amber-400", bg: "bg-amber-500/10", border: "border-amber-500/20" },
+          { label: "From Direct Sales", value: `GH₵${totalAgentProfit.toFixed(2)}`, icon: Users, color: "text-blue-600 dark:text-blue-400", bg: "bg-blue-500/10", border: "border-blue-500/20" },
+          { label: "From Sub-Agents", value: `GH₵${totalParentProfit.toFixed(2)}`, icon: Users2, color: "text-purple-600 dark:text-purple-400", bg: "bg-purple-500/10", border: "border-purple-500/20" },
         ].map(({ label, value, icon: Icon, color, bg, border }) => (
-          <div key={label} className={`p-5 rounded-2xl bg-white/[0.02] border ${border} shadow-xl relative overflow-hidden`}>
+          <div key={label} className={`p-5 rounded-2xl border ${border} ${cardBg} shadow-xl relative overflow-hidden`}>
             <div className={`absolute top-0 right-0 w-20 h-20 ${bg} blur-2xl -mr-8 -mt-8 rounded-full`} />
             <div className={`w-8 h-8 rounded-xl ${bg} ${border} border flex items-center justify-center mb-3 relative z-10`}>
               <Icon className={`w-4 h-4 ${color}`} />
             </div>
             <p className={`font-display text-2xl font-black ${color} relative z-10`}>{value}</p>
-            <p className="text-xs text-white/40 mt-1 relative z-10">{label}</p>
+            <p className={`text-xs mt-1 relative z-10 ${sub}`}>{label}</p>
           </div>
         ))}
       </div>
 
       {/* Chart */}
-      <div className="rounded-2xl bg-white/[0.02] border border-white/5 p-6">
-        <h3 className="font-bold text-white mb-1">Daily Profit Breakdown — Last 14 Days</h3>
-        <p className="text-xs text-white/40 mb-5">Agent direct profits vs. sub-agent margin profits, per day.</p>
+      <div className={`rounded-2xl border p-6 ${cardBg}`}>
+        <h3 className={`font-bold mb-1 ${head}`}>Daily Profit Breakdown — Last 14 Days</h3>
+        <p className={`text-xs mb-5 ${sub}`}>Agent direct profits vs. sub-agent margin profits, per day.</p>
         <ResponsiveContainer width="100%" height={240}>
           <AreaChart data={dailyData} margin={{ top: 5, right: 10, left: -10, bottom: 0 }}>
             <defs>
@@ -241,11 +250,11 @@ const AdminProfits = () => {
                 <stop offset="95%" stopColor="#a855f7" stopOpacity={0} />
               </linearGradient>
             </defs>
-            <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
-            <XAxis dataKey="date" tick={{ fill: "rgba(255,255,255,0.4)", fontSize: 11 }} axisLine={false} tickLine={false} />
-            <YAxis tick={{ fill: "rgba(255,255,255,0.4)", fontSize: 11 }} axisLine={false} tickLine={false} />
-            <Tooltip content={<CustomTooltip />} />
-            <Legend formatter={(v) => <span style={{ color: "rgba(255,255,255,0.6)", fontSize: 12 }}>{v}</span>} />
+            <CartesianGrid strokeDasharray="3 3" stroke={gridColor} />
+            <XAxis dataKey="date" tick={{ fill: tickColor, fontSize: 11 }} axisLine={false} tickLine={false} />
+            <YAxis tick={{ fill: tickColor, fontSize: 11 }} axisLine={false} tickLine={false} />
+            <Tooltip content={<CustomTooltip isDark={isDark} />} />
+            <Legend formatter={(v) => <span style={{ color: isDark ? "rgba(255,255,255,0.6)" : "#4b5563", fontSize: 12 }}>{v}</span>} />
             <Area type="monotone" dataKey="Agent Profits" stroke="#f59e0b" strokeWidth={2} fill="url(#gAgent)" dot={false} />
             <Area type="monotone" dataKey="Sub-Agent Profits" stroke="#a855f7" strokeWidth={2} fill="url(#gSub)" dot={false} />
           </AreaChart>
@@ -253,23 +262,23 @@ const AdminProfits = () => {
       </div>
 
       {/* Agent leaderboard */}
-      <div className="rounded-2xl bg-white/[0.02] border border-white/5 overflow-hidden">
-        <div className="p-5 border-b border-white/5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+      <div className={`rounded-2xl border overflow-hidden ${cardBg}`}>
+        <div className={`p-5 border-b flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${isDark ? "border-white/5" : "border-gray-100 bg-gray-50/50"}`}>
           <div>
-            <h3 className="font-bold text-white">Agent Profit Leaderboard</h3>
-            <p className="text-xs text-white/40 mt-0.5">Click any agent to see their individual sub-agent breakdown.</p>
+            <h3 className={`font-bold ${head}`}>Agent Profit Leaderboard</h3>
+            <p className={`text-xs mt-0.5 ${sub}`}>Click any agent to see their individual sub-agent breakdown.</p>
           </div>
           <div className="relative w-full sm:w-56">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-white/30" />
+            <Search className={`absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 ${sub}`} />
             <Input placeholder="Search agents..." value={search} onChange={e => setSearch(e.target.value)}
-              className="pl-8 bg-white/5 border-white/10 text-sm h-8" />
+              className={`pl-8 text-sm h-8 ${isDark ? "bg-white/5 border-white/10" : "bg-white border-gray-200 shadow-sm"}`} />
           </div>
         </div>
 
         {filteredAgents.length === 0 ? (
-          <div className="py-16 text-center text-white/30 text-sm">No agent profit data found.</div>
+          <div className={`py-16 text-center text-sm ${sub}`}>No agent profit data found.</div>
         ) : (
-          <div className="divide-y divide-white/5">
+          <div className={`divide-y ${isDark ? "divide-white/5" : "divide-gray-100"}`}>
             {filteredAgents.map((agent, idx) => {
               const isExpanded = expandedAgent === agent.id;
               const subAgentRows = subAgentProfits.filter(sa => sa.parentId === agent.id);
@@ -279,19 +288,19 @@ const AdminProfits = () => {
                 <div key={agent.id}>
                   <button
                     onClick={() => setExpandedAgent(isExpanded ? null : agent.id)}
-                    className="w-full flex items-center gap-4 p-4 hover:bg-white/3 transition-colors text-left"
+                    className={`w-full flex items-center gap-4 p-4 transition-colors text-left ${isDark ? "hover:bg-white/3" : "hover:bg-gray-50"}`}
                   >
                     {/* Rank */}
-                    <span className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-black shrink-0 ${idx === 0 ? "bg-amber-400/20 text-amber-400" : idx === 1 ? "bg-white/10 text-white/60" : "bg-white/5 text-white/30"}`}>
+                    <span className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-black shrink-0 ${idx === 0 ? "bg-amber-400/20 text-amber-600 dark:text-amber-400" : idx === 1 ? isDark ? "bg-white/10 text-white/60" : "bg-gray-100 text-gray-600" : isDark ? "bg-white/5 text-white/30" : "bg-gray-50 text-gray-400"}`}>
                       {idx + 1}
                     </span>
 
                     {/* Name + progress */}
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-bold text-white truncate">{agent.name}</p>
-                      <p className="text-[10px] text-white/30 truncate">{agent.email}</p>
-                      <div className="mt-1.5 h-1 rounded-full bg-white/5 overflow-hidden">
-                        <div className="h-full rounded-full bg-amber-400/50" style={{ width: `${pct}%` }} />
+                      <p className={`text-sm font-bold truncate ${head}`}>{agent.name}</p>
+                      <p className={`text-[10px] truncate ${sub}`}>{agent.email}</p>
+                      <div className={`mt-1.5 h-1 rounded-full overflow-hidden ${isDark ? "bg-white/5" : "bg-gray-100"}`}>
+                        <div className="h-full rounded-full bg-amber-500/50" style={{ width: `${pct}%` }} />
                       </div>
                     </div>
 
@@ -299,47 +308,47 @@ const AdminProfits = () => {
                     <div className="text-right shrink-0 hidden sm:block">
                       <div className="flex gap-4 items-end justify-end">
                         <div>
-                          <p className="text-[10px] text-white/30">Direct</p>
-                          <p className="text-xs font-bold text-blue-400">GH₵{agent.directProfit.toFixed(2)}</p>
+                          <p className={`text-[10px] ${sub}`}>Direct</p>
+                          <p className="text-xs font-bold text-blue-600 dark:text-blue-400">GH₵{agent.directProfit.toFixed(2)}</p>
                         </div>
                         <div>
-                          <p className="text-[10px] text-white/30">Sub-Agent</p>
-                          <p className="text-xs font-bold text-purple-400">GH₵{agent.subAgentProfit.toFixed(2)}</p>
+                          <p className={`text-[10px] ${sub}`}>Sub-Agent</p>
+                          <p className="text-xs font-bold text-purple-600 dark:text-purple-400">GH₵{agent.subAgentProfit.toFixed(2)}</p>
                         </div>
                         <div>
-                          <p className="text-[10px] text-white/30">Total</p>
-                          <p className="text-sm font-black text-amber-400">GH₵{agent.totalProfit.toFixed(2)}</p>
+                          <p className={`text-[10px] ${sub}`}>Total</p>
+                          <p className="text-sm font-black text-amber-600 dark:text-amber-400">GH₵{agent.totalProfit.toFixed(2)}</p>
                         </div>
                       </div>
-                      <p className="text-[10px] text-white/20 mt-1">{agent.orderCount} orders • {agent.subAgentOrderCount} sub-agent</p>
+                      <p className={`text-[10px] mt-1 ${muted}`}>{agent.orderCount} orders • {agent.subAgentOrderCount} sub-agent</p>
                     </div>
                     {/* Mobile total */}
                     <div className="sm:hidden text-right shrink-0">
-                      <p className="text-sm font-black text-amber-400">GH₵{agent.totalProfit.toFixed(2)}</p>
+                      <p className="text-sm font-black text-amber-600 dark:text-amber-400">GH₵{agent.totalProfit.toFixed(2)}</p>
                     </div>
-                    {isExpanded ? <ChevronUp className="w-4 h-4 text-white/30 shrink-0" /> : <ChevronDown className="w-4 h-4 text-white/30 shrink-0" />}
+                    {isExpanded ? <ChevronUp className={`w-4 h-4 shrink-0 ${sub}`} /> : <ChevronDown className={`w-4 h-4 shrink-0 ${sub}`} />}
                   </button>
 
                   {/* Sub-agent breakdown */}
                   {isExpanded && (
-                    <div className="bg-black/20 border-t border-white/5 px-4 pb-4 pt-3">
-                      <p className="text-[10px] font-bold uppercase tracking-widest text-white/30 mb-3">Sub-Agents under {agent.name}</p>
+                    <div className={`border-t px-4 pb-4 pt-3 ${isDark ? "bg-black/20 border-white/5" : "bg-gray-50/50 border-gray-100"}`}>
+                      <p className={`text-[10px] font-bold uppercase tracking-widest mb-3 ${sub}`}>Sub-Agents under {agent.name}</p>
                       {subAgentRows.length === 0 ? (
-                        <p className="text-xs text-white/20 italic">No sub-agents with profits yet.</p>
+                        <p className={`text-xs italic ${muted}`}>No sub-agents with profits yet.</p>
                       ) : (
                         <div className="space-y-2">
                           {subAgentRows.map(sa => (
-                            <div key={sa.id} className="flex items-center justify-between gap-3 px-3 py-2 rounded-xl bg-white/3 border border-white/5">
+                            <div key={sa.id} className={`flex items-center justify-between gap-3 px-3 py-2 rounded-xl border shadow-sm ${isDark ? "bg-white/3 border-white/5" : "bg-white border-gray-200"}`}>
                               <div className="flex items-center gap-2 min-w-0">
                                 <span className="w-1.5 h-1.5 rounded-full bg-purple-400 shrink-0" />
                                 <div className="min-w-0">
-                                  <p className="text-xs font-semibold text-white/70 truncate">{sa.name}</p>
-                                  <p className="text-[10px] text-white/30 truncate">{sa.email}</p>
+                                  <p className={`text-xs font-semibold truncate ${isDark ? "text-white/70" : "text-gray-700"}`}>{sa.name}</p>
+                                  <p className={`text-[10px] truncate ${sub}`}>{sa.email}</p>
                                 </div>
                               </div>
                               <div className="text-right shrink-0">
-                                <p className="text-xs font-bold text-purple-400">GH₵{sa.profit.toFixed(2)}</p>
-                                <p className="text-[10px] text-white/20">{sa.orderCount} orders</p>
+                                <p className="text-xs font-bold text-purple-600 dark:text-purple-400">GH₵{sa.profit.toFixed(2)}</p>
+                                <p className={`text-[10px] ${muted}`}>{sa.orderCount} orders</p>
                               </div>
                             </div>
                           ))}
@@ -355,35 +364,35 @@ const AdminProfits = () => {
       </div>
 
       {/* Sub-agent profit table */}
-      <div className="rounded-2xl bg-white/[0.02] border border-white/5 overflow-hidden">
-        <div className="p-5 border-b border-white/5">
-          <h3 className="font-bold text-white">Sub-Agent Individual Profits</h3>
-          <p className="text-xs text-white/40 mt-0.5">Every sub-agent's own earnings and the parent agent they belong to.</p>
+      <div className={`rounded-2xl border overflow-hidden ${cardBg}`}>
+        <div className={`p-5 border-b ${isDark ? "border-white/5" : "border-gray-100 bg-gray-50/50"}`}>
+          <h3 className={`font-bold ${head}`}>Sub-Agent Individual Profits</h3>
+          <p className={`text-xs mt-0.5 ${sub}`}>Every sub-agent's own earnings and the parent agent they belong to.</p>
         </div>
         {subAgentProfits.length === 0 ? (
-          <div className="py-12 text-center text-white/30 text-sm">No sub-agent orders yet.</div>
+          <div className={`py-12 text-center text-sm ${sub}`}>No sub-agent orders yet.</div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-white/5 bg-white/3">
+                <tr className={`border-b ${isDark ? "border-white/5 bg-white/3" : "border-gray-100 bg-gray-50"}`}>
                   {["Sub-Agent", "Parent Agent", "Orders", "Profit"].map(h => (
-                    <th key={h} className="text-left px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-white/30">{h}</th>
+                    <th key={h} className={`text-left px-4 py-3 text-[10px] font-bold uppercase tracking-widest ${sub}`}>{h}</th>
                   ))}
                 </tr>
               </thead>
-              <tbody className="divide-y divide-white/5">
+              <tbody className={`divide-y ${isDark ? "divide-white/5" : "divide-gray-100"}`}>
                 {subAgentProfits.map(sa => (
-                  <tr key={sa.id} className="hover:bg-white/3 transition-colors">
+                  <tr key={sa.id} className={`transition-colors ${isDark ? "hover:bg-white/3" : "hover:bg-gray-50 bg-white"}`}>
                     <td className="px-4 py-3">
-                      <p className="text-xs font-semibold text-white/80">{sa.name}</p>
-                      <p className="text-[10px] text-white/30">{sa.email}</p>
+                      <p className={`text-xs font-semibold ${isDark ? "text-white/80" : "text-gray-700"}`}>{sa.name}</p>
+                      <p className={`text-[10px] ${sub}`}>{sa.email}</p>
                     </td>
                     <td className="px-4 py-3">
-                      <Badge variant="outline" className="border-amber-500/20 text-amber-400 text-[10px]">{sa.parentName}</Badge>
+                      <Badge variant="outline" className="border-amber-500/20 text-amber-600 dark:text-amber-400 text-[10px] shadow-sm">{sa.parentName}</Badge>
                     </td>
-                    <td className="px-4 py-3 text-xs text-white/50">{sa.orderCount}</td>
-                    <td className="px-4 py-3 text-xs font-black text-purple-400">GH₵{sa.profit.toFixed(2)}</td>
+                    <td className={`px-4 py-3 text-xs ${isDark ? "text-white/50" : "text-gray-500"}`}>{sa.orderCount}</td>
+                    <td className="px-4 py-3 text-xs font-black text-purple-600 dark:text-purple-400">GH₵{sa.profit.toFixed(2)}</td>
                   </tr>
                 ))}
               </tbody>

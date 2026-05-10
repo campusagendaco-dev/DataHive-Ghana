@@ -324,7 +324,7 @@ const DashboardAccountSettings = () => {
                       <button
                         type="button"
                         onClick={() => setShowPassword(!showPassword)}
-                        className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-white transition-colors"
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
                       >
                         {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                       </button>
@@ -374,7 +374,7 @@ const DashboardAccountSettings = () => {
             </CardHeader>
             <CardContent className="space-y-5">
               {!isSupported && (
-                <div className="rounded-xl bg-amber-500/10 border border-amber-500/20 p-4 text-sm text-amber-300 flex items-start gap-3">
+                <div className="rounded-xl bg-amber-500/10 border border-amber-500/20 p-4 text-sm text-amber-600 dark:text-amber-300 flex items-start gap-3">
                   <Shield className="w-5 h-5 shrink-0 mt-0.5" />
                   <p>{supportReason || "Biometric authentication is not available on this browser."}</p>
                 </div>
@@ -556,7 +556,7 @@ const DashboardAccountSettings = () => {
             <CardContent className="p-6">
               <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
                 <div className="space-y-1">
-                  <p className="text-sm font-bold text-white/90">Delete My Account</p>
+                  <p className="text-sm font-bold text-foreground/90">Delete My Account</p>
                   <p className="text-xs text-muted-foreground">
                     Instantly and permanently delete your SwiftData account and all associated data.
                   </p>

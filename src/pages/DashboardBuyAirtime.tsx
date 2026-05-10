@@ -209,7 +209,10 @@ const DashboardBuyAirtime = () => {
               <Sparkles className="w-3 h-3" />
               Flash Sale Live
             </span>
-            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/[0.04] text-white/40 text-[10px] font-bold uppercase tracking-wider border border-white/[0.08]">
+            <span className={cn(
+              "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider border",
+              isDark ? "bg-white/[0.04] text-white/40 border-white/[0.08]" : "bg-gray-100 text-gray-400 border-gray-200"
+            )}>
               <ShieldCheck className="w-3 h-3" />
               Secured
             </span>
@@ -256,7 +259,10 @@ const DashboardBuyAirtime = () => {
             </div>
             <button
               onClick={() => window.location.reload()}
-              className="ml-2 p-1.5 rounded-lg hover:bg-white/5 text-white/20 hover:text-white/60 transition-colors"
+              className={cn(
+                "ml-2 p-1.5 rounded-lg transition-colors",
+                isDark ? "hover:bg-white/5 text-white/20 hover:text-white/60" : "hover:bg-gray-100 text-gray-300 hover:text-gray-500"
+              )}
             >
               <RotateCcw className="w-3.5 h-3.5" />
             </button>
@@ -369,9 +375,9 @@ const DashboardBuyAirtime = () => {
             </div>
 
             <div className="relative">
-              <div className="absolute left-5 top-1/2 -translate-y-1/2 pointer-events-none text-white/20">
-                <Phone className="w-5 h-5" />
-              </div>
+            <div className={cn("absolute left-5 top-1/2 -translate-y-1/2 pointer-events-none", isDark ? "text-white/20" : "text-gray-300")}>
+              <Phone className="w-5 h-5" />
+            </div>
               <input
                 type="tel"
                 value={phone}
@@ -452,7 +458,7 @@ const DashboardBuyAirtime = () => {
             <div className="relative">
               <div
                 className="absolute left-6 top-1/2 -translate-y-1/2 text-4xl font-black pointer-events-none transition-all duration-300 select-none"
-                style={{ color: numAmount > 0 ? activeNet.color : "rgba(255,255,255,0.10)" }}
+                style={{ color: numAmount > 0 ? activeNet.color : (isDark ? "rgba(255,255,255,0.10)" : "rgba(0,0,0,0.08)") }}
               >
                 ₵
               </div>
@@ -493,22 +499,22 @@ const DashboardBuyAirtime = () => {
             }}
           >
             {/* Preview header */}
-            <div className="p-5 border-b border-white/[0.05]">
+            <div className={cn("p-5 border-b", isDark ? "border-white/[0.05]" : "border-gray-100")}>
               <div className="flex items-center justify-between mb-4">
-                <span className="text-[9px] font-bold uppercase tracking-[0.2em] text-white/25">
+                <span className={cn("text-[9px] font-bold uppercase tracking-[0.2em]", isDark ? "text-white/25" : "text-gray-400")}>
                   Order Preview
                 </span>
                 <div className="flex items-center gap-1.5">
                   <span
                     className="w-1.5 h-1.5 rounded-full transition-all duration-700"
                     style={{
-                      background: canPay ? activeNet.color : "rgba(255,255,255,0.15)",
+                      background: canPay ? activeNet.color : (isDark ? "rgba(255,255,255,0.15)" : "rgba(0,0,0,0.1)"),
                       boxShadow: canPay ? `0 0 8px ${activeNet.glow}` : "none",
                     }}
                   />
                   <span
                     className="text-[9px] font-bold uppercase tracking-wider transition-all duration-700"
-                    style={{ color: canPay ? activeNet.color : "rgba(255,255,255,0.20)" }}
+                    style={{ color: canPay ? activeNet.color : (isDark ? "rgba(255,255,255,0.20)" : "rgba(0,0,0,0.3)") }}
                   >
                     {canPay ? "Ready" : "Pending"}
                   </span>
@@ -516,11 +522,11 @@ const DashboardBuyAirtime = () => {
               </div>
 
               <div className="flex items-center gap-3">
-                <div className="w-12 h-12 rounded-2xl flex items-center justify-center bg-white/[0.05] border border-white/[0.08]">
+                <div className={cn("w-12 h-12 rounded-2xl flex items-center justify-center border", isDark ? "bg-white/[0.05] border-white/[0.08]" : "bg-gray-50 border-gray-200 shadow-sm")}>
                   <ActiveLogo size={36} />
                 </div>
                 <div>
-                  <p className="text-xs text-white/35 font-medium">{network} Airtime</p>
+                  <p className={cn("text-xs font-medium", isDark ? "text-white/35" : "text-gray-500")}>{network} Airtime</p>
                   <p
                     className={cn("text-2xl font-black transition-all duration-300", numAmount > 0 ? (isDark ? "text-white" : "text-gray-900") : (isDark ? "text-white/18" : "text-gray-200"))}
                   >
@@ -533,22 +539,22 @@ const DashboardBuyAirtime = () => {
             {/* Order details */}
             <div className="px-5 py-4 space-y-3">
               <div className="flex justify-between items-center">
-                <span className="text-xs text-white/30">To</span>
-                <span className={cn("text-sm font-bold", phone ? "text-white" : "text-white/20")}>
+                <span className={cn("text-xs", isDark ? "text-white/30" : "text-gray-500")}>To</span>
+                <span className={cn("text-sm font-bold", phone ? (isDark ? "text-white" : "text-gray-900") : (isDark ? "text-white/20" : "text-gray-300"))}>
                   {phone || "—"}
                 </span>
               </div>
               <div className="flex justify-between items-center">
-                <span className="text-xs text-white/30">Network</span>
+                <span className={cn("text-xs", isDark ? "text-white/30" : "text-gray-500")}>Network</span>
                 <span className="text-sm font-bold" style={{ color: activeNet.color }}>
                   {network}
                 </span>
               </div>
               <div
                 className="flex justify-between items-center pt-3"
-                style={{ borderTop: "1px solid rgba(255,255,255,0.05)" }}
+                style={{ borderTop: isDark ? "1px solid rgba(255,255,255,0.05)" : "1px solid rgba(0,0,0,0.05)" }}
               >
-                <span className="text-xs text-white/30">Total</span>
+                <span className={cn("text-xs", isDark ? "text-white/30" : "text-gray-500")}>Total</span>
                 <span className={cn("text-xl font-black", isDark ? "text-white" : "text-gray-900")}>
                   ₵{numAmount > 0 ? numAmount.toFixed(2) : "0.00"}
                 </span>
@@ -557,7 +563,7 @@ const DashboardBuyAirtime = () => {
 
             {/* Payment method toggle */}
             <div className="px-5 pb-4 space-y-2.5">
-              <p className="text-[9px] font-bold uppercase tracking-[0.2em] text-white/20">Pay With</p>
+              <p className={cn("text-[9px] font-bold uppercase tracking-[0.2em]", isDark ? "text-white/20" : "text-gray-400")}>Pay With</p>
               <div
                 className="grid grid-cols-2 gap-1.5 p-1 rounded-2xl"
                 style={{
@@ -577,7 +583,7 @@ const DashboardBuyAirtime = () => {
                             color: activeNet.color,
                             boxShadow: `0 4px 16px ${activeNet.glow}`,
                           }
-                        : { color: "rgba(255,255,255,0.25)" }
+                        : { color: isDark ? "rgba(255,255,255,0.25)" : "rgba(0,0,0,0.3)" }
                     }
                   >
                     {method === "wallet" ? (
@@ -624,7 +630,7 @@ const DashboardBuyAirtime = () => {
                 )}
               </button>
 
-              <div className="flex items-center justify-center gap-1.5 text-[9px] font-bold uppercase tracking-[0.15em] text-white/20">
+              <div className={cn("flex items-center justify-center gap-1.5 text-[9px] font-bold uppercase tracking-[0.15em]", isDark ? "text-white/20" : "text-gray-400")}>
                 <ShieldCheck className="w-3 h-3" />
                 256-bit encrypted · Powered by Paystack
               </div>
@@ -645,7 +651,7 @@ const DashboardBuyAirtime = () => {
                 Agent Perk
               </span>
             </div>
-            <p className="text-[11px] text-white/35 leading-relaxed">
+            <p className={cn("text-[11px] leading-relaxed", isDark ? "text-white/35" : "text-gray-600")}>
               Earn up to{" "}
               <span className="text-amber-400 font-bold">2.5% cashback</span> on every
               airtime purchase as a registered agent.

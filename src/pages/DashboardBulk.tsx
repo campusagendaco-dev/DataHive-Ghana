@@ -101,13 +101,13 @@ const DashboardBulk = () => {
     <div className="p-4 md:p-8 max-w-6xl mx-auto space-y-8 animate-in fade-in duration-700">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-black text-white tracking-tight flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-amber-400 flex items-center justify-center shrink-0">
+          <h1 className="text-3xl font-black text-foreground tracking-tight flex items-center gap-3">
+            <div className="w-10 h-10 rounded-2xl bg-amber-500 dark:bg-amber-400 flex items-center justify-center shrink-0">
               <Users className="w-5 h-5 text-black" />
             </div>
             Bulk Disbursement
           </h1>
-          <p className="text-white/35 text-sm mt-1.5 ml-[52px]">
+          <p className="text-muted-foreground text-sm mt-1.5 ml-[52px]">
             Send data to hundreds of numbers at once.
           </p>
         </div>
@@ -115,7 +115,7 @@ const DashboardBulk = () => {
         <div className="flex items-center gap-3">
           <button 
             onClick={handleDownloadSample}
-            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white/5 border border-white/10 text-xs font-bold text-white/60 hover:text-white transition-all"
+            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-muted/50 border border-border text-xs font-bold text-muted-foreground hover:text-foreground hover:bg-muted transition-all"
           >
             <Download className="w-3.5 h-3.5" /> Sample CSV
           </button>
@@ -128,41 +128,41 @@ const DashboardBulk = () => {
         <div className="lg:col-span-7 space-y-6">
           
           {/* Step 1: Recipients */}
-          <div className="rounded-3xl p-6 space-y-4 bg-white/5 border border-white/10">
+          <div className="rounded-3xl p-6 space-y-4 bg-card border border-border shadow-sm">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <div className="w-6 h-6 rounded-full bg-white/10 flex items-center justify-center text-[10px] font-black">1</div>
-                <h2 className="text-sm font-black uppercase tracking-wider text-white/50">Recipients</h2>
+                <div className="w-6 h-6 rounded-full bg-muted border border-border flex items-center justify-center text-[10px] font-black">1</div>
+                <h2 className="text-sm font-black uppercase tracking-wider text-muted-foreground/80">Recipients</h2>
               </div>
-              <span className="text-[10px] font-bold text-amber-400 bg-amber-400/10 px-2 py-0.5 rounded-full">
+              <span className="text-[10px] font-bold text-amber-500 dark:text-amber-400 bg-amber-400/10 px-2 py-0.5 rounded-full">
                 {parsedNumbers.length} Numbers Detected
               </span>
             </div>
             
-            <p className="text-xs text-white/30">Paste phone numbers separated by commas, spaces or new lines.</p>
+            <p className="text-xs text-muted-foreground">Paste phone numbers separated by commas, spaces or new lines.</p>
             
             <textarea
               value={inputNumbers}
               onChange={(e) => setInputNumbers(e.target.value)}
               placeholder="0240000001, 0240000002..."
-              className="w-full h-48 bg-black/40 border border-white/10 rounded-2xl p-4 text-sm font-mono text-white focus:border-amber-400/50 transition-all outline-none"
+              className="w-full h-48 bg-muted/30 border border-border rounded-2xl p-4 text-sm font-mono text-foreground focus:border-amber-500/50 transition-all outline-none"
             />
           </div>
 
           {/* Step 2: Package */}
-          <div className="rounded-3xl p-6 space-y-6 bg-white/5 border border-white/10">
+          <div className="rounded-3xl p-6 space-y-6 bg-card border border-border shadow-sm">
             <div className="flex items-center gap-3">
-              <div className="w-6 h-6 rounded-full bg-white/10 flex items-center justify-center text-[10px] font-black">2</div>
-              <h2 className="text-sm font-black uppercase tracking-wider text-white/50">Select Package</h2>
+              <div className="w-6 h-6 rounded-full bg-muted border border-border flex items-center justify-center text-[10px] font-black">2</div>
+              <h2 className="text-sm font-black uppercase tracking-wider text-muted-foreground/80">Select Package</h2>
             </div>
 
-            <div className="flex gap-2 p-1 bg-black/40 rounded-2xl border border-white/5">
+            <div className="flex gap-2 p-1 bg-muted/50 rounded-2xl border border-border">
               {(["MTN", "Telecel", "AirtelTigo"] as const).map(net => (
                 <button
                   key={net}
                   onClick={() => { setSelectedNetwork(net); setSelectedSize(""); }}
                   className={`flex-1 py-2.5 rounded-xl text-xs font-black transition-all ${
-                    selectedNetwork === net ? "bg-white/10 text-white shadow-xl" : "text-white/30 hover:text-white/50"
+                    selectedNetwork === net ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
                   }`}
                 >
                   {net}
@@ -177,13 +177,13 @@ const DashboardBulk = () => {
                   onClick={() => setSelectedSize(p.size)}
                   className={`p-3 rounded-2xl border-2 text-left transition-all ${
                     selectedSize === p.size 
-                      ? "border-amber-400 bg-amber-400/10" 
-                      : "border-white/5 bg-white/5 hover:border-white/20"
+                      ? "border-amber-500 bg-amber-500/10" 
+                      : "border-border bg-muted/20 hover:bg-muted/40"
                   }`}
                 >
-                  <p className="text-[10px] font-bold text-white/40 uppercase">{selectedNetwork}</p>
-                  <p className="text-xl font-black text-white">{p.size}</p>
-                  <p className="text-xs font-black text-amber-400 mt-1">₵{p.price.toFixed(2)}</p>
+                  <p className="text-[10px] font-bold text-muted-foreground uppercase">{selectedNetwork}</p>
+                  <p className="text-xl font-black text-foreground">{p.size}</p>
+                  <p className="text-xs font-black text-amber-500 dark:text-amber-400 mt-1">₵{p.price.toFixed(2)}</p>
                 </button>
               ))}
             </div>
@@ -192,37 +192,37 @@ const DashboardBulk = () => {
 
         {/* Right: Summary & Action */}
         <div className="lg:col-span-5 space-y-6">
-          <div className="rounded-3xl p-8 space-y-6 bg-gradient-to-br from-white/[0.03] to-transparent border border-white/10 sticky top-24">
-            <h3 className="text-lg font-black text-white">Bulk Summary</h3>
+          <div className="rounded-3xl p-8 space-y-6 bg-card border border-border shadow-lg sticky top-24">
+            <h3 className="text-lg font-black text-foreground">Bulk Summary</h3>
             
             <div className="space-y-4">
               <div className="flex justify-between items-center text-sm">
-                <span className="text-white/40">Network</span>
-                <span className="font-bold text-white">{selectedNetwork}</span>
+                <span className="text-muted-foreground">Network</span>
+                <span className="font-bold text-foreground">{selectedNetwork}</span>
               </div>
               <div className="flex justify-between items-center text-sm">
-                <span className="text-white/40">Package</span>
-                <span className="font-bold text-white">{selectedSize || "—"}</span>
+                <span className="text-muted-foreground">Package</span>
+                <span className="font-bold text-foreground">{selectedSize || "—"}</span>
               </div>
               <div className="flex justify-between items-center text-sm">
-                <span className="text-white/40">Unit Price</span>
-                <span className="font-bold text-white">₵{selectedPackage?.price.toFixed(2) || "0.00"}</span>
+                <span className="text-muted-foreground">Unit Price</span>
+                <span className="font-bold text-foreground">₵{selectedPackage?.price.toFixed(2) || "0.00"}</span>
               </div>
               <div className="flex justify-between items-center text-sm">
-                <span className="text-white/40">Total Recipients</span>
-                <span className="font-bold text-white">{parsedNumbers.length}</span>
+                <span className="text-muted-foreground">Total Recipients</span>
+                <span className="font-bold text-foreground">{parsedNumbers.length}</span>
               </div>
               
-              <div className="pt-4 border-t border-white/5 flex justify-between items-center">
-                <span className="text-white/40 font-bold uppercase tracking-widest text-xs">Total Cost</span>
-                <span className="text-3xl font-black text-amber-400">₵{totalCost.toFixed(2)}</span>
+              <div className="pt-4 border-t border-border flex justify-between items-center">
+                <span className="text-muted-foreground font-bold uppercase tracking-widest text-xs">Total Cost</span>
+                <span className="text-3xl font-black text-amber-500 dark:text-amber-400">₵{totalCost.toFixed(2)}</span>
               </div>
             </div>
 
             <button
               onClick={handleBulkSend}
               disabled={isProcessing || parsedNumbers.length === 0 || !selectedSize}
-              className="w-full py-5 rounded-2xl bg-amber-400 text-black font-black text-lg shadow-2xl shadow-amber-400/20 hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-50 flex items-center justify-center gap-3"
+              className="w-full py-5 rounded-2xl bg-amber-500 dark:bg-amber-400 text-black font-black text-lg shadow-2xl shadow-amber-500/20 hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-50 flex items-center justify-center gap-3"
             >
               {isProcessing ? (
                 <><Loader2 className="w-6 h-6 animate-spin" /> Processing...</>
@@ -231,9 +231,9 @@ const DashboardBulk = () => {
               )}
             </button>
 
-            <div className="flex items-center gap-3 p-4 rounded-2xl bg-white/5 border border-white/10">
-              <Info className="w-5 h-5 text-white/30 shrink-0" />
-              <p className="text-[10px] text-white/30 leading-relaxed uppercase font-black tracking-widest">
+            <div className="flex items-center gap-3 p-4 rounded-2xl bg-muted/50 border border-border">
+              <Info className="w-5 h-5 text-muted-foreground/50 shrink-0" />
+              <p className="text-[10px] text-muted-foreground/70 leading-relaxed uppercase font-black tracking-widest">
                 Transactions are processed sequentially. Please do not close the window until complete.
               </p>
             </div>
@@ -241,12 +241,12 @@ const DashboardBulk = () => {
 
           {/* Results section */}
           {results && (
-            <div className="rounded-3xl p-6 bg-black/40 border border-white/5 space-y-4 max-h-[400px] overflow-y-auto">
-              <h4 className="text-xs font-black text-white/40 uppercase tracking-widest">Processing Results</h4>
+            <div className="rounded-3xl p-6 bg-muted/30 border border-border shadow-inner space-y-4 max-h-[400px] overflow-y-auto">
+              <h4 className="text-xs font-black text-muted-foreground uppercase tracking-widest">Processing Results</h4>
               <div className="space-y-2">
                 {results.map((res, i) => (
-                  <div key={i} className="flex items-center justify-between p-3 rounded-xl bg-white/5">
-                    <span className="text-xs font-mono text-white/60">{res.phone}</span>
+                  <div key={i} className="flex items-center justify-between p-3 rounded-xl bg-background border border-border">
+                    <span className="text-xs font-mono text-foreground/70">{res.phone}</span>
                     {res.status === "success" ? (
                       <CheckCircle2 className="w-4 h-4 text-green-500" />
                     ) : (
@@ -270,20 +270,20 @@ const DashboardBulk = () => {
           className="w-full flex items-center justify-between gap-4 px-8 py-5 text-left"
         >
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-amber-400/15 border border-amber-400/25 flex items-center justify-center shrink-0">
-              <Building2 className="w-5 h-5 text-amber-400" />
+            <div className="w-10 h-10 rounded-xl bg-amber-400/20 border border-amber-400/30 flex items-center justify-center shrink-0">
+              <Building2 className="w-5 h-5 text-amber-600 dark:text-amber-400" />
             </div>
             <div>
-              <p className="font-black text-base text-white">B2B & Corporate Pricing</p>
-              <p className="text-[11px] text-white/40">Volume discounts for businesses, churches, schools & companies</p>
+              <p className="font-black text-base text-foreground">B2B & Corporate Pricing</p>
+              <p className="text-[11px] text-muted-foreground">Volume discounts for businesses, churches, schools & companies</p>
             </div>
           </div>
-          {showB2B ? <ChevronUp className="w-4 h-4 text-white/40 shrink-0" /> : <ChevronDown className="w-4 h-4 text-white/40 shrink-0" />}
+          {showB2B ? <ChevronUp className="w-4 h-4 text-muted-foreground shrink-0" /> : <ChevronDown className="w-4 h-4 text-muted-foreground shrink-0" />}
         </button>
 
         {showB2B && (
           <div className="px-8 pb-8 space-y-6 border-t border-amber-400/10">
-            <p className="text-sm text-white/50 pt-4">
+            <p className="text-sm text-muted-foreground pt-4">
               Buying data for a company, school, or event? Get volume discounts applied automatically.
               Contact us via WhatsApp to lock in your corporate rate.
             </p>
@@ -295,18 +295,18 @@ const DashboardBulk = () => {
                 { label: "Business", range: "10 – 49 numbers", discount: "5% off each bundle", highlight: false, icon: "🔵" },
                 { label: "Enterprise", range: "50+ numbers", discount: "12% off + priority", highlight: true, icon: "🏆" },
               ].map(tier => (
-                <div key={tier.label} className={`rounded-2xl border p-5 space-y-2 ${tier.highlight ? "border-amber-400/40 bg-amber-400/10" : "border-white/8 bg-white/[0.02]"}`}>
+                <div key={tier.label} className={`rounded-2xl border p-5 space-y-2 ${tier.highlight ? "border-amber-400/40 bg-amber-400/10" : "border-border bg-muted/30"}`}>
                   <p className="text-lg">{tier.icon}</p>
-                  <p className={`font-black text-sm ${tier.highlight ? "text-amber-400" : "text-white"}`}>{tier.label}</p>
-                  <p className="text-[11px] text-white/40">{tier.range}</p>
-                  <p className={`text-xs font-bold ${tier.highlight ? "text-amber-300" : "text-white/60"}`}>{tier.discount}</p>
+                  <p className={`font-black text-sm ${tier.highlight ? "text-amber-600 dark:text-amber-400" : "text-foreground"}`}>{tier.label}</p>
+                  <p className="text-[11px] text-muted-foreground">{tier.range}</p>
+                  <p className={`text-xs font-bold ${tier.highlight ? "text-amber-600 dark:text-amber-300" : "text-muted-foreground"}`}>{tier.discount}</p>
                 </div>
               ))}
             </div>
 
             {/* What's included */}
-            <div className="rounded-2xl border border-white/6 bg-white/[0.02] p-5 space-y-3">
-              <p className="text-[10px] font-black uppercase tracking-widest text-white/30">What corporate clients get</p>
+            <div className="rounded-2xl border border-border bg-muted/30 p-5 space-y-3">
+              <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">What corporate clients get</p>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 {[
                   "Volume discount on every bundle",
@@ -316,8 +316,8 @@ const DashboardBulk = () => {
                   "Recurring bulk schedule option",
                   "Custom invoice on request",
                 ].map(f => (
-                  <div key={f} className="flex items-center gap-2 text-xs text-white/60">
-                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                  <div key={f} className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
                     {f}
                   </div>
                 ))}
@@ -339,9 +339,9 @@ const DashboardBulk = () => {
                 href={`https://wa.me/?text=${encodeURIComponent(`Hi! I need bulk data for my organisation. I want to send data to multiple employees/members at once. Can you help me set up a corporate plan?`)}`}
                 target="_blank"
                 rel="noreferrer"
-                className="flex items-center gap-2 px-6 py-3 rounded-2xl border border-white/10 bg-white/5 text-white/70 font-bold text-sm hover:bg-white/10 transition-all"
+                className="flex items-center gap-2 px-6 py-3 rounded-2xl border border-border bg-muted/50 text-foreground font-bold text-sm hover:bg-muted transition-all"
               >
-                <MessageCircle className="w-4 h-4" />
+                <MessageCircle className="w-4 h-4 text-muted-foreground" />
                 WhatsApp SwiftData
               </a>
             </div>

@@ -593,8 +593,8 @@ const DashboardBuyDataNetwork = ({ network }: DashboardBuyDataNetworkProps) => {
                       className="w-full flex items-center justify-between px-3 py-2.5 hover:bg-primary/10 transition-colors text-left"
                     >
                       <div>
-                        <p className="text-xs font-bold text-white">{c.name}</p>
-                        <p className="text-[10px] text-white/40 font-mono">{c.phone}</p>
+                        <p className="text-xs font-bold text-foreground">{c.name}</p>
+                        <p className="text-[10px] text-muted-foreground font-mono">{c.phone}</p>
                       </div>
                       <span className="text-[9px] font-black uppercase text-primary/60 px-1.5 py-0.5 rounded border border-primary/20">{c.network}</span>
                     </button>
@@ -742,7 +742,7 @@ const DashboardBuyDataNetwork = ({ network }: DashboardBuyDataNetworkProps) => {
                   <span className="text-muted-foreground uppercase tracking-tight">Processing fee</span>
                   <span>GH₵ {paystackFee.toFixed(2)}</span>
                 </div>
-                <div className="flex justify-between px-3 py-2.5 bg-primary/5 font-black text-white uppercase tracking-wider">
+                <div className="flex justify-between px-3 py-2.5 bg-primary/5 font-black text-foreground uppercase tracking-wider">
                   <span>Total Payable</span>
                   <span className="text-primary">GH₵ {paystackTotal.toFixed(2)}</span>
                 </div>
@@ -782,7 +782,7 @@ const DashboardBuyDataNetwork = ({ network }: DashboardBuyDataNetworkProps) => {
                   className={`w-full gap-2 font-black text-xs py-6 uppercase tracking-[0.2em] shadow-xl transition-all rounded-2xl disabled:opacity-40 disabled:grayscale disabled:cursor-not-allowed ${
                     payMethod === "wallet" 
                       ? "bg-primary hover:bg-primary/90 text-primary-foreground shadow-primary/20" 
-                      : "bg-white text-black hover:bg-white/90 shadow-white/10"
+                      : "bg-slate-900 text-white dark:bg-white dark:text-black hover:opacity-90 shadow-lg shadow-slate-900/10 dark:shadow-white/10"
                   }`}
                   onClick={payMethod === "wallet" ? handleWalletBuy : handlePaystackBuy}
                   disabled={buying || !resolvedName || !selectedPackage}

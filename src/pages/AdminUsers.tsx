@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback } from "react";
+import { useAppTheme } from "@/contexts/ThemeContext";
 import { Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Badge } from "@/components/ui/badge";
@@ -36,6 +37,7 @@ interface UserRow {
 type RoleTab = "all" | "customers" | "agents" | "sub-agents";
 
 const AdminUsers = () => {
+  const { isDark } = useAppTheme();
   const { toast } = useToast();
   const { user: currentUser, session } = useAuth();
   const [users, setUsers] = useState<UserRow[]>([]);
@@ -218,7 +220,7 @@ const AdminUsers = () => {
         ? <Badge className="bg-green-500/20 text-green-400 border-green-500/30 text-[10px]">Agent</Badge>
         : <Badge className="bg-yellow-500/20 text-yellow-400 border-yellow-500/30 text-[10px]">Agent (Pending)</Badge>;
     }
-    return <Badge variant="outline" className="text-[10px] text-white/40 border-white/10">Customer</Badge>;
+    return <Badge variant="outline" className="text-[10px] text-muted-foreground border-border">Customer</Badge>;
   };
 
   const tabCounts = {
@@ -295,8 +297,8 @@ const AdminUsers = () => {
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center h-64 gap-4">
-        <Loader2 className="w-8 h-8 text-amber-400 animate-spin" />
-        <p className="text-white/50 text-sm">Loading users...</p>
+        <Loader2 className="w-8 h-8 text-amber-500 animate-spin" />
+        <p className="text-muted-foreground text-sm font-medium">Loading users...</p>
       </div>
     );
   }
@@ -304,14 +306,14 @@ const AdminUsers = () => {
   return (
     <div className="space-y-6 pb-24">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 border-b border-white/5 pb-6">
+      <div className={`flex flex-col sm:flex-row sm:items-end justify-between gap-4 border-b pb-6 ${isDark ? "border-white/5" : "border-gray-200"}`}>
         <div>
-          <h1 className="font-display text-3xl font-black tracking-tight bg-gradient-to-r from-white to-white/60 bg-clip-text text-transparent">
+          <h1 className={`font-display text-3xl font-black tracking-tight ${isDark ? "bg-gradient-to-r from-white to-white/60 bg-clip-text text-transparent" : "text-gray-900"}`}>
             User Management
           </h1>
-          <p className="text-sm text-white/50 mt-1">Manage all platform users — customers, agents, and sub-agents.</p>
+          <p className={`text-sm mt-1 ${isDark ? "text-white/50" : "text-gray-500"}`}>Manage all platform users — customers, agents, and sub-agents.</p>
         </div>
-        <Button onClick={fetchUsers} className="gap-2 bg-white/5 hover:bg-white/10 text-white border border-white/10 rounded-xl">
+        <Button onClick={fetchUsers} variant={isDark ? "outline" : "default"} className={isDark ? "gap-2 bg-white/5 hover:bg-white/10 text-white border border-white/10 rounded-xl" : "gap-2 rounded-xl shadow-sm"}>
           <RefreshCw className="w-4 h-4" /> Refresh
         </Button>
       </div>
@@ -327,15 +329,15 @@ const AdminUsers = () => {
           <button
             key={key}
             onClick={() => setTab(key)}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all ${
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all border shadow-sm ${
               tab === key
-                ? "bg-amber-400/20 text-amber-400 border border-amber-400/30"
-                : "bg-white/5 text-white/50 border border-white/10 hover:text-white/80"
+                ? "bg-amber-400/20 text-amber-700 dark:text-amber-400 border-amber-400/30"
+                : "bg-card text-muted-foreground border-border hover:text-foreground hover:bg-secondary"
             }`}
           >
             <Icon className="w-3.5 h-3.5" />
             {label}
-            <span className={`text-xs rounded-full px-1.5 py-0.5 font-bold ${tab === key ? "bg-amber-400/30" : "bg-white/10"}`}>
+            <span className={`text-xs rounded-full px-1.5 py-0.5 font-bold ${tab === key ? "bg-amber-400/30 text-amber-800 dark:text-amber-400" : "bg-secondary text-muted-foreground"}`}>
               {tabCounts[key]}
             </span>
           </button>
@@ -344,60 +346,60 @@ const AdminUsers = () => {
 
       {/* Search */}
       <div className="relative">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/30" />
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
         <Input
           placeholder="Search by name, email, phone..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="pl-9 bg-white/5 border-white/10 text-white placeholder:text-white/30 rounded-xl focus:border-amber-400/40"
+          className="pl-9 rounded-xl border-input bg-card shadow-sm"
         />
       </div>
 
       {/* Desktop Table View */}
-      <div className="hidden md:block rounded-2xl bg-white/[0.02] border border-white/5 overflow-hidden">
+      <div className="hidden md:block rounded-2xl bg-card border border-border shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-white/5 bg-white/[0.02]">
+              <tr className="border-b border-border bg-secondary/50">
                 <th className="p-4 w-10">
                    <input 
                      type="checkbox" 
                      checked={selectedUsers.length === users.length && users.length > 0} 
                      onChange={toggleSelectAll}
-                     className="rounded border-white/10 bg-white/5 text-amber-500 focus:ring-amber-500/30"
+                     className="rounded border-input text-amber-500 focus:ring-amber-500/30"
                    />
                 </th>
-                <th className="text-left p-4 font-semibold text-white/40 text-xs uppercase tracking-wider">User</th>
-                <th className="text-left p-4 font-semibold text-white/40 text-xs uppercase tracking-wider">Phone</th>
-                <th className="text-left p-4 font-semibold text-white/40 text-xs uppercase tracking-wider">Role</th>
-                <th className="text-left p-4 font-semibold text-white/40 text-xs uppercase tracking-wider">Wallet</th>
-                <th className="text-left p-4 font-semibold text-white/40 text-xs uppercase tracking-wider">Sales</th>
-                <th className="text-left p-4 font-semibold text-white/40 text-xs uppercase tracking-wider hidden md:table-cell">Parent Agent</th>
-                <th className="text-left p-4 font-semibold text-white/40 text-xs uppercase tracking-wider">Actions</th>
+                <th className="text-left p-4 font-semibold text-muted-foreground text-xs uppercase tracking-wider">User</th>
+                <th className="text-left p-4 font-semibold text-muted-foreground text-xs uppercase tracking-wider">Phone</th>
+                <th className="text-left p-4 font-semibold text-muted-foreground text-xs uppercase tracking-wider">Role</th>
+                <th className="text-left p-4 font-semibold text-muted-foreground text-xs uppercase tracking-wider">Wallet</th>
+                <th className="text-left p-4 font-semibold text-muted-foreground text-xs uppercase tracking-wider">Sales</th>
+                <th className="text-left p-4 font-semibold text-muted-foreground text-xs uppercase tracking-wider hidden md:table-cell">Parent Agent</th>
+                <th className="text-left p-4 font-semibold text-muted-foreground text-xs uppercase tracking-wider">Actions</th>
               </tr>
             </thead>
             <tbody>
               {filtered.map((user) => (
-                <tr key={user.user_id} onClick={() => setSelectedUser(user)} className="border-b border-white/5 hover:bg-white/[0.03] transition-colors cursor-pointer group">
+                <tr key={user.user_id} onClick={() => setSelectedUser(user)} className="border-b border-border hover:bg-muted/50 transition-colors cursor-pointer group">
                   <td className="p-4" onClick={e => toggleSelectUser(user.user_id, e)}>
                      <input 
                        type="checkbox" 
                        checked={selectedUsers.includes(user.user_id)} 
                        onChange={() => {}}
-                       className="rounded border-white/10 bg-white/5 text-amber-500 focus:ring-amber-500/30"
+                       className="rounded border-input text-amber-500 focus:ring-amber-500/30"
                      />
                   </td>
                   <td className="p-4">
-                    <p className="font-semibold text-white">{user.full_name || "—"}</p>
-                    <p className="text-xs text-white/40 mt-0.5">{user.email}</p>
+                    <p className="font-semibold text-foreground">{user.full_name || "—"}</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">{user.email}</p>
                   </td>
                   <td className="p-4">
                     {user.phone ? (
-                      <span className="flex items-center gap-1 text-white/60">
+                      <span className="flex items-center gap-1 text-foreground/70">
                         <Phone className="w-3 h-3" /> {user.phone}
                       </span>
                     ) : (
-                      <span className="text-white/20">—</span>
+                      <span className="text-muted-foreground/30">—</span>
                     )}
                   </td>
                   <td className="p-4">
@@ -409,18 +411,18 @@ const AdminUsers = () => {
                     </div>
                   </td>
                   <td className="p-4">
-                    <p className={`font-bold ${Number(user.wallet_balance) < 10 ? "text-red-400" : "text-cyan-400"}`}>
+                    <p className={`font-bold ${Number(user.wallet_balance) < 10 ? "text-red-600 dark:text-red-400" : "text-cyan-600 dark:text-cyan-400"}`}>
                       GH₵{(user.wallet_balance || 0).toFixed(2)}
                     </p>
                   </td>
                   <td className="p-4">
-                    <p className="font-bold text-green-400">GH₵{(user.total_sales_volume || 0).toFixed(2)}</p>
+                    <p className="font-bold text-emerald-600 dark:text-emerald-400">GH₵{(user.total_sales_volume || 0).toFixed(2)}</p>
                   </td>
                   <td className="p-4 hidden md:table-cell">
                     {(user as any).is_sub_agent && user.parent_name ? (
-                      <span className="text-xs text-white/50">{user.parent_name}</span>
+                      <span className="text-xs text-muted-foreground">{user.parent_name}</span>
                     ) : (
-                      <span className="text-white/20">—</span>
+                      <span className="text-muted-foreground/30">—</span>
                     )}
                   </td>
                   <td className="p-4" onClick={(e) => e.stopPropagation()}>
@@ -429,7 +431,7 @@ const AdminUsers = () => {
                         size="sm" variant="outline"
                         onClick={() => handleResetPassword(user)}
                         disabled={!!actionLoading[user.user_id]}
-                        className="text-xs border-white/10 text-white/60 hover:text-white rounded-xl h-8"
+                        className="text-xs border-input hover:bg-secondary rounded-xl h-8 shadow-sm"
                       >
                         {actionLoading[user.user_id] === "reset" ? <Loader2 className="w-3 h-3 animate-spin" /> : "Reset"}
                       </Button>
@@ -469,7 +471,7 @@ const AdminUsers = () => {
           <div 
             key={user.user_id} 
             onClick={() => setSelectedUser(user)}
-            className="rounded-2xl bg-white/[0.02] border border-white/5 p-4 space-y-4 active:bg-white/[0.05] transition-colors relative"
+            className="rounded-2xl bg-card border border-border p-4 space-y-4 shadow-sm active:bg-muted/30 transition-colors relative"
           >
             <div className="flex items-start justify-between">
               <div className="flex items-center gap-3">
@@ -481,19 +483,19 @@ const AdminUsers = () => {
                     type="checkbox" 
                     checked={selectedUsers.includes(user.user_id)} 
                     onChange={(e) => toggleSelectUser(user.user_id, e)}
-                    className="rounded border-white/10 bg-white/5 text-amber-500 focus:ring-amber-500/30 w-5 h-5"
+                    className="rounded border-input text-amber-500 focus:ring-amber-500/30 w-5 h-5"
                   />
                 </div>
                 <div>
-                  <p className="font-bold text-white leading-none">{user.full_name || "—"}</p>
-                  <p className="text-[10px] text-white/40 mt-1">{user.email}</p>
+                  <p className="font-bold text-foreground leading-none">{user.full_name || "—"}</p>
+                  <p className="text-[10px] text-muted-foreground mt-1">{user.email}</p>
                 </div>
               </div>
               <div className="text-right">
-                <p className={`font-black ${Number(user.wallet_balance || 0) < 10 ? "text-red-400" : "text-cyan-400"}`}>
+                <p className={`font-black ${Number(user.wallet_balance || 0) < 10 ? "text-red-600 dark:text-red-400" : "text-cyan-600 dark:text-cyan-400"}`}>
                   ₵{(user.wallet_balance || 0).toFixed(2)}
                 </p>
-                <p className="text-[9px] text-white/30 uppercase tracking-widest font-bold">Wallet</p>
+                <p className="text-[9px] text-muted-foreground uppercase tracking-widest font-bold">Wallet</p>
               </div>
             </div>
 
@@ -503,22 +505,22 @@ const AdminUsers = () => {
                 <Badge className="bg-red-500/20 text-red-400 border-red-500/30 text-[9px]">Suspended</Badge>
               )}
               {user.phone && (
-                <span className="flex items-center gap-1 text-[10px] text-white/50 bg-white/5 px-2 py-0.5 rounded-full border border-white/5">
+                <span className="flex items-center gap-1 text-[10px] text-muted-foreground bg-secondary px-2 py-0.5 rounded-full border border-border">
                   <Phone className="w-2.5 h-2.5" /> {user.phone}
                 </span>
               )}
             </div>
 
-            <div className="flex items-center justify-between pt-3 border-t border-white/5">
+            <div className="flex items-center justify-between pt-3 border-t border-border">
                <div className="flex items-center gap-4">
                   <div>
-                    <p className="text-[9px] text-white/30 uppercase tracking-widest font-bold">Total Sales</p>
-                    <p className="text-xs font-bold text-green-400">GH₵{(user.total_sales_volume || 0).toFixed(2)}</p>
+                    <p className="text-[9px] text-muted-foreground uppercase tracking-widest font-bold">Total Sales</p>
+                    <p className="text-xs font-bold text-emerald-600 dark:text-emerald-400">GH₵{(user.total_sales_volume || 0).toFixed(2)}</p>
                   </div>
                   {user.is_sub_agent && user.parent_name && (
                     <div>
-                      <p className="text-[9px] text-white/30 uppercase tracking-widest font-bold">Parent</p>
-                      <p className="text-[10px] text-white/60 truncate max-w-[80px]">{user.parent_name}</p>
+                      <p className="text-[9px] text-muted-foreground uppercase tracking-widest font-bold">Parent</p>
+                      <p className="text-[10px] text-foreground/70 truncate max-w-[80px]">{user.parent_name}</p>
                     </div>
                   )}
                </div>
@@ -545,7 +547,7 @@ const AdminUsers = () => {
       {/* Bulk Actions Bar */}
       {selectedUsers.length > 0 && (
         <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 animate-in fade-in slide-in-from-bottom-4">
-          <div className="bg-[#1a1a2e] border border-amber-500/30 rounded-2xl p-4 shadow-2xl shadow-black/50 flex items-center gap-4">
+          <div className="bg-slate-900 dark:bg-[#1a1a2e] border border-amber-500/30 rounded-2xl p-4 shadow-2xl shadow-black/50 flex items-center gap-4">
             <div className="px-3 border-r border-white/10">
                <p className="text-xs font-black text-amber-500 uppercase tracking-widest">{selectedUsers.length} Selected</p>
             </div>
@@ -555,7 +557,7 @@ const AdminUsers = () => {
                  variant="outline"
                  onClick={() => handleBulkSuspend(true)}
                  disabled={bulkActionLoading}
-                 className="h-9 rounded-xl border-white/10 text-xs font-bold gap-2"
+                 className="h-9 rounded-xl border-white/10 text-xs font-bold gap-2 text-white hover:bg-white/10"
                >
                  <Ban className="w-3.5 h-3.5 text-red-400" /> Suspend
                </Button>
@@ -564,7 +566,7 @@ const AdminUsers = () => {
                  variant="outline"
                  onClick={() => handleBulkSuspend(false)}
                  disabled={bulkActionLoading}
-                 className="h-9 rounded-xl border-white/10 text-xs font-bold gap-2"
+                 className="h-9 rounded-xl border-white/10 text-xs font-bold gap-2 text-white hover:bg-white/10"
                >
                  <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" /> Restore
                </Button>
@@ -572,7 +574,7 @@ const AdminUsers = () => {
                  size="sm" 
                  onClick={handleBulkSMS}
                  disabled={bulkActionLoading}
-                 className="h-9 rounded-xl bg-blue-500 hover:bg-blue-600 text-white text-xs font-bold gap-2"
+                 className="h-9 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold gap-2 shadow-sm"
                >
                  <MessageCircle className="w-3.5 h-3.5" /> Send Bulk SMS
                </Button>
@@ -580,7 +582,7 @@ const AdminUsers = () => {
                  size="sm" 
                  variant="ghost"
                  onClick={() => setSelectedUsers([])}
-                 className="h-9 rounded-xl text-white/30 hover:text-white"
+                 className="h-9 rounded-xl text-white/50 hover:text-white hover:bg-white/5"
                >
                  Cancel
                </Button>
@@ -595,7 +597,7 @@ const AdminUsers = () => {
             variant="outline"
             onClick={() => fetchUsers(true)}
             disabled={loading}
-            className="bg-white/5 border-white/10 text-white rounded-xl px-10 font-black tracking-widest uppercase text-xs"
+            className="rounded-xl px-10 font-black tracking-widest uppercase text-xs shadow-sm"
           >
             {loading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <ChevronDown className="w-4 h-4 mr-2" />}
             Load More Users

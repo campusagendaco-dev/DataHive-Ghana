@@ -52,10 +52,10 @@ interface SystemSettings {
 /* ─── helpers ─────────────────────────────────────────────────────── */
 
 const roleLabel = (p: ProfileRow) => {
-  if (p.is_sub_agent)                      return { label: "Sub-Agent",      cls: "bg-blue-500/20 text-blue-400 border-blue-500/30" };
-  if (p.is_agent && p.agent_approved)      return { label: "Agent",          cls: "bg-green-500/20 text-green-400 border-green-500/30" };
-  if (p.is_agent)                          return { label: "Pending Agent",  cls: "bg-amber-500/20 text-amber-400 border-amber-500/30" };
-  return                                          { label: "Customer",       cls: "bg-white/5 text-white/40 border-white/10" };
+  if (p.is_sub_agent)                      return { label: "Sub-Agent",      cls: "bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20" };
+  if (p.is_agent && p.agent_approved)      return { label: "Agent",          cls: "bg-green-500/10 text-green-600 dark:text-green-400 border-green-500/20" };
+  if (p.is_agent)                          return { label: "Pending Agent",  cls: "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20" };
+  return                                          { label: "Customer",       cls: "bg-muted text-muted-foreground border-border" };
 };
 
 const exportCsv = (rows: Record<string, unknown>[], filename: string) => {
@@ -81,20 +81,20 @@ const SectionCard = ({ title, count, icon: Icon, color, children, onExport, defa
 }) => {
   const [open, setOpen] = useState(defaultOpen);
   return (
-    <div className="rounded-2xl border border-white/8 bg-white/[0.02] overflow-hidden">
+    <div className="rounded-2xl border border-border bg-card shadow-sm overflow-hidden">
       <button
         type="button"
         onClick={() => setOpen(o => !o)}
-        className="w-full flex items-center justify-between px-5 py-4 hover:bg-white/[0.03] transition-colors"
+        className="w-full flex items-center justify-between px-5 py-4 hover:bg-muted/50 transition-colors"
       >
         <div className="flex items-center gap-3">
           <div className={`p-2 rounded-xl ${color.replace("text-", "bg-").replace("400", "500/10")} border ${color.replace("text-", "border-").replace("400", "500/20")}`}>
             <Icon className={`w-4 h-4 ${color}`} />
           </div>
-          <span className="font-black text-white text-sm">{title}</span>
+          <span className="font-black text-foreground text-sm">{title}</span>
           {count !== undefined && (
             <span className={`text-[10px] font-black px-2 py-0.5 rounded-full border ${
-              count > 0 ? `${color.replace("text-", "bg-").replace("400", "500/20")} ${color} ${color.replace("text-", "border-").replace("400", "500/30")}` : "bg-green-500/20 text-green-400 border-green-500/30"
+              count > 0 ? `${color.replace("text-", "bg-").replace("400", "500/20")} ${color} ${color.replace("text-", "border-").replace("400", "500/30")}` : "bg-green-500/10 text-green-600 dark:text-green-400 border-green-500/20"
             }`}>{count}</span>
           )}
         </div>
@@ -103,28 +103,28 @@ const SectionCard = ({ title, count, icon: Icon, color, children, onExport, defa
             <button
               type="button"
               onClick={e => { e.stopPropagation(); onExport(); }}
-              className="flex items-center gap-1 text-[10px] text-white/30 hover:text-white/60 transition-colors px-2 py-1 rounded-lg hover:bg-white/5"
+              className="flex items-center gap-1 text-[10px] text-muted-foreground hover:text-foreground transition-colors px-2 py-1 rounded-lg hover:bg-muted"
             >
               <FileDown className="w-3 h-3" /> CSV
             </button>
           )}
-          {open ? <ChevronUp className="w-4 h-4 text-white/30" /> : <ChevronDown className="w-4 h-4 text-white/30" />}
+          {open ? <ChevronUp className="w-4 h-4 text-muted-foreground" /> : <ChevronDown className="w-4 h-4 text-muted-foreground" />}
         </div>
       </button>
-      {open && <div className="border-t border-white/5 p-5">{children}</div>}
+      {open && <div className="border-t border-border p-5">{children}</div>}
     </div>
   );
 };
 
 const EmptyState = ({ icon: Icon = CheckCircle2, message }: { icon?: typeof Shield; message: string }) => (
-  <div className="flex flex-col items-center justify-center py-10 gap-3 opacity-40">
-    <Icon className="w-8 h-8 text-green-400" />
-    <p className="text-sm text-white/60 text-center">{message}</p>
+  <div className="flex flex-col items-center justify-center py-10 gap-3 opacity-60">
+    <Icon className="w-8 h-8 text-emerald-500" />
+    <p className="text-sm text-muted-foreground text-center font-medium">{message}</p>
   </div>
 );
 
 const TH = ({ children }: { children: ReactNode }) => (
-  <th className="text-left px-4 py-3 text-[10px] font-black uppercase tracking-widest text-white/30 whitespace-nowrap">{children}</th>
+  <th className="text-left px-4 py-3 text-[10px] font-black uppercase tracking-widest text-muted-foreground whitespace-nowrap">{children}</th>
 );
 
 /* ─── main component ──────────────────────────────────────────────── */
@@ -340,8 +340,8 @@ const AdminSecurity = () => {
 
   if (loading) return (
     <div className="flex flex-col items-center justify-center h-64 gap-4">
-      <Loader2 className="w-8 h-8 text-amber-400 animate-spin" />
-      <p className="text-white/40 text-sm font-bold uppercase tracking-widest">Loading security data…</p>
+      <Loader2 className="w-8 h-8 text-amber-500 animate-spin" />
+      <p className="text-muted-foreground text-sm font-black uppercase tracking-widest">Loading security data…</p>
     </div>
   );
 
@@ -351,45 +351,45 @@ const AdminSecurity = () => {
       {/* Top row: health + live feed */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         {/* Health score */}
-        <div className={`lg:col-span-2 rounded-2xl border border-white/8 bg-gradient-to-br ${scoreBg} to-transparent p-6`}>
+        <div className={`lg:col-span-2 rounded-2xl border border-border shadow-sm bg-gradient-to-br ${scoreBg} to-card/50 p-6`}>
           <div className="flex items-start justify-between mb-5">
             <div>
-              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-white/30 mb-1">Security Health</p>
+              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground mb-1">Security Health</p>
               <div className="flex items-baseline gap-3">
-                <span className={`text-6xl font-black italic tracking-tighter ${scoreColor}`}>{healthScore}</span>
+                <span className={`text-6xl font-black italic tracking-tighter ${scoreColor.replace("text-", "text-")}`}>{healthScore}</span>
                 <span className={`text-lg font-black ${scoreColor}`}>/ 100</span>
-                <span className={`text-sm font-black px-3 py-1 rounded-full border ${
-                  healthScore >= 80 ? "bg-green-500/20 text-green-400 border-green-500/30"
-                  : healthScore >= 60 ? "bg-amber-500/20 text-amber-400 border-amber-500/30"
-                  : "bg-red-500/20 text-red-400 border-red-500/30"
+                <span className={`text-sm font-black px-3 py-1 rounded-full border shadow-sm bg-card ${
+                  healthScore >= 80 ? "text-green-600 dark:text-green-400 border-green-500/20"
+                  : healthScore >= 60 ? "text-amber-600 dark:text-amber-400 border-amber-500/20"
+                  : "text-red-600 dark:text-red-400 border-red-500/20"
                 }`}>{scoreLabel}</span>
               </div>
             </div>
             <Shield className={`w-12 h-12 ${scoreColor} opacity-20`} />
           </div>
-          <div className="w-full h-2 bg-white/5 rounded-full overflow-hidden mb-5">
+          <div className="w-full h-2 bg-muted rounded-full overflow-hidden mb-5">
             <div className={`h-full rounded-full transition-all duration-700 ${
-              healthScore >= 80 ? "bg-green-400" : healthScore >= 60 ? "bg-amber-400" : "bg-red-500"
+              healthScore >= 80 ? "bg-green-500" : healthScore >= 60 ? "bg-amber-500" : "bg-red-500"
             }`} style={{ width: `${healthScore}%` }} />
           </div>
           <div className="grid grid-cols-2 gap-3">
             {clusters.length > 0 && (
-              <div className="flex items-center gap-2.5 p-3 rounded-xl bg-red-500/5 border border-red-500/10 text-xs text-red-400">
+              <div className="flex items-center gap-2.5 p-3 rounded-xl bg-red-50 dark:bg-red-500/5 border border-red-200 dark:border-red-500/10 text-xs font-medium text-red-700 dark:text-red-400 shadow-sm">
                 <AlertTriangle className="w-3.5 h-3.5 shrink-0" />{clusters.length} shared IP cluster{clusters.length !== 1 ? "s" : ""}
               </div>
             )}
             {referralGroups.length > 0 && (
-              <div className="flex items-center gap-2.5 p-3 rounded-xl bg-purple-500/5 border border-purple-500/10 text-xs text-purple-400">
+              <div className="flex items-center gap-2.5 p-3 rounded-xl bg-purple-50 dark:bg-purple-500/5 border border-purple-200 dark:border-purple-500/10 text-xs font-medium text-purple-700 dark:text-purple-400 shadow-sm">
                 <Gift className="w-3.5 h-3.5 shrink-0" />{referralGroups.length} referral abuse pattern{referralGroups.length !== 1 ? "s" : ""}
               </div>
             )}
             {failedUsers.length > 0 && (
-              <div className="flex items-center gap-2.5 p-3 rounded-xl bg-orange-500/5 border border-orange-500/10 text-xs text-orange-400">
+              <div className="flex items-center gap-2.5 p-3 rounded-xl bg-orange-50 dark:bg-orange-500/5 border border-orange-200 dark:border-orange-500/10 text-xs font-medium text-orange-700 dark:text-orange-400 shadow-sm">
                 <Flame className="w-3.5 h-3.5 shrink-0" />{failedUsers.length} high failure rate account{failedUsers.length !== 1 ? "s" : ""}
               </div>
             )}
             {clusters.length === 0 && referralGroups.length === 0 && failedUsers.length === 0 && (
-              <div className="flex items-center gap-2.5 p-3 rounded-xl bg-green-500/5 border border-green-500/10 text-xs text-green-400 col-span-2">
+              <div className="flex items-center gap-2.5 p-3 rounded-xl bg-green-50 dark:bg-green-500/5 border border-green-200 dark:border-green-500/10 text-xs font-medium text-green-700 dark:text-green-400 col-span-2 shadow-sm">
                 <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />No active threats detected
               </div>
             )}
@@ -397,23 +397,23 @@ const AdminSecurity = () => {
         </div>
 
         {/* Live feed */}
-        <div className="rounded-2xl border border-cyan-500/20 bg-cyan-500/[0.03] p-5 flex flex-col">
+        <div className="rounded-2xl border border-cyan-500/20 bg-cyan-50/30 dark:bg-cyan-500/[0.03] p-5 flex flex-col shadow-sm">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse" />
-              <span className="text-xs font-black uppercase tracking-widest text-cyan-400">Live Events</span>
+              <span className="w-2 h-2 rounded-full bg-cyan-500 animate-pulse" />
+              <span className="text-xs font-black uppercase tracking-widest text-cyan-600 dark:text-cyan-400">Live Events</span>
             </div>
-            <button type="button" onClick={() => setLiveAlerts([])} className="text-[10px] text-white/20 hover:text-white/50 uppercase font-bold">Clear</button>
+            <button type="button" onClick={() => setLiveAlerts([])} className="text-[10px] text-muted-foreground hover:text-foreground uppercase font-black transition-colors">Clear</button>
           </div>
           <div className="flex-1 space-y-2 overflow-y-auto max-h-48 scrollbar-none">
             {liveAlerts.length === 0 ? (
-              <div className="flex flex-col items-center justify-center h-full gap-2 opacity-20 py-6">
-                <Globe className="w-7 h-7" /><p className="text-[10px] font-bold uppercase">Waiting for events…</p>
+              <div className="flex flex-col items-center justify-center h-full gap-2 opacity-40 py-6">
+                <Globe className="w-7 h-7 text-cyan-500" /><p className="text-[10px] font-black text-cyan-600 uppercase">Waiting for events…</p>
               </div>
             ) : liveAlerts.map(a => (
-              <div key={a.id} className="flex flex-col gap-0.5 border-l-2 border-cyan-500/40 pl-3 py-1">
-                <span className="text-[9px] font-mono text-cyan-400/40">{a.time.toLocaleTimeString()}</span>
-                <p className="text-[11px] text-white/60 line-clamp-2">{a.message}</p>
+              <div key={a.id} className="flex flex-col gap-0.5 border-l-2 border-cyan-500/40 dark:border-cyan-500/40 pl-3 py-1">
+                <span className="text-[9px] font-mono text-cyan-600/60 dark:text-cyan-400/40 font-bold">{a.time.toLocaleTimeString()}</span>
+                <p className="text-[11px] text-foreground/70 font-medium line-clamp-2">{a.message}</p>
               </div>
             ))}
           </div>
@@ -423,33 +423,33 @@ const AdminSecurity = () => {
       {/* Stats grid */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
         {STATS.map(({ label, value, icon: Icon, danger, color, bg }) => (
-          <div key={label} className={`rounded-2xl border p-4 ${danger && value > 0 ? bg : "bg-white/[0.02] border-white/5"}`}>
-            <Icon className={`w-5 h-5 mb-2.5 ${danger && value > 0 ? color : "text-white/20"}`} />
-            <p className={`text-2xl font-black tabular-nums ${danger && value > 0 ? color : "text-white/50"}`}>{value}</p>
-            <p className="text-[10px] text-white/30 uppercase tracking-wider mt-0.5 leading-tight">{label}</p>
+          <div key={label} className={`rounded-2xl border shadow-sm p-4 ${danger && value > 0 ? bg : "bg-card border-border"}`}>
+            <Icon className={`w-5 h-5 mb-2.5 ${danger && value > 0 ? color : "text-muted-foreground"}`} />
+            <p className={`text-2xl font-black tabular-nums ${danger && value > 0 ? color : "text-foreground"}`}>{value}</p>
+            <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-wider mt-0.5 leading-tight">{label}</p>
           </div>
         ))}
       </div>
 
       {/* Signup trend */}
-      <div className="rounded-2xl border border-white/8 bg-white/[0.02] p-6">
+      <div className="rounded-2xl border border-border bg-card shadow-sm p-6">
         <div className="flex items-center justify-between mb-5">
           <div className="flex items-center gap-2">
-            <BarChart2 className="w-4 h-4 text-cyan-400" />
-            <span className="font-black text-white text-sm">Signup Trend</span>
-            <span className="text-[10px] bg-cyan-500/20 text-cyan-400 border border-cyan-500/30 px-2 py-0.5 rounded-full font-bold">14 days</span>
+            <BarChart2 className="w-4 h-4 text-cyan-600 dark:text-cyan-400" />
+            <span className="font-black text-foreground text-sm">Signup Trend</span>
+            <span className="text-[10px] bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 border border-cyan-500/20 px-2 py-0.5 rounded-full font-black">14 days</span>
           </div>
           <div className="text-right">
-            <span className="text-xl font-black text-cyan-400">{signupTrend.reduce((s, d) => s + d.count, 0)}</span>
-            <p className="text-[10px] text-white/30">new accounts</p>
+            <span className="text-xl font-black text-cyan-600 dark:text-cyan-400">{signupTrend.reduce((s, d) => s + d.count, 0)}</span>
+            <p className="text-[10px] text-muted-foreground font-medium">new accounts</p>
           </div>
         </div>
         <div className="flex items-end gap-1 h-20">
           {signupTrend.map(day => (
             <div key={day.date} className="flex flex-col items-center gap-1 flex-1 group cursor-default">
-              <span className="text-[9px] text-white/40 opacity-0 group-hover:opacity-100 transition-opacity">{day.count}</span>
+              <span className="text-[9px] text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity font-bold">{day.count}</span>
               <div
-                className="w-full bg-cyan-500/30 hover:bg-cyan-400/60 rounded-t-sm transition-colors"
+                className="w-full bg-cyan-500/30 hover:bg-cyan-500/60 rounded-t-sm transition-colors"
                 style={{ height: `${Math.max(3, (day.count / maxSignup) * 64)}px` }}
                 title={`${day.date}: ${day.count} signups`}
               />
@@ -457,8 +457,8 @@ const AdminSecurity = () => {
           ))}
         </div>
         <div className="flex items-center justify-between mt-1.5">
-          <span className="text-[9px] text-white/20">{signupTrend[0]?.date.slice(5)}</span>
-          <span className="text-[9px] text-white/20">{signupTrend[signupTrend.length - 1]?.date.slice(5)}</span>
+          <span className="text-[9px] text-muted-foreground font-medium">{signupTrend[0]?.date.slice(5)}</span>
+          <span className="text-[9px] text-muted-foreground font-medium">{signupTrend[signupTrend.length - 1]?.date.slice(5)}</span>
         </div>
       </div>
     </div>
@@ -475,42 +475,42 @@ const AdminSecurity = () => {
             {fClusters.map(cluster => {
               const exp = expandedIp === cluster.ip;
               return (
-                <div key={cluster.ip} className="rounded-xl border border-red-500/20 bg-red-500/[0.03] overflow-hidden">
+                <div key={cluster.ip} className="rounded-xl border border-red-200 dark:border-red-500/20 bg-red-50/50 dark:bg-red-500/[0.03] overflow-hidden shadow-sm">
                   <div className="flex items-center justify-between px-4 py-3">
                     <button type="button" onClick={() => setExpandedIp(exp ? null : cluster.ip)}
                       className="flex-1 flex items-center gap-3 text-left"
                     >
-                      {exp ? <ChevronUp className="w-3.5 h-3.5 text-red-400 shrink-0" /> : <ChevronDown className="w-3.5 h-3.5 text-white/30 shrink-0" />}
-                      <span className="font-mono text-sm font-bold text-red-300">{cluster.ip}</span>
-                      {cluster.location && <span className="flex items-center gap-1 text-[10px] text-emerald-400/60"><MapPin className="w-3 h-3" />{cluster.location}</span>}
-                      <span className="text-[10px] font-black bg-red-500/20 text-red-400 border border-red-500/30 px-2 py-0.5 rounded-full">{cluster.accounts.length} accounts</span>
+                      {exp ? <ChevronUp className="w-3.5 h-3.5 text-red-600 dark:text-red-400 shrink-0" /> : <ChevronDown className="w-3.5 h-3.5 text-muted-foreground shrink-0" />}
+                      <span className="font-mono text-sm font-bold text-red-700 dark:text-red-300">{cluster.ip}</span>
+                      {cluster.location && <span className="flex items-center gap-1 text-[10px] font-black text-emerald-600 dark:text-emerald-400/60"><MapPin className="w-3 h-3" />{cluster.location}</span>}
+                      <span className="text-[10px] font-black bg-red-500/10 text-red-600 dark:text-red-400 border border-red-500/20 px-2 py-0.5 rounded-full shadow-sm">{cluster.accounts.length} accounts</span>
                     </button>
                     <div className="flex items-center gap-2 shrink-0">
                       <button type="button" onClick={() => copyText(cluster.ip, "IP copied")}
-                        className="p-1.5 rounded-lg text-white/20 hover:text-white/60 hover:bg-white/5 transition-all">
+                        className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-background transition-all shadow-sm">
                         <Copy className="w-3.5 h-3.5" />
                       </button>
                       <button type="button" onClick={() => handleBulkSuspend(cluster.accounts.map(a => a.user_id), true)}
-                        className="text-[10px] font-black uppercase bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 px-3 py-1.5 rounded-lg transition-all">
+                        className="text-[10px] font-black uppercase bg-red-600 hover:bg-red-700 text-white border border-red-600 px-3 py-1.5 rounded-lg transition-all shadow-sm">
                         Suspend All
                       </button>
                     </div>
                   </div>
                   {exp && (
-                    <div className="border-t border-red-500/10 divide-y divide-white/[0.04]">
+                    <div className="border-t border-red-100 dark:border-red-500/10 divide-y divide-border">
                       {cluster.accounts.map(acc => {
                         const role = roleLabel(acc);
                         return (
-                          <div key={acc.user_id} className="flex items-center justify-between px-4 py-2.5 bg-black/20">
+                          <div key={acc.user_id} className="flex items-center justify-between px-4 py-2.5 bg-background/50">
                             <div className="min-w-0">
-                              <p className="text-sm font-bold text-white truncate">{acc.full_name || "—"}</p>
-                              <p className="text-[11px] text-white/35 truncate">{acc.email}</p>
-                              {acc.last_seen_at && <p className="text-[10px] text-white/20 mt-0.5">{fmt(acc.last_seen_at)}</p>}
+                              <p className="text-sm font-black text-foreground truncate">{acc.full_name || "—"}</p>
+                              <p className="text-[11px] text-muted-foreground font-medium truncate">{acc.email}</p>
+                              {acc.last_seen_at && <p className="text-[10px] text-muted-foreground/70 font-medium mt-0.5">{fmt(acc.last_seen_at)}</p>}
                             </div>
                             <div className="flex items-center gap-1.5 shrink-0 ml-3">
-                              {acc.is_suspended && <span className="text-[9px] font-bold px-2 py-0.5 rounded-full border bg-red-500/20 text-red-400 border-red-500/30">Suspended</span>}
-                              <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full border ${role.cls}`}>{role.label}</span>
-                              <span className="text-[10px] text-white/25">{acc.login_count ?? 0} logins</span>
+                              {acc.is_suspended && <span className="text-[9px] font-black px-2 py-0.5 rounded-full border shadow-sm bg-red-500/10 text-red-600 border-red-500/20">Suspended</span>}
+                              <span className={`text-[9px] font-black px-2 py-0.5 rounded-full border shadow-sm ${role.cls}`}>{role.label}</span>
+                              <span className="text-[10px] text-muted-foreground font-medium">{acc.login_count ?? 0} logins</span>
                             </div>
                           </div>
                         );
@@ -529,16 +529,16 @@ const AdminSecurity = () => {
         onExport={() => exportCsv(fVelocity as unknown as Record<string, unknown>[], "velocity.csv")}
       >
         {fVelocity.length === 0 ? <EmptyState icon={Zap} message="No accounts placed orders within 5 minutes of signup." /> : (
-          <div className="overflow-x-auto rounded-xl border border-white/5 overflow-hidden">
+          <div className="overflow-x-auto rounded-xl border border-border overflow-hidden shadow-sm">
             <table className="w-full text-sm">
-              <thead><tr className="bg-white/[0.03] border-b border-white/5"><TH>User</TH><TH>Joined</TH><TH>First Order</TH><TH>Delay</TH></tr></thead>
+              <thead><tr className="bg-muted border-b border-border"><TH>User</TH><TH>Joined</TH><TH>First Order</TH><TH>Delay</TH></tr></thead>
               <tbody>
                 {fVelocity.map(v => (
-                  <tr key={v.user_id} className="border-b border-white/[0.04] hover:bg-white/[0.03]">
-                    <td className="px-4 py-3"><p className="font-semibold text-white">{v.full_name || "—"}</p><p className="text-[11px] text-white/35">{v.email}</p></td>
-                    <td className="px-4 py-3 text-xs text-white/40">{fmt(v.joined_at)}</td>
-                    <td className="px-4 py-3 text-xs text-white/40">{fmt(v.first_order_at)}</td>
-                    <td className="px-4 py-3"><span className="text-sm font-black text-orange-400">{v.minutes_to_first_order}m</span></td>
+                  <tr key={v.user_id} className="border-b border-border hover:bg-muted/50 transition-colors">
+                    <td className="px-4 py-3"><p className="font-black text-foreground">{v.full_name || "—"}</p><p className="text-[11px] text-muted-foreground font-medium">{v.email}</p></td>
+                    <td className="px-4 py-3 text-xs text-muted-foreground font-medium">{fmt(v.joined_at)}</td>
+                    <td className="px-4 py-3 text-xs text-muted-foreground font-medium">{fmt(v.first_order_at)}</td>
+                    <td className="px-4 py-3"><span className="text-sm font-black text-orange-600 dark:text-orange-400">{v.minutes_to_first_order}m</span></td>
                   </tr>
                 ))}
               </tbody>
@@ -554,17 +554,17 @@ const AdminSecurity = () => {
         {fReferrals.length === 0 ? <EmptyState icon={Gift} message="No referral codes with 5+ signups." /> : (
           <div className="space-y-2">
             {fReferrals.map(g => (
-              <div key={g.referrer_id} className="rounded-xl border border-purple-500/20 bg-purple-500/[0.03] p-4">
+              <div key={g.referrer_id} className="rounded-xl border border-purple-200 dark:border-purple-500/20 bg-purple-50 dark:bg-purple-500/[0.03] p-4 shadow-sm">
                 <div className="flex items-center justify-between mb-3">
-                  <div><p className="font-bold text-white text-sm">{g.referrer_name}</p><p className="text-[11px] text-white/35">{g.referrer_email}</p></div>
-                  <span className="text-[10px] font-black bg-purple-500/20 text-purple-400 border border-purple-500/30 px-2 py-0.5 rounded-full">{g.count} referrals</span>
+                  <div><p className="font-black text-foreground text-sm">{g.referrer_name}</p><p className="text-[11px] text-muted-foreground font-medium">{g.referrer_email}</p></div>
+                  <span className="text-[10px] font-black bg-purple-500/10 text-purple-700 dark:text-purple-400 border border-purple-500/20 px-2 py-0.5 rounded-full shadow-sm">{g.count} referrals</span>
                 </div>
                 <div className="space-y-1">
                   {g.members.map(m => (
-                    <div key={m.user_id} className="flex items-center gap-2 text-[11px] bg-black/20 px-3 py-1.5 rounded-lg">
-                      <span className="text-white/60">{m.full_name || "—"}</span>
-                      <span className="text-white/20">·</span>
-                      <span className="font-mono text-white/35">{m.email}</span>
+                    <div key={m.user_id} className="flex items-center gap-2 text-[11px] bg-background border border-border px-3 py-1.5 rounded-lg shadow-sm">
+                      <span className="text-foreground font-black">{m.full_name || "—"}</span>
+                      <span className="text-muted-foreground/30">·</span>
+                      <span className="font-mono text-muted-foreground font-medium">{m.email}</span>
                     </div>
                   ))}
                 </div>
@@ -579,19 +579,19 @@ const AdminSecurity = () => {
         onExport={() => exportCsv(fFailed as unknown as Record<string, unknown>[], "failed_rate.csv")}
       >
         {fFailed.length === 0 ? <EmptyState icon={TrendingUp} message="No users with ≥50% failure rate (min 5 orders)." /> : (
-          <div className="overflow-x-auto rounded-xl border border-white/5 overflow-hidden">
+          <div className="overflow-x-auto rounded-xl border border-border overflow-hidden shadow-sm">
             <table className="w-full text-sm">
-              <thead><tr className="bg-white/[0.03] border-b border-white/5"><TH>User</TH><TH>Orders</TH><TH>Failed</TH><TH>Rate</TH></tr></thead>
+              <thead><tr className="bg-muted border-b border-border"><TH>User</TH><TH>Orders</TH><TH>Failed</TH><TH>Rate</TH></tr></thead>
               <tbody>
                 {fFailed.map(u => (
-                  <tr key={u.user_id} className="border-b border-white/[0.04] hover:bg-white/[0.03]">
-                    <td className="px-4 py-3"><p className="font-semibold text-white">{u.full_name || "—"}</p><p className="text-[11px] text-white/35">{u.email}</p></td>
-                    <td className="px-4 py-3 text-xs text-white/50">{u.total}</td>
-                    <td className="px-4 py-3 text-xs text-red-400">{u.failed}</td>
+                  <tr key={u.user_id} className="border-b border-border hover:bg-muted/50 transition-colors">
+                    <td className="px-4 py-3"><p className="font-black text-foreground">{u.full_name || "—"}</p><p className="text-[11px] text-muted-foreground font-medium">{u.email}</p></td>
+                    <td className="px-4 py-3 text-xs text-muted-foreground font-black">{u.total}</td>
+                    <td className="px-4 py-3 text-xs text-red-600 dark:text-red-400 font-black">{u.failed}</td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2">
-                        <div className="w-16 h-1.5 rounded-full bg-white/10 overflow-hidden"><div className="h-full bg-red-500 rounded-full" style={{ width: `${u.rate}%` }} /></div>
-                        <span className="text-xs font-black text-red-400">{u.rate}%</span>
+                        <div className="w-16 h-1.5 rounded-full bg-muted overflow-hidden"><div className="h-full bg-red-500 rounded-full" style={{ width: `${u.rate}%` }} /></div>
+                        <span className="text-xs font-black text-red-600 dark:text-red-400">{u.rate}%</span>
                       </div>
                     </td>
                   </tr>
@@ -607,27 +607,27 @@ const AdminSecurity = () => {
   const renderActivity = () => (
     <div className="space-y-4">
       {/* Recent Logins */}
-      <SectionCard title="Recent Logins" count={fLogins.length} icon={LogIn} color="text-cyan-400"
+      <SectionCard title="Recent Logins" count={fLogins.length} icon={LogIn} color="text-cyan-600 dark:text-cyan-400"
         onExport={() => exportCsv(fLogins.map(l => ({ user_id: l.user_id, full_name: l.full_name, email: l.email, last_ip: l.last_ip, last_location: l.last_location, last_seen_at: l.last_seen_at, login_count: l.login_count } as Record<string, unknown>)), "recent_logins.csv")}
       >
-        <div className="overflow-x-auto rounded-xl border border-white/5 overflow-hidden">
+        <div className="overflow-x-auto rounded-xl border border-border overflow-hidden shadow-sm">
           <table className="w-full text-sm">
-            <thead><tr className="bg-white/[0.03] border-b border-white/5"><TH>User</TH><TH>IP Address</TH><TH>Location</TH><TH>Last Seen</TH><TH>Logins</TH></tr></thead>
+            <thead><tr className="bg-muted border-b border-border"><TH>User</TH><TH>IP Address</TH><TH>Location</TH><TH>Last Seen</TH><TH>Logins</TH></tr></thead>
             <tbody>
               {fLogins.map(l => (
-                <tr key={l.user_id} className="border-b border-white/[0.04] hover:bg-white/[0.03]">
-                  <td className="px-4 py-3"><p className="font-semibold text-white">{l.full_name || "—"}</p><p className="text-[11px] text-white/35">{l.email}</p></td>
+                <tr key={l.user_id} className="border-b border-border hover:bg-muted/50 transition-colors">
+                  <td className="px-4 py-3"><p className="font-black text-foreground">{l.full_name || "—"}</p><p className="text-[11px] text-muted-foreground font-medium">{l.email}</p></td>
                   <td className="px-4 py-3">
                     {l.last_ip ? (
                       <div className="flex items-center gap-1.5">
-                        <span className="font-mono text-xs text-cyan-400/80">{l.last_ip}</span>
-                        <button type="button" onClick={() => copyText(l.last_ip!, "IP copied")} className="text-white/20 hover:text-white/50 transition-colors"><Copy className="w-3 h-3" /></button>
+                        <span className="font-mono text-xs text-cyan-700 dark:text-cyan-400/80 font-bold">{l.last_ip}</span>
+                        <button type="button" onClick={() => copyText(l.last_ip!, "IP copied")} className="text-muted-foreground hover:text-foreground transition-colors"><Copy className="w-3 h-3" /></button>
                       </div>
-                    ) : <span className="text-white/20">—</span>}
+                    ) : <span className="text-muted-foreground/50">—</span>}
                   </td>
-                  <td className="px-4 py-3 text-xs text-emerald-400/60">{l.last_location || <span className="text-white/20">—</span>}</td>
-                  <td className="px-4 py-3 text-xs text-white/40">{fmt(l.last_seen_at)}</td>
-                  <td className="px-4 py-3"><span className="text-xs font-bold text-white/50">{l.login_count ?? 0}</span></td>
+                  <td className="px-4 py-3 text-xs font-bold text-emerald-600 dark:text-emerald-400/60">{l.last_location || <span className="text-muted-foreground/50">—</span>}</td>
+                  <td className="px-4 py-3 text-xs text-muted-foreground font-medium">{fmt(l.last_seen_at)}</td>
+                  <td className="px-4 py-3"><span className="text-xs font-black text-muted-foreground">{l.login_count ?? 0}</span></td>
                 </tr>
               ))}
             </tbody>
@@ -640,19 +640,19 @@ const AdminSecurity = () => {
         onExport={() => exportCsv(fHighLogin.map(p => ({ user_id: p.user_id, full_name: p.full_name, email: p.email, login_count: p.login_count, last_ip: p.last_ip, last_location: p.last_location } as Record<string, unknown>)), "high_logins.csv")}
       >
         {fHighLogin.length === 0 ? <EmptyState icon={Hash} message="No accounts with 50+ logins." /> : (
-          <div className="overflow-x-auto rounded-xl border border-white/5 overflow-hidden">
+          <div className="overflow-x-auto rounded-xl border border-border overflow-hidden shadow-sm">
             <table className="w-full text-sm">
-              <thead><tr className="bg-white/[0.03] border-b border-white/5"><TH>User</TH><TH>Logins</TH><TH>IP</TH><TH>Location</TH><TH>Role</TH></tr></thead>
+              <thead><tr className="bg-muted border-b border-border"><TH>User</TH><TH>Logins</TH><TH>IP</TH><TH>Location</TH><TH>Role</TH></tr></thead>
               <tbody>
                 {fHighLogin.map(p => {
                   const role = roleLabel(p);
                   return (
-                    <tr key={p.user_id} className="border-b border-white/[0.04] hover:bg-white/[0.03]">
-                      <td className="px-4 py-3"><p className="font-semibold text-white">{p.full_name || "—"}</p><p className="text-[11px] text-white/35">{p.email}</p></td>
-                      <td className="px-4 py-3"><span className="text-base font-black text-amber-400">{p.login_count}</span></td>
-                      <td className="px-4 py-3"><span className="font-mono text-xs text-cyan-400/60">{p.last_ip || "—"}</span></td>
-                      <td className="px-4 py-3 text-xs text-emerald-400/60">{p.last_location || "—"}</td>
-                      <td className="px-4 py-3"><span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${role.cls}`}>{role.label}</span></td>
+                    <tr key={p.user_id} className="border-b border-border hover:bg-muted/50 transition-colors">
+                      <td className="px-4 py-3"><p className="font-black text-foreground">{p.full_name || "—"}</p><p className="text-[11px] text-muted-foreground font-medium">{p.email}</p></td>
+                      <td className="px-4 py-3"><span className="text-base font-black text-amber-600 dark:text-amber-400">{p.login_count}</span></td>
+                      <td className="px-4 py-3"><span className="font-mono text-xs text-cyan-600 dark:text-cyan-400/60 font-bold">{p.last_ip || "—"}</span></td>
+                      <td className="px-4 py-3 text-xs font-bold text-emerald-600 dark:text-emerald-400/60">{p.last_location || "—"}</td>
+                      <td className="px-4 py-3"><span className={`text-[10px] font-black px-2 py-0.5 rounded-full border shadow-sm ${role.cls}`}>{role.label}</span></td>
                     </tr>
                   );
                 })}
@@ -667,31 +667,31 @@ const AdminSecurity = () => {
   const renderAccess = () => (
     <div className="space-y-4">
       {/* System Controls */}
-      <div className="rounded-2xl border border-white/8 bg-white/[0.02] p-5">
+      <div className="rounded-2xl border border-border bg-card shadow-sm p-5">
         <div className="flex items-center gap-2 mb-5">
-          <div className="p-2 rounded-xl bg-amber-500/10 border border-amber-500/20"><Lock className="w-4 h-4 text-amber-400" /></div>
-          <span className="font-black text-white text-sm">Platform Controls</span>
+          <div className="p-2 rounded-xl bg-amber-500/10 border border-amber-500/20"><Lock className="w-4 h-4 text-amber-600 dark:text-amber-500" /></div>
+          <span className="font-black text-foreground text-sm">Platform Controls</span>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           {[
-            { key: "registration_enabled", label: "User Registration", desc: "Allow new users to sign up", active: sysSettings?.registration_enabled, activeColor: "border-green-500/30 bg-green-500/10 text-green-400", inactiveColor: "border-red-500/30 bg-red-500/10 text-red-400", activeLabel: "Open", inactiveLabel: "Locked" },
-            { key: "maintenance_mode", label: "Maintenance Mode", desc: "Show maintenance message at checkout", active: sysSettings?.maintenance_mode, activeColor: "border-amber-500/30 bg-amber-500/10 text-amber-400", inactiveColor: "border-white/10 bg-white/5 text-white/40", activeLabel: "Active", inactiveLabel: "Off" },
+            { key: "registration_enabled", label: "User Registration", desc: "Allow new users to sign up", active: sysSettings?.registration_enabled, activeColor: "border-green-500/20 bg-green-500/10 text-green-600 dark:text-green-400", inactiveColor: "border-red-500/20 bg-red-500/10 text-red-600 dark:text-red-400", activeLabel: "Open", inactiveLabel: "Locked" },
+            { key: "maintenance_mode", label: "Maintenance Mode", desc: "Show maintenance message at checkout", active: sysSettings?.maintenance_mode, activeColor: "border-amber-500/20 bg-amber-500/10 text-amber-600 dark:text-amber-400", inactiveColor: "border-border bg-muted text-muted-foreground", activeLabel: "Active", inactiveLabel: "Off" },
           ].map(setting => (
-            <div key={setting.key} className="flex items-center justify-between p-4 rounded-xl bg-white/[0.02] border border-white/8">
+            <div key={setting.key} className="flex items-center justify-between p-4 rounded-xl bg-background border border-border shadow-sm">
               <div>
-                <p className="font-bold text-sm text-white">{setting.label}</p>
-                <p className="text-[11px] text-white/35 mt-0.5">{setting.desc}</p>
+                <p className="font-black text-sm text-foreground">{setting.label}</p>
+                <p className="text-[11px] text-muted-foreground font-medium mt-0.5">{setting.desc}</p>
               </div>
               <button type="button"
                 onClick={() => toggleSetting(setting.key, !setting.active)}
-                className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase transition-all border ${setting.active ? setting.activeColor : setting.inactiveColor}`}
+                className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase transition-all border shadow-sm ${setting.active ? setting.activeColor : setting.inactiveColor}`}
               >
                 {setting.active ? setting.activeLabel : setting.inactiveLabel}
               </button>
             </div>
           ))}
         </div>
-        <div className="mt-3 pt-3 border-t border-white/5">
+        <div className="mt-3 pt-3 border-t border-border">
           <Button onClick={handlePurge} disabled={purging}
             className="gap-2 bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 rounded-xl text-xs h-9 w-full sm:w-auto">
             {purging ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Ban className="w-3.5 h-3.5" />}
@@ -701,24 +701,24 @@ const AdminSecurity = () => {
       </div>
 
       {/* Blocklist */}
-      <div className="rounded-2xl border border-white/8 bg-white/[0.02] overflow-hidden">
-        <div className="flex items-center gap-3 px-5 py-4 border-b border-white/5">
-          <div className="p-2 rounded-xl bg-red-500/10 border border-red-500/20"><Shield className="w-4 h-4 text-red-400" /></div>
-          <span className="font-black text-white text-sm">IP & Domain Blocklist</span>
-          <span className="text-[10px] font-black bg-red-500/20 text-red-400 border border-red-500/30 px-2 py-0.5 rounded-full">{blacklist.length}</span>
+      <div className="rounded-2xl border border-border bg-card shadow-sm overflow-hidden">
+        <div className="flex items-center gap-3 px-5 py-4 border-b border-border">
+          <div className="p-2 rounded-xl bg-red-500/10 border border-red-500/20"><Shield className="w-4 h-4 text-red-600 dark:text-red-500" /></div>
+          <span className="font-black text-foreground text-sm">IP & Domain Blocklist</span>
+          <span className="text-[10px] font-black bg-red-500/10 text-red-600 dark:text-red-400 border border-red-500/20 px-2 py-0.5 rounded-full shadow-sm">{blacklist.length}</span>
         </div>
         <div className="p-5 space-y-4">
           {/* Add form */}
           <div className="grid grid-cols-1 sm:grid-cols-4 gap-2">
             <select value={blType} onChange={e => setBlType(e.target.value)}
-              className="bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-sm text-white outline-none focus:border-red-500/40">
+              className="bg-background border border-border rounded-xl px-3 py-2 text-sm text-foreground outline-none focus:ring-2 focus:ring-red-500/20">
               <option value="ip">IP Address</option>
               <option value="domain">Email Domain</option>
             </select>
             <Input value={blValue} onChange={e => setBlValue(e.target.value)} placeholder="192.168.1.1 or @domain.com"
-              className="sm:col-span-2 bg-white/5 border-white/10 text-white rounded-xl focus:border-red-500/40" />
+              className="sm:col-span-2 bg-background border-border text-foreground rounded-xl focus-visible:ring-red-500/20" />
             <Button onClick={() => { if (blValue.trim()) handleBlacklist("add", blValue.trim(), blType, blReason || "Manual block"); }}
-              className="bg-red-500 hover:bg-red-600 text-white rounded-xl font-bold">
+              className="bg-red-600 hover:bg-red-700 text-white rounded-xl font-black shadow-sm">
               Block
             </Button>
           </div>
@@ -726,16 +726,16 @@ const AdminSecurity = () => {
           {blacklist.length === 0 ? (
             <EmptyState icon={Shield} message="No IPs or domains blocked." />
           ) : (
-            <div className="rounded-xl border border-white/5 divide-y divide-white/[0.04] overflow-hidden">
+            <div className="rounded-xl border border-border divide-y divide-border overflow-hidden shadow-sm">
               {blacklist.map(item => (
-                <div key={item.id} className="flex items-center justify-between px-4 py-3 hover:bg-white/[0.02] transition-colors">
+                <div key={item.id} className="flex items-center justify-between px-4 py-3 bg-background hover:bg-muted/50 transition-colors">
                   <div className="flex items-center gap-3 min-w-0">
-                    <span className="text-[9px] font-black uppercase px-2 py-0.5 rounded-full bg-red-500/10 text-red-500 border border-red-500/20 shrink-0">{item.type}</span>
-                    <span className="text-sm font-mono text-white font-bold truncate">{item.value}</span>
-                    {item.reason && <span className="text-[10px] text-white/25 truncate hidden sm:block">{item.reason}</span>}
+                    <span className="text-[9px] font-black uppercase px-2 py-0.5 rounded-full bg-red-500/10 text-red-600 dark:text-red-500 border border-red-500/20 shrink-0 shadow-sm">{item.type}</span>
+                    <span className="text-sm font-mono text-foreground font-black truncate">{item.value}</span>
+                    {item.reason && <span className="text-[10px] text-muted-foreground font-medium truncate hidden sm:block">{item.reason}</span>}
                   </div>
                   <button type="button" onClick={() => handleBlacklist("remove", item.value)}
-                    className="text-[10px] font-bold text-white/25 hover:text-red-400 transition-colors ml-3 shrink-0">
+                    className="text-[10px] font-black text-muted-foreground hover:text-red-600 transition-colors ml-3 shrink-0 uppercase tracking-wider">
                     Remove
                   </button>
                 </div>
@@ -748,37 +748,37 @@ const AdminSecurity = () => {
   );
 
   const renderAudit = () => (
-    <div className="rounded-2xl border border-white/8 bg-white/[0.02] overflow-hidden">
-      <div className="flex items-center justify-between px-5 py-4 border-b border-white/5">
+    <div className="rounded-2xl border border-border bg-card shadow-sm overflow-hidden">
+      <div className="flex items-center justify-between px-5 py-4 border-b border-border">
         <div className="flex items-center gap-3">
-          <div className="p-2 rounded-xl bg-violet-500/10 border border-violet-500/20"><BookOpen className="w-4 h-4 text-violet-400" /></div>
-          <span className="font-black text-white text-sm">Admin Action Log</span>
-          <span className="text-[10px] font-black bg-violet-500/20 text-violet-400 border border-violet-500/30 px-2 py-0.5 rounded-full">Last 50</span>
+          <div className="p-2 rounded-xl bg-violet-500/10 border border-violet-500/20"><BookOpen className="w-4 h-4 text-violet-600 dark:text-violet-400" /></div>
+          <span className="font-black text-foreground text-sm">Admin Action Log</span>
+          <span className="text-[10px] font-black bg-violet-500/10 text-violet-600 dark:text-violet-400 border border-violet-500/20 px-2 py-0.5 rounded-full shadow-sm">Last 50</span>
         </div>
         <button type="button" onClick={() => exportCsv(actionLog as unknown as Record<string, unknown>[], "admin_log.csv")}
-          className="flex items-center gap-1.5 text-[10px] text-white/30 hover:text-white/60 transition-colors px-2 py-1 rounded-lg hover:bg-white/5">
+          className="flex items-center gap-1.5 text-[10px] text-muted-foreground hover:text-foreground transition-colors px-2 py-1 rounded-lg hover:bg-muted font-black shadow-sm bg-background border border-border">
           <FileDown className="w-3 h-3" /> CSV
         </button>
       </div>
       {actionLog.length === 0 ? (
         <div className="p-5"><EmptyState icon={BookOpen} message="No admin actions recorded yet." /></div>
       ) : (
-        <div className="divide-y divide-white/[0.04]">
+        <div className="divide-y divide-border">
           {actionLog.map(entry => (
-            <div key={entry.id} className="flex items-center justify-between px-5 py-3 hover:bg-white/[0.02] transition-colors gap-4">
+            <div key={entry.id} className="flex items-center justify-between px-5 py-3 bg-background hover:bg-muted/50 transition-colors gap-4">
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2 flex-wrap">
-                  <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-full border ${
-                    entry.action.includes("suspend") ? "bg-red-500/20 text-red-400 border-red-500/30" :
-                    entry.action.includes("approve") || entry.action.includes("unsuspend") ? "bg-green-500/20 text-green-400 border-green-500/30" :
-                    entry.action.includes("reject") ? "bg-orange-500/20 text-orange-400 border-orange-500/30" :
-                    "bg-white/5 text-white/40 border-white/10"
+                  <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-full border shadow-sm ${
+                    entry.action.includes("suspend") ? "bg-red-500/10 text-red-600 border-red-500/20" :
+                    entry.action.includes("approve") || entry.action.includes("unsuspend") ? "bg-green-500/10 text-green-600 border-green-500/20" :
+                    entry.action.includes("reject") ? "bg-orange-500/10 text-orange-600 border-orange-500/20" :
+                    "bg-muted text-muted-foreground border-border"
                   }`}>{entry.action.replace(/_/g, " ")}</span>
-                  <span className="text-xs text-white/50">{entry.target_email || "—"}</span>
-                  <span className="text-[10px] text-white/25 hidden sm:block">by {entry.admin_email}</span>
+                  <span className="text-xs font-bold text-foreground/80">{entry.target_email || "—"}</span>
+                  <span className="text-[10px] text-muted-foreground font-medium hidden sm:block">by {entry.admin_email}</span>
                 </div>
               </div>
-              <span className="text-[10px] text-white/25 shrink-0 whitespace-nowrap">{fmt(entry.created_at)}</span>
+              <span className="text-[10px] text-muted-foreground font-bold shrink-0 whitespace-nowrap">{fmt(entry.created_at)}</span>
             </div>
           ))}
         </div>
@@ -791,24 +791,24 @@ const AdminSecurity = () => {
     <div className="space-y-6 pb-10">
 
       {/* ── Header ── */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-border pb-6">
         <div className="flex items-center gap-3">
           <div className="p-2.5 rounded-2xl bg-amber-500/10 border border-amber-500/20">
-            <Shield className="w-5 h-5 text-amber-400" />
+            <Shield className="w-5 h-5 text-amber-600 dark:text-amber-500" />
           </div>
           <div>
-            <h1 className="font-black text-2xl text-white tracking-tight">Security Center</h1>
-            <p className="text-xs text-white/35 mt-0.5">Fraud detection · Access control · Audit trail</p>
+            <h1 className="font-black text-2xl text-foreground tracking-tight uppercase">Security Center</h1>
+            <p className="text-xs text-muted-foreground font-medium mt-0.5">Fraud detection · Access control · Audit trail</p>
           </div>
         </div>
         <div className="flex items-center gap-2">
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-white/25" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
             <Input placeholder="Search users, IPs…" value={search} onChange={e => setSearch(e.target.value)}
-              className="pl-9 h-9 w-52 bg-white/5 border-white/10 text-white placeholder:text-white/25 rounded-xl text-sm focus:border-amber-400/30" />
+              className="pl-9 h-9 w-52 bg-background border-border text-foreground placeholder:text-muted-foreground rounded-xl text-sm focus-visible:ring-amber-500/20 shadow-sm" />
           </div>
           <button type="button" onClick={() => void fetchData(true)}
-            className="flex items-center justify-center w-9 h-9 rounded-xl bg-white/5 border border-white/10 text-white/50 hover:text-white hover:bg-white/10 transition-all">
+            className="flex items-center justify-center w-9 h-9 rounded-xl bg-background border border-border text-muted-foreground hover:text-foreground hover:bg-muted transition-all shadow-sm">
             <RefreshCw className={`w-4 h-4 ${refreshing ? "animate-spin" : ""}`} />
           </button>
           <button type="button"
@@ -817,14 +817,14 @@ const AdminSecurity = () => {
               ...velocityAccts.map(v => ({ section: "velocity", ...v } as Record<string, unknown>)),
               ...failedUsers.map(u => ({ section: "failed_orders", ...u } as Record<string, unknown>)),
             ], "security_export.csv")}
-            className="flex items-center gap-1.5 h-9 px-3 rounded-xl bg-white/5 border border-white/10 text-white/50 hover:text-white hover:bg-white/10 transition-all text-xs font-bold">
+            className="flex items-center gap-1.5 h-9 px-3 rounded-xl bg-background border border-border text-muted-foreground hover:text-foreground hover:bg-muted transition-all text-xs font-black shadow-sm">
             <FileDown className="w-3.5 h-3.5" /> Export
           </button>
         </div>
       </div>
 
       {/* ── Tabs ── */}
-      <div className="flex items-center gap-1 p-1 bg-white/[0.03] border border-white/8 rounded-2xl w-fit overflow-x-auto">
+      <div className="flex items-center gap-1 p-1.5 bg-muted/50 border border-border rounded-2xl w-fit overflow-x-auto shadow-sm">
         {TABS.map(t => {
           const active = tab === t.id;
           const Icon   = t.icon;
@@ -833,13 +833,13 @@ const AdminSecurity = () => {
             (t.id === "access"   && sysSettings?.maintenance_mode);
           return (
             <button key={t.id} type="button" onClick={() => setTab(t.id)}
-              className={`relative flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap ${
-                active ? "bg-white/10 text-white shadow-sm" : "text-white/40 hover:text-white/70"
+              className={`relative flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all whitespace-nowrap shadow-sm ${
+                active ? "bg-card text-foreground border border-border shadow-md" : "text-muted-foreground hover:text-foreground hover:bg-muted border border-transparent"
               }`}
             >
               <Icon className="w-3.5 h-3.5" />
               {t.label}
-              {danger && !active && <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 bg-red-400 rounded-full" />}
+              {danger && !active && <span className="absolute top-1 right-1 w-1.5 h-1.5 bg-red-500 rounded-full animate-pulse" />}
             </button>
           );
         })}

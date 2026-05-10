@@ -55,7 +55,7 @@ const MEDALS = [
     avatarBg: "bg-slate-400/15 border-slate-400/30", avatarText: "text-slate-300",
     accent: "text-slate-300", pillarH: "h-28",
     pillarBg: "bg-gradient-to-t from-slate-500/15 to-transparent border border-b-0 border-slate-500/15",
-    cardBorder: "border-white/[0.06]", cardBg: "",
+    cardBorder: "border-border", cardBg: "",
   },
   {
     rank: 3, label: "Bronze Tier", icon: Award,
@@ -63,7 +63,7 @@ const MEDALS = [
     avatarBg: "bg-orange-700/15 border-orange-700/30", avatarText: "text-orange-500",
     accent: "text-orange-500", pillarH: "h-20",
     pillarBg: "bg-gradient-to-t from-orange-700/15 to-transparent border border-b-0 border-orange-700/15",
-    cardBorder: "border-white/[0.06]", cardBg: "",
+    cardBorder: "border-border", cardBg: "",
   },
 ];
 
@@ -72,7 +72,7 @@ const TIERS = [
   { label: "Gold",    min: 50,  color: "text-amber-400",  bg: "bg-amber-400/10 border-amber-400/25",  icon: "🥇" },
   { label: "Silver",  min: 25,  color: "text-slate-300",  bg: "bg-slate-400/10 border-slate-400/20",  icon: "🥈" },
   { label: "Bronze",  min: 10,  color: "text-orange-500", bg: "bg-orange-600/10 border-orange-600/20",icon: "🥉" },
-  { label: "Starter", min: 1,   color: "text-white/40",   bg: "bg-white/[0.03] border-white/[0.06]",  icon: "⭐" },
+  { label: "Starter", min: 1,   color: "text-muted-foreground", bg: "bg-muted border-border", icon: "⭐" },
 ];
 
 const getTier = (weekOrders: number) =>
@@ -651,7 +651,7 @@ const DashboardLeaderboard = () => {
                     <span className={`inline-flex items-center justify-center w-7 h-7 rounded-full text-xs font-black mb-2 shadow-md ${medal.badgeBg} ${medal.badgeText}`}>
                       {entry.display_rank}
                     </span>
-                    <div className={`mx-auto mb-2 flex items-center justify-center font-black rounded-2xl border ring-2 ring-offset-1 ring-offset-transparent ${medal.avatarBg} ${medal.avatarText} ${isFirst ? "w-14 h-14 text-lg ring-amber-400/30" : "w-11 h-11 text-sm ring-white/10"}`}>
+                    <div className={`mx-auto mb-2 flex items-center justify-center font-black rounded-2xl border ring-2 ring-offset-1 ring-offset-transparent ${medal.avatarBg} ${medal.avatarText} ${isFirst ? "w-14 h-14 text-lg ring-amber-400/30" : `w-11 h-11 text-sm ${isDark ? "ring-white/10" : "ring-gray-200"}`}`}>
                       {initials(entry.agent_name)}
                     </div>
                     <p className={`font-black truncate text-xs sm:text-sm ${head}`}>{entry.agent_name}</p>

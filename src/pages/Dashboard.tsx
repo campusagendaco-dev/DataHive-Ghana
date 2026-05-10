@@ -153,18 +153,18 @@ const Dashboard = () => {
       {/* ── Greeting row ── */}
       <div className="flex items-center justify-between">
         <div>
-          <p className="text-white/35 text-xs font-medium">{getGreeting()} 👋</p>
-          <h1 className="text-xl font-black text-white tracking-tight">{firstName}</h1>
+          <p className="text-muted-foreground text-xs font-medium">{getGreeting()} 👋</p>
+          <h1 className="text-xl font-black text-foreground tracking-tight">{firstName}</h1>
         </div>
         
         <div className="flex items-center gap-2">
           {/* Live Premium Clock */}
-          <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border border-white/5 bg-white/[0.02] backdrop-blur-md shadow-lg">
+          <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border border-border bg-card backdrop-blur-md shadow-sm">
             <div className="relative flex items-center justify-center">
-              <Clock className="w-3 h-3 text-amber-400/80" />
+              <Clock className="w-3 h-3 text-amber-500 dark:text-amber-400/80" />
               <span className="absolute inset-0 rounded-full bg-amber-400/20 animate-ping pointer-events-none" />
             </div>
-            <span className="text-[10px] font-bold text-white/60 font-mono tracking-tight">
+            <span className="text-[10px] font-bold text-foreground/80 font-mono tracking-tight">
               {format(currentTime, "hh:mm:ss a")}
             </span>
           </div>
@@ -173,7 +173,7 @@ const Dashboard = () => {
             type="button"
             onClick={() => fetchData(true)}
             aria-label="Refresh dashboard"
-            className={`w-9 h-9 rounded-xl border border-white/10 bg-white/5 flex items-center justify-center text-white/40 hover:text-white hover:border-white/20 transition-all ${refreshing ? "animate-spin" : ""}`}
+            className={`w-9 h-9 rounded-xl border border-border bg-card flex items-center justify-center text-muted-foreground hover:text-foreground hover:border-foreground/20 transition-all ${refreshing ? "animate-spin" : ""}`}
           >
             <RefreshCw className="w-4 h-4" />
           </button>
@@ -284,13 +284,13 @@ const Dashboard = () => {
             <CloudOff className="w-8 h-8 text-red-500" />
           </div>
           <div>
-            <h3 className="text-lg font-black text-white">Connection Issues</h3>
-            <p className="text-sm text-white/50 max-w-xs mx-auto mt-1">Couldn't load your latest data. Check your connection and try again.</p>
+            <h3 className="text-lg font-black text-foreground">Connection Issues</h3>
+            <p className="text-sm text-muted-foreground max-w-xs mx-auto mt-1">Couldn't load your latest data. Check your connection and try again.</p>
           </div>
           <button
             type="button"
             onClick={() => fetchData()}
-            className="inline-flex items-center gap-2 rounded-xl px-6 py-2.5 bg-white text-black text-sm font-black hover:bg-white/90 transition-all active:scale-95"
+            className="inline-flex items-center gap-2 rounded-xl px-6 py-2.5 bg-slate-900 text-white dark:bg-white dark:text-black text-sm font-black hover:opacity-90 transition-all active:scale-95"
           >
             <RefreshCw className="w-4 h-4" /> Try Again
           </button>
@@ -301,7 +301,7 @@ const Dashboard = () => {
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {loading
           ? Array.from({ length: 4 }).map((_, i) => (
-              <div key={i} className="rounded-2xl p-4 border border-white/8 bg-white/[0.03]">
+              <div key={i} className="rounded-2xl p-4 border border-border bg-card">
                 <Skeleton className="h-4 w-4 mb-3 rounded-lg" />
                 <Skeleton className="h-6 w-3/4 mb-1.5 rounded-lg" />
                 <Skeleton className="h-3 w-full rounded-lg" />
@@ -316,14 +316,14 @@ const Dashboard = () => {
                   <s.icon className={`w-4 h-4 ${s.color}`} />
                 </div>
                 <p className={`font-black text-base sm:text-lg leading-tight ${s.color}`}>{s.value}</p>
-                <p className="text-white/40 text-[11px] font-medium">{s.label}</p>
+                <p className="text-muted-foreground text-[11px] font-medium">{s.label}</p>
               </div>
             ))}
       </div>
 
       {/* ── Quick actions ── */}
       <div>
-        <p className="text-[10px] font-black uppercase tracking-widest text-white/25 mb-3 flex items-center gap-2">
+        <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/70 mb-3 flex items-center gap-2">
           <Sparkles className="w-3 h-3" /> Quick Actions
         </p>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
@@ -338,7 +338,7 @@ const Dashboard = () => {
                 <a.icon className={`w-4 h-4 ${a.color}`} />
               </div>
               <div className="flex items-center justify-between w-full">
-                <span className="text-xs font-black text-white/80">{a.label}</span>
+                <span className="text-xs font-black text-foreground/80">{a.label}</span>
                 <ChevronRight className={`w-3.5 h-3.5 ${a.color} opacity-0 group-hover:opacity-100 transition-opacity`} />
               </div>
             </button>
@@ -351,10 +351,10 @@ const Dashboard = () => {
         <div className="relative overflow-hidden rounded-3xl border border-amber-500/20 bg-amber-500/5 p-5 flex flex-col sm:flex-row sm:items-center gap-4">
           <div className="absolute -top-6 -right-6 w-32 h-32 rounded-full bg-amber-500/10 blur-2xl pointer-events-none" />
           <div className="flex-1 relative">
-            <p className="font-black text-sm text-white mb-1 flex items-center gap-2">
-              <Sparkles className="w-3.5 h-3.5 text-amber-400" /> Unlock Agent Prices
+            <p className="font-black text-sm text-foreground mb-1 flex items-center gap-2">
+              <Sparkles className="w-3.5 h-3.5 text-amber-500 dark:text-amber-400" /> Unlock Agent Prices
             </p>
-            <p className="text-white/40 text-xs leading-relaxed">
+            <p className="text-muted-foreground text-xs leading-relaxed">
               Become an agent to get wholesale bundle rates, your own store, and profit tracking.
             </p>
           </div>

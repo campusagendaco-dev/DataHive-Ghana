@@ -739,28 +739,28 @@ const AdminOverview = () => {
               <div className={`p-6 rounded-[2rem] border ${isDark ? "bg-black/40 border-white/5 shadow-inner" : "bg-white border-gray-100 shadow-sm"}`}>
                 <p className={`text-[10px] uppercase font-black tracking-widest mb-2 text-emerald-500`}>Settled Inflow</p>
                 <div className="flex items-baseline gap-1">
-                   <p className={`text-2xl font-black text-white`}>GH₵ {(stats.rangeVerifiedInflow || 0).toFixed(2)}</p>
+                   <p className={`text-2xl font-black ${head}`}>GH₵ {(stats.rangeVerifiedInflow || 0).toFixed(2)}</p>
                    <ArrowUpRight className="w-4 h-4 text-emerald-500" />
                 </div>
-                <p className="text-[10px] text-white/20 mt-2 font-medium">Paystack confirmed settlements.</p>
+                <p className={`text-[10px] mt-2 font-medium ${muted}`}>Paystack confirmed settlements.</p>
               </div>
               
               <div className={`p-6 rounded-[2rem] border ${isDark ? "bg-black/40 border-white/5 shadow-inner" : "bg-white border-gray-100 shadow-sm"}`}>
                 <p className={`text-[10px] uppercase font-black tracking-widest mb-2 text-red-400`}>Wallet Liability</p>
                 <div className="flex items-baseline gap-1">
-                   <p className={`text-2xl font-black text-white`}>GH₵ {(stats.totalSystemBalance || 0).toFixed(2)}</p>
+                   <p className={`text-2xl font-black ${head}`}>GH₵ {(stats.totalSystemBalance || 0).toFixed(2)}</p>
                    <Wallet className="w-4 h-4 text-red-400" />
                 </div>
-                <p className="text-[10px] text-white/20 mt-2 font-medium">Total unspent funds in user wallets.</p>
+                <p className={`text-[10px] mt-2 font-medium ${muted}`}>Total unspent funds in user wallets.</p>
               </div>
               
               <div className={`p-6 rounded-[2rem] border ${isDark ? "bg-black/40 border-white/5 shadow-inner" : "bg-white border-gray-100 shadow-sm"}`}>
                 <p className={`text-[10px] uppercase font-black tracking-widest mb-2 text-blue-400`}>Consumed Volume</p>
                 <div className="flex items-baseline gap-1">
-                   <p className={`text-2xl font-black text-white`}>GH₵ {(stats.rangePurchases || 0).toFixed(2)}</p>
+                   <p className={`text-2xl font-black ${head}`}>GH₵ {(stats.rangePurchases || 0).toFixed(2)}</p>
                    <ShoppingCart className="w-4 h-4 text-blue-400" />
                 </div>
-                <p className="text-[10px] text-white/20 mt-2 font-medium">Gross data and airtime consumption.</p>
+                <p className={`text-[10px] mt-2 font-medium ${muted}`}>Gross data and airtime consumption.</p>
               </div>
             </div>
 
@@ -769,18 +769,18 @@ const AdminOverview = () => {
               <div className={`p-6 rounded-[2rem] border ${isDark ? "bg-black/40 border-white/5 shadow-inner" : "bg-white border-gray-100 shadow-sm"}`}>
                 <p className="text-[10px] uppercase font-black tracking-widest mb-2 text-pink-400">API Volume (All-time)</p>
                 <div className="flex items-baseline gap-1">
-                  <p className="text-2xl font-black text-white">GH₵ {(stats.apiVolume || 0).toFixed(2)}</p>
+                  <p className={`text-2xl font-black ${head}`}>GH₵ {(stats.apiVolume || 0).toFixed(2)}</p>
                   <Activity className="w-4 h-4 text-pink-400" />
                 </div>
-                <p className="text-[10px] text-white/20 mt-2 font-medium">Developer API orders — no Paystack fee.</p>
+                <p className={`text-[10px] mt-2 font-medium ${muted}`}>Developer API orders — no Paystack fee.</p>
               </div>
               <div className={`p-6 rounded-[2rem] border ${isDark ? "bg-black/40 border-white/5 shadow-inner" : "bg-white border-gray-100 shadow-sm"}`}>
                 <p className="text-[10px] uppercase font-black tracking-widest mb-2 text-emerald-400">Paystack Volume (All-time)</p>
                 <div className="flex items-baseline gap-1">
-                  <p className="text-2xl font-black text-white">GH₵ {(stats.paystackVolume || 0).toFixed(2)}</p>
+                  <p className={`text-2xl font-black ${head}`}>GH₵ {(stats.paystackVolume || 0).toFixed(2)}</p>
                   <ArrowUpRight className="w-4 h-4 text-emerald-400" />
                 </div>
-                <p className="text-[10px] text-white/20 mt-2 font-medium">Direct Paystack sales — verified settlement amounts.</p>
+                <p className={`text-[10px] mt-2 font-medium ${muted}`}>Direct Paystack sales — verified settlement amounts.</p>
               </div>
             </div>
 
@@ -1240,21 +1240,21 @@ const AdminOverview = () => {
                     </div>
                   ) : (
                     auditLogs.map((log: any) => (
-                      <div key={log.id} className="p-3 rounded-2xl bg-white/[0.03] border border-white/5 hover:bg-white/[0.05] transition-all">
+                      <div key={log.id} className={`p-3 rounded-2xl border transition-all hover:brightness-110 ${isDark ? "bg-white/[0.03] border-white/5" : "bg-gray-50 border-gray-100"}`}>
                         <div className="flex items-center justify-between mb-1.5">
-                          <span className="text-[9px] font-black text-amber-400 uppercase tracking-widest border border-amber-400/20 px-1.5 py-0.5 rounded-md bg-amber-400/5">
+                          <span className="text-[9px] font-black text-amber-500 uppercase tracking-widest border border-amber-500/20 px-1.5 py-0.5 rounded-md bg-amber-500/5">
                             {log.action.replace(/_/g, " ")}
                           </span>
-                          <span className="text-[9px] text-white/20 font-mono">{new Date(log.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span>
+                          <span className={`text-[9px] font-mono ${muted}`}>{new Date(log.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span>
                         </div>
-                        <p className="text-xs font-black text-white/90 mb-1">{log.profiles?.full_name || "System"}</p>
-                        <p className="text-[10px] text-white/40 font-mono truncate bg-black/20 p-2 rounded-lg border border-white/5">
+                        <p className={`text-xs font-black mb-1 ${head}`}>{log.profiles?.full_name || "System"}</p>
+                        <p className={`text-[10px] font-mono truncate p-2 rounded-lg border ${isDark ? "text-white/40 bg-black/20 border-white/5" : "text-gray-600 bg-white border-gray-200"}`}>
                           {JSON.stringify(log.details)}
                         </p>
                       </div>
                     ))
                   )}
-                  <Button variant="ghost" onClick={() => navigate("/admin/audit-logs")} className="w-full h-10 text-[9px] font-black uppercase tracking-[0.2em] text-white/20 hover:text-white/60 hover:bg-white/5">
+                  <Button variant="ghost" onClick={() => navigate("/admin/audit-logs")} className={`w-full h-10 text-[9px] font-black uppercase tracking-[0.2em] transition-colors ${isDark ? "text-white/20 hover:text-white/60 hover:bg-white/5" : "text-gray-400 hover:text-gray-700"}`}>
                     Open Security Center
                   </Button>
                 </div>

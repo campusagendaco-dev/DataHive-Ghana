@@ -471,14 +471,14 @@ const DashboardFlyer = () => {
           <Sparkles className="w-5 h-5 text-amber-400" />
         </div>
         <div>
-          <h1 className="font-display text-2xl font-black tracking-tight">Flyer Generator</h1>
-          <p className="text-sm text-white/40">Create pro marketing flyers for your store</p>
+          <h1 className="font-display text-2xl font-black tracking-tight text-foreground">Flyer Generator</h1>
+          <p className="text-sm text-muted-foreground">Create pro marketing flyers for your store</p>
         </div>
       </div>
 
       {/* Template selector */}
       <div>
-        <p className="text-[11px] font-black uppercase tracking-widest text-white/30 mb-3">Choose Template</p>
+        <p className="text-[11px] font-black uppercase tracking-widest text-muted-foreground/70 mb-3">Choose Template</p>
         <div className="grid grid-cols-3 gap-3">
           {TEMPLATES.map(t => (
             <button
@@ -487,19 +487,19 @@ const DashboardFlyer = () => {
               onClick={() => { setTemplate(t.id as Template); setFlyerHtml(null); }}
               className={`relative rounded-2xl p-4 text-left transition-all border ${
                 template === t.id
-                  ? "border-amber-400/50 bg-amber-400/5"
-                  : "border-white/8 bg-white/[0.02] hover:border-white/15"
+                  ? "border-amber-500/50 bg-amber-500/10 dark:bg-amber-400/5"
+                  : "border-border bg-card hover:border-border/80 shadow-sm"
               }`}
             >
               {/* mini color preview */}
               <div className="flex gap-1 mb-3">
-                <div className="h-8 flex-1 rounded-lg" style={{ background: t.bg }} />
-                <div className="h-8 w-8 rounded-lg" style={{ background: t.accent }} />
+                <div className="h-8 flex-1 rounded-lg shadow-inner" style={{ background: t.bg }} />
+                <div className="h-8 w-8 rounded-lg shadow-sm" style={{ background: t.accent }} />
               </div>
-              <p className="text-sm font-black text-white">{t.name}</p>
-              <p className="text-[11px] text-white/40 mt-0.5">{t.desc}</p>
+              <p className="text-sm font-black text-foreground">{t.name}</p>
+              <p className="text-[11px] text-muted-foreground mt-0.5">{t.desc}</p>
               {template === t.id && (
-                <div className="absolute top-2.5 right-2.5 w-5 h-5 bg-amber-400 rounded-full flex items-center justify-center">
+                <div className="absolute top-2.5 right-2.5 w-5 h-5 bg-amber-500 dark:bg-amber-400 rounded-full flex items-center justify-center shadow-sm">
                   <Check className="w-3 h-3 text-black" strokeWidth={3} />
                 </div>
               )}
@@ -509,7 +509,7 @@ const DashboardFlyer = () => {
       </div>
 
       {/* Store summary + QR toggle */}
-      <div className="rounded-2xl bg-white/[0.02] border border-white/8 p-5 space-y-4">
+      <div className="rounded-2xl bg-card border border-border shadow-sm p-5 space-y-4">
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-sm">
           {[
             { label: "Store Name", value: profile?.store_name || "Not set", highlight: !!profile?.store_name },
@@ -518,26 +518,26 @@ const DashboardFlyer = () => {
             { label: "Packages", value: `${totalPackages} active`, highlight: totalPackages > 0 },
           ].map(({ label, value, highlight }) => (
             <div key={label}>
-              <p className="text-[10px] font-bold uppercase tracking-widest text-white/30 mb-1">{label}</p>
-              <p className={`font-bold text-sm truncate ${highlight ? "text-white" : "text-white/30"}`}>{value}</p>
+              <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-1">{label}</p>
+              <p className={`font-bold text-sm truncate ${highlight ? "text-foreground" : "text-muted-foreground/50"}`}>{value}</p>
             </div>
           ))}
         </div>
 
         {/* QR code toggle */}
-        <div className="flex items-center justify-between pt-3 border-t border-white/6">
+        <div className="flex items-center justify-between pt-3 border-t border-border">
           <div className="flex items-center gap-2.5">
-            <QrCode className="w-4 h-4 text-white/40" />
+            <QrCode className="w-4 h-4 text-muted-foreground" />
             <div>
-              <p className="text-sm font-bold text-white/70">Include QR Code</p>
-              <p className="text-[11px] text-white/30">Embed scan-to-order QR in flyer footer</p>
+              <p className="text-sm font-bold text-foreground/80">Include QR Code</p>
+              <p className="text-[11px] text-muted-foreground/70">Embed scan-to-order QR in flyer footer</p>
             </div>
           </div>
           <button
             type="button"
             aria-label={includeQr ? "Disable QR code in flyer" : "Enable QR code in flyer"}
             onClick={() => { setIncludeQr(v => !v); setFlyerHtml(null); }}
-            className={`relative w-11 h-6 rounded-full transition-colors duration-200 ${includeQr ? "bg-amber-400" : "bg-white/10"}`}
+            className={`relative w-11 h-6 rounded-full transition-colors duration-200 ${includeQr ? "bg-amber-500 dark:bg-amber-400" : "bg-muted"}`}
           >
             <div className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-all duration-200 ${includeQr ? "left-5" : "left-0.5"}`} />
           </button>
@@ -560,11 +560,11 @@ const DashboardFlyer = () => {
 
       {/* Flyer preview */}
       {flyerHtml && (
-        <div className="space-y-4">
-          <p className="text-[11px] font-black uppercase tracking-widest text-white/30">Preview</p>
+        <div className="space-y-4 animate-in slide-in-from-bottom-2 duration-300">
+          <p className="text-[11px] font-black uppercase tracking-widest text-muted-foreground">Preview</p>
 
           {/* Scaled preview — 800×1200 flyer at 54% = 432×648px visible */}
-          <div className="mx-auto rounded-2xl overflow-hidden border border-white/10 shadow-2xl" style={{ width: 432, height: 648 }}>
+          <div className="mx-auto rounded-2xl overflow-hidden border border-border shadow-2xl bg-background" style={{ width: 432, height: 648 }}>
             <div style={{ width: 800, transformOrigin: "top left", transform: "scale(0.54)" }}>
               <iframe
                 srcDoc={flyerHtml}
@@ -579,7 +579,7 @@ const DashboardFlyer = () => {
             <Button
               onClick={downloadFlyer}
               disabled={downloading || sharingStatus}
-              className="h-11 gap-2 bg-amber-400 hover:bg-amber-300 text-black font-black rounded-xl"
+              className="h-11 gap-2 bg-amber-500 hover:bg-amber-600 text-white font-black rounded-xl shadow-lg shadow-amber-500/20"
             >
               {downloading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
               {downloading ? "Saving…" : "Download PNG"}
@@ -587,7 +587,7 @@ const DashboardFlyer = () => {
             <Button
               onClick={shareToStatus}
               disabled={downloading || sharingStatus}
-              className="h-11 gap-2 bg-green-600 hover:bg-green-500 text-white font-black rounded-xl"
+              className="h-11 gap-2 bg-green-600 hover:bg-green-700 text-white font-black rounded-xl shadow-lg shadow-green-600/20"
             >
               {sharingStatus ? <Loader2 className="w-4 h-4 animate-spin" /> : <MessageCircle className="w-4 h-4" />}
               {sharingStatus ? "Sharing…" : "WhatsApp Status"}
@@ -595,7 +595,7 @@ const DashboardFlyer = () => {
             <Button
               onClick={shareWhatsApp}
               variant="outline"
-              className="h-11 gap-2 border-green-500/30 bg-green-500/8 text-green-400 hover:bg-green-500/15 rounded-xl font-bold"
+              className="h-11 gap-2 border-green-500/30 bg-green-500/5 text-green-600 dark:text-green-400 hover:bg-green-500/10 rounded-xl font-bold"
             >
               <MessageCircle className="w-4 h-4" />
               Share Link
@@ -603,9 +603,9 @@ const DashboardFlyer = () => {
             <Button
               onClick={copyLink}
               variant="outline"
-              className="h-11 gap-2 border-white/10 text-white/70 hover:text-white rounded-xl font-bold"
+              className="h-11 gap-2 border-border text-foreground/70 hover:text-foreground rounded-xl font-bold"
             >
-              {copied ? <Check className="w-4 h-4 text-green-400" /> : <Eye className="w-4 h-4" />}
+              {copied ? <Check className="w-4 h-4 text-green-500" /> : <Eye className="w-4 h-4" />}
               {copied ? "Copied!" : "Full Size"}
             </Button>
           </div>
@@ -615,7 +615,7 @@ const DashboardFlyer = () => {
             <Button
               onClick={openFull}
               variant="outline"
-              className="h-9 gap-2 border-white/10 text-white/50 hover:text-white rounded-xl font-bold text-xs flex-1"
+              className="h-9 gap-2 border-border text-muted-foreground hover:text-foreground hover:bg-muted rounded-xl font-bold text-xs flex-1"
             >
               <Eye className="w-3.5 h-3.5" />
               Open Full Size

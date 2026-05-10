@@ -122,7 +122,7 @@ const ReferAndEarn = () => {
             />
             <button 
               onClick={() => copyToClipboard(referralLink)}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-white transition-colors"
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
             >
               {copied ? <Check className="w-4 h-4 text-emerald-500" /> : <Copy className="w-4 h-4" />}
             </button>
@@ -137,7 +137,7 @@ const ReferAndEarn = () => {
             <Button 
               onClick={handleShare}
               variant="outline"
-              className="h-11 rounded-xl border-white/10 hover:bg-white/5 font-bold"
+              className="h-11 rounded-xl font-bold"
             >
               More Options
             </Button>
@@ -145,24 +145,24 @@ const ReferAndEarn = () => {
         </div>
 
         <div className="grid grid-cols-2 gap-4 pt-2">
-          <div className="p-3 rounded-xl bg-white/[0.03] border border-white/5 space-y-1">
+          <div className="p-3 rounded-xl bg-muted/50 border border-border space-y-1">
             <div className="flex items-center gap-1.5 text-[10px] font-bold text-muted-foreground uppercase tracking-widest">
               <Users className="w-3 h-3" /> Friends Joined
             </div>
-            <p className="text-lg font-black text-white">{stats.count}</p>
+            <p className="text-lg font-black text-foreground">{stats.count}</p>
           </div>
-          <div className="p-3 rounded-xl bg-white/[0.03] border border-white/5 space-y-1">
+          <div className="p-3 rounded-xl bg-muted/50 border border-border space-y-1">
             <div className="flex items-center gap-1.5 text-[10px] font-bold text-muted-foreground uppercase tracking-widest">
               <Award className="w-3 h-3" /> Points Earned
             </div>
-            <p className="text-lg font-black text-amber-400">{stats.pointsEarned}</p>
+            <p className="text-lg font-black text-amber-600 dark:text-amber-400">{stats.pointsEarned}</p>
           </div>
         </div>
 
         <div className="pt-2 border-t border-white/5">
           <div className="flex items-center gap-3 text-xs text-muted-foreground">
             <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-            <span>Referee also gets <span className="text-white font-bold">100 points</span> as a welcome gift!</span>
+            <span>Referee also gets <span className="text-foreground font-bold">100 points</span> as a welcome gift!</span>
           </div>
         </div>
       </CardContent>

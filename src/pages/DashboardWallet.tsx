@@ -375,10 +375,10 @@ const DashboardWallet = () => {
       {/* ── Header ── */}
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
         <div>
-          <h1 className="font-display text-3xl font-black tracking-tight text-white flex items-center gap-3">
-            <Wallet className="w-8 h-8 text-amber-400" /> My Wallet
+          <h1 className="font-display text-3xl font-black tracking-tight text-foreground flex items-center gap-3">
+            <Wallet className="w-8 h-8 text-amber-500 dark:text-amber-400" /> My Wallet
           </h1>
-          <p className="text-sm text-white/40 mt-1 max-w-md">
+          <p className="text-sm text-muted-foreground mt-1 max-w-md">
             Manage your funds, top up instantly with Paystack, and track your loyalty points.
           </p>
         </div>
@@ -386,7 +386,7 @@ const DashboardWallet = () => {
           <Button 
             variant="outline" 
             size="sm" 
-            className="bg-white/5 border-white/10 hover:bg-white/10 text-white/70 h-10 px-4 rounded-xl gap-2"
+            className="bg-muted/50 border-border hover:bg-muted text-foreground/70 h-10 px-4 rounded-xl gap-2"
             onClick={handleSyncPendingDeposits}
             disabled={syncingDeposits}
           >
@@ -431,16 +431,16 @@ const DashboardWallet = () => {
         </Card>
 
         {/* Loyalty Card (Pro Design) */}
-        <Card className="relative overflow-hidden border-white/10 bg-white/5 backdrop-blur-xl group">
+        <Card className="relative overflow-hidden border-border bg-card backdrop-blur-xl group shadow-sm">
           <div className="absolute -top-4 -right-4 w-24 h-24 bg-amber-400/10 rounded-full blur-2xl group-hover:bg-amber-400/20 transition-colors" />
           <CardHeader className="pb-2 flex flex-row items-center justify-between">
-            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-white/40">SwiftPoints</p>
-            <Gift className="w-4 h-4 text-amber-400" />
+            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/60">SwiftPoints</p>
+            <Gift className="w-4 h-4 text-amber-500 dark:text-amber-400" />
           </CardHeader>
           <CardContent className="space-y-4">
             <div>
-              <p className="text-3xl font-black text-white">{loyaltyBalance.toLocaleString()} <span className="text-sm text-amber-400">pts</span></p>
-              <p className="text-[10px] text-white/40 mt-1 font-medium uppercase tracking-widest">Est. Value: GHS {(loyaltyBalance / 100).toFixed(2)}</p>
+              <p className="text-3xl font-black text-foreground">{loyaltyBalance.toLocaleString()} <span className="text-sm text-amber-500 dark:text-amber-400">pts</span></p>
+              <p className="text-[10px] text-muted-foreground mt-1 font-medium uppercase tracking-widest">Est. Value: GHS {(loyaltyBalance / 100).toFixed(2)}</p>
             </div>
             <Button 
               variant="outline" 
@@ -455,14 +455,14 @@ const DashboardWallet = () => {
         </Card>
 
         {/* Quick Topup (Pro Design) */}
-        <Card className="border-white/10 bg-white/5 backdrop-blur-xl">
+        <Card className="border-border bg-card backdrop-blur-xl shadow-sm">
           <CardHeader className="pb-2 flex flex-row items-center justify-between">
-            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-white/40">Quick Top Up</p>
-            <Zap className="w-4 h-4 text-blue-400" />
+            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/60">Quick Top Up</p>
+            <Zap className="w-4 h-4 text-blue-500 dark:text-blue-400" />
           </CardHeader>
           <CardContent className="space-y-3">
             <div className="relative group">
-              <div className="absolute left-3 top-1/2 -translate-y-1/2 text-white/20 group-focus-within:text-blue-400 transition-colors">
+              <div className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground/50 group-focus-within:text-blue-500 transition-colors">
                 <span className="text-xs font-bold">GHS</span>
               </div>
               <Input
@@ -470,7 +470,7 @@ const DashboardWallet = () => {
                 placeholder="0.00"
                 value={topupAmount}
                 onChange={(e) => setTopupAmount(e.target.value)}
-                className="h-12 pl-12 bg-white/5 border-white/10 focus:border-blue-400/50 rounded-xl text-lg font-black text-white"
+                className="h-12 pl-12 bg-muted/30 border-border focus:border-blue-500/50 rounded-xl text-lg font-black text-foreground"
               />
             </div>
             <Button 
@@ -482,8 +482,8 @@ const DashboardWallet = () => {
             </Button>
             {topupChargeTotal > 0 && (
               <div className="flex justify-between items-center px-1">
-                <span className="text-[9px] text-white/20 font-bold uppercase tracking-wider">Fee Included</span>
-                <span className="text-[10px] text-blue-400 font-black">Total: GHS {topupChargeTotal.toFixed(2)}</span>
+                <span className="text-[9px] text-muted-foreground/40 font-bold uppercase tracking-wider">Fee Included</span>
+                <span className="text-[10px] text-blue-500 dark:text-blue-400 font-black">Total: GHS {topupChargeTotal.toFixed(2)}</span>
               </div>
             )}
           </CardContent>
@@ -496,30 +496,30 @@ const DashboardWallet = () => {
         <div className="lg:col-span-3 space-y-6">
           <div className="flex items-center gap-2 mb-2">
             <div className="w-1 h-6 bg-amber-500 rounded-full" />
-            <h2 className="text-lg font-black text-white uppercase tracking-wider">Purchase Service</h2>
+            <h2 className="text-lg font-black text-foreground uppercase tracking-wider">Purchase Service</h2>
           </div>
           
-          <Card className="border-white/10 bg-white/3 overflow-hidden rounded-[2rem]">
+          <Card className="border-border bg-card shadow-sm overflow-hidden rounded-[2rem]">
             <CardContent className="p-8 space-y-6">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                 <div className="space-y-2">
-                  <Label className="text-[10px] font-black uppercase tracking-widest text-white/40 px-1">Network</Label>
+                  <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground px-1">Network</Label>
                   <Select value={selectedNetwork} onValueChange={(v) => { setSelectedNetwork(v); setSelectedPackage(""); }}>
-                    <SelectTrigger className="h-12 bg-white/5 border-white/10 rounded-xl text-white">
+                    <SelectTrigger className="h-12 bg-muted/30 border-border rounded-xl text-foreground">
                       <SelectValue placeholder="Select Network" />
                     </SelectTrigger>
-                    <SelectContent className="bg-zinc-900 border-white/10 text-white">
+                    <SelectContent className="bg-background border-border text-foreground">
                       {networks.map((n) => (<SelectItem key={n.name} value={n.name}>{n.name}</SelectItem>))}
                     </SelectContent>
                   </Select>
                 </div>
                 <div className="space-y-2">
-                  <Label className="text-[10px] font-black uppercase tracking-widest text-white/40 px-1">Package</Label>
+                  <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground px-1">Package</Label>
                   <Select value={selectedPackage} onValueChange={setSelectedPackage} disabled={!selectedNetwork}>
-                    <SelectTrigger className="h-12 bg-white/5 border-white/10 rounded-xl text-white">
+                    <SelectTrigger className="h-12 bg-muted/30 border-border rounded-xl text-foreground">
                       <SelectValue placeholder="Choose Plan" />
                     </SelectTrigger>
-                    <SelectContent className="bg-zinc-900 border-white/10 text-white max-h-[300px]">
+                    <SelectContent className="bg-background border-border text-foreground max-h-[300px]">
                       {agentPackages.map((p) => (
                         <SelectItem key={p.size} value={p.size} className="focus:bg-amber-400 focus:text-black">
                           {p.size} — GHS {p.price.toFixed(2)}
@@ -531,31 +531,31 @@ const DashboardWallet = () => {
               </div>
 
               <div className="space-y-2">
-                <Label className="text-[10px] font-black uppercase tracking-widest text-white/40 px-1">Recipient Number</Label>
+                <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground px-1">Recipient Number</Label>
                 <div className="relative">
                   <Input 
                     placeholder="e.g. 024XXXXXXX" 
                     value={customerPhone} 
                     onChange={(e) => setCustomerPhone(e.target.value)} 
-                    className="h-12 bg-white/5 border-white/10 rounded-xl pl-11 text-white font-mono" 
+                    className="h-12 bg-muted/30 border-border rounded-xl pl-11 text-foreground font-mono" 
                   />
-                  <div className="absolute left-4 top-1/2 -translate-y-1/2 text-white/20">
+                  <div className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground/40">
                     <CreditCard className="w-4 h-4" />
                   </div>
                 </div>
               </div>
 
               {selectedPkg && (
-                <div className="bg-white/5 border border-white/5 rounded-2xl p-5 space-y-2 animate-in fade-in slide-in-from-top-2 duration-300">
-                  <div className="flex justify-between items-center text-xs font-bold uppercase tracking-wider text-white/40">
+                <div className="bg-muted/50 border border-border rounded-2xl p-5 space-y-2 animate-in fade-in slide-in-from-top-2 duration-300">
+                  <div className="flex justify-between items-center text-xs font-bold uppercase tracking-wider text-muted-foreground">
                     <span>Selected Plan</span>
-                    <span className="text-white">{selectedNetwork} {selectedPkg.size}</span>
+                    <span className="text-foreground">{selectedNetwork} {selectedPkg.size}</span>
                   </div>
                   <div className="flex justify-between items-center text-sm font-black">
-                    <span className="text-white/40 uppercase text-[10px] tracking-widest">Amount to Pay</span>
-                    <span className="text-amber-400 text-lg">GHS {selectedPkg.price.toFixed(2)}</span>
+                    <span className="text-muted-foreground uppercase text-[10px] tracking-widest">Amount to Pay</span>
+                    <span className="text-amber-500 dark:text-amber-400 text-lg">GHS {selectedPkg.price.toFixed(2)}</span>
                   </div>
-                  <div className="pt-2 mt-2 border-t border-white/5 flex justify-between items-center text-[10px] font-medium text-white/20 italic">
+                  <div className="pt-2 mt-2 border-t border-border flex justify-between items-center text-[10px] font-medium text-muted-foreground italic">
                     <span>Balance after purchase</span>
                     <span>GHS {(balance - selectedPkg.price).toFixed(2)}</span>
                   </div>
@@ -584,43 +584,43 @@ const DashboardWallet = () => {
         <div className="lg:col-span-2 space-y-6">
           <div className="flex items-center gap-2 mb-2">
             <div className="w-1 h-6 bg-blue-500 rounded-full" />
-            <h2 className="text-lg font-black text-white uppercase tracking-wider">Recent Activity</h2>
+            <h2 className="text-lg font-black text-foreground uppercase tracking-wider">Recent Activity</h2>
           </div>
 
-          <Card className="border-white/10 bg-white/3 overflow-hidden rounded-[2rem]">
+          <Card className="border-border bg-card shadow-sm overflow-hidden rounded-[2rem]">
             <CardContent className="p-6">
               {recentTopups.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-12 text-center">
-                  <History className="w-10 h-10 text-white/10 mb-4" />
-                  <p className="text-xs font-bold text-white/20 uppercase tracking-widest">No activity yet</p>
+                  <History className="w-10 h-10 text-muted-foreground/30 mb-4" />
+                  <p className="text-xs font-bold text-muted-foreground/50 uppercase tracking-widest">No activity yet</p>
                 </div>
               ) : (
                 <div className="space-y-4">
                   {recentTopups.map((row) => (
                     <div 
                       key={row.id} 
-                      className="group flex items-center justify-between p-4 rounded-2xl border border-white/5 bg-white/[0.02] hover:bg-white/[0.05] transition-all hover:scale-[1.02]"
+                      className="group flex items-center justify-between p-4 rounded-2xl border border-border bg-muted/10 hover:bg-muted/30 transition-all hover:scale-[1.02]"
                     >
                       <div className="flex items-center gap-4">
-                        <div className={`w-10 h-10 rounded-full flex items-center justify-center ${row.status === "fulfilled" ? "bg-emerald-500/10 text-emerald-400" : "bg-amber-500/10 text-amber-400"}`}>
+                        <div className={`w-10 h-10 rounded-full flex items-center justify-center ${row.status === "fulfilled" ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400" : "bg-amber-500/10 text-amber-600 dark:text-amber-400"}`}>
                           <PlusCircle className="w-5 h-5" />
                         </div>
                         <div>
-                          <p className="text-sm font-black text-white">GHS {Number(row.amount || 0).toFixed(2)}</p>
-                          <p className="text-[10px] text-white/20 font-medium uppercase tracking-tight">
+                          <p className="text-sm font-black text-foreground">GHS {Number(row.amount || 0).toFixed(2)}</p>
+                          <p className="text-[10px] text-muted-foreground font-medium uppercase tracking-tight">
                             {new Date(row.created_at).toLocaleDateString("en-GH", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}
                           </p>
                         </div>
                       </div>
                       <div className="flex items-center gap-2">
-                         <div className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-tighter ${row.status === "fulfilled" ? "bg-emerald-500/20 text-emerald-400" : "bg-white/5 text-white/40"}`}>
+                         <div className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-tighter ${row.status === "fulfilled" ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400" : "bg-muted text-muted-foreground"}`}>
                             {row.status === "fulfilled" ? "Verified" : row.status}
                          </div>
-                         <ChevronRight className="w-4 h-4 text-white/10 group-hover:text-white/40 transition-colors" />
+                         <ChevronRight className="w-4 h-4 text-muted-foreground/30 group-hover:text-muted-foreground transition-colors" />
                       </div>
                     </div>
                   ))}
-                  <Button variant="ghost" className="w-full h-10 text-[10px] font-black uppercase tracking-[0.2em] text-white/20 hover:text-white/60 hover:bg-transparent">
+                  <Button variant="ghost" className="w-full h-10 text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground hover:bg-muted">
                      View All History
                   </Button>
                 </div>
@@ -631,11 +631,11 @@ const DashboardWallet = () => {
           {/* Quick Help Tip */}
           <div className="bg-blue-500/10 border border-blue-500/20 rounded-2xl p-6 flex gap-4">
             <div className="w-10 h-10 rounded-full bg-blue-500/20 flex items-center justify-center shrink-0">
-               <ArrowUpRight className="w-5 h-5 text-blue-400" />
+               <ArrowUpRight className="w-5 h-5 text-blue-600 dark:text-blue-400" />
             </div>
             <div className="space-y-1">
-               <p className="text-xs font-black text-white uppercase tracking-wider">Pro Tip</p>
-               <p className="text-[10px] text-white/40 leading-relaxed font-medium">
+               <p className="text-xs font-black text-foreground uppercase tracking-wider">Pro Tip</p>
+               <p className="text-[10px] text-muted-foreground leading-relaxed font-medium">
                  Use the wallet to bypass Paystack fees on every single purchase. Top up a large amount once and save on processing costs!
                </p>
             </div>

@@ -15,6 +15,8 @@ import { Switch } from "@/components/ui/switch";
 import { Link } from "react-router-dom";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { cn } from "@/lib/utils";
+import { useAppTheme } from "@/contexts/ThemeContext";
 
 async function sha256Hex(input: string): Promise<string> {
   const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(input));
@@ -24,6 +26,7 @@ async function sha256Hex(input: string): Promise<string> {
 const DashboardDeveloperAPI = () => {
   const { user } = useAuth();
   const { toast } = useToast();
+  const { isDark } = useAppTheme();
 
   const [plaintextKey, setPlaintextKey] = useState<string | null>(null);
   const [plaintextSecret, setPlaintextSecret] = useState<string | null>(null);
@@ -179,21 +182,21 @@ const DashboardDeveloperAPI = () => {
       {/* Wallet Balances Grid */}
       {!loading && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="bg-gradient-to-br from-indigo-500/10 to-blue-500/10 border border-indigo-500/20 rounded-3xl p-6 backdrop-blur-md relative overflow-hidden group">
+          <div className={cn("border rounded-3xl p-6 backdrop-blur-md relative overflow-hidden group transition-all", isDark ? "bg-gradient-to-br from-indigo-500/10 to-blue-500/10 border-indigo-500/20" : "bg-indigo-50/50 border-indigo-100")}>
             <div className="absolute top-0 right-0 p-4 opacity-[0.03] group-hover:opacity-[0.08] transition-opacity">
-              <Wallet className="w-24 h-24 text-white" />
+              <Wallet className={cn("w-24 h-24", isDark ? "text-white" : "text-indigo-900")} />
             </div>
-            <p className="text-[10px] uppercase font-black tracking-widest text-indigo-400 mb-2">Main Wallet Balance</p>
-            <p className="text-3xl font-black text-white">GH₵{walletBalance.toFixed(2)}</p>
-            <p className="text-[10px] text-white/40 mt-1">Used for manual portal purchases</p>
+            <p className="text-[10px] uppercase font-black tracking-widest text-indigo-500 dark:text-indigo-400 mb-2">Main Wallet Balance</p>
+            <p className={cn("text-3xl font-black", isDark ? "text-white" : "text-indigo-950")}>GH₵{walletBalance.toFixed(2)}</p>
+            <p className={cn("text-[10px] mt-1", isDark ? "text-white/40" : "text-indigo-700/60")}>Used for manual portal purchases</p>
           </div>
-          <div className="bg-gradient-to-br from-sky-500/10 to-teal-500/10 border border-sky-500/20 rounded-3xl p-6 backdrop-blur-md relative overflow-hidden group">
+          <div className={cn("border rounded-3xl p-6 backdrop-blur-md relative overflow-hidden group transition-all", isDark ? "bg-gradient-to-br from-sky-500/10 to-teal-500/10 border-sky-500/20" : "bg-sky-50/50 border-sky-100")}>
             <div className="absolute top-0 right-0 p-4 opacity-[0.03] group-hover:opacity-[0.08] transition-opacity">
-              <Zap className="w-24 h-24 text-white" />
+              <Zap className={cn("w-24 h-24", isDark ? "text-white" : "text-sky-900")} />
             </div>
-            <p className="text-[10px] uppercase font-black tracking-widest text-sky-400 mb-2">API Wallet Balance</p>
-            <p className="text-3xl font-black text-white">GH₵{apiBalance.toFixed(2)}</p>
-            <p className="text-[10px] text-white/40 mt-1">Deducted automatically for API-fulfilled orders</p>
+            <p className="text-[10px] uppercase font-black tracking-widest text-sky-500 dark:text-sky-400 mb-2">API Wallet Balance</p>
+            <p className={cn("text-3xl font-black", isDark ? "text-white" : "text-sky-950")}>GH₵{apiBalance.toFixed(2)}</p>
+            <p className={cn("text-[10px] mt-1", isDark ? "text-white/40" : "text-sky-700/60")}>Deducted automatically for API-fulfilled orders</p>
           </div>
         </div>
       )}
@@ -222,7 +225,7 @@ const DashboardDeveloperAPI = () => {
                   <Input
                     value={plaintextKey && revealed ? plaintextKey : maskedKey}
                     readOnly
-                    className="font-mono bg-black/40 border-white/10 text-sm h-10"
+                    className="font-mono bg-background border-border text-sm h-10"
                   />
                   {plaintextKey && (
                     <Button variant="secondary" size="icon" className="h-10 w-10" onClick={() => setRevealed(!revealed)}>
@@ -237,17 +240,17 @@ const DashboardDeveloperAPI = () => {
 
 
               <div className="flex flex-wrap items-center gap-6 pt-2">
-                <div className="flex items-center gap-2 text-xs text-white/40">
-                  <Shield className="w-3.5 h-3.5" /> Rate Limit: <strong className="text-white/60">{rateLimit} req/min</strong>
+                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <Shield className="w-3.5 h-3.5" /> Rate Limit: <strong className="text-foreground/80">{rateLimit} req/min</strong>
                 </div>
-                <div className="flex items-center gap-2 text-xs text-white/40">
-                  <Terminal className="w-3.5 h-3.5" /> Auth: <strong className="text-sky-400">Bearer Token</strong>
+                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <Terminal className="w-3.5 h-3.5" /> Auth: <strong className="text-sky-500 dark:text-sky-400">Bearer Token</strong>
                 </div>
                 
-                <div className="flex items-center gap-3 ml-auto bg-white/5 px-3 py-1.5 rounded-lg border border-white/8">
+                <div className="flex items-center gap-3 ml-auto bg-muted/30 px-3 py-1.5 rounded-lg border border-border">
                   <div className="flex flex-col">
-                    <span className="text-[10px] font-bold text-white/60 uppercase tracking-wider leading-none">Testing Mode</span>
-                    <span className="text-[9px] text-white/30 mt-1">Bypass signatures</span>
+                    <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider leading-none">Testing Mode</span>
+                    <span className="text-[9px] text-muted-foreground/60 mt-1">Bypass signatures</span>
                   </div>
                   <Switch 
                     checked={testMode} 
@@ -277,10 +280,10 @@ const DashboardDeveloperAPI = () => {
               {confirmRegen ? "Confirm Regeneration" : hasKey ? "Rotate Keys" : "Generate API Credentials"}
             </Button>
             {confirmRegen && (
-              <Button variant="ghost" size="sm" className="text-white/40" onClick={() => setConfirmRegen(false)}>Cancel</Button>
+              <Button variant="ghost" size="sm" className="text-muted-foreground" onClick={() => setConfirmRegen(false)}>Cancel</Button>
             )}
             {hasKey && !confirmRegen && (
-              <p className="text-[10px] text-white/20 italic max-w-xs">Rotating keys will immediately invalidate your current API Key.</p>
+              <p className="text-[10px] text-muted-foreground italic max-w-xs">Rotating keys will immediately invalidate your current API Key.</p>
             )}
           </div>
         </CardContent>
@@ -289,22 +292,22 @@ const DashboardDeveloperAPI = () => {
       {/* API Logs & Quick Start */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Quick Start */}
-        <Card className="lg:col-span-1 bg-white/3 border-white/8">
+        <Card className="lg:col-span-1 bg-card border-border">
           <CardHeader>
             <CardTitle className="text-base flex items-center gap-2">
-              <Zap className="w-4 h-4 text-sky-400" /> Quick Integration
+              <Zap className="w-4 h-4 text-sky-500 dark:text-sky-400" /> Quick Integration
             </CardTitle>
           </CardHeader>
           <CardContent className="text-xs space-y-4 text-muted-foreground">
             <div className="space-y-1">
-              <p className="font-bold text-white/60">1. Required Header</p>
+              <p className="font-bold text-foreground/70">1. Required Header</p>
               <ul className="list-disc list-inside space-y-1">
                 <li><code>Authorization: Bearer [YOUR_KEY]</code></li>
               </ul>
             </div>
             <div className="space-y-1">
-              <p className="font-bold text-white/60">2. Sample Request</p>
-              <pre className="p-2 bg-black/40 rounded border border-white/5 overflow-x-auto text-[10px]">
+              <p className="font-bold text-foreground/70">2. Sample Request</p>
+              <pre className="p-2 bg-muted border border-border rounded overflow-x-auto text-[10px]">
                 curl -X GET {BASE_URL}/balance \<br />
                 &nbsp;&nbsp;-H "Authorization: Bearer [KEY]"
               </pre>
@@ -316,13 +319,13 @@ const DashboardDeveloperAPI = () => {
         </Card>
 
         {/* Recent API Logs */}
-        <Card className="lg:col-span-2 bg-white/3 border-white/8">
+        <Card className="lg:col-span-2 bg-card border-border">
           <CardHeader className="flex flex-row items-center justify-between space-y-0">
             <CardTitle className="text-base flex items-center gap-2">
-              <History className="w-4 h-4 text-amber-400" /> Recent Errors & Activity
+              <History className="w-4 h-4 text-amber-500 dark:text-amber-400" /> Recent Errors & Activity
             </CardTitle>
             <Button variant="ghost" size="icon" className="h-8 w-8" onClick={fetchApiKey}>
-              <RefreshCw className="w-3.5 h-3.5 text-white/40" />
+              <RefreshCw className="w-3.5 h-3.5 text-muted-foreground" />
             </Button>
           </CardHeader>
           <CardContent>
@@ -332,10 +335,10 @@ const DashboardDeveloperAPI = () => {
                 <p className="text-xs">No errors or activity logged yet.</p>
               </div>
             ) : (
-              <div className="rounded-lg border border-white/5 overflow-hidden">
+              <div className="rounded-lg border border-border overflow-hidden">
                 <Table>
                   <TableHeader>
-                    <TableRow className="bg-white/5 hover:bg-white/5 border-white/5">
+                    <TableRow className="bg-muted/50 hover:bg-muted/50 border-border">
                       <TableHead className="text-[10px] font-black uppercase tracking-widest px-3">Reference</TableHead>
                       <TableHead className="text-[10px] font-black uppercase tracking-widest px-3">Endpoint</TableHead>
                       <TableHead className="text-[10px] font-black uppercase tracking-widest px-3">Status</TableHead>
@@ -344,13 +347,13 @@ const DashboardDeveloperAPI = () => {
                   </TableHeader>
                   <TableBody>
                     {logs.map((log) => (
-                      <TableRow key={log.log_reference} className="border-white/5 text-[11px] hover:bg-white/[0.02]">
-                        <TableCell className="font-mono text-amber-400 px-3">{log.log_reference}</TableCell>
-                        <TableCell className="text-white/60 px-3 truncate max-w-[120px]">{log.method} {log.endpoint}</TableCell>
+                      <TableRow key={log.log_reference} className="border-border text-[11px] hover:bg-muted/50">
+                        <TableCell className="font-mono text-amber-600 dark:text-amber-400 px-3">{log.log_reference}</TableCell>
+                        <TableCell className="text-foreground/80 px-3 truncate max-w-[120px]">{log.method} {log.endpoint}</TableCell>
                         <TableCell className="px-3">
-                          <Badge variant="outline" className="text-[9px] border-red-500/20 text-red-400 bg-red-500/5">Error</Badge>
+                          <Badge variant="outline" className="text-[9px] border-red-500/30 text-red-600 dark:text-red-400 bg-red-500/5">Error</Badge>
                         </TableCell>
-                        <TableCell className="text-right text-white/30 px-3">
+                        <TableCell className="text-right text-muted-foreground px-3">
                           {new Date(log.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                         </TableCell>
                       </TableRow>
@@ -359,7 +362,7 @@ const DashboardDeveloperAPI = () => {
                 </Table>
               </div>
             )}
-            <p className="text-[10px] text-white/20 mt-4 italic flex items-center gap-1.5">
+            <p className="text-[10px] text-muted-foreground mt-4 italic flex items-center gap-1.5">
               <Shield className="w-3 h-3" /> If you receive an Internal Server Error, provide the 8-character reference ID to support for troubleshooting.
             </p>
           </CardContent>
@@ -399,10 +402,10 @@ const DashboardDeveloperAPI = () => {
         </Card>
 
         {/* Integration use cases */}
-        <Card className="lg:col-span-2 bg-white/3 border-white/8">
+        <Card className="lg:col-span-2 bg-card border-border">
           <CardHeader className="pb-3">
             <CardTitle className="text-base flex items-center gap-2">
-              <Code2 className="w-4 h-4 text-amber-400" /> What Developers Build
+              <Code2 className="w-4 h-4 text-amber-500 dark:text-amber-400" /> What Developers Build
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -413,10 +416,10 @@ const DashboardDeveloperAPI = () => {
                 { emoji: "📊", title: "Business Dashboards", desc: "Internal tools for tracking corporate data spend" },
                 { emoji: "🔗", title: "POS Integrations", desc: "Connect SwiftData to existing point-of-sale systems" },
               ].map(uc => (
-                <div key={uc.title} className="flex items-start gap-3 p-3 rounded-xl bg-white/[0.025] border border-white/5">
+                <div key={uc.title} className="flex items-start gap-3 p-3 rounded-xl bg-muted/50 border border-border">
                   <span className="text-lg shrink-0">{uc.emoji}</span>
                   <div>
-                    <p className="text-xs font-black text-white/80">{uc.title}</p>
+                    <p className="text-xs font-black text-foreground/90">{uc.title}</p>
                     <p className="text-[10px] text-muted-foreground mt-0.5">{uc.desc}</p>
                   </div>
                 </div>
@@ -424,9 +427,9 @@ const DashboardDeveloperAPI = () => {
             </div>
 
             {/* Share your integration CTA */}
-            <div className="mt-4 flex items-center gap-3 p-3 rounded-xl bg-amber-400/8 border border-amber-400/20">
-              <Share2 className="w-4 h-4 text-amber-400 shrink-0" />
-              <p className="text-xs text-white/60 flex-1">Built something cool with the API?</p>
+            <div className="mt-4 flex items-center gap-3 p-3 rounded-xl bg-amber-500/10 border border-amber-500/20">
+              <Share2 className="w-4 h-4 text-amber-500 dark:text-amber-400 shrink-0" />
+              <p className="text-xs text-foreground/70 flex-1">Built something cool with the API?</p>
               <a
                 href={`https://wa.me/?text=${encodeURIComponent("🚀 I just built an integration with the SwiftData Ghana API! Check out the Developer Portal: https://swiftdatagh.shop/developers")}`}
 

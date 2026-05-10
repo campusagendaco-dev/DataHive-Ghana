@@ -3,6 +3,8 @@ import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { basePackages } from "@/lib/data";
+import { useAppTheme } from "@/context/ThemeContext";
+import { cn } from "@/lib/utils";
 import {
   CalendarClock, Plus, Trash2, ToggleLeft, ToggleRight,
   Loader2, RefreshCw, Star, Zap, TrendingUp, Award,
@@ -33,17 +35,17 @@ function isValidGhanaPhone(phone: string): boolean {
 
 // ── Network config ─────────────────────────────────────────────────────────────
 const NETWORK_CONFIG = {
-  MTN: { color: "bg-amber-500", border: "border-amber-500/40", text: "text-amber-400", glow: "shadow-amber-500/20", ring: "ring-amber-500/50" },
-  Telecel: { color: "bg-rose-500", border: "border-rose-500/40", text: "text-rose-400", glow: "shadow-rose-500/20", ring: "ring-rose-500/50" },
-  AirtelTigo: { color: "bg-sky-500", border: "border-sky-500/40", text: "text-sky-400", glow: "shadow-sky-500/20", ring: "ring-sky-500/50" },
+  MTN: { color: "bg-amber-500", border: "border-amber-500/40", text: "text-amber-600 dark:text-amber-400", glow: "shadow-amber-500/20", ring: "ring-amber-500/50" },
+  Telecel: { color: "bg-rose-500", border: "border-rose-500/40", text: "text-rose-600 dark:text-rose-400", glow: "shadow-rose-500/20", ring: "ring-rose-500/50" },
+  AirtelTigo: { color: "bg-sky-500", border: "border-sky-500/40", text: "text-sky-600 dark:text-sky-400", glow: "shadow-sky-500/20", ring: "ring-sky-500/50" },
 } as const;
 
 // ── Loyalty tiers ──────────────────────────────────────────────────────────────
 const LOYALTY_TIERS = [
-  { name: "Bronze", min: 0, max: 19, icon: Star, color: "text-orange-400", bg: "bg-orange-500/10 border-orange-500/20", bar: "bg-orange-500", badge: "bg-orange-500/15 text-orange-400 border-orange-500/25", discount: 0, perks: ["Standard rates", "Basic support"] },
-  { name: "Silver", min: 20, max: 99, icon: Zap, color: "text-slate-300", bg: "bg-slate-500/10 border-slate-500/20", bar: "bg-slate-400", badge: "bg-slate-500/15 text-slate-300 border-slate-500/25", discount: 1, perks: ["1% loyalty discount", "Priority support"] },
-  { name: "Gold", min: 100, max: 499, icon: TrendingUp, color: "text-amber-400", bg: "bg-amber-400/10 border-amber-400/20", bar: "bg-amber-400", badge: "bg-amber-400/15 text-amber-400 border-amber-400/25", discount: 2, perks: ["2% wallet discount", "Dedicated support", "Early access"] },
-  { name: "Platinum", min: 500, max: Infinity, icon: Award, color: "text-violet-400", bg: "bg-violet-500/10 border-violet-500/20", bar: "bg-violet-500", badge: "bg-violet-500/15 text-violet-400 border-violet-500/25", discount: 3, perks: ["3% wallet discount", "VIP support", "Custom pricing"] },
+  { name: "Bronze", min: 0, max: 19, icon: Star, color: "text-orange-500 dark:text-orange-400", bg: "bg-orange-500/10 border-orange-500/20", bar: "bg-orange-500", badge: "bg-orange-500/15 text-orange-600 dark:text-orange-400 border-orange-500/25", discount: 0, perks: ["Standard rates", "Basic support"] },
+  { name: "Silver", min: 20, max: 99, icon: Zap, color: "text-slate-500 dark:text-slate-300", bg: "bg-slate-500/10 border-slate-500/20", bar: "bg-slate-400", badge: "bg-slate-500/15 text-slate-600 dark:text-slate-300 border-slate-500/25", discount: 1, perks: ["1% loyalty discount", "Priority support"] },
+  { name: "Gold", min: 100, max: 499, icon: TrendingUp, color: "text-amber-500 dark:text-amber-400", bg: "bg-amber-500/10 border-amber-500/20", bar: "bg-amber-400", badge: "bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/25", discount: 2, perks: ["2% wallet discount", "Dedicated support", "Early access"] },
+  { name: "Platinum", min: 500, max: Infinity, icon: Award, color: "text-violet-500 dark:text-violet-400", bg: "bg-violet-500/10 border-violet-500/20", bar: "bg-violet-500", badge: "bg-violet-500/15 text-violet-600 dark:text-violet-400 border-violet-500/25", discount: 3, perks: ["3% wallet discount", "VIP support", "Custom pricing"] },
 ];
 
 const getLoyaltyTier = (orders: number) =>
@@ -97,8 +99,8 @@ const PhoneValidator = ({
   if (!valid) {
     return (
       <div className="flex items-center gap-2 mt-2 px-3 py-2 rounded-xl bg-red-500/10 border border-red-500/20">
-        <XCircle className="w-3.5 h-3.5 text-red-400 shrink-0" />
-        <p className="text-[11px] text-red-400 font-semibold">
+        <XCircle className="w-3.5 h-3.5 text-red-500 dark:text-red-400 shrink-0" />
+        <p className="text-[11px] text-red-600 dark:text-red-400 font-semibold">
           Invalid — must be 10 digits starting with 0 (e.g. 0241234567)
         </p>
       </div>
@@ -108,8 +110,8 @@ const PhoneValidator = ({
   if (!detected) {
     return (
       <div className="flex items-center gap-2 mt-2 px-3 py-2 rounded-xl bg-amber-500/10 border border-amber-500/20">
-        <AlertTriangle className="w-3.5 h-3.5 text-amber-400 shrink-0" />
-        <p className="text-[11px] text-amber-400 font-semibold">
+        <AlertTriangle className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400 shrink-0" />
+        <p className="text-[11px] text-amber-700 dark:text-amber-400 font-semibold">
           Valid number — network could not be detected from this prefix
         </p>
       </div>
@@ -119,8 +121,8 @@ const PhoneValidator = ({
   if (detected !== selectedNetwork) {
     return (
       <div className="flex items-center gap-2 mt-2 px-3 py-2 rounded-xl bg-amber-500/10 border border-amber-500/20">
-        <AlertTriangle className="w-3.5 h-3.5 text-amber-400 shrink-0" />
-        <p className="text-[11px] text-amber-400 font-semibold">
+        <AlertTriangle className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400 shrink-0" />
+        <p className="text-[11px] text-amber-700 dark:text-amber-400 font-semibold">
           This looks like a <span className="font-black">{detected}</span> number — you selected <span className="font-black">{selectedNetwork}</span>
         </p>
       </div>
@@ -129,8 +131,8 @@ const PhoneValidator = ({
 
   return (
     <div className="flex items-center gap-2 mt-2 px-3 py-2 rounded-xl bg-emerald-500/10 border border-emerald-500/20">
-      <ShieldCheck className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-      <p className="text-[11px] text-emerald-400 font-semibold">
+      <ShieldCheck className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
+      <p className="text-[11px] text-emerald-700 dark:text-emerald-400 font-semibold">
         Verified — valid <span className="font-black">{detected}</span> number
       </p>
     </div>
@@ -141,6 +143,7 @@ const PhoneValidator = ({
 const DashboardSchedule = () => {
   const { user } = useAuth();
   const { toast } = useToast();
+  const { isDark } = useAppTheme();
 
   const [schedules, setSchedules] = useState<Schedule[]>([]);
   const [loading, setLoading] = useState(true);
@@ -287,31 +290,32 @@ const DashboardSchedule = () => {
         <div>
           <div className="flex items-center gap-3 mb-1">
             <div className="w-10 h-10 rounded-2xl bg-sky-500/15 border border-sky-500/25 flex items-center justify-center">
-              <CalendarClock className="w-5 h-5 text-sky-400" />
+              <CalendarClock className="w-5 h-5 text-sky-600 dark:text-sky-400" />
             </div>
-            <h1 className="text-2xl font-black tracking-tight text-white">Auto-Renewal</h1>
+            <h1 className="text-2xl font-black tracking-tight text-foreground">Auto-Renewal</h1>
           </div>
-          <p className="text-white/40 text-sm ml-[52px]">Set up recurring data bundles that top-up automatically.</p>
+          <p className="text-muted-foreground text-sm ml-[52px]">Set up recurring data bundles that top-up automatically.</p>
         </div>
         <div className="flex items-center gap-2">
           <button
             type="button"
             onClick={load}
             aria-label="Refresh schedules"
-            className="w-9 h-9 rounded-xl border border-white/10 bg-white/5 flex items-center justify-center text-white/40 hover:text-white transition-all"
+            className="w-9 h-9 rounded-xl border border-border bg-card flex items-center justify-center text-muted-foreground hover:text-foreground transition-all"
           >
             <RefreshCw className="w-4 h-4" />
           </button>
           <button
             type="button"
             onClick={() => { setShowForm(v => !v); setPackageSize(""); setPhone(""); setRecipientName(""); userChoseNetwork.current = false; }}
-            className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl font-black text-sm transition-all ${
+            className={cn(
+              "flex items-center gap-2 px-4 py-2.5 rounded-2xl font-black text-sm transition-all",
               showForm
-                ? "bg-white/10 text-white/50 border border-white/10"
-                : "bg-sky-500 hover:bg-sky-400 text-white shadow-lg shadow-sky-500/20"
-            }`}
+                ? "bg-secondary text-muted-foreground border border-border"
+                : "bg-sky-500 hover:bg-sky-600 text-white shadow-lg shadow-sky-500/20"
+            )}
           >
-            <Plus className={`w-4 h-4 transition-transform ${showForm ? "rotate-45" : ""}`} />
+            <Plus className={cn("w-4 h-4 transition-transform", showForm ? "rotate-45" : "")} />
             {showForm ? "Cancel" : "New Schedule"}
           </button>
         </div>
@@ -320,52 +324,52 @@ const DashboardSchedule = () => {
       {/* ── Stats row ──────────────────────────────────────────────────────── */}
       <div className="grid grid-cols-3 gap-3">
         {[
-          { label: "Active", value: activeCount, icon: Activity, color: "text-emerald-400", bg: "bg-emerald-500/10 border-emerald-500/20" },
-          { label: "Total", value: schedules.length, icon: CalendarClock, color: "text-sky-400", bg: "bg-sky-500/10 border-sky-500/20" },
-          { label: "Orders", value: totalOrders, icon: CheckCircle2, color: "text-amber-400", bg: "bg-amber-500/10 border-amber-500/20" },
+          { label: "Active", value: activeCount, icon: Activity, color: "text-emerald-600 dark:text-emerald-400", bg: "bg-emerald-500/10 border-emerald-500/20" },
+          { label: "Total", value: schedules.length, icon: CalendarClock, color: "text-sky-600 dark:text-sky-400", bg: "bg-sky-500/10 border-sky-500/20" },
+          { label: "Orders", value: totalOrders, icon: CheckCircle2, color: "text-amber-600 dark:text-amber-400", bg: "bg-amber-500/10 border-amber-500/20" },
         ].map(({ label, value, icon: Icon, color, bg }) => (
-          <div key={label} className={`rounded-2xl border p-4 text-center ${bg}`}>
-            <Icon className={`w-4 h-4 ${color} mx-auto mb-1.5`} />
-            <p className={`text-xl font-black ${color}`}>{value}</p>
-            <p className="text-[10px] text-white/30 font-bold uppercase tracking-wider mt-0.5">{label}</p>
+          <div key={label} className={cn("rounded-2xl border p-4 text-center", bg)}>
+            <Icon className={cn("w-4 h-4 mx-auto mb-1.5", color)} />
+            <p className={cn("text-xl font-black", color)}>{value}</p>
+            <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-wider mt-0.5">{label}</p>
           </div>
         ))}
       </div>
 
       {/* ── Loyalty tier ───────────────────────────────────────────────────── */}
-      <div className={`relative overflow-hidden rounded-3xl border p-5 ${loyaltyTier.bg}`}>
+      <div className={cn("relative overflow-hidden rounded-3xl border p-5", loyaltyTier.bg)}>
         <div className="flex items-center gap-4 mb-4">
-          <div className={`w-12 h-12 rounded-2xl flex items-center justify-center border ${loyaltyTier.bg}`}>
-            <loyaltyTier.icon className={`w-6 h-6 ${loyaltyTier.color}`} />
+          <div className={cn("w-12 h-12 rounded-2xl flex items-center justify-center border", loyaltyTier.bg)}>
+            <loyaltyTier.icon className={cn("w-6 h-6", loyaltyTier.color)} />
           </div>
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
-              <p className={`text-xl font-black ${loyaltyTier.color}`}>{loyaltyTier.name} Member</p>
-              <span className={`text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full border ${loyaltyTier.badge}`}>
+              <p className={cn("text-xl font-black", loyaltyTier.color)}>{loyaltyTier.name} Member</p>
+              <span className={cn("text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full border", loyaltyTier.badge)}>
                 {loyaltyTier.discount > 0 ? `${loyaltyTier.discount}% off` : "Standard"}
               </span>
             </div>
-            <p className="text-white/30 text-xs mt-0.5">{totalOrders} fulfilled orders</p>
+            <p className="text-muted-foreground text-xs mt-0.5">{totalOrders} fulfilled orders</p>
           </div>
         </div>
 
         <div className="flex flex-wrap gap-1.5 mb-4">
           {loyaltyTier.perks.map(p => (
-            <span key={p} className="flex items-center gap-1 text-[10px] font-bold text-white/50 bg-white/5 border border-white/8 rounded-full px-2.5 py-1">
-              <CheckCircle2 className="w-2.5 h-2.5 text-emerald-400" />{p}
+            <span key={p} className="flex items-center gap-1 text-[10px] font-bold text-foreground/60 bg-secondary/50 border border-border rounded-full px-2.5 py-1">
+              <CheckCircle2 className="w-2.5 h-2.5 text-emerald-600 dark:text-emerald-400" />{p}
             </span>
           ))}
         </div>
 
         {nextTier ? (
           <>
-            <div className="flex justify-between text-[10px] text-white/30 mb-1.5 font-bold">
+            <div className="flex justify-between text-[10px] text-muted-foreground mb-1.5 font-bold">
               <span>{totalOrders}</span>
               <span>{nextTier.min - totalOrders} more → <span className={nextTier.color}>{nextTier.name} ({nextTier.discount}% off)</span></span>
             </div>
-            <div className="h-1.5 rounded-full bg-black/25 overflow-hidden">
+            <div className="h-1.5 rounded-full bg-black/10 dark:bg-black/25 overflow-hidden">
               <div
-                className={`h-full rounded-full transition-all duration-700 ${loyaltyTier.bar}`}
+                className={cn("h-full rounded-full transition-all duration-700", loyaltyTier.bar)}
                 role="progressbar"
                 aria-label={`Loyalty progress: ${Math.round(loyaltyProgress)}%`}
                 style={{ width: `${loyaltyProgress}%` }}
@@ -373,7 +377,7 @@ const DashboardSchedule = () => {
             </div>
           </>
         ) : (
-          <div className={`flex items-center gap-2 text-[11px] font-bold ${loyaltyTier.color}`}>
+          <div className={cn("flex items-center gap-2 text-[11px] font-bold", loyaltyTier.color)}>
             <Award className="w-3.5 h-3.5" /> Max tier — {loyaltyTier.discount}% applied to all wallet purchases.
           </div>
         )}
@@ -381,23 +385,23 @@ const DashboardSchedule = () => {
 
       {/* ── New Schedule Form ───────────────────────────────────────────────── */}
       {showForm && (
-        <div className="rounded-3xl border border-white/10 bg-white/[0.025] overflow-hidden">
+        <div className="rounded-3xl border border-border bg-card overflow-hidden shadow-sm">
           {/* Form header */}
-          <div className="px-6 py-4 border-b border-white/6 flex items-center gap-3">
+          <div className="px-6 py-4 border-b border-border flex items-center gap-3 bg-secondary/30">
             <div className="w-7 h-7 rounded-xl bg-sky-500/15 border border-sky-500/25 flex items-center justify-center">
-              <Plus className="w-3.5 h-3.5 text-sky-400" />
+              <Plus className="w-3.5 h-3.5 text-sky-600 dark:text-sky-400" />
             </div>
             <div>
-              <p className="text-sm font-black text-white">New Auto-Renewal</p>
-              <p className="text-[10px] text-white/30">Configure your recurring bundle</p>
+              <p className="text-sm font-black text-foreground">New Auto-Renewal</p>
+              <p className="text-[10px] text-muted-foreground">Configure your recurring bundle</p>
             </div>
           </div>
 
           <div className="p-6 space-y-6">
             {/* ── Step 1: Network ── */}
             <div className="space-y-2.5">
-              <p className="text-[10px] font-black uppercase tracking-widest text-white/30 flex items-center gap-2">
-                <span className="w-4 h-4 rounded-full bg-white/10 text-white/50 text-[8px] font-black flex items-center justify-center">1</span>
+              <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground flex items-center gap-2">
+                <span className="w-4 h-4 rounded-full bg-secondary text-foreground/70 text-[8px] font-black flex items-center justify-center border border-border">1</span>
                 Choose Network
               </p>
               <div className="grid grid-cols-3 gap-2">
@@ -409,11 +413,12 @@ const DashboardSchedule = () => {
                       key={n}
                       type="button"
                       onClick={() => { userChoseNetwork.current = true; setNetwork(n); setPackageSize(""); }}
-                      className={`py-3 rounded-2xl border font-black text-sm transition-all ${
+                      className={cn(
+                        "py-3 rounded-2xl border font-black text-sm transition-all",
                         active
                           ? `${cfg.color} text-white border-transparent shadow-lg ${cfg.glow}`
-                          : `border-white/8 bg-white/[0.02] ${cfg.text} hover:border-white/20 hover:bg-white/[0.04]`
-                      }`}
+                          : `border-border bg-secondary/50 hover:border-border/80 hover:bg-secondary ${cfg.text}`
+                      )}
                     >
                       {n}
                     </button>
@@ -424,8 +429,8 @@ const DashboardSchedule = () => {
 
             {/* ── Step 2: Bundle ── */}
             <div className="space-y-2.5">
-              <p className="text-[10px] font-black uppercase tracking-widest text-white/30 flex items-center gap-2">
-                <span className="w-4 h-4 rounded-full bg-white/10 text-white/50 text-[8px] font-black flex items-center justify-center">2</span>
+              <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground flex items-center gap-2">
+                <span className="w-4 h-4 rounded-full bg-secondary text-foreground/70 text-[8px] font-black flex items-center justify-center border border-border">2</span>
                 Choose Bundle
               </p>
               <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
@@ -436,20 +441,21 @@ const DashboardSchedule = () => {
                       key={p.size}
                       type="button"
                       onClick={() => setPackageSize(p.size)}
-                      className={`relative p-3 rounded-2xl border text-center transition-all ${
+                      className={cn(
+                        "relative p-3 rounded-2xl border text-center transition-all",
                         selected
-                          ? `${netCfg.border} bg-white/[0.06] ring-1 ${netCfg.ring}`
-                          : "border-white/8 bg-white/[0.02] hover:border-white/20"
-                      }`}
+                          ? `${netCfg.border} bg-secondary ring-1 ${netCfg.ring}`
+                          : "border-border bg-secondary/20 hover:border-border/80 hover:bg-secondary/50"
+                      )}
                     >
                       {p.popular && !selected && (
                         <span className="absolute -top-1.5 left-1/2 -translate-x-1/2 text-[7px] font-black uppercase bg-amber-500 text-black px-1.5 rounded-full">
                           Popular
                         </span>
                       )}
-                      <p className={`text-xs font-black ${selected ? "text-white" : "text-white/70"}`}>{p.size}</p>
-                      <p className={`text-[10px] font-bold mt-0.5 ${selected ? netCfg.text : "text-white/30"}`}>₵{p.price.toFixed(2)}</p>
-                      {p.validity && <p className="text-[9px] text-white/20 mt-0.5">{p.validity}</p>}
+                      <p className={cn("text-xs font-black", selected ? "text-foreground" : "text-muted-foreground")}>{p.size}</p>
+                      <p className={cn("text-[10px] font-bold mt-0.5", selected ? netCfg.text : "text-muted-foreground/60")}>₵{p.price.toFixed(2)}</p>
+                      {p.validity && <p className="text-[9px] text-muted-foreground/50 mt-0.5">{p.validity}</p>}
                     </button>
                   );
                 })}
@@ -458,22 +464,22 @@ const DashboardSchedule = () => {
 
             {/* ── Step 3: Phone & Frequency ── */}
             <div className="space-y-2.5">
-              <p className="text-[10px] font-black uppercase tracking-widest text-white/30 flex items-center gap-2">
-                <span className="w-4 h-4 rounded-full bg-white/10 text-white/50 text-[8px] font-black flex items-center justify-center">3</span>
+              <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground flex items-center gap-2">
+                <span className="w-4 h-4 rounded-full bg-secondary text-foreground/70 text-[8px] font-black flex items-center justify-center border border-border">3</span>
                 Recipient & Schedule
               </p>
               {/* Name */}
               <div className="space-y-1.5">
-                <p className="text-[10px] font-bold text-white/40 uppercase tracking-widest">Recipient Name <span className="text-white/20 normal-case tracking-normal font-normal">(optional label)</span></p>
+                <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Recipient Name <span className="text-muted-foreground/50 normal-case tracking-normal font-normal">(optional label)</span></p>
                 <div className="relative">
-                  <User className="absolute left-3.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-white/25 pointer-events-none" />
+                  <User className="absolute left-3.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground/60 pointer-events-none" />
                   <input
                     type="text"
                     value={recipientName}
                     onChange={e => setRecipientName(e.target.value)}
                     placeholder="e.g. Mum, Wife, Client A"
                     maxLength={40}
-                    className="w-full h-12 pl-10 pr-4 bg-black/40 border border-white/10 rounded-xl text-sm text-white outline-none transition-all focus:border-sky-500/50 placeholder:text-white/20"
+                    className="w-full h-12 pl-10 pr-4 bg-background border border-border rounded-xl text-sm text-foreground outline-none transition-all focus:border-sky-500/50 placeholder:text-muted-foreground/40"
                   />
                 </div>
               </div>
@@ -481,30 +487,31 @@ const DashboardSchedule = () => {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {/* Phone */}
                 <div className="space-y-1.5">
-                  <p className="text-[10px] font-bold text-white/40 uppercase tracking-widest">Recipient Phone</p>
+                  <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Recipient Phone</p>
                   <div className="relative">
-                    <Phone className="absolute left-3.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-white/25 pointer-events-none" />
+                    <Phone className="absolute left-3.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground/60 pointer-events-none" />
                     <input
                       type="tel"
                       value={phone}
                       onChange={e => setPhone(formatPhone(e.target.value))}
                       placeholder="0241234567"
                       maxLength={10}
-                      className={`w-full h-12 pl-10 pr-4 bg-black/40 border rounded-xl text-sm text-white font-mono outline-none transition-all ${
+                      className={cn(
+                        "w-full h-12 pl-10 pr-4 bg-background border rounded-xl text-sm text-foreground font-mono outline-none transition-all",
                         phone.length === 0
-                          ? "border-white/10 focus:border-sky-500/50"
+                          ? "border-border focus:border-sky-500/50"
                           : isValidGhanaPhone(phone)
                           ? detectNetwork(phone) === network
                             ? "border-emerald-500/40 focus:border-emerald-500/60"
                             : "border-amber-500/40 focus:border-amber-500/60"
                           : "border-red-500/40 focus:border-red-500/60"
-                      }`}
+                      )}
                     />
                     {phone.length > 0 && (
                       <div className="absolute right-3 top-1/2 -translate-y-1/2">
                         {isValidGhanaPhone(phone)
-                          ? <ShieldCheck className={`w-4 h-4 ${detectNetwork(phone) === network ? "text-emerald-400" : "text-amber-400"}`} />
-                          : <XCircle className="w-4 h-4 text-red-400" />}
+                          ? <ShieldCheck className={cn("w-4 h-4", detectNetwork(phone) === network ? "text-emerald-600 dark:text-emerald-400" : "text-amber-600 dark:text-amber-400")} />
+                          : <XCircle className="w-4 h-4 text-red-500 dark:text-red-400" />}
                       </div>
                     )}
                   </div>
@@ -513,7 +520,7 @@ const DashboardSchedule = () => {
 
                 {/* Frequency */}
                 <div className="space-y-1.5">
-                  <p className="text-[10px] font-bold text-white/40 uppercase tracking-widest">Renewal Frequency</p>
+                  <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Renewal Frequency</p>
                   <div className="grid grid-cols-3 gap-1.5">
                     {(["daily", "weekly", "monthly"] as const).map(f => {
                       const cfg = FREQ_CONFIG[f];
@@ -523,11 +530,12 @@ const DashboardSchedule = () => {
                           key={f}
                           type="button"
                           onClick={() => setFrequency(f)}
-                          className={`py-2.5 rounded-xl border text-center transition-all ${
+                          className={cn(
+                            "py-2.5 rounded-xl border text-center transition-all",
                             active
-                              ? "bg-sky-500/20 border-sky-500/40 text-sky-300"
-                              : "border-white/8 bg-white/[0.02] text-white/30 hover:text-white/50 hover:border-white/20"
-                          }`}
+                              ? "bg-sky-500/10 border-sky-500/30 text-sky-600 dark:text-sky-300"
+                              : "border-border bg-secondary/30 text-muted-foreground hover:text-foreground hover:border-border/80"
+                          )}
                         >
                           <p className="text-[11px] font-black">{cfg.label}</p>
                           <p className="text-[9px] opacity-60 mt-0.5">{cfg.sub}</p>
@@ -541,24 +549,24 @@ const DashboardSchedule = () => {
 
             {/* ── Summary + Create ── */}
             {packageSize && phoneValid && (
-              <div className={`p-4 rounded-2xl border ${netCfg.border} bg-white/[0.02] space-y-2`}>
-                <p className="text-[10px] font-black uppercase tracking-widest text-white/30">Schedule Summary</p>
+              <div className={cn("p-4 rounded-2xl border bg-secondary/20 space-y-2", netCfg.border)}>
+                <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Schedule Summary</p>
                 <div className="flex items-center gap-3">
-                  <div className={`w-9 h-9 rounded-xl ${netCfg.color} flex items-center justify-center shrink-0`}>
+                  <div className={cn("w-9 h-9 rounded-xl flex items-center justify-center shrink-0", netCfg.color)}>
                     <CalendarClock className="w-4 h-4 text-white" />
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <p className="text-sm font-black text-white">{network} {packageSize}</p>
-                      <span className={`text-[9px] font-black uppercase px-1.5 py-0.5 rounded-full border ${netCfg.border} ${netCfg.text}`}>
+                      <p className="text-sm font-black text-foreground">{network} {packageSize}</p>
+                      <span className={cn("text-[9px] font-black uppercase px-1.5 py-0.5 rounded-full border", netCfg.border, netCfg.text)}>
                         {detectNetwork(phone) === network ? "✓ verified" : network}
                       </span>
                     </div>
-                    <p className="text-[11px] text-white/40 mt-0.5">
+                    <p className="text-[11px] text-muted-foreground mt-0.5">
                       {recipientName ? `${recipientName} · ` : ""}{phone} · {FREQ_CONFIG[frequency].label.toLowerCase()}
                     </p>
                   </div>
-                  <ChevronRight className={`w-4 h-4 ${netCfg.text} shrink-0`} />
+                  <ChevronRight className={cn("w-4 h-4 shrink-0", netCfg.text)} />
                 </div>
               </div>
             )}
@@ -567,7 +575,7 @@ const DashboardSchedule = () => {
               type="button"
               onClick={handleCreate}
               disabled={saving || !packageSize || !phoneValid}
-              className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl bg-sky-500 hover:bg-sky-400 disabled:bg-white/10 disabled:text-white/30 text-white font-black text-sm transition-all shadow-lg shadow-sky-500/20 disabled:shadow-none"
+              className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl bg-sky-500 hover:bg-sky-600 disabled:bg-secondary disabled:text-muted-foreground text-white font-black text-sm transition-all shadow-lg shadow-sky-500/20 disabled:shadow-none"
             >
               {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <CalendarClock className="w-4 h-4" />}
               {saving ? "Creating schedule…" : "Create Auto-Renewal"}
@@ -577,34 +585,34 @@ const DashboardSchedule = () => {
       )}
 
       {/* ── Schedule List ───────────────────────────────────────────────────── */}
-      <div className="rounded-3xl border border-white/8 bg-white/[0.02] overflow-hidden">
-        <div className="px-6 py-4 border-b border-white/6 flex items-center justify-between">
+      <div className="rounded-3xl border border-border bg-card overflow-hidden shadow-sm">
+        <div className="px-6 py-4 border-b border-border flex items-center justify-between bg-secondary/10">
           <div>
-            <h3 className="font-black text-sm text-white">Your Schedules</h3>
-            <p className="text-[10px] text-white/30 mt-0.5">{activeCount} active of {schedules.length} total</p>
+            <h3 className="font-black text-sm text-foreground">Your Schedules</h3>
+            <p className="text-[10px] text-muted-foreground mt-0.5">{activeCount} active of {schedules.length} total</p>
           </div>
-          <span className="text-xs font-bold text-white/30 bg-white/5 border border-white/8 px-2.5 py-1 rounded-full">
+          <span className="text-xs font-bold text-muted-foreground bg-secondary border border-border px-2.5 py-1 rounded-full">
             {schedules.length}
           </span>
         </div>
 
         {loading ? (
           <div className="p-4 space-y-3">
-            {[1, 2, 3].map(i => <div key={i} className="h-[72px] rounded-2xl bg-white/5 animate-pulse" />)}
+            {[1, 2, 3].map(i => <div key={i} className="h-[72px] rounded-2xl bg-secondary animate-pulse" />)}
           </div>
         ) : schedules.length === 0 ? (
           <div className="py-16 text-center space-y-4">
-            <div className="w-16 h-16 rounded-3xl bg-white/5 border border-white/8 flex items-center justify-center mx-auto">
-              <CalendarClock className="w-7 h-7 text-white/15" />
+            <div className="w-16 h-16 rounded-3xl bg-secondary border border-border flex items-center justify-center mx-auto">
+              <CalendarClock className="w-7 h-7 text-muted-foreground/30" />
             </div>
             <div>
-              <p className="text-sm font-bold text-white/30">No schedules yet</p>
-              <p className="text-xs text-white/20 mt-1">Hit "New Schedule" to set one up</p>
+              <p className="text-sm font-bold text-muted-foreground">No schedules yet</p>
+              <p className="text-xs text-muted-foreground/60 mt-1">Hit "New Schedule" to set one up</p>
             </div>
             <button
               type="button"
               onClick={() => setShowForm(true)}
-              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-2xl bg-sky-500/15 border border-sky-500/25 text-sky-400 text-sm font-black hover:bg-sky-500/25 transition-all"
+              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-2xl bg-sky-500/10 border border-sky-500/25 text-sky-600 dark:text-sky-400 text-sm font-black hover:bg-sky-500/20 transition-all"
             >
               <Plus className="w-4 h-4" /> Create First Schedule
             </button>
@@ -616,58 +624,60 @@ const DashboardSchedule = () => {
               return (
                 <div
                   key={s.id}
-                  className={`group relative flex items-center gap-4 rounded-2xl border px-4 py-4 transition-all ${
+                  className={cn(
+                    "group relative flex items-center gap-4 rounded-2xl border px-4 py-4 transition-all bg-card hover:bg-secondary/20",
                     s.active
-                      ? "border-white/8 bg-white/[0.025] hover:border-white/15"
-                      : "border-white/4 bg-white/[0.01] opacity-45 hover:opacity-70"
-                  }`}
+                      ? "border-border shadow-sm"
+                      : "border-border/50 opacity-60 hover:opacity-90"
+                  )}
                 >
                   {/* Network dot */}
-                  <div className={`w-2 h-2 rounded-full shrink-0 ${s.active ? cfg.color : "bg-white/15"}`} />
+                  <div className={cn("w-2 h-2 rounded-full shrink-0", s.active ? cfg.color : "bg-muted")} />
 
                   {/* Network + package icon */}
-                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${s.active ? `${cfg.color} bg-opacity-15` : "bg-white/5"} border border-white/8`}>
-                    <CalendarClock className={`w-4 h-4 ${s.active ? cfg.text : "text-white/20"}`} />
+                  <div className={cn("w-10 h-10 rounded-xl flex items-center justify-center shrink-0 border border-border bg-secondary/50", s.active && "bg-secondary")}>
+                    <CalendarClock className={cn("w-4 h-4", s.active ? cfg.text : "text-muted-foreground/40")} />
                   </div>
 
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <p className="font-black text-sm text-white">{s.network} {s.package_size}</p>
-                      <span className={`text-[9px] font-black uppercase px-1.5 py-0.5 rounded-full border ${cfg.border} ${cfg.text} bg-white/[0.02]`}>
+                      <p className="font-black text-sm text-foreground">{s.network} {s.package_size}</p>
+                      <span className={cn("text-[9px] font-black uppercase px-1.5 py-0.5 rounded-full border bg-secondary/30", cfg.border, cfg.text)}>
                         {s.frequency}
                       </span>
                       {!s.active && (
-                        <span className="text-[9px] font-black uppercase px-1.5 py-0.5 rounded-full bg-white/5 border border-white/10 text-white/30">
+                        <span className="text-[9px] font-black uppercase px-1.5 py-0.5 rounded-full bg-muted border border-border text-muted-foreground">
                           Paused
                         </span>
                       )}
                     </div>
                     <div className="flex items-center gap-3 mt-1 flex-wrap">
                       {s.recipient_name && (
-                        <span className="text-[10px] font-bold text-white/60 flex items-center gap-1">
+                        <span className="text-[10px] font-bold text-foreground/70 flex items-center gap-1">
                           <User className="w-2.5 h-2.5" /> {s.recipient_name}
                         </span>
                       )}
-                      <span className="text-[10px] text-white/35 flex items-center gap-1 font-mono">
+                      <span className="text-[10px] text-muted-foreground flex items-center gap-1 font-mono">
                         <Phone className="w-2.5 h-2.5" /> {s.recipient_phone}
                       </span>
                       {s.active && (
-                        <span className="text-[10px] text-white/30 flex items-center gap-1">
+                        <span className="text-[10px] text-muted-foreground/80 flex items-center gap-1">
                           <Clock className="w-2.5 h-2.5" /> {nextRunLabel(s.next_run_at)}
                         </span>
                       )}
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-1.5 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <div className="flex items-center gap-1.5 shrink-0 md:opacity-0 group-hover:opacity-100 transition-opacity">
                     <button
                       type="button"
                       onClick={() => toggleActive(s.id, s.active)}
-                      className={`w-8 h-8 rounded-xl flex items-center justify-center border transition-all ${
+                      className={cn(
+                        "w-8 h-8 rounded-xl flex items-center justify-center border transition-all",
                         s.active
-                          ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20"
-                          : "border-white/10 bg-white/5 text-white/30 hover:text-white/60"
-                      }`}
+                          ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20"
+                          : "border-border bg-secondary text-muted-foreground hover:text-foreground"
+                      )}
                       aria-label={s.active ? "Pause" : "Resume"}
                     >
                       {s.active ? <ToggleRight className="w-4 h-4" /> : <ToggleLeft className="w-4 h-4" />}
@@ -675,7 +685,7 @@ const DashboardSchedule = () => {
                     <button
                       type="button"
                       onClick={() => deleteSchedule(s.id)}
-                      className="w-8 h-8 rounded-xl flex items-center justify-center border border-red-500/20 bg-red-500/5 text-red-400/50 hover:text-red-400 hover:bg-red-500/15 transition-all"
+                      className="w-8 h-8 rounded-xl flex items-center justify-center border border-red-500/20 bg-red-500/5 text-red-600 dark:text-red-400/50 hover:text-red-500 dark:hover:text-red-400 hover:bg-red-500/15 transition-all"
                       aria-label="Delete"
                     >
                       <Trash2 className="w-3.5 h-3.5" />
@@ -689,9 +699,9 @@ const DashboardSchedule = () => {
       </div>
 
       {/* ── Info note ──────────────────────────────────────────────────────── */}
-      <div className="flex items-start gap-3 p-4 rounded-2xl bg-white/[0.02] border border-white/6">
-        <Info className="w-4 h-4 text-white/20 shrink-0 mt-0.5" />
-        <p className="text-[11px] text-white/25 leading-relaxed">
+      <div className="flex items-start gap-3 p-4 rounded-2xl bg-secondary border border-border shadow-sm">
+        <Info className="w-4 h-4 text-muted-foreground shrink-0 mt-0.5" />
+        <p className="text-[11px] text-muted-foreground leading-relaxed">
           Renewals are funded from your wallet. Maintain sufficient balance before each renewal date.
           Schedules with insufficient balance are skipped and retried the following day.
         </p>

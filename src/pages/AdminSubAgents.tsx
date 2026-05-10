@@ -164,8 +164,8 @@ const AdminSubAgents = () => {
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center h-64 gap-4">
-        <Loader2 className="w-8 h-8 text-blue-400 animate-spin" />
-        <p className="text-white/50 text-sm">Loading sub-agents...</p>
+        <Loader2 className="w-8 h-8 text-blue-500 animate-spin" />
+        <p className="text-muted-foreground text-sm font-medium animate-pulse">Loading sub-agents...</p>
       </div>
     );
   }
@@ -176,28 +176,28 @@ const AdminSubAgents = () => {
   return (
     <div className="space-y-6 pb-10">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 border-b border-white/5 pb-6">
+      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 border-b border-border pb-6">
         <div>
-          <h1 className="font-display text-3xl font-black tracking-tight bg-gradient-to-r from-white to-white/60 bg-clip-text text-transparent">
+          <h1 className="font-display text-3xl font-black tracking-tight text-foreground">
             Sub-Agent Management
           </h1>
-          <p className="text-sm text-white/50 mt-1">View and manage all sub-agents and their parent agent links.</p>
+          <p className="text-sm text-muted-foreground mt-1">View and manage all sub-agents and their parent agent links.</p>
         </div>
-        <Button onClick={() => fetchAgents(false)} className="gap-2 bg-white/5 hover:bg-white/10 text-white border border-white/10 rounded-xl">
+        <Button onClick={() => fetchAgents(false)} variant="outline" className="gap-2 bg-card border-border text-foreground hover:bg-muted rounded-xl">
           <RefreshCw className="w-4 h-4" /> Refresh
         </Button>
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {[
-          { label: "Total Sub-Agents", value: agents.length, color: "text-white" },
-          { label: "Approved", value: approvedCount, color: "text-blue-400" },
-          { label: "Pending", value: pendingCount, color: "text-yellow-400" },
+          { label: "Total Sub-Agents", value: agents.length, color: "text-foreground" },
+          { label: "Approved", value: approvedCount, color: "text-emerald-600 dark:text-emerald-400" },
+          { label: "Pending", value: pendingCount, color: "text-amber-600 dark:text-amber-400" },
         ].map(s => (
-          <div key={s.label} className="rounded-2xl bg-white/[0.02] border border-white/5 p-4 text-center">
-            <p className={`font-display text-2xl font-black ${s.color}`}>{s.value}</p>
-            <p className="text-xs text-white/40 mt-1">{s.label}</p>
+          <div key={s.label} className="rounded-2xl bg-card border border-border shadow-sm p-5">
+            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground mb-1">{s.label}</p>
+            <p className={`font-display text-3xl font-black ${s.color}`}>{s.value}</p>
           </div>
         ))}
       </div>
@@ -205,12 +205,12 @@ const AdminSubAgents = () => {
       {/* Filters */}
       <div className="flex flex-col sm:flex-row gap-3">
         <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/30" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground/50" />
           <Input
             placeholder="Search by name, email, parent..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="pl-9 bg-white/5 border-white/10 text-white placeholder:text-white/30 rounded-xl focus:border-blue-400/40"
+            className="pl-9 bg-card border-border text-foreground placeholder:text-muted-foreground/40 rounded-xl focus:ring-primary/20"
           />
         </div>
         <div className="flex gap-2">
@@ -218,10 +218,10 @@ const AdminSubAgents = () => {
             <button
               key={f}
               onClick={() => setFilter(f)}
-              className={`px-4 py-2 rounded-xl text-sm font-semibold transition-all capitalize ${
+              className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-all border ${
                 filter === f
-                  ? "bg-blue-400/20 text-blue-400 border border-blue-400/30"
-                  : "bg-white/5 text-white/50 border border-white/10 hover:text-white/80"
+                  ? "bg-primary text-primary-foreground border-primary shadow-md"
+                  : "bg-card text-muted-foreground border-border hover:bg-muted hover:text-foreground"
               }`}
             >
               {f}
@@ -232,39 +232,39 @@ const AdminSubAgents = () => {
 
       {/* List */}
       {agents.length === 0 ? (
-        <div className="text-center py-16 text-white/30 text-sm">No sub-agents found.</div>
+        <div className="text-center py-16 text-muted-foreground/60 text-sm font-medium border border-dashed border-border rounded-3xl">No sub-agents found.</div>
       ) : (
         <div className="space-y-3">
           {agents.map((agent) => (
-            <div key={agent.user_id} className="rounded-2xl bg-white/[0.02] border border-white/5 overflow-hidden">
-              <div className="p-4 flex flex-col gap-4">
+            <div key={agent.user_id} className="rounded-2xl bg-card border border-border shadow-sm overflow-hidden transition-all hover:shadow-md hover:border-border/80">
+              <div className="p-5 flex flex-col gap-4">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                   <div className="flex-1 min-w-0">
                     <div className="flex flex-wrap items-center gap-2 mb-1.5">
-                      <p className="font-bold text-white text-base">{agent.full_name || "—"}</p>
+                      <p className="font-black text-foreground text-lg tracking-tight">{agent.full_name || "—"}</p>
                       <div className="flex gap-1.5 flex-wrap">
                         {agent.sub_agent_approved ? (
-                          <Badge className="gap-1 bg-blue-500/20 text-blue-400 border-blue-500/30 text-[9px] font-bold">
+                          <Badge className="gap-1 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20 text-[9px] font-black uppercase tracking-wider">
                             <CheckCircle className="w-2.5 h-2.5" /> Active
                           </Badge>
                         ) : (
-                          <Badge className="gap-1 bg-yellow-500/20 text-yellow-400 border-yellow-500/30 text-[9px] font-bold">
+                          <Badge className="gap-1 bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20 text-[9px] font-black uppercase tracking-wider">
                             <Clock className="w-2.5 h-2.5" /> Pending Approval
                           </Badge>
                         )}
                       </div>
                     </div>
-                    <div className="grid grid-cols-1 sm:flex sm:flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-white/40">
+                    <div className="grid grid-cols-1 sm:flex sm:flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-muted-foreground font-medium">
                       <span className="flex items-center gap-1.5">
-                        <Users2 className="w-3.5 h-3.5 text-blue-400/50" /> Parent: <span className="text-white/70 font-semibold">{agent.parent_name || "Direct Signup"}</span>
+                        <Users2 className="w-3.5 h-3.5 text-muted-foreground/50" /> Parent: <span className="text-foreground font-bold">{agent.parent_name || "Direct Signup"}</span>
                       </span>
                       {agent.phone && (
                         <span className="flex items-center gap-1.5">
-                          <Phone className="w-3.5 h-3.5 text-white/20" /> {agent.phone}
+                          <Phone className="w-3.5 h-3.5 text-muted-foreground/40" /> {agent.phone}
                         </span>
                       )}
                       <span className="truncate">{agent.email}</span>
-                      <span className="text-[10px] uppercase tracking-wider text-white/20">Joined {new Date(agent.created_at).toLocaleDateString()}</span>
+                      <span className="text-[10px] uppercase tracking-wider text-muted-foreground/40">Joined {new Date(agent.created_at).toLocaleDateString()}</span>
                     </div>
                   </div>
 
@@ -289,40 +289,40 @@ const AdminSubAgents = () => {
                   </div>
                 </div>
 
-                <div className="flex flex-wrap items-center justify-between gap-4 pt-4 border-t border-white/5">
+                <div className="flex flex-wrap items-center justify-between gap-4 pt-4 border-t border-border">
                    <div className="flex items-center gap-6">
                       <div>
-                        <p className="text-[10px] text-white/30 uppercase tracking-widest mb-0.5">Wallet Balance</p>
-                        <p className="text-sm font-black text-white">GH₵{(agent.wallet_balance || 0).toFixed(2)}</p>
+                        <p className="text-[9px] text-muted-foreground font-black uppercase tracking-widest mb-0.5">Wallet Balance</p>
+                        <p className="text-base font-black text-foreground">GH₵{(agent.wallet_balance || 0).toFixed(2)}</p>
                       </div>
                       <div>
-                        <p className="text-[10px] text-white/30 uppercase tracking-widest mb-0.5">Sales Volume</p>
-                        <p className="text-sm font-black text-green-400">GH₵{(agent.total_sales_volume || 0).toFixed(2)}</p>
+                        <p className="text-[9px] text-muted-foreground font-black uppercase tracking-widest mb-0.5">Sales Volume</p>
+                        <p className="text-base font-black text-emerald-600 dark:text-emerald-400">GH₵{(agent.total_sales_volume || 0).toFixed(2)}</p>
                       </div>
                    </div>
 
                    <div className="flex items-center gap-2">
                       <div className="relative">
-                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40 text-xs">₵</span>
+                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground/50 text-xs font-bold">₵</span>
                         <Input
                           type="number"
                           placeholder="Top-up"
                           value={topupAmount[agent.user_id] || ""}
                           onChange={(e) => setTopupAmount(prev => ({ ...prev, [agent.user_id]: e.target.value }))}
-                          className="pl-7 w-24 bg-white/5 border-white/10 text-white text-xs rounded-lg h-8 focus:border-blue-400/40"
+                          className="pl-7 w-24 bg-muted/50 border-border text-foreground font-bold text-xs rounded-xl h-9 focus:ring-primary/20"
                         />
                       </div>
                       <Button
                         size="sm"
                         onClick={() => handleTopUp(agent)}
                         disabled={toppingUp === agent.user_id}
-                        className="h-8 bg-blue-500/20 text-blue-400 hover:bg-blue-500/30 border border-blue-500/30 text-xs rounded-lg"
+                        className="h-9 px-3 bg-primary/10 text-primary hover:bg-primary hover:text-primary-foreground border border-primary/20 text-xs rounded-xl shadow-sm transition-all"
                       >
-                        {toppingUp === agent.user_id ? <Loader2 className="w-3 h-3 animate-spin" /> : <Wallet className="w-3.5 h-3.5" />}
+                        {toppingUp === agent.user_id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Wallet className="w-3.5 h-3.5 mr-1" />} Top up
                       </Button>
                       <Link
                         to={`/admin/orders?agent=${encodeURIComponent(agent.full_name || agent.email)}`}
-                        className="h-8 px-3 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center text-white/50 hover:text-white transition-colors text-xs gap-2"
+                        className="h-9 px-4 rounded-xl bg-muted/50 border border-border flex items-center justify-center text-muted-foreground font-bold hover:bg-muted hover:text-foreground transition-all text-xs gap-2 shadow-sm"
                       >
                         <ShoppingCart className="w-3.5 h-3.5" /> History
                       </Link>
@@ -340,7 +340,7 @@ const AdminSubAgents = () => {
             variant="outline"
             onClick={() => fetchAgents(true)}
             disabled={loading}
-            className="bg-white/5 border-white/10 text-white rounded-xl px-10 font-black tracking-widest uppercase text-xs"
+            className="bg-card border-border text-foreground hover:bg-muted rounded-xl px-10 font-black tracking-widest uppercase text-xs shadow-sm"
           >
             {loading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <ChevronDown className="w-4 h-4 mr-2" />}
             Load More

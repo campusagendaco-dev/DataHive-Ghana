@@ -414,9 +414,9 @@ const AdminOrders = () => {
 
   if (loading && allOrders.length === 0) return (
     <div className="flex flex-col items-center justify-center py-24 gap-4">
-      <Loader2 className="w-7 h-7 animate-spin text-amber-400" />
+      <Loader2 className="w-7 h-7 animate-spin text-amber-500" />
       <div className="text-center">
-        <p className="text-white/60 text-sm font-medium">Loading orders…</p>
+        <p className="text-muted-foreground text-sm font-medium">Loading orders…</p>
       </div>
     </div>
   );
@@ -476,21 +476,21 @@ const AdminOrders = () => {
       {/* Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3">
         {[
-          { label: "Total Orders", value: allOrders.length.toLocaleString(), icon: ShoppingCart, color: "text-blue-400" },
-          { label: "Gross Revenue", value: `GH₵${totalRevenue.toFixed(2)}`, icon: TrendingUp, color: "text-emerald-400" },
-          { label: "Paystack Fees", value: `GH₵${totalPaystackFees.toFixed(2)}`, icon: TrendingUp, color: "text-red-400" },
-          { label: "Agent Profits", value: `GH₵${(totalAgentProfits + totalParentProfits).toFixed(2)}`, icon: TrendingUp, color: "text-purple-400" },
-          { label: "Platform Costs", value: `GH₵${totalCosts.toFixed(2)}`, icon: TrendingUp, color: "text-orange-400" },
-          { label: "Net Admin Profit", value: `GH₵${totalAdminNetProfit.toFixed(2)}`, icon: TrendingUp, color: "text-sky-400 font-black" },
-          { label: "Paystack Verified", value: verifiedCount.toLocaleString(), icon: CheckCircle2, color: "text-green-400" },
-          { label: "Pending / Processing / Failed", value: `${pending} / ${allOrders.filter(o => o.status === "processing").length} / ${failed}`, icon: failed > 0 ? AlertTriangle : Clock, color: failed > 0 ? "text-red-400" : "text-yellow-400" },
+          { label: "Total Orders", value: allOrders.length.toLocaleString(), icon: ShoppingCart, color: "text-blue-500" },
+          { label: "Gross Revenue", value: `GH₵${totalRevenue.toFixed(2)}`, icon: TrendingUp, color: "text-emerald-500" },
+          { label: "Paystack Fees", value: `GH₵${totalPaystackFees.toFixed(2)}`, icon: TrendingUp, color: "text-red-500" },
+          { label: "Agent Profits", value: `GH₵${(totalAgentProfits + totalParentProfits).toFixed(2)}`, icon: TrendingUp, color: "text-purple-500" },
+          { label: "Platform Costs", value: `GH₵${totalCosts.toFixed(2)}`, icon: TrendingUp, color: "text-orange-500" },
+          { label: "Net Admin Profit", value: `GH₵${totalAdminNetProfit.toFixed(2)}`, icon: TrendingUp, color: "text-sky-500 font-black" },
+          { label: "Paystack Verified", value: verifiedCount.toLocaleString(), icon: CheckCircle2, color: "text-green-500" },
+          { label: "Pending / Processing / Failed", value: `${pending} / ${allOrders.filter(o => o.status === "processing").length} / ${failed}`, icon: failed > 0 ? AlertTriangle : Clock, color: failed > 0 ? "text-red-500" : "text-amber-500" },
         ].map(({ label, value, icon: Icon, color }) => (
-          <Card key={label} className="bg-white/3 border-white/8">
+          <Card key={label} className="bg-card border-border shadow-sm">
             <CardContent className="p-3 flex items-center gap-2">
-              <Icon className={`w-6 h-6 ${color} shrink-0 opacity-70`} />
+              <Icon className={`w-6 h-6 ${color} shrink-0 opacity-90`} />
               <div className="min-w-0">
-                <p className="text-base font-black text-white truncate">{value}</p>
-                <p className="text-[10px] text-white/40 truncate">{label}</p>
+                <p className="text-base font-black text-foreground truncate">{value}</p>
+                <p className="text-[10px] text-muted-foreground truncate">{label}</p>
               </div>
             </CardContent>
           </Card>
@@ -500,21 +500,21 @@ const AdminOrders = () => {
       {/* Filters */}
       <div className="flex flex-wrap gap-3 items-center">
         <div className="relative flex-1 min-w-[200px] max-w-xs">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/30" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input
             placeholder="Search orders, agents, phones…"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="pl-9 bg-white/5 border-white/10 text-sm"
+            className="pl-9 bg-secondary/50 border-input text-sm"
           />
         </div>
 
-        <div className="flex items-center gap-1 bg-white/5 border border-white/10 rounded-lg p-1">
+        <div className="flex items-center gap-1 bg-secondary/50 border border-input rounded-lg p-1">
           {(["all", "agents", "sub_agents"] as FilterType[]).map((f) => (
             <button
               key={f}
               onClick={() => setTypeFilter(f)}
-              className={`px-3 py-1 text-xs rounded-md font-semibold transition-all ${typeFilter === f ? "bg-amber-400 text-black" : "text-white/40 hover:text-white"}`}
+              className={`px-3 py-1 text-xs rounded-md font-semibold transition-all ${typeFilter === f ? "bg-amber-400 text-black shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
             >
               {f === "all" ? "All" : f === "agents" ? "Agents" : "Sub-Agents"}
             </button>
@@ -524,7 +524,7 @@ const AdminOrders = () => {
         <select
           value={statusFilter}
           onChange={(e) => setStatusFilter(e.target.value)}
-          className="text-xs bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white/70 outline-none"
+          className="text-xs bg-secondary/50 border border-input rounded-lg px-3 py-2 text-foreground outline-none"
         >
           <option value="all">All Statuses</option>
           <option value="fulfilled">Fulfilled</option>
@@ -536,7 +536,7 @@ const AdminOrders = () => {
         <select
           value={networkFilter}
           onChange={(e) => setNetworkFilter(e.target.value)}
-          className="text-xs bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white/70 outline-none"
+          className="text-xs bg-secondary/50 border border-input rounded-lg px-3 py-2 text-foreground outline-none"
         >
           <option value="all">All Networks</option>
           {uniqueNetworks.map((n) => <option key={n} value={n}>{n}</option>)}
@@ -545,7 +545,7 @@ const AdminOrders = () => {
         <select
           value={orderTypeFilter}
           onChange={(e) => setOrderTypeFilter(e.target.value)}
-          className="text-xs bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white/70 outline-none"
+          className="text-xs bg-secondary/50 border border-input rounded-lg px-3 py-2 text-foreground outline-none"
         >
           <option value="all">All Order Types</option>
           <option value="data">Data Bundles</option>
@@ -558,47 +558,47 @@ const AdminOrders = () => {
           <option value="wallet_topup">Wallet Top-up</option>
         </select>
 
-        <span className="text-xs text-white/30 ml-auto">
+        <span className="text-xs text-muted-foreground ml-auto">
           {totalCount.toLocaleString()} result{totalCount !== 1 ? "s" : ""}
         </span>
       </div>
 
       {/* Desktop Table */}
-      <div className="hidden md:block rounded-xl border border-white/8 overflow-hidden">
+      <div className="hidden md:block rounded-xl border border-border overflow-hidden shadow-sm">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-white/8 bg-white/3">
-                <th className="text-left px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-white/30">Date</th>
-                <th className="text-left px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-white/30">Agent</th>
-                <th className="text-left px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-white/30">Type</th>
-                <th className="text-left px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-white/30 hidden sm:table-cell">Phone</th>
-                <th className="text-left px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-white/30 hidden md:table-cell">Network</th>
-                <th className="text-left px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-white/30 hidden md:table-cell">Package</th>
-                <th className="text-right px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-white/30">Amount</th>
-                <th className="text-right px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-white/30 hidden xl:table-cell">Cost</th>
-                <th className="text-right px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-white/30 hidden lg:table-cell">Agent Profit</th>
-                <th className="text-right px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-white/30 hidden lg:table-cell">Admin Profit</th>
-                <th className="text-center px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-white/30">Status</th>
-                <th className="text-center px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-white/30">Action</th>
+              <tr className="border-b border-border bg-muted/50">
+                <th className="text-left px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Date</th>
+                <th className="text-left px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Agent</th>
+                <th className="text-left px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Type</th>
+                <th className="text-left px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-muted-foreground hidden sm:table-cell">Phone</th>
+                <th className="text-left px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-muted-foreground hidden md:table-cell">Network</th>
+                <th className="text-left px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-muted-foreground hidden md:table-cell">Package</th>
+                <th className="text-right px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Amount</th>
+                <th className="text-right px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-muted-foreground hidden xl:table-cell">Cost</th>
+                <th className="text-right px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-muted-foreground hidden lg:table-cell">Agent Profit</th>
+                <th className="text-right px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-muted-foreground hidden lg:table-cell">Admin Profit</th>
+                <th className="text-center px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Status</th>
+                <th className="text-center px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Action</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-white/5">
+            <tbody className="divide-y divide-border">
               {paginated.map((order) => (
-                <tr key={order.id} className="hover:bg-white/3 transition-colors">
-                  <td className="px-4 py-3 text-white/40 text-xs whitespace-nowrap">
+                <tr key={order.id} className="hover:bg-muted/30 transition-colors bg-card">
+                  <td className="px-4 py-3 text-muted-foreground text-xs whitespace-nowrap">
                     {new Date(order.created_at).toLocaleDateString("en-GH", { day: "2-digit", month: "short" })}
-                    <span className="block text-white/25 text-[10px]">
+                    <span className="block text-muted-foreground/60 text-[10px]">
                       {new Date(order.created_at).toLocaleTimeString("en-GH", { hour: "2-digit", minute: "2-digit" })}
                     </span>
                   </td>
                   <td className="px-4 py-3">
-                    <p className="text-xs font-semibold text-white/80 truncate max-w-[120px]">{order.agent_name}</p>
-                    <p className="text-[10px] text-white/30 truncate max-w-[120px]">{order.agent_email}</p>
+                    <p className="text-xs font-semibold text-foreground truncate max-w-[120px]">{order.agent_name}</p>
+                    <p className="text-[10px] text-muted-foreground truncate max-w-[120px]">{order.agent_email}</p>
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex flex-col items-start gap-1">
-                      <span className="text-xs font-bold text-white/90">
+                      <span className="text-xs font-bold text-foreground/90">
                         {order.order_type === "wallet_topup" ? "Wallet Top-up" :
                          order.order_type === "afa" ? "AFA Registration" :
                          order.order_type === "api" ? "API Purchase" :
@@ -609,7 +609,7 @@ const AdminOrders = () => {
                          order.order_type === "agent_activation" ? "Agent Activation" :
                          "Data Purchase"}
                       </span>
-                      <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded border ${order.is_sub_agent ? "border-purple-500/30 text-purple-400 bg-purple-500/10" : "border-amber-500/30 text-amber-400 bg-amber-500/10"}`}>
+                      <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded border ${order.is_sub_agent ? "border-purple-500/30 text-purple-600 dark:text-purple-400 bg-purple-500/10" : "border-amber-500/30 text-amber-600 dark:text-amber-400 bg-amber-500/10"}`}>
                         {order.is_sub_agent ? "Sub-Agent" : "Agent"}
                       </span>
                     </div>
@@ -617,15 +617,15 @@ const AdminOrders = () => {
                   <td className="px-4 py-3 hidden sm:table-cell group/phone">
                     <div className="flex items-center gap-2">
                       <div className="flex-1 min-w-0">
-                        <p className="text-xs font-mono text-white/50">{order.customer_phone || "—"}</p>
+                        <p className="text-xs font-mono text-muted-foreground">{order.customer_phone || "—"}</p>
                         {order.customer_name ? (
-                          <p className="text-[10px] text-emerald-400 font-bold uppercase truncate max-w-[100px]">{order.customer_name}</p>
+                          <p className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold uppercase truncate max-w-[100px]">{order.customer_name}</p>
                         ) : (
                           (order.agent_id === "00000000-0000-0000-0000-000000000000" || !order.agent_id) && order.customer_phone && (
                             <button 
                               onClick={() => handleResolveGuestName(order.id, order.customer_phone!, order.network)}
                               disabled={resolvingNames[order.id]}
-                              className="text-[9px] text-white/20 hover:text-amber-400 font-bold uppercase flex items-center gap-1 transition-colors mt-0.5"
+                              className="text-[9px] text-muted-foreground/60 hover:text-amber-500 font-bold uppercase flex items-center gap-1 transition-colors mt-0.5"
                             >
                               {resolvingNames[order.id] ? <Loader2 className="w-2.5 h-2.5 animate-spin" /> : <UserCheck className="w-2.5 h-2.5" />}
                               Resolve Name
@@ -635,28 +635,28 @@ const AdminOrders = () => {
                       </div>
                     </div>
                   </td>
-                  <td className="px-4 py-3 text-xs text-white/60 hidden md:table-cell">{order.network || "—"}</td>
-                  <td className="px-4 py-3 text-xs text-white/60 hidden md:table-cell">{order.package_size || "—"}</td>
+                  <td className="px-4 py-3 text-xs text-foreground/70 hidden md:table-cell">{order.network || "—"}</td>
+                  <td className="px-4 py-3 text-xs text-foreground/70 hidden md:table-cell">{order.package_size || "—"}</td>
                   <td className="px-4 py-3 text-right">
-                    <span className="text-sm font-bold text-white">GH₵{Number(order.amount).toFixed(2)}</span>
+                    <span className="text-sm font-bold text-foreground">GH₵{Number(order.amount).toFixed(2)}</span>
                   </td>
                   <td className="px-4 py-3 text-right hidden xl:table-cell">
                     {order.cost_price != null ? (
-                      <span className="text-xs text-white/60">GH₵{Number(order.cost_price).toFixed(2)}</span>
+                      <span className="text-xs text-foreground/70">GH₵{Number(order.cost_price).toFixed(2)}</span>
                     ) : (
-                      <span className="text-xs text-white/20">—</span>
+                      <span className="text-xs text-muted-foreground/40">—</span>
                     )}
                   </td>
                   <td className="px-4 py-3 text-right hidden lg:table-cell">
                     {Number(order.profit) + Number(order.parent_profit) > 0 ? (
-                      <span className="text-xs font-bold text-emerald-400">+GH₵{(Number(order.profit) + Number(order.parent_profit)).toFixed(2)}</span>
+                      <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400">+GH₵{(Number(order.profit) + Number(order.parent_profit)).toFixed(2)}</span>
                     ) : (
-                      <span className="text-xs text-white/20">—</span>
+                      <span className="text-xs text-muted-foreground/40">—</span>
                     )}
                   </td>
                   <td className="px-4 py-3 text-right hidden lg:table-cell">
                     {order.status === "fulfilled" && order.cost_price != null ? (
-                      <span className="text-xs font-black text-sky-400">
+                      <span className="text-xs font-black text-sky-600 dark:text-sky-400">
                         GH₵{(
                           Number(order.paystack_verified_amount ?? order.amount) - 
                           Number(order.paystack_fee || 0) - 
@@ -666,11 +666,11 @@ const AdminOrders = () => {
                         ).toFixed(2)}
                       </span>
                     ) : (
-                      <span className="text-xs text-white/20">—</span>
+                      <span className="text-xs text-muted-foreground/40">—</span>
                     )}
                   </td>
                   <td className="px-4 py-3 text-center">
-                    <Badge className={`text-[10px] border ${STATUS_COLORS[order.status] || "bg-white/10 text-white/40 border-white/10"}`}>
+                    <Badge className={`text-[10px] border ${STATUS_COLORS[order.status] || "bg-muted text-muted-foreground border-border"}`}>
                       {order.status === "pending" ? "Awaiting Checkout" : order.status.replace(/_/g, " ")}
                     </Badge>
                     {order.failure_reason && (
@@ -702,58 +702,58 @@ const AdminOrders = () => {
       {/* Mobile Card View */}
       <div className="md:hidden space-y-4">
         {paginated.map((order) => (
-          <div key={order.id} className="rounded-2xl bg-white/[0.03] border border-white/5 p-4 space-y-4">
+          <div key={order.id} className="rounded-2xl bg-card border border-border p-4 space-y-4 shadow-sm">
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
                 <div className="flex items-center gap-2 mb-1">
-                  <span className="text-[10px] font-bold text-white/40">{new Date(order.created_at).toLocaleDateString()}</span>
-                  <Badge className={`text-[9px] border ${STATUS_COLORS[order.status] || "bg-white/10 text-white/40 border-white/10"}`}>
+                  <span className="text-[10px] font-bold text-muted-foreground">{new Date(order.created_at).toLocaleDateString()}</span>
+                  <Badge className={`text-[9px] border ${STATUS_COLORS[order.status] || "bg-muted text-muted-foreground border-border"}`}>
                     {order.status.replace(/_/g, " ")}
                   </Badge>
                 </div>
-                <p className="font-bold text-white text-sm">{order.agent_name}</p>
-                <p className="text-[10px] text-white/30 truncate">{order.agent_email}</p>
+                <p className="font-bold text-foreground text-sm">{order.agent_name}</p>
+                <p className="text-[10px] text-muted-foreground truncate">{order.agent_email}</p>
               </div>
               <div className="text-right shrink-0">
-                <p className="font-black text-white">GH₵{Number(order.amount).toFixed(2)}</p>
+                <p className="font-black text-foreground">GH₵{Number(order.amount).toFixed(2)}</p>
                 {order.paystack_verified_amount != null && (
-                  <p className="flex items-center justify-end gap-0.5 text-[10px] text-green-400">
+                  <p className="flex items-center justify-end gap-0.5 text-[10px] text-emerald-600 dark:text-emerald-400">
                     <CheckCircle2 className="w-2.5 h-2.5" />
                     GH₵{Number(order.paystack_verified_amount).toFixed(2)}
                   </p>
                 )}
-                <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded border ${order.is_sub_agent ? "border-purple-500/30 text-purple-400 bg-purple-500/10" : "border-amber-500/30 text-amber-400 bg-amber-500/10"}`}>
+                <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded border ${order.is_sub_agent ? "border-purple-500/30 text-purple-600 dark:text-purple-400 bg-purple-500/10" : "border-amber-500/30 text-amber-600 dark:text-amber-400 bg-amber-500/10"}`}>
                   {order.is_sub_agent ? "Sub-Agent" : "Agent"}
                 </span>
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-y-3 gap-x-4 py-3 border-y border-white/5">
+            <div className="grid grid-cols-2 gap-y-3 gap-x-4 py-3 border-y border-border">
               <div>
-                <p className="text-[10px] uppercase tracking-wider text-white/30 mb-0.5">Type</p>
-                <p className="text-xs text-white/80 font-bold">
+                <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-0.5">Type</p>
+                <p className="text-xs text-foreground/80 font-bold">
                   {order.order_type === "wallet_topup" ? "Top-up" : order.order_type === "api" ? "API" : "Data"}
                 </p>
               </div>
               <div>
-                <p className="text-[10px] uppercase tracking-wider text-white/30 mb-0.5">Network</p>
-                <p className="text-xs text-white/80 font-bold">{order.network || "—"}</p>
+                <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-0.5">Network</p>
+                <p className="text-xs text-foreground/80 font-bold">{order.network || "—"}</p>
               </div>
               <div>
-                <p className="text-[10px] uppercase tracking-wider text-white/30 mb-0.5">Package</p>
-                <p className="text-xs text-white/80 font-bold">{order.package_size || "—"}</p>
+                <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-0.5">Package</p>
+                <p className="text-xs text-foreground/80 font-bold">{order.package_size || "—"}</p>
               </div>
               <div>
-                <p className="text-[10px] uppercase tracking-wider text-white/30 mb-0.5">Recipient</p>
+                <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-0.5">Recipient</p>
                 <div className="flex flex-col">
-                  <span className="text-xs text-white/80 font-mono">{order.customer_phone || "—"}</span>
+                  <span className="text-xs text-foreground/80 font-mono">{order.customer_phone || "—"}</span>
                   {order.customer_name ? (
-                    <span className="text-[9px] text-emerald-400 font-bold uppercase truncate">{order.customer_name}</span>
+                    <span className="text-[9px] text-emerald-600 dark:text-emerald-400 font-bold uppercase truncate">{order.customer_name}</span>
                   ) : (
                     (order.agent_id === "00000000-0000-0000-0000-000000000000" || !order.agent_id) && order.customer_phone && (
                       <button 
                         onClick={() => handleResolveGuestName(order.id, order.customer_phone!, order.network)}
                         disabled={resolvingNames[order.id]}
-                        className="text-[9px] text-amber-500/80 hover:text-amber-400 font-bold uppercase flex items-center gap-1 transition-colors mt-0.5"
+                        className="text-[9px] text-amber-600 hover:text-amber-500 font-bold uppercase flex items-center gap-1 transition-colors mt-0.5"
                       >
                         {resolvingNames[order.id] ? <Loader2 className="w-2.5 h-2.5 animate-spin" /> : <UserCheck className="w-2.5 h-2.5" />}
                         Resolve Name
@@ -767,7 +767,7 @@ const AdminOrders = () => {
               {(order.status === "pending" || order.status === "fulfillment_failed" || order.status === "paid") && (
                 <Button
                   size="sm" variant="outline"
-                  className="flex-1 text-xs gap-2 h-9 border-white/10 hover:border-amber-400/30 rounded-xl"
+                  className="flex-1 text-xs gap-2 h-9 border-input hover:border-amber-400/30 rounded-xl"
                   disabled={retrying === order.id}
                   onClick={() => handleRetry(order.id)}
                 >
@@ -776,7 +776,7 @@ const AdminOrders = () => {
                 </Button>
               )}
               {order.failure_reason && (
-                <div className="flex-1 text-[9px] text-red-400/80 italic leading-tight">
+                <div className="flex-1 text-[9px] text-red-600 dark:text-red-400/80 italic leading-tight">
                   Error: {order.failure_reason}
                 </div>
               )}
@@ -787,15 +787,15 @@ const AdminOrders = () => {
 
       {allOrders.length === 0 && !loading && (
         <div className="py-16 text-center">
-          <ShoppingCart className="w-10 h-10 text-white/10 mx-auto mb-3" />
-          <p className="text-white/40 text-sm">No orders match your filters.</p>
+          <ShoppingCart className="w-10 h-10 text-muted-foreground/30 mx-auto mb-3" />
+          <p className="text-muted-foreground text-sm">No orders match your filters.</p>
         </div>
       )}
 
       {/* ── Pagination controls ── */}
       {totalPages > 1 && (
         <div className="flex items-center justify-between gap-4 pt-2">
-          <p className="text-xs text-white/35">
+          <p className="text-xs text-muted-foreground">
             Showing {((safePage - 1) * PAGE_SIZE) + 1}–{Math.min(safePage * PAGE_SIZE, totalCount)} of {totalCount.toLocaleString()}
           </p>
 
@@ -804,7 +804,7 @@ const AdminOrders = () => {
             <button
               onClick={() => setPage(1)}
               disabled={safePage === 1}
-              className="w-8 h-8 rounded-lg flex items-center justify-center text-white/40 hover:text-white hover:bg-white/8 disabled:opacity-25 disabled:cursor-not-allowed transition-all"
+              className="w-8 h-8 rounded-lg flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted disabled:opacity-25 disabled:cursor-not-allowed transition-all"
             >
               <ChevronsLeft className="w-4 h-4" />
             </button>
@@ -812,7 +812,7 @@ const AdminOrders = () => {
             <button
               onClick={() => setPage((p) => Math.max(1, p - 1))}
               disabled={safePage === 1}
-              className="w-8 h-8 rounded-lg flex items-center justify-center text-white/40 hover:text-white hover:bg-white/8 disabled:opacity-25 disabled:cursor-not-allowed transition-all"
+              className="w-8 h-8 rounded-lg flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted disabled:opacity-25 disabled:cursor-not-allowed transition-all"
             >
               <ChevronLeft className="w-4 h-4" />
             </button>
@@ -836,7 +836,7 @@ const AdminOrders = () => {
                   className={`w-8 h-8 rounded-lg text-xs font-bold transition-all ${
                     p === safePage
                       ? "bg-amber-400 text-black"
-                      : "text-white/40 hover:text-white hover:bg-white/8"
+                      : "text-muted-foreground hover:text-foreground hover:bg-muted"
                   }`}
                 >
                   {p}
@@ -848,7 +848,7 @@ const AdminOrders = () => {
             <button
               onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
               disabled={safePage === totalPages}
-              className="w-8 h-8 rounded-lg flex items-center justify-center text-white/40 hover:text-white hover:bg-white/8 disabled:opacity-25 disabled:cursor-not-allowed transition-all"
+              className="w-8 h-8 rounded-lg flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted disabled:opacity-25 disabled:cursor-not-allowed transition-all"
             >
               <ChevronRight className="w-4 h-4" />
             </button>
@@ -856,13 +856,13 @@ const AdminOrders = () => {
             <button
               onClick={() => setPage(totalPages)}
               disabled={safePage === totalPages}
-              className="w-8 h-8 rounded-lg flex items-center justify-center text-white/40 hover:text-white hover:bg-white/8 disabled:opacity-25 disabled:cursor-not-allowed transition-all"
+              className="w-8 h-8 rounded-lg flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted disabled:opacity-25 disabled:cursor-not-allowed transition-all"
             >
               <ChevronsRight className="w-4 h-4" />
             </button>
           </div>
 
-          <p className="text-xs text-white/35 hidden sm:block">
+          <p className="text-xs text-muted-foreground hidden sm:block">
             Page {safePage} of {totalPages}
           </p>
         </div>

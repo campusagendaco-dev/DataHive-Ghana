@@ -127,95 +127,95 @@ const AdminSupport = () => {
   };
 
   return (
-    <div className="h-[calc(100vh-100px)] flex bg-black/20 border border-white/5 rounded-[2.5rem] overflow-hidden m-6">
+    <div className="h-[calc(100vh-100px)] flex bg-card border border-border shadow-xl rounded-[2.5rem] overflow-hidden my-6">
       {/* Sidebar - Conversation List */}
-      <div className="w-80 border-r border-white/5 flex flex-col bg-white/5">
-        <div className="p-6 border-b border-white/5">
-          <h2 className="text-xl font-black text-white flex items-center gap-2">
+      <div className="w-80 border-r border-border flex flex-col bg-muted/20">
+        <div className="p-6 border-b border-border bg-muted/30">
+          <h2 className="text-xl font-black text-foreground flex items-center gap-2">
             <MessageCircle className="w-5 h-5 text-primary" />
             Support Inbox
           </h2>
           <div className="relative mt-4">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/20" />
-            <Input placeholder="Search chats..." className="pl-10 h-10 bg-white/5 border-white/10 rounded-xl text-xs" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground/50" />
+            <Input placeholder="Search chats..." className="pl-10 h-10 bg-background border-border text-foreground placeholder:text-muted-foreground/40 rounded-xl text-xs focus:ring-primary/20" />
           </div>
         </div>
 
         <div className="flex-1 overflow-y-auto">
           {loading ? (
-            <div className="p-10 text-center"><Loader2 className="w-6 h-6 animate-spin mx-auto text-white/10" /></div>
+            <div className="p-10 text-center"><Loader2 className="w-6 h-6 animate-spin mx-auto text-muted-foreground/30" /></div>
           ) : conversations.length > 0 ? (
             conversations.map((c) => (
               <button
                 key={c.id}
                 onClick={() => setSelectedConv(c)}
                 className={cn(
-                  "w-full p-4 flex items-center gap-3 border-b border-white/5 transition-all text-left",
-                  selectedConv?.id === c.id ? "bg-primary/10 border-r-2 border-r-primary" : "hover:bg-white/[0.02]"
+                  "w-full p-4 flex items-center gap-3 border-b border-border/50 transition-all text-left",
+                  selectedConv?.id === c.id ? "bg-primary/10 dark:bg-primary/20 border-r-2 border-r-primary" : "hover:bg-muted/50"
                 )}
               >
-                <Avatar className="w-10 h-10 border border-white/10">
+                <Avatar className="w-10 h-10 border border-border">
                   <AvatarImage src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${c.user_id}`} />
                   <AvatarFallback>{c.profiles?.full_name?.charAt(0)}</AvatarFallback>
                 </Avatar>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between">
-                    <p className="text-white font-bold text-sm truncate">{c.profiles?.full_name}</p>
-                    <span className="text-[8px] text-white/20 font-black uppercase">
+                    <p className="text-foreground font-black text-sm truncate">{c.profiles?.full_name}</p>
+                    <span className="text-[8px] text-muted-foreground/60 font-black uppercase tracking-widest">
                       {new Date(c.last_message_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                     </span>
                   </div>
-                  <p className="text-white/40 text-[10px] truncate">{c.profiles?.store_name}</p>
-                  <p className="text-white/60 text-xs truncate mt-1">{c.last_message}</p>
+                  <p className="text-muted-foreground/60 text-[10px] font-medium truncate">{c.profiles?.store_name}</p>
+                  <p className="text-muted-foreground text-xs truncate mt-1 font-medium">{c.last_message}</p>
                 </div>
               </button>
             ))
           ) : (
-            <div className="p-10 text-center text-white/20 text-sm">No active chats</div>
+            <div className="p-10 text-center text-muted-foreground/50 text-sm font-medium">No active chats</div>
           )}
         </div>
       </div>
 
       {/* Main Chat Area */}
-      <div className="flex-1 flex flex-col bg-white/[0.01]">
+      <div className="flex-1 flex flex-col bg-background">
         {selectedConv ? (
           <>
-            <div className="h-20 px-8 border-b border-white/5 flex items-center justify-between bg-white/5">
+            <div className="h-20 px-8 border-b border-border flex items-center justify-between bg-muted/30">
               <div className="flex items-center gap-4">
-                <Avatar className="w-10 h-10 border border-white/10">
+                <Avatar className="w-10 h-10 border border-border">
                   <AvatarImage src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${selectedConv.user_id}`} />
                   <AvatarFallback>{selectedConv.profiles?.full_name?.charAt(0)}</AvatarFallback>
                 </Avatar>
                 <div>
-                  <p className="text-white font-black">{selectedConv.profiles?.full_name}</p>
-                  <p className="text-primary text-[10px] font-black uppercase tracking-widest">{selectedConv.profiles?.store_name}</p>
+                  <p className="text-foreground font-black text-base">{selectedConv.profiles?.full_name}</p>
+                  <p className="text-primary text-[10px] font-black uppercase tracking-widest leading-none mt-0.5">{selectedConv.profiles?.store_name}</p>
                 </div>
               </div>
               <div className="flex items-center gap-2">
-                <Button variant="outline" size="sm" className="h-9 rounded-xl border-white/10 hover:bg-white/5 gap-2">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                <Button variant="outline" size="sm" className="h-9 rounded-xl bg-background border-border hover:bg-muted font-bold gap-2 shadow-sm">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
                   Mark Resolved
                 </Button>
-                <Button variant="ghost" size="sm" className="h-9 w-9 rounded-xl text-red-400 hover:bg-red-400/10 p-0">
+                <Button variant="ghost" size="sm" className="h-9 w-9 rounded-xl text-red-500 hover:bg-red-500/10 hover:text-red-600 p-0">
                   <Trash2 className="w-4 h-4" />
                 </Button>
               </div>
             </div>
 
-            <div ref={scrollRef} className="flex-1 overflow-y-auto p-8 space-y-6">
+            <div ref={scrollRef} className="flex-1 overflow-y-auto p-8 space-y-6 bg-muted/10">
               {messages.map((m) => {
                 const isMe = m.sender_id === user?.id;
                 return (
                   <div key={m.id} className={cn("flex flex-col", isMe ? "items-end" : "items-start")}>
                     <div className={cn(
-                      "max-w-[70%] px-5 py-3 rounded-[1.5rem] text-sm leading-relaxed",
+                      "max-w-[70%] px-5 py-3 rounded-[1.5rem] text-sm leading-relaxed shadow-sm",
                       isMe 
-                        ? "bg-primary text-black font-medium rounded-tr-none" 
-                        : "bg-white/5 text-white/80 rounded-tl-none border border-white/5"
+                        ? "bg-primary text-primary-foreground font-semibold rounded-tr-none shadow-md" 
+                        : "bg-card text-foreground rounded-tl-none border border-border font-medium"
                     )}>
                       {m.content}
                     </div>
-                    <span className="text-[9px] font-black text-white/20 uppercase tracking-widest mt-2 px-1">
+                    <span className="text-[9px] font-black text-muted-foreground/40 uppercase tracking-widest mt-2 px-2">
                       {new Date(m.created_at).toLocaleString([], { hour: '2-digit', minute: '2-digit', day: '2-digit', month: 'short' })}
                     </span>
                   </div>
@@ -223,28 +223,28 @@ const AdminSupport = () => {
               })}
             </div>
 
-            <form onSubmit={handleSend} className="p-6 bg-white/5 border-t border-white/5 flex gap-3">
+            <form onSubmit={handleSend} className="p-6 bg-card border-t border-border flex gap-3 shadow-[0_-4px_20px_rgba(0,0,0,0.02)]">
               <Input
                 value={newMessage}
                 onChange={(e) => setNewMessage(e.target.value)}
                 placeholder="Type your response..."
-                className="bg-white/5 border-white/10 h-14 rounded-2xl flex-1 px-6"
+                className="bg-muted/30 border-border text-foreground h-14 rounded-2xl flex-1 px-6 focus:ring-primary/20 text-sm"
               />
-              <Button type="submit" disabled={!newMessage.trim() || sending} className="h-14 px-8 rounded-2xl font-black gap-2">
+              <Button type="submit" disabled={!newMessage.trim() || sending} className="h-14 px-8 rounded-2xl font-black text-xs uppercase tracking-widest gap-2 shadow-lg hover:shadow-xl shadow-primary/20 transition-all">
                 {sending ? <Loader2 className="w-5 h-5 animate-spin" /> : <Send className="w-5 h-5" />}
                 Send Reply
               </Button>
             </form>
           </>
         ) : (
-          <div className="flex-1 flex flex-col items-center justify-center text-center p-10 space-y-6">
-            <div className="w-24 h-24 rounded-[3rem] bg-white/5 border border-white/10 flex items-center justify-center shadow-2xl">
-              <MessageCircle className="w-12 h-12 text-white/10" />
+          <div className="flex-1 flex flex-col items-center justify-center text-center p-10 space-y-6 bg-muted/20">
+            <div className="w-24 h-24 rounded-[3rem] bg-card border border-border flex items-center justify-center shadow-xl shadow-muted/30 animate-bounce-gentle">
+              <MessageCircle className="w-12 h-12 text-muted-foreground/30" />
             </div>
             <div className="space-y-2">
-              <h3 className="text-2xl font-black text-white">Select a Chat</h3>
-              <p className="text-white/30 max-w-xs mx-auto">
-                Select a conversation from the sidebar to view messages and respond to users.
+              <h3 className="text-2xl font-black text-foreground tracking-tight">Select a Chat</h3>
+              <p className="text-muted-foreground text-sm font-medium max-w-xs mx-auto leading-relaxed">
+                Choose a user conversation from the sidebar to start chatting and managing support tickets.
               </p>
             </div>
           </div>

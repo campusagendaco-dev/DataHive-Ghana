@@ -324,12 +324,12 @@ const DashboardSubAgents = () => {
                       <div className="flex items-center gap-2 mb-0.5">
                         <p className="font-semibold text-sm truncate">{sa.full_name || "—"}</p>
                         {sa.sub_agent_approved ? (
-                          <span className="inline-flex items-center gap-1 text-[10px] font-semibold bg-green-100 text-green-700 px-1.5 py-0.5 rounded-full">
-                            <CheckCircle className="w-3 h-3" /> Active
+                          <span className="inline-flex items-center gap-1 text-[10px] font-bold bg-green-500/10 text-green-600 dark:text-green-400 px-2 py-0.5 rounded-full border border-green-500/20">
+                            <CheckCircle className="w-2.5 h-2.5" /> Active
                           </span>
                         ) : (
-                          <span className="inline-flex items-center gap-1 text-[10px] font-semibold bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full">
-                            <Clock className="w-3 h-3" /> Pending
+                          <span className="inline-flex items-center gap-1 text-[10px] font-bold bg-amber-500/10 text-amber-600 dark:text-amber-400 px-2 py-0.5 rounded-full border border-amber-500/20">
+                            <Clock className="w-2.5 h-2.5" /> Pending
                           </span>
                         )}
                       </div>
@@ -370,7 +370,7 @@ const DashboardSubAgents = () => {
                   step={0.01}
                   value={activationFee}
                   onChange={(e) => setActivationFee(Math.max(0, Number(e.target.value)))}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-amber-400 bg-transparent"
+                  className="w-full border border-input bg-background rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-amber-400 text-foreground"
                 />
               </div>
               <div className="flex justify-between text-sm">
@@ -419,8 +419,8 @@ const DashboardSubAgents = () => {
                 onClick={() => setSelectedNetwork(n.name)}
                 className={`px-4 py-1.5 rounded-full text-sm font-semibold border transition-colors ${
                   selectedNetwork === n.name
-                    ? "bg-amber-400 border-amber-400 text-black"
-                    : "border-gray-300 text-black hover:border-amber-400"
+                    ? "bg-amber-400 border-amber-400 text-black shadow-sm"
+                    : "border-border text-muted-foreground hover:text-foreground hover:border-amber-400"
                 }`}
               >
                 {n.name}
@@ -462,7 +462,7 @@ const DashboardSubAgents = () => {
                           }));
                         }}
                         disabled={!hasAdminBase}
-                        className="w-24 border border-gray-300 rounded px-2 py-1 text-sm focus:outline-none focus:border-amber-400 bg-transparent"
+                        className="w-24 border border-input bg-background text-foreground rounded px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-amber-400"
                       />
                       {hasAdminBase && profit > 0 && (
                         <span className="text-xs text-green-600 font-medium">+GH₵{profit.toFixed(2)}</span>

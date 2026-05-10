@@ -124,7 +124,7 @@ const DashboardReportIssue = () => {
                     {ticket.admin_response && (
                       <div className="bg-amber-500/10 p-3 rounded-lg border border-amber-500/20">
                         <p className="text-xs font-bold text-amber-500 mb-1">Admin Response:</p>
-                        <p className="text-sm text-white/80">{ticket.admin_response}</p>
+                        <p className="text-sm text-foreground/90">{ticket.admin_response}</p>
                       </div>
                     )}
                   </CardContent>

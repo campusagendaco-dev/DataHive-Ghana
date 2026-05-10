@@ -958,28 +958,28 @@ const AdminSettings = () => {
               {loadingProviders ? (
                  <div className="flex justify-center p-4"><Loader2 className="w-6 h-6 animate-spin text-amber-500" /></div>
               ) : providers.length === 0 ? (
-                 <div className="text-center p-8 border-2 border-dashed border-white/5 rounded-2xl">
-                    <p className="text-xs text-white/30">No active providers configured.</p>
+                 <div className="text-center p-8 border-2 border-dashed border-border rounded-2xl">
+                    <p className="text-xs text-muted-foreground">No active providers configured.</p>
                  </div>
               ) : (
                 <div className="space-y-3">
                   {providers.map((provider) => (
-                    <div key={provider.id} className="p-4 rounded-xl bg-white/5 border border-white/10 space-y-4">
+                    <div key={provider.id} className="p-4 rounded-xl bg-muted/30 border border-border space-y-4 shadow-sm">
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-3">
                           <div className="flex items-center gap-1">
-                            <Label className="text-[10px] text-white/40">Priority</Label>
+                            <Label className="text-[10px] text-muted-foreground">Priority</Label>
                             <Input 
                               type="number"
                               value={provider.priority} 
                               onChange={(e) => handleUpdateProvider(provider.id, { priority: parseInt(e.target.value) || 1 })}
-                              className="h-7 w-12 bg-white/5 border-white/10 text-[10px] p-1 text-center"
+                              className="h-7 w-12 bg-background border-border text-[10px] p-1 text-center font-bold"
                             />
                           </div>
                           <Input 
                             value={provider.name || ""} 
                             onChange={(e) => handleUpdateProvider(provider.id, { name: e.target.value })}
-                            className="h-8 w-48 bg-transparent border-none font-bold text-sm focus:ring-0"
+                            className="h-8 w-48 bg-transparent border-none font-black text-sm focus:ring-0 text-foreground"
                           />
                         </div>
                         <div className="flex items-center gap-2">
@@ -1032,32 +1032,32 @@ const AdminSettings = () => {
                       
                       <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-1">
-                          <Label className="text-[10px] text-white/40">API Key / Secret</Label>
+                          <Label className="text-[10px] text-muted-foreground">API Key / Secret</Label>
                           <Input 
                             type="password" 
                             value={provider.api_key || ""} 
                             onChange={(e) => handleUpdateProvider(provider.id, { api_key: e.target.value })}
-                            className="h-8 bg-white/5 border-white/10 text-xs"
+                            className="h-8 bg-background border-border text-xs"
                           />
                         </div>
                         <div className="space-y-1">
-                          <Label className="text-[10px] text-white/40">API Base URL</Label>
+                          <Label className="text-[10px] text-muted-foreground">API Base URL</Label>
                           <Input 
                             value={provider.base_url || ""} 
                             onChange={(e) => handleUpdateProvider(provider.id, { base_url: e.target.value })}
                             placeholder="https://api.provider.com"
-                            className="h-8 bg-white/5 border-white/10 text-xs"
+                            className="h-8 bg-background border-border text-xs"
                           />
                         </div>
                       </div>
 
                       <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-1">
-                          <Label className="text-[10px] text-white/40">Type</Label>
+                          <Label className="text-[10px] text-muted-foreground">Type</Label>
                           <select 
                             value={provider.provider_type || "data"} 
                             onChange={(e) => handleUpdateProvider(provider.id, { provider_type: e.target.value })}
-                            className="w-full h-8 bg-white/5 border border-white/10 rounded-md px-2 text-xs focus:outline-none"
+                            className="w-full h-8 bg-background border border-border text-foreground rounded-md px-2 text-xs focus:outline-none"
                           >
                             <option value="data">Data Bundles</option>
                             <option value="airtime">Airtime</option>
@@ -1066,11 +1066,11 @@ const AdminSettings = () => {
                           </select>
                         </div>
                         <div className="space-y-1">
-                          <Label className="text-[10px] text-white/40">API Logic (Handler)</Label>
+                          <Label className="text-[10px] text-muted-foreground">API Logic (Handler)</Label>
                           <select 
                             value={provider.handler_type || "standard"} 
                             onChange={(e) => handleUpdateProvider(provider.id, { handler_type: e.target.value })}
-                            className="w-full h-8 bg-white/5 border border-white/10 rounded-md px-2 text-xs focus:outline-none"
+                            className="w-full h-8 bg-background border border-border text-foreground rounded-md px-2 text-xs focus:outline-none"
                           >
                             <option value="standard">Standard</option>
                             <option value="datamart">DataMart GH</option>
@@ -1079,7 +1079,7 @@ const AdminSettings = () => {
                           </select>
                         </div>
                         <div className="space-y-1">
-                          <Label className="text-[10px] text-white/40">Webhook Secret (Optional)</Label>
+                          <Label className="text-[10px] text-muted-foreground">Webhook Secret (Optional)</Label>
                           <Input 
                             type="password"
                             value={provider.settings?.webhook_secret || ""} 
@@ -1087,22 +1087,22 @@ const AdminSettings = () => {
                               settings: { ...provider.settings, webhook_secret: e.target.value } 
                             })}
                             placeholder="DataMart Webhook Key"
-                            className="h-8 bg-white/5 border-white/10 text-xs"
+                            className="h-8 bg-background border-border text-xs"
                           />
                         </div>
                       </div>
 
                       {provider.balance > 0 && (
-                        <div className="flex items-center justify-between pt-2 border-t border-white/5">
-                           <p className="text-[10px] text-white/40">Current Balance</p>
-                           <p className="text-xs font-bold text-green-400">₵{Number(provider.balance).toFixed(2)}</p>
+                        <div className="flex items-center justify-between pt-2 border-t border-border">
+                           <p className="text-[10px] text-muted-foreground font-medium">Current Balance</p>
+                           <p className="text-xs font-black text-emerald-600 dark:text-emerald-400">₵{Number(provider.balance).toFixed(2)}</p>
                         </div>
                       )}
 
                       {provider.last_synced_at && (
                         <div className="flex items-center justify-between pt-2">
-                           <p className="text-[10px] text-white/40">Last Synced</p>
-                           <p className="text-[10px] text-white/60">{new Date(provider.last_synced_at).toLocaleString()}</p>
+                           <p className="text-[10px] text-muted-foreground font-medium">Last Synced</p>
+                           <p className="text-[10px] text-foreground/60 font-bold">{new Date(provider.last_synced_at).toLocaleString()}</p>
                         </div>
                       )}
                     </div>
@@ -1147,10 +1147,10 @@ const AdminSettings = () => {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="p-3 rounded-xl bg-white/5 border border-white/10 flex items-center justify-between">
+              <div className="p-3 rounded-xl bg-muted border border-border shadow-sm flex items-center justify-between">
                 <div className="space-y-0.5">
-                  <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Your Current IP</p>
-                  <p className="text-sm font-mono font-bold text-primary">{currentIp || "Detecting..."}</p>
+                  <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Your Current IP</p>
+                  <p className="text-sm font-mono font-black text-foreground">{currentIp || "Detecting..."}</p>
                 </div>
                 <Button 
                   size="sm" 

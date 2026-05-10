@@ -105,18 +105,18 @@ const DashboardCustomers = () => {
     <div className="p-6 md:p-8 space-y-8 animate-in fade-in duration-500">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-black tracking-tight text-white flex items-center gap-3">
+          <h1 className="text-3xl font-black tracking-tight text-foreground flex items-center gap-3">
             <Users2 className="w-8 h-8 text-primary" />
             Address Book
           </h1>
-          <p className="text-white/40 text-sm mt-1">Manage your frequent customers for faster data delivery.</p>
+          <p className="text-muted-foreground text-sm mt-1">Manage your frequent customers for faster data delivery.</p>
         </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Add Customer Form */}
-        <div className="bg-white/5 border border-white/10 rounded-[2rem] p-6 h-fit backdrop-blur-xl">
-          <h2 className="text-xl font-bold text-white mb-6 flex items-center gap-2">
+        <div className="bg-card border border-border shadow-sm rounded-[2rem] p-6 h-fit backdrop-blur-xl">
+          <h2 className="text-xl font-bold text-foreground mb-6 flex items-center gap-2">
             <Plus className="w-5 h-5 text-primary" />
             Add New Customer
           </h2>
@@ -128,7 +128,7 @@ const DashboardCustomers = () => {
                 value={newCustomer.name}
                 onChange={(e) => setNewCustomer({ ...newCustomer, name: e.target.value })}
                 placeholder="e.g. Abena Mensah"
-                className="bg-white/5 border-white/10"
+                className="bg-muted/50 border-border focus:border-primary/50"
                 required
               />
             </div>
@@ -139,7 +139,7 @@ const DashboardCustomers = () => {
                 value={newCustomer.phone}
                 onChange={(e) => setNewCustomer({ ...newCustomer, phone: e.target.value })}
                 placeholder="024XXXXXXX"
-                className="bg-white/5 border-white/10"
+                className="bg-muted/50 border-border focus:border-primary/50"
                 required
               />
             </div>
@@ -149,11 +149,11 @@ const DashboardCustomers = () => {
                 id="cust-net"
                 value={newCustomer.network}
                 onChange={(e) => setNewCustomer({ ...newCustomer, network: e.target.value })}
-                className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white"
+                className="w-full bg-muted/50 border border-border rounded-lg px-3 py-2 text-sm text-foreground focus:border-primary/50 outline-none"
               >
-                <option value="MTN" className="bg-[#0d140d]">MTN</option>
-                <option value="Telecel" className="bg-[#0d140d]">Telecel</option>
-                <option value="AirtelTigo" className="bg-[#0d140d]">AirtelTigo</option>
+                <option value="MTN" className="bg-background text-foreground">MTN</option>
+                <option value="Telecel" className="bg-background text-foreground">Telecel</option>
+                <option value="AirtelTigo" className="bg-background text-foreground">AirtelTigo</option>
               </select>
             </div>
             <Button type="submit" className="w-full h-12 rounded-xl" disabled={adding}>
@@ -166,32 +166,32 @@ const DashboardCustomers = () => {
         {/* Customer List */}
         <div className="lg:col-span-2 space-y-6">
           <div className="relative">
-            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-white/40" />
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <Input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search by name or phone..."
-              className="pl-12 h-14 bg-white/5 border-white/10 rounded-2xl"
+              className="pl-12 h-14 bg-card border-border shadow-sm rounded-2xl focus:border-primary/50"
             />
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {loading ? (
               Array.from({ length: 4 }).map((_, i) => (
-                <div key={i} className="h-24 bg-white/5 rounded-2xl animate-pulse" />
+                <div key={i} className="h-24 bg-muted rounded-2xl animate-pulse" />
               ))
             ) : filtered.length > 0 ? (
               filtered.map((c) => (
-                <div key={c.id} className="group bg-white/5 border border-white/10 rounded-2xl p-4 hover:border-primary/50 transition-all flex items-center justify-between">
+                <div key={c.id} className="group bg-card border border-border shadow-sm rounded-2xl p-4 hover:border-primary/50 transition-all flex items-center justify-between">
                   <div className="flex items-center gap-4">
                     <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center">
                       <UserIcon className="w-6 h-6 text-primary" />
                     </div>
                     <div>
-                      <p className="text-white font-bold">{c.name}</p>
+                      <p className="text-foreground font-bold">{c.name}</p>
                       <div className="flex items-center gap-2 mt-1">
-                        <p className="text-white/40 text-xs font-mono">{c.phone}</p>
-                        <Badge variant="outline" className="text-[10px] h-4 px-1.5 border-white/10 text-white/60">
+                        <p className="text-muted-foreground text-xs font-mono">{c.phone}</p>
+                        <Badge variant="outline" className="text-[10px] h-4 px-1.5 border-border text-muted-foreground/80 bg-muted/30">
                           {c.network}
                         </Badge>
                       </div>
@@ -199,16 +199,16 @@ const DashboardCustomers = () => {
                   </div>
                   <button
                     onClick={() => handleDelete(c.id)}
-                    className="p-2 text-white/20 hover:text-red-400 transition-colors opacity-0 group-hover:opacity-100"
+                    className="p-2 text-muted-foreground/30 hover:text-destructive transition-colors opacity-0 group-hover:opacity-100"
                   >
                     <Trash2 className="w-4 h-4" />
                   </button>
                 </div>
               ))
             ) : (
-              <div className="col-span-full py-20 text-center bg-white/5 rounded-[3rem] border border-dashed border-white/10">
-                <Users2 className="w-12 h-12 text-white/10 mx-auto mb-4" />
-                <p className="text-white/40">No customers found.</p>
+              <div className="col-span-full py-20 text-center bg-muted/30 rounded-[3rem] border border-dashed border-border">
+                <Users2 className="w-12 h-12 text-muted-foreground/20 mx-auto mb-4" />
+                <p className="text-muted-foreground">No customers found.</p>
               </div>
             )}
           </div>
