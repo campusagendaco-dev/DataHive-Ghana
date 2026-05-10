@@ -444,7 +444,7 @@ const BuyData = () => {
       {selectedPkg && (
         <div
           className="fixed bottom-0 left-0 right-0 z-50 border-t border-white/10"
-          style={{ background: "rgba(8,8,18,0.97)", backdropFilter: "blur(28px)", WebkitBackdropFilter: "blur(28px)" }}
+          style={{ background: "rgba(8,8,18,0.98)", backdropFilter: "blur(12px)", WebkitBackdropFilter: "blur(12px)" }}
         >
           <div className="container mx-auto max-w-5xl px-4 pt-3 pb-4 sm:pb-5 space-y-2.5">
             {/* Package summary row */}

@@ -37,7 +37,14 @@ export const TraditionalBackground = () => {
   // If disabled and no custom background to override, don't show anything.
   if (!enabled && !customBgUrl) return null;
 
-  const symbols = [
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth < 768);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  const allSymbols = [
     { top: '5%', left: '5%', size: 120, rotate: 15, delay: 0 },
     { top: '15%', right: '8%', size: 160, rotate: -10, delay: 2 },
     { bottom: '12%', left: '10%', size: 140, rotate: 25, delay: 4 },
@@ -45,6 +52,9 @@ export const TraditionalBackground = () => {
     { top: '42%', left: '-3%', size: 80, rotate: 45, delay: 3 },
     { top: '58%', right: '-3%', size: 90, rotate: -30, delay: 5 },
   ];
+
+  // Render fewer symbols on mobile to maximize performance
+  const symbols = isMobile ? allSymbols.slice(0, 3) : allSymbols;
 
   const getSymbol = (index: number) => {
     const type = index % 3;
