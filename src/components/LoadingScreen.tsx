@@ -18,7 +18,7 @@ const LoadingScreen = () => {
   return (
     <div className="fixed inset-0 z-[9999] flex flex-col items-center justify-center bg-[#020402]">
       {/* ── Cultural Grounding Background ── */}
-      <TraditionalBackground className="absolute inset-0 z-0 opacity-[0.08] dark:opacity-[0.12]" />
+      <TraditionalBackground className="absolute inset-0 z-0 opacity-[0.2] dark:opacity-[0.3]" />
 
       {/* ── Premium Evening Glow ── */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
@@ -67,31 +67,31 @@ const LoadingScreen = () => {
             <div className="h-full bg-gradient-to-r from-transparent via-primary to-transparent animate-progress-slide" />
           </div>
         </div>
+      </div>
 
-        {/* ── Slow Connection / Retry UI ── */}
-        <div className="h-20 flex flex-col items-center justify-center gap-4">
-          {showSlowMessage && !showRetry && (
-            <div className="flex items-center gap-2 text-amber-400/80 animate-in fade-in zoom-in duration-700">
-              <WifiOff className="w-3.5 h-3.5" />
-              <p className="text-[10px] font-black uppercase tracking-widest">Connection looks slow...</p>
-            </div>
-          )}
+      {/* ── Slow Connection / Retry UI (Absolute bottom prevents layout pushing) ── */}
+      <div className="absolute bottom-12 inset-x-0 h-20 flex flex-col items-center justify-center gap-4 z-20">
+        {showSlowMessage && !showRetry && (
+          <div className="flex items-center gap-2 text-amber-400/80 animate-in fade-in zoom-in duration-700">
+            <WifiOff className="w-3.5 h-3.5" />
+            <p className="text-[10px] font-black uppercase tracking-widest">Connection looks slow...</p>
+          </div>
+        )}
 
-          {showRetry && (
-            <div className="flex flex-col items-center gap-3 animate-in slide-in-from-bottom-2 duration-500">
-              <p className="text-white/40 text-[10px] font-bold uppercase tracking-widest text-center max-w-[200px]">
-                Still loading? You may have a weak connection.
-              </p>
-              <button
-                onClick={() => window.location.reload()}
-                className="flex items-center gap-2 px-5 py-2 rounded-xl bg-white/5 border border-white/10 text-white hover:bg-white/10 transition-all group"
-              >
-                <RefreshCw className="w-3.5 h-3.5 group-hover:rotate-180 transition-transform duration-500" />
-                <span className="text-xs font-black uppercase tracking-tight">Reload App</span>
-              </button>
-            </div>
-          )}
-        </div>
+        {showRetry && (
+          <div className="flex flex-col items-center gap-3 animate-in slide-in-from-bottom-2 duration-500">
+            <p className="text-white/40 text-[10px] font-bold uppercase tracking-widest text-center max-w-[200px]">
+              Still loading? You may have a weak connection.
+            </p>
+            <button
+              onClick={() => window.location.reload()}
+              className="flex items-center gap-2 px-5 py-2 rounded-xl bg-white/5 border border-white/10 text-white hover:bg-white/10 transition-all group"
+            >
+              <RefreshCw className="w-3.5 h-3.5 group-hover:rotate-180 transition-transform duration-500" />
+              <span className="text-xs font-black uppercase tracking-tight">Reload App</span>
+            </button>
+          </div>
+        )}
       </div>
 
       <style>{`
