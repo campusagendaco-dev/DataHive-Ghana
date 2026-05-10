@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
-import { Check, X, Shuffle, ChevronDown } from "lucide-react";
+import { createPortal } from "react-dom";
+import { Check, X, Shuffle } from "lucide-react";
 import { toast } from "sonner";
 import { AnimatePresence, motion } from "framer-motion";
 
@@ -77,7 +78,7 @@ export const AvatarPicker = ({ isOpen, onClose, onSelect, currentAvatarUrl }: Av
     }
   };
 
-  return (
+  return createPortal(
     <AnimatePresence>
       {isOpen && (
         <>
@@ -99,11 +100,11 @@ export const AvatarPicker = ({ isOpen, onClose, onSelect, currentAvatarUrl }: Av
             animate={{ y: 0 }}
             exit={{ y: "100%" }}
             transition={{ type: "spring", damping: 28, stiffness: 260 }}
-            className="fixed bottom-0 left-0 right-0 z-[201] flex flex-col"
+            className="fixed bottom-0 left-0 right-0 z-[201] flex flex-col overflow-hidden"
             style={{
               background: "#0f0f17",
               borderRadius: "24px 24px 0 0",
-              maxHeight: "92dvh",
+              maxHeight: "88dvh",
               boxShadow: "0 -20px 60px rgba(0,0,0,0.6)",
             }}
           >
@@ -149,27 +150,38 @@ export const AvatarPicker = ({ isOpen, onClose, onSelect, currentAvatarUrl }: Av
             <div className="shrink-0 mx-4" style={{ height: 1, background: "rgba(255,255,255,0.07)" }} />
 
             {/* Style pills */}
-            <div className="shrink-0 px-4 pt-3 pb-2">
-              <p className="text-[9px] font-black uppercase tracking-widest text-white/30 mb-2">Style</p>
-              <div
-                className="flex gap-2 overflow-x-auto"
-                style={{ scrollbarWidth: "none", WebkitOverflowScrolling: "touch" }}
-              >
-                {STYLES.map((s) => (
-                  <button
-                    key={s.id}
-                    type="button"
-                    onClick={() => setStyle(s)}
-                    className="shrink-0 px-3 h-7 rounded-full text-[11px] font-bold transition-all whitespace-nowrap"
-                    style={
-                      style.id === s.id
-                        ? { background: "#fbbf24", color: "#000" }
-                        : { background: "rgba(255,255,255,0.07)", color: "rgba(255,255,255,0.5)" }
-                    }
-                  >
-                    {s.name}
-                  </button>
-                ))}
+            <div className="shrink-0 pt-3 pb-2">
+              <p className="text-[9px] font-black uppercase tracking-widest text-white/30 mb-2 px-4">Style</p>
+              <div className="relative">
+                <div
+                  className="flex gap-2 px-4 overflow-x-auto"
+                  style={{ scrollbarWidth: "none", msOverflowStyle: "none", WebkitOverflowScrolling: "touch" }}
+                >
+                  {STYLES.map((s) => (
+                    <button
+                      key={s.id}
+                      type="button"
+                      onClick={() => setStyle(s)}
+                      className="shrink-0 flex items-center gap-1.5 px-3 h-8 rounded-full text-[11px] font-bold transition-all whitespace-nowrap border"
+                      style={
+                        style.id === s.id
+                          ? { background: "#fbbf24", color: "#000", borderColor: "#fbbf24" }
+                          : { background: "rgba(255,255,255,0.10)", color: "rgba(255,255,255,0.75)", borderColor: "rgba(255,255,255,0.12)" }
+                      }
+                    >
+                      <span
+                        className="w-2 h-2 rounded-full shrink-0"
+                        style={{ background: s.bg }}
+                      />
+                      {s.name}
+                    </button>
+                  ))}
+                </div>
+                {/* Fade hint — scroll right */}
+                <div
+                  className="absolute top-0 right-0 bottom-0 w-8 pointer-events-none"
+                  style={{ background: "linear-gradient(to right, transparent, #0f0f17)" }}
+                />
               </div>
             </div>
 
@@ -243,6 +255,7 @@ export const AvatarPicker = ({ isOpen, onClose, onSelect, currentAvatarUrl }: Av
           </motion.div>
         </>
       )}
-    </AnimatePresence>
+    </AnimatePresence>,
+    document.body
   );
 };
