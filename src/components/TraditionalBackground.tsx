@@ -32,17 +32,17 @@ export const TraditionalBackground = () => {
     fetchSettings();
   }, []);
 
-  if (loading) return null; // Skip render during fast check
-  
-  // If disabled and no custom background to override, don't show anything.
-  if (!enabled && !customBgUrl) return null;
-
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth < 768);
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
+
+  if (loading) return null; // Skip render during fast check
+  
+  // If disabled and no custom background to override, don't show anything.
+  if (!enabled && !customBgUrl) return null;
 
   const allSymbols = [
     { top: '5%', left: '5%', size: 120, rotate: 15, delay: 0 },
