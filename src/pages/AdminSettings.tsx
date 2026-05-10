@@ -65,6 +65,8 @@ interface SystemSettings {
   bece_price: string;
   wassce_cost_price: string;
   bece_cost_price: string;
+  traditional_background_enabled: boolean;
+  background_custom_image_url: string;
 }
 
 const AdminSettings = () => {
@@ -124,6 +126,8 @@ const AdminSettings = () => {
     bece_price: "15.00",
     wassce_cost_price: "17.00",
     bece_cost_price: "14.00",
+    traditional_background_enabled: true,
+    background_custom_image_url: "",
   });
 
   const [currentIp, setCurrentIp] = useState("");
@@ -602,6 +606,55 @@ const AdminSettings = () => {
                     <span className="font-black text-emerald-500">₵{(parseFloat(settings.bece_price || "0") - parseFloat(settings.bece_cost_price || "0")).toFixed(2)}</span>
                   </div>
                 </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg flex items-center gap-2">
+                <Sparkles className="w-5 h-5 text-primary" />
+                Global Site Background
+              </CardTitle>
+              <CardDescription>Control the beautiful drifting Ghanaian traditional background system.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="flex items-center justify-between p-3 rounded-xl bg-white/5 border border-white/10">
+                <div className="space-y-0.5">
+                  <Label className="text-sm font-bold">Drifting Ghanaian Symbols</Label>
+                  <p className="text-xs text-muted-foreground">Toggle floating animated symbols on dark/light themes.</p>
+                </div>
+                <Switch
+                  checked={settings.traditional_background_enabled}
+                  onCheckedChange={(c) => setSettings({ ...settings, traditional_background_enabled: c })}
+                />
+              </div>
+
+              <div className="space-y-3 pt-2 border-t border-white/5">
+                <Label className="flex items-center gap-2">
+                  <Globe className="w-4 h-4 text-muted-foreground" />
+                  Custom Background Image URL (Overrides Symbols)
+                </Label>
+                <div className="flex gap-2">
+                  <Input
+                    placeholder="https://example.com/your-bg-image.jpg"
+                    value={settings.background_custom_image_url}
+                    onChange={(e) => setSettings({ ...settings, background_custom_image_url: e.target.value })}
+                  />
+                  {settings.background_custom_image_url && (
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      onClick={() => setSettings({ ...settings, background_custom_image_url: "" })}
+                      title="Reset"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                  )}
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Providing a URL will load a solid fixed background across all pages instead of floating symbols. Leave empty to keep symbols.
+                </p>
               </div>
             </CardContent>
           </Card>

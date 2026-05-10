@@ -139,7 +139,7 @@ serve(async (req) => {
 
   const readSettings = async () => {
     const fullSelect =
-      "auto_api_switch, preferred_provider, backup_provider, holiday_mode_enabled, holiday_message, disable_ordering, dark_mode_enabled, customer_service_number, support_channel_link, active_api_source, secondary_price_markup_pct, sub_agent_base_fee, agent_activation_fee";
+      "auto_api_switch, preferred_provider, backup_provider, holiday_mode_enabled, holiday_message, disable_ordering, dark_mode_enabled, customer_service_number, support_channel_link, active_api_source, secondary_price_markup_pct, sub_agent_base_fee, agent_activation_fee, traditional_background_enabled, background_custom_image_url";
     const legacySelect =
       "auto_api_switch, preferred_provider, backup_provider, holiday_mode_enabled, holiday_message, disable_ordering, dark_mode_enabled, customer_service_number, support_channel_link";
 
@@ -182,6 +182,8 @@ serve(async (req) => {
         coerceText(data?.support_channel_link) || DEFAULT_SETTINGS.support_channel_link,
       sub_agent_base_fee: Number(data?.sub_agent_base_fee ?? DEFAULT_SETTINGS.sub_agent_base_fee),
       agent_activation_fee: Number(data?.agent_activation_fee ?? DEFAULT_SETTINGS.agent_activation_fee),
+      traditional_background_enabled: data?.traditional_background_enabled !== false,
+      background_custom_image_url: coerceText(data?.background_custom_image_url),
       table_ready: true,
       warning: null,
     };
@@ -281,6 +283,8 @@ serve(async (req) => {
       support_channel_link: supportChannelLink,
       sub_agent_base_fee: subAgentBaseFee,
       agent_activation_fee: agentActivationFee,
+      traditional_background_enabled: payload?.traditional_background_enabled !== false,
+      background_custom_image_url: coerceText(payload?.background_custom_image_url),
       updated_at: new Date().toISOString(),
       updated_by: user.id,
     };
