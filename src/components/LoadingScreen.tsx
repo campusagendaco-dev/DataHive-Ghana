@@ -6,8 +6,8 @@ const LoadingScreen = () => {
   const [showRetry, setShowRetry] = useState(false);
 
   useEffect(() => {
-    const slowTimer = setTimeout(() => setShowSlowMessage(true), 6000);
-    const retryTimer = setTimeout(() => setShowRetry(true), 12000);
+    const slowTimer = setTimeout(() => setShowSlowMessage(true), 12000);
+    const retryTimer = setTimeout(() => setShowRetry(true), 20000);
     return () => {
       clearTimeout(slowTimer);
       clearTimeout(retryTimer);

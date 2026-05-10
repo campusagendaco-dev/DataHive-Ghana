@@ -24,7 +24,7 @@ export const OfflineAlert = () => {
     }
   }, [isOnline]);
 
-  const showSlowWarning = isOnline && (quality === "poor" || quality === "fair") && !dismissed;
+  const showSlowWarning = isOnline && quality === "poor" && !dismissed;
   const showOfflineWarning = !isOnline;
 
   return (
