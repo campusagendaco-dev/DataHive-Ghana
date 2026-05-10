@@ -11,6 +11,7 @@ interface StoreVisitorPopupProps {
 }
 
 const StoreVisitorPopup = ({ agentSlug, showSubAgentLink = true }: StoreVisitorPopupProps) => {
+  // Force cache flush for hmr sync
   const { profile } = useAuth();
   const [visible, setVisible] = useState(false);
 
