@@ -475,17 +475,27 @@ const BuyData = () => {
               className="relative w-full max-w-[400px] bg-[#0b0d13] border border-white/[0.06] shadow-[0_32px_80px_-20px_rgba(0,0,0,0.8)] rounded-[2.5rem] overflow-hidden flex flex-col my-auto select-none"
             >
               {/* Dynamic Header Section */}
-              <div className="relative w-full pt-10 pb-8 text-center rounded-b-[3rem] overflow-hidden z-10">
+              <div className="relative w-full pt-10 pb-8 text-center rounded-b-[3.5rem] overflow-hidden z-10 shadow-[0_10px_30px_rgba(0,0,0,0.2)]">
+                {/* Traditional Symbols Overlay (Embedded Culturally) */}
+                <div 
+                  className="absolute inset-0 opacity-[0.18] pointer-events-none mix-blend-overlay z-0"
+                  style={{ 
+                    backgroundImage: "url('/assets/adinkra_pattern.png')",
+                    backgroundSize: "180px",
+                    backgroundRepeat: "repeat"
+                  }}
+                />
+                
                 {/* Thematic Ambient Glow Vector */}
                 <div 
-                  className="absolute inset-0 opacity-40 blur-2xl"
+                  className="absolute inset-0 opacity-50 blur-3xl z-0"
                   style={{ 
                     background: `radial-gradient(circle at 50% 20%, hsl(${theme.primary}), transparent 70%)`
                   }} 
                 />
                 
-                {/* Absolute Background Shell */}
-                <div className="absolute inset-0 bg-gradient-to-b from-white/[0.03] to-transparent z-0" />
+                {/* Absolute Background Shell (Gradient overlay to darken the top slightly) */}
+                <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-transparent to-[#0b0d13] z-[1]" />
 
                 {/* Close Vector */}
                 <button 
@@ -567,7 +577,7 @@ const BuyData = () => {
                       placeholder="Enter Phone (0XX XXXXXXX)"
                       value={phone} onChange={(e) => setPhone(e.target.value)}
                       maxLength={12}
-                      className="w-full h-[60px] bg-white/[0.02] border border-white/[0.08] rounded-2xl pl-5 pr-14 text-white placeholder-white/15 text-xl font-bold tracking-wide focus:outline-none focus:border-white/20 focus:bg-white/[0.04] focus:shadow-[0_0_0_4px_rgba(255,255,255,0.02)] transition-all duration-300 selection:bg-primary/30"
+                      className="w-full h-[62px] bg-white/[0.02] border border-white/[0.08] rounded-[1.5rem] pl-5 pr-14 text-white placeholder-white/15 text-xl font-bold tracking-wide focus:outline-none focus:border-white/20 focus:bg-white/[0.04] focus:shadow-[0_0_0_4px_rgba(255,255,255,0.02)] transition-all duration-300 selection:bg-primary/30"
                       style={resolvedName ? { 
                         borderColor: "rgba(52, 211, 153, 0.4)",
                         background: "rgba(16, 185, 129, 0.04)",
@@ -582,8 +592,8 @@ const BuyData = () => {
                             <Loader2 className="w-5 h-5 animate-spin text-white/40" />
                           </motion.div>
                         ) : resolvedName ? (
-                          <motion.div key="done" initial={{ opacity: 0, scale: 0.5 }} animate={{ opacity: 1, scale: 1, rotate: [0, -10, 10, 0] }} transition={{ type: "spring" }}>
-                            <div className="bg-emerald-500 rounded-full p-1 shadow-lg shadow-emerald-500/30">
+                          <motion.div key="done" initial={{ opacity: 0, scale: 0.5 }} animate={{ opacity: 1, scale: 1.2, rotate: [0, -15, 15, 0] }} transition={{ type: "spring", bounce: 0.5 }}>
+                            <div className="bg-emerald-500 rounded-full p-1.5 shadow-lg shadow-emerald-500/30">
                               <CheckCircle2 className="w-4 h-4 text-black" />
                             </div>
                           </motion.div>
@@ -600,18 +610,19 @@ const BuyData = () => {
                   <AnimatePresence>
                     {resolvedName && (
                       <motion.div 
-                        initial={{ opacity: 0, height: 0, y: -10 }}
-                        animate={{ opacity: 1, height: "auto", y: 0 }}
-                        exit={{ opacity: 0, height: 0 }}
+                        initial={{ opacity: 0, height: 0, scale: 0.9 }}
+                        animate={{ opacity: 1, height: "auto", scale: 1 }}
+                        transition={{ type: "spring", bounce: 0.4 }}
+                        exit={{ opacity: 0, height: 0, scale: 0.9 }}
                         className="overflow-hidden"
                       >
-                        <div className="flex items-center gap-2.5 bg-emerald-500/5 border border-emerald-500/10 rounded-xl p-3 shadow-sm">
-                          <div className="shrink-0 w-7 h-7 rounded-lg bg-emerald-500/10 flex items-center justify-center text-emerald-400 font-bold text-sm">
+                        <div className="flex items-center gap-3 bg-emerald-500/5 border border-emerald-500/10 rounded-2xl p-3.5 shadow-sm">
+                          <div className="shrink-0 w-8 h-8 rounded-xl bg-emerald-500/10 flex items-center justify-center text-emerald-400 font-bold text-sm">
                             {resolvedName.charAt(0)}
                           </div>
                           <div className="min-w-0">
-                            <p className="text-[9px] font-black uppercase tracking-widest text-emerald-500/60 leading-none mb-1">Verified Owner</p>
-                            <p className="text-xs font-black text-emerald-300 uppercase truncate leading-tight">
+                            <p className="text-[9px] font-black uppercase tracking-widest text-emerald-500/60 leading-none mb-1">Identity Confirmed</p>
+                            <p className="text-sm font-black text-emerald-300 uppercase truncate leading-tight tracking-wide">
                               {resolvedName}
                             </p>
                           </div>
@@ -621,10 +632,10 @@ const BuyData = () => {
 
                     {phone.length > 0 && !isPhoneValid && (
                       <motion.p 
-                        initial={{ opacity: 0 }} animate={{ opacity: 1 }}
+                        initial={{ opacity: 0, y: -5 }} animate={{ opacity: 1, y: 0 }}
                         className="text-xs text-red-400/90 font-bold px-2 flex items-center gap-1.5"
                       >
-                        <AlertTriangle className="w-3.5 h-3.5" /> Must be a valid network number
+                        <AlertTriangle className="w-3.5 h-3.5" /> Ensure it's correct!
                       </motion.p>
                     )}
                   </AnimatePresence>
@@ -647,14 +658,14 @@ const BuyData = () => {
                         className="space-y-2 overflow-hidden border-t border-white/[0.04] pt-3"
                       >
                         <label className="text-[10px] font-black uppercase tracking-[0.2em] text-white/30 px-1 block">
-                          Email Receipt <span className="text-white/15 normal-case font-medium">(Optional)</span>
+                          Email <span className="text-white/15 normal-case font-medium">(Optional for receipt)</span>
                         </label>
                         <input
                           type="email" inputMode="email"
-                          placeholder="Drop your email for safe storage"
+                          placeholder="Optional delivery receipt..."
                           value={email} onChange={(e) => setEmail(e.target.value)}
                           autoComplete="email"
-                          className="w-full h-[44px] bg-white/[0.01] border border-white/[0.06] rounded-xl px-4 text-white placeholder-white/10 text-sm focus:outline-none focus:border-white/10 focus:bg-white/[0.02] transition-all"
+                          className="w-full h-[46px] bg-white/[0.01] border border-white/[0.06] rounded-xl px-4 text-white placeholder-white/10 text-sm focus:outline-none focus:border-white/10 focus:bg-white/[0.02] transition-all"
                         />
                       </motion.div>
                     )}
@@ -665,9 +676,9 @@ const BuyData = () => {
                     {!promoOpen && !validPromo ? (
                       <button 
                         onClick={() => { setPromoOpen(true); setTimeout(() => promoInputRef.current?.focus(), 80); }}
-                        className="inline-flex items-center gap-1.5 text-[11px] font-black uppercase tracking-wider text-white/30 hover:text-amber-400 hover:bg-white/[0.03] px-3 py-1.5 rounded-lg transition-all group"
+                        className="inline-flex items-center gap-1.5 text-[11px] font-black uppercase tracking-wider text-white/30 hover:text-amber-400 hover:bg-white/[0.03] px-3 py-2 rounded-xl transition-all group"
                       >
-                        <Tag className="w-3.5 h-3.5 group-hover:rotate-12 transition-transform" /> Enter Promo Code
+                        <Tag className="w-3.5 h-3.5 group-hover:rotate-12 transition-transform" /> Have a code?
                       </button>
                     ) : (
                       <motion.div 
@@ -676,12 +687,12 @@ const BuyData = () => {
                         className="space-y-2"
                       >
                         {validPromo ? (
-                          <div className={`flex items-center justify-between gap-3 px-3 py-2 rounded-xl text-xs font-black border ${validPromo.is_free ? "bg-green-500/10 border-green-500/20 text-green-400" : "bg-amber-500/10 border-amber-500/20 text-amber-400"} shadow-sm`}>
+                          <div className={`flex items-center justify-between gap-3 px-3.5 py-2.5 rounded-2xl text-xs font-black border ${validPromo.is_free ? "bg-green-500/10 border-green-500/20 text-green-400" : "bg-amber-500/10 border-amber-500/20 text-amber-400"} shadow-sm`}>
                             <div className="flex items-center gap-2 truncate uppercase tracking-wide">
                               <Tag className="w-3.5 h-3.5 shrink-0" />
-                              <span className="truncate">{validPromo.is_free ? "100% OFF ACTIVATED" : `${validPromo.discount_percentage}% SAVINGS APPLIED`}</span>
+                              <span className="truncate">{validPromo.is_free ? "FREE DATA ACTIVATED" : `${validPromo.discount_percentage}% SAVINGS!`}</span>
                             </div>
-                            <button onClick={() => { setPromoResult(null); setPromoCode(""); setPromoOpen(true); }} className="p-1.5 hover:bg-white/10 rounded-lg transition-colors text-current opacity-60 hover:opacity-100">
+                            <button onClick={() => { setPromoResult(null); setPromoCode(""); setPromoOpen(true); }} className="p-1.5 hover:bg-white/10 rounded-xl transition-colors text-current opacity-60 hover:opacity-100">
                               <X className="w-3.5 h-3.5" />
                             </button>
                           </div>
@@ -691,21 +702,21 @@ const BuyData = () => {
                               ref={promoInputRef}
                               type="text" placeholder="TYPE CODE"
                               value={promoCode} onChange={(e) => { setPromoCode(e.target.value.toUpperCase()); setPromoResult(null); }}
-                              className="flex-1 h-10 bg-white/[0.02] border border-white/[0.08] rounded-xl px-3 text-white placeholder-white/10 text-xs font-mono font-black tracking-widest uppercase focus:outline-none focus:border-amber-400/30 transition-colors"
+                              className="flex-1 h-11 bg-white/[0.02] border border-white/[0.08] rounded-xl px-3 text-white placeholder-white/10 text-xs font-mono font-black tracking-widest uppercase focus:outline-none focus:border-amber-400/30 transition-colors"
                             />
                             <button 
                               onClick={handleApplyPromo} disabled={promoValidating || !promoCode.trim()}
-                              className="h-10 px-4 rounded-xl text-[11px] font-black bg-amber-400 text-black hover:bg-amber-300 disabled:opacity-30 disabled:cursor-not-allowed transition-all shadow-lg shadow-amber-500/10 active:scale-95"
+                              className="h-11 px-4 rounded-xl text-[11px] font-black bg-amber-400 text-black hover:bg-amber-300 disabled:opacity-30 disabled:cursor-not-allowed transition-all shadow-lg shadow-amber-500/10 active:scale-95"
                             >
                               {promoValidating ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : "APPLY"}
                             </button>
-                            <button onClick={() => { setPromoOpen(false); setPromoCode(""); setPromoResult(null); }} className="h-10 w-10 flex items-center justify-center rounded-xl bg-white/5 text-white/40 hover:text-white hover:bg-white/10 transition-all">
+                            <button onClick={() => { setPromoOpen(false); setPromoCode(""); setPromoResult(null); }} className="h-11 w-11 flex items-center justify-center rounded-xl bg-white/5 text-white/40 hover:text-white hover:bg-white/10 transition-all">
                               <X className="w-4 h-4" />
                             </button>
                           </div>
                         )}
                         {promoResult && !promoResult.valid && (
-                          <p className="text-xs font-bold text-red-400/80 px-2 tracking-tight">{promoResult.error || "Code not recognized"}</p>
+                          <p className="text-xs font-bold text-red-400/80 px-2 tracking-tight">Code not active :(</p>
                         )}
                       </motion.div>
                     )}
@@ -720,50 +731,50 @@ const BuyData = () => {
                   className="pt-2 relative"
                 >
                   {isFreePromo ? (
-                    <button 
+                            <button 
                       onClick={handleClaimFree} 
                       disabled={claiming || !isPhoneValid || !resolvedName}
-                      className="w-full h-[68px] font-black text-base tracking-wider rounded-2xl bg-green-500 hover:bg-green-400 text-black shadow-[0_12px_24px_-8px_rgba(34,197,94,0.5)] transition-all active:scale-[0.97] hover:-translate-y-0.5 disabled:opacity-30 disabled:grayscale disabled:transform-none flex items-center justify-center gap-2.5"
+                      className="w-full h-[70px] font-black text-lg tracking-wider rounded-[2rem] bg-green-500 hover:bg-green-400 text-black shadow-[0_12px_30px_-8px_rgba(34,197,94,0.6)] transition-all active:scale-[0.95] hover:-translate-y-0.5 disabled:opacity-30 disabled:grayscale disabled:transform-none flex items-center justify-center gap-2.5"
                     >
                       {claiming ? (
-                        <><Loader2 className="w-6 h-6 animate-spin" /> UNLOCKING...</>
+                        <><Loader2 className="w-6 h-6 animate-spin" /> SECURING...</>
                       ) : (
-                        <><Gift className="w-6 h-6" /> UNLOCK FREE DATA</>
+                        <><Gift className="w-6 h-6" /> CLAIM DATA</>
                       )}
                     </button>
                   ) : (
                     <div className="relative group">
                       {/* Kinetic Dynamic Pulsating Ring behind button */}
                       <div 
-                        className="absolute -inset-1 opacity-20 rounded-2xl blur-xl transition-all duration-500 group-hover:opacity-40 group-hover:blur-2xl pointer-events-none"
+                        className="absolute -inset-2 opacity-25 rounded-[2.2rem] blur-xl transition-all duration-500 group-hover:opacity-50 group-hover:blur-2xl pointer-events-none"
                         style={{ background: `hsl(${theme.primary})` }}
                       />
                       
                       <button 
                         onClick={handlePay} 
                         disabled={buying || !resolvedName}
-                        className="w-full h-[76px] relative overflow-hidden rounded-2xl shadow-[0_12px_32px_-8px_rgba(0,0,0,0.5)] transition-all active:scale-[0.97] hover:-translate-y-0.5 disabled:opacity-30 disabled:grayscale disabled:transform-none flex items-center justify-center"
+                        className="w-full h-[80px] relative overflow-hidden rounded-[2rem] shadow-[0_15px_40px_-10px_rgba(0,0,0,0.6)] transition-all active:scale-[0.95] hover:-translate-y-1 disabled:opacity-30 disabled:grayscale disabled:transform-none flex items-center justify-center group/btn"
                         style={{ 
                           background: `linear-gradient(135deg, hsl(${theme.primary}) 0%, #F59E0B 100%)`,
                           color: "#000"
                         }}
                       >
                         {/* Internal Light Shimmer */}
-                        <div className="absolute inset-0 bg-white/10 transform -translate-x-full group-hover:animate-shimmer pointer-events-none" style={{ width: '50%', skewX: '-20deg' }} />
+                        <div className="absolute inset-0 bg-white/20 transform -translate-x-full group-hover/btn:animate-shimmer pointer-events-none" style={{ width: '60%', skewX: '-25deg' }} />
 
                         <div className="relative z-10 flex flex-col items-center justify-center leading-none">
                           {buying ? (
                             <div className="flex items-center gap-3 font-black text-base uppercase tracking-widest">
                               <Loader2 className="w-6 h-6 animate-spin" />
-                              <span>Establishing Secure Tunnel...</span>
+                              <span>Loading Paystack...</span>
                             </div>
                           ) : (
                             <>
-                              <div className="flex items-center gap-2 text-[11px] font-black uppercase tracking-[0.25em] mb-1.5 opacity-75">
-                                <CreditCard className="w-3.5 h-3.5" />
-                                Secure Deposit
+                              <div className="flex items-center gap-2 text-[12px] font-black uppercase tracking-[0.25em] mb-1.5 opacity-80">
+                                <CreditCard className="w-4 h-4" />
+                                Pay & Deliver
                               </div>
-                              <div className="flex items-baseline gap-1 font-black text-3xl tracking-tight">
+                              <div className="flex items-baseline gap-1 font-black text-4xl tracking-tighter transition-transform duration-300 group-hover/btn:scale-110">
                                 <span className="text-lg font-black align-top opacity-70">GH₵</span>
                                 {total.toFixed(2)}
                               </div>
@@ -775,10 +786,10 @@ const BuyData = () => {
                   )}
                   
                   {/* Final Verification Anchor */}
-                  <div className="flex items-center justify-center gap-1.5 mt-5 opacity-25 group-hover:opacity-40 transition-opacity duration-500">
-                    <ShieldCheck className="w-3 h-3 text-white" />
+                  <div className="flex items-center justify-center gap-1.5 mt-6 opacity-30 group-hover:opacity-50 transition-opacity duration-500">
+                    <ShieldCheck className="w-3.5 h-3.5 text-white" />
                     <p className="text-[9px] font-black uppercase tracking-[0.2em] text-white">
-                      Tier 1 Bank Encryption
+                      Safe, Encrypted Payment
                     </p>
                   </div>
                 </motion.div>
@@ -790,15 +801,15 @@ const BuyData = () => {
 
       <style>{`
         @keyframes shimmer {
-          0% { transform: translateX(-150%) skewX(-20deg); }
-          100% { transform: translateX(300%) skewX(-20deg); }
+          0% { transform: translateX(-200%) skewX(-25deg); }
+          100% { transform: translateX(400%) skewX(-25deg); }
         }
-        .group-hover\\:animate-shimmer {
-          animation: shimmer 1.5s ease-out infinite;
+        .group-hover\\:animate-shimmer, .group-hover\\/btn\\:animate-shimmer {
+          animation: shimmer 1.8s ease-out infinite;
         }
         @keyframes bounce-subtle {
           0%, 100% { transform: translateY(0); }
-          50% { transform: translateY(-3px); }
+          50% { transform: translateY(-4px); }
         }
         .animate-bounce-subtle {
           animation: bounce-subtle 2s infinite ease-in-out;
