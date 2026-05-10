@@ -64,10 +64,10 @@ export const TraditionalBackground = () => {
   if (customBgUrl) {
     return (
       <div 
-        className="fixed inset-0 w-full h-full pointer-events-none z-0 select-none bg-cover bg-center bg-no-repeat transition-opacity duration-1000"
+        className="fixed inset-0 w-full h-full pointer-events-none z-0 select-none bg-cover bg-center bg-no-repeat transition-all duration-1000"
         style={{ 
           backgroundImage: `url(${customBgUrl})`,
-          opacity: 0.15 // Subtle transparency to blend with theme color
+          opacity: 0.3 // Boosted significantly from 0.15 for higher dynamic range on phone screens
         }} 
       />
     );
@@ -75,7 +75,7 @@ export const TraditionalBackground = () => {
 
   // CASE B: Traditional Animated Symbols (Enabled is implied because case check failed earlier)
   return (
-    <div className="fixed inset-0 w-full h-full overflow-hidden pointer-events-none z-0 select-none opacity-[0.1] dark:opacity-[0.2]">
+    <div className="fixed inset-0 w-full h-full overflow-hidden pointer-events-none z-0 select-none opacity-[0.15] dark:opacity-[0.25]">
       {symbols.map((sym, i) => (
         <motion.div
           key={i}
