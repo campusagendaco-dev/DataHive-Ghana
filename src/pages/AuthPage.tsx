@@ -166,11 +166,16 @@ const AuthPage = () => {
       }
     } catch (err: any) {
       console.error("Biometric Login Error:", err);
-      // Provide a helpful hint if no email was entered and it failed
-      const hint = !email.trim() ? "\n\nHint: Try entering your email first if this is your first time using this device." : "";
+      
+      // Robust recommendations for failures
+      let recommendation = "\n\n💡 Recommendation: Ensure you have registered your biometrics in 'Account Settings' on this device first.";
+      if (!email.trim()) {
+        recommendation += " Or try typing your email to perform a targeted lookup.";
+      }
+      
       toast({ 
-        title: "Biometric Failed", 
-        description: (err.message || "Could not verify identity.") + hint, 
+        title: "Authentication Hint", 
+        description: (err.message || "Could not verify identity.") + recommendation, 
         variant: "destructive" 
       });
     } finally {

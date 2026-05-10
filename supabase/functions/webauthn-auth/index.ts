@@ -3,67 +3,84 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { corsHeaders } from "../_shared/cors.ts";
 
 serve(async (req: Request) => {
-  if (req.method === "OPTIONS") {
-    return new Response(null, { headers: corsHeaders });
-  }
-
-  const body = await req.json();
-  const { action, payload } = body;
-  
-  const origin = req.headers.get("origin") || req.headers.get("referer");
-  let originHost = null;
+  // Giant safety net encompassing everything
   try {
-    if (origin) originHost = new URL(origin).hostname;
-  } catch (e) {
-    console.error("Invalid origin:", origin);
-  }
-  
-  let rpId = body.requested_rp_id || body.rpId || payload?.rpId || originHost || req.headers.get("x-forwarded-host") || req.headers.get("host")?.split(":")[0] || "swiftdatagh.shop";
-
-  if (rpId.includes("supabase.co") || rpId.includes("supabase.com") || rpId === "localhost") {
-    if (originHost && !originHost.includes("supabase")) {
-      rpId = originHost;
-    } else if (body.requested_rp_id) {
-      rpId = body.requested_rp_id;
-    } else if (body.rpId) {
-      rpId = body.rpId;
+    if (req.method === "OPTIONS") {
+      return new Response(null, { headers: corsHeaders });
     }
-  }
-  
-  const authHeader = req.headers.get("Authorization");
-  
-  const supabaseAdmin = createClient(
-    Deno.env.get("SUPABASE_URL") ?? "",
-    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
-  );
 
-  let user: any = null;
-  if (authHeader) {
-    const supabaseClient = createClient(
-      Deno.env.get("SUPABASE_URL") ?? "",
-      Deno.env.get("SUPABASE_ANON_KEY") ?? "",
-      { global: { headers: { Authorization: authHeader } } }
-    );
-    const { data } = await supabaseClient.auth.getUser();
-    user = data.user;
-  }
-
-  const resolveUserId = async () => {
-    if (user) return user.id;
-    const email = body.email || payload?.email;
-    if (!email) return null;
+    // Safely read body to prevent parse crashes
+    let body: any = {};
+    try {
+      body = await req.json();
+    } catch (e) {
+      body = {}; 
+    }
+    const { action, payload } = body;
     
-    const { data: profile, error } = await supabaseAdmin
-      .from("profiles")
-      .select("user_id")
-      .ilike("email", email)
-      .maybeSingle();
-      
-    if (error || !profile) return null;
-    return profile.user_id;
-  };
+    const origin = req.headers.get("origin") || req.headers.get("referer");
+    let originHost = null;
+    try {
+      if (origin) originHost = new URL(origin).hostname;
+    } catch (e) {
+      // Safe ignore
+    }
+    
+    let rpId = body.requested_rp_id || body.rpId || payload?.rpId || originHost || req.headers.get("x-forwarded-host") || req.headers.get("host")?.split(":")[0] || "swiftdatagh.shop";
 
-  try {
+    if (rpId && (rpId.includes("supabase.co") || rpId.includes("supabase.com") || rpId === "localhost")) {
+      if (originHost && !originHost.includes("supabase")) {
+        rpId = originHost;
+      } else if (body.requested_rp_id) {
+        rpId = body.requested_rp_id;
+      } else if (body.rpId) {
+        rpId = body.rpId;
+      }
+    }
+    
+    const authHeader = req.headers.get("Authorization");
+    
+    const supabaseAdmin = createClient(
+      Deno.env.get("SUPABASE_URL") ?? "",
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
+    );
+
+    let user: any = null;
+    // Wrap auth lookup in its own safe try-catch!
+    if (authHeader) {
+      try {
+        const supabaseClient = createClient(
+          Deno.env.get("SUPABASE_URL") ?? "",
+          Deno.env.get("SUPABASE_ANON_KEY") ?? "",
+          { global: { headers: { Authorization: authHeader } } }
+        );
+        const { data } = await supabaseClient.auth.getUser();
+        user = data?.user || null;
+      } catch (authErr) {
+        console.warn("Authorization header was invalid or expired. Proceeding anonymously.");
+        user = null;
+      }
+    }
+
+    const resolveUserId = async () => {
+      if (user) return user.id;
+      const email = body.email || payload?.email;
+      if (!email) return null;
+      
+      try {
+        const { data: profile, error } = await supabaseAdmin
+          .from("profiles")
+          .select("user_id")
+          .ilike("email", email)
+          .maybeSingle();
+          
+        if (error || !profile) return null;
+        return profile.user_id;
+      } catch (e) {
+        return null;
+      }
+    };
+
     switch (action) {
       case "registration-options": {
         if (!user) throw new Error("Authentication required for registration");
@@ -88,9 +105,9 @@ serve(async (req: Request) => {
           timeout: 60000,
           attestation: "none",
           authenticatorSelection: {
-            residentKey: "required", // FORCE passkey storage for email-less login
+            residentKey: "required",
             userVerification: "preferred",
-            requireResidentKey: true // Backwards compat
+            requireResidentKey: true
           }
         }), {
           status: 200,
@@ -111,7 +128,7 @@ serve(async (req: Request) => {
           .limit(1)
           .single();
 
-        if (!challengeData) throw new Error("Challenge not found");
+        if (!challengeData) throw new Error("Challenge timed out or not found. Try again.");
 
         const { error: storeError } = await supabaseAdmin.from("user_credentials").insert({
           user_id: user.id,
@@ -138,8 +155,6 @@ serve(async (req: Request) => {
 
         let allowedCredentials: any[] = [];
         
-        // If user provided, limit to their keys. 
-        // If not provided, leave EMPTY array to trigger Discoverable Credentials (Passkey picker)
         if (targetUserId) {
           const { data: credentials } = await supabaseAdmin
             .from("user_credentials")
@@ -152,33 +167,23 @@ serve(async (req: Request) => {
           })) || [];
         }
 
-        // Store challenge under service account if no user id yet. 
-        // Since challenges aren't purely matched to users during generation for Passkeys.
-        // We'll make storing it optional or just tag as anonymous.
-        // Actually, let's just insert it with a null user_id if allowed, OR just not link it for anonymous.
-        // Wait, let's check if webauthn_challenges allows null user_id. 
-        // To be safe, I'll skip challenge persistence or just pass it back, 
-        // since this MVP is just credential verification.
-        
-        // Wait, let me check the webauthn_challenges table schema again.
-        // Line 29 of earlier view file said: user_id UUID NOT NULL REFERENCES auth.users(id)
-        // So it IS NOT NULLable!
-        // In that case, I cannot insert a challenge without a user ID.
-        // BUT wait! For MVP verification, line 161 didn't even lookup the challenge! It just looks up the credential ID!
-        // So I can safely skip the insert if targetUserId doesn't exist!
-        
         if (targetUserId) {
-          await supabaseAdmin.from("webauthn_challenges").insert({
-            user_id: targetUserId,
-            challenge,
-            action: "authenticate"
-          });
+          // Insert challenge asynchronously, don't crash flow if audit logging fails
+          try {
+            await supabaseAdmin.from("webauthn_challenges").insert({
+              user_id: targetUserId,
+              challenge,
+              action: "authenticate"
+            });
+          } catch (e) {
+            console.error("Failed to store check challenge:", e);
+          }
         }
 
         return new Response(JSON.stringify({
           challenge,
           timeout: 60000,
-          userVerification: "required", // Require pin/biometric to extract resident key
+          userVerification: "required", 
           allowCredentials: allowedCredentials
         }), {
           status: 200,
@@ -189,7 +194,6 @@ serve(async (req: Request) => {
       case "verify-authentication": {
         const { response } = payload;
         
-        // 🔎 SEARCH ALL CREDENTIALS for the provided ID to find the matching user!
         const { data: cred, error: credErr } = await supabaseAdmin
           .from("user_credentials")
           .select("id, user_id")
@@ -197,7 +201,7 @@ serve(async (req: Request) => {
           .maybeSingle();
 
         if (credErr || !cred) {
-          return new Response(JSON.stringify({ error: "No biometric registered with this device for our application." }), {
+          return new Response(JSON.stringify({ error: "This device has no active biometric keys setup." }), {
             status: 403,
             headers: { ...corsHeaders, "Content-Type": "application/json" },
           });
@@ -205,11 +209,13 @@ serve(async (req: Request) => {
         
         const matchedUserId = cred.user_id;
 
-        await supabaseAdmin.from("user_credentials").update({
-          last_used_at: new Date().toISOString()
-        }).eq("id", cred.id);
+        // Async update last used time
+        try {
+          await supabaseAdmin.from("user_credentials").update({
+            last_used_at: new Date().toISOString()
+          }).eq("id", cred.id);
+        } catch (e) {}
 
-        // 🔥 Generate explicit session automatically for the recovered user ID!
         let loginSession = null;
         if (!user) {
           const { data: sess, error: sessErr } = await supabaseAdmin.auth.admin.createSessionForUser({
@@ -249,14 +255,19 @@ serve(async (req: Request) => {
       }
 
       default:
-        return new Response(JSON.stringify({ error: "Invalid action" }), {
+        return new Response(JSON.stringify({ error: "Invalid backend action submitted." }), {
           status: 400,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
     }
   } catch (error: any) {
-    return new Response(JSON.stringify({ error: error.message }), {
-      status: 500,
+    console.error("CRITICAL EDGE FUNCTION CRASH:", error);
+    // ALWAYS return descriptive JSON now instead of raw text 500 so the client can parse it!
+    return new Response(JSON.stringify({ 
+      error: error.message || "An unexpected error occurred on server.",
+      stack: error.stack
+    }), {
+      status: 200, // Using 200 with {error} payload is safer for fetch clients to parse exact reasons
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
