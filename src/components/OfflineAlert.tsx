@@ -28,46 +28,52 @@ export const OfflineAlert = () => {
   const showOfflineWarning = !isOnline;
 
   return (
-    <div className="fixed top-0 left-0 right-0 z-[100] pointer-events-none flex flex-col items-center p-4 gap-2">
-      <AnimatePresence>
+    <div className="fixed top-16 left-0 right-0 z-[100] pointer-events-none flex flex-col items-center px-4 gap-2">
+      <AnimatePresence mode="popLayout">
         {/* Offline Warning */}
         {showOfflineWarning && (
           <motion.div
-            initial={{ y: -50, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            exit={{ y: -50, opacity: 0 }}
-            className="pointer-events-auto bg-red-600 text-white py-2.5 px-5 rounded-2xl flex items-center gap-3 shadow-2xl border border-red-500/50 backdrop-blur-md"
+            initial={{ scale: 0.8, y: -40, opacity: 0 }}
+            animate={{ scale: 1, y: 0, opacity: 1 }}
+            exit={{ scale: 0.8, opacity: 0, transition: { duration: 0.15 } }}
+            transition={{ type: "spring", damping: 20, stiffness: 300 }}
+            className="pointer-events-auto bg-red-600/95 text-white py-1.5 px-3.5 rounded-full flex items-center gap-2.5 shadow-lg shadow-red-900/20 border border-red-500/40 backdrop-blur-md"
           >
-            <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center animate-pulse">
-              <WifiOff className="w-4 h-4" />
-            </div>
-            <div className="flex flex-col">
-              <span className="text-sm font-black tracking-tight leading-none mb-0.5">Offline Mode</span>
-              <span className="text-[10px] font-bold text-white/70 uppercase tracking-widest">Check your connection</span>
-            </div>
+            <motion.div 
+              animate={{ scale: [1, 1.15, 1] }}
+              transition={{ repeat: Infinity, duration: 2, ease: "easeInOut" }}
+              className="flex items-center justify-center"
+            >
+              <WifiOff className="w-3.5 h-3.5" />
+            </motion.div>
+            <span className="text-xs font-bold tracking-tight">Offline Mode</span>
           </motion.div>
         )}
 
         {/* Slow Connection Warning */}
         {showSlowWarning && (
           <motion.div
-            initial={{ y: -50, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            exit={{ y: -50, opacity: 0 }}
-            className="pointer-events-auto bg-amber-500 text-black py-2.5 px-5 rounded-2xl flex items-center gap-3 shadow-2xl border border-amber-400/50 backdrop-blur-md"
+            initial={{ scale: 0.8, y: -40, opacity: 0 }}
+            animate={{ scale: 1, y: 0, opacity: 1 }}
+            exit={{ scale: 0.8, opacity: 0, transition: { duration: 0.15 } }}
+            transition={{ type: "spring", damping: 18, stiffness: 350 }}
+            className="pointer-events-auto bg-amber-500/95 text-black py-1.5 px-3.5 rounded-full flex items-center gap-2.5 shadow-lg shadow-amber-900/20 border border-amber-400/40 backdrop-blur-md"
           >
-            <div className="w-8 h-8 rounded-full bg-black/10 flex items-center justify-center">
-              <AlertTriangle className="w-4 h-4" />
-            </div>
-            <div className="flex flex-col flex-1">
-              <span className="text-sm font-black tracking-tight leading-none mb-0.5">Weak Connection</span>
-              <span className="text-[10px] font-bold text-black/60 uppercase tracking-widest">Actions may take longer</span>
+            <motion.div
+              animate={{ rotate: [-6, 6, -6] }}
+              transition={{ repeat: Infinity, duration: 2.5, ease: "easeInOut" }}
+            >
+              <AlertTriangle className="w-3.5 h-3.5 text-black/80" />
+            </motion.div>
+            <div className="flex items-center gap-1.5">
+              <span className="text-xs font-bold tracking-tight">Slow Connection</span>
+              <div className="w-px h-2.5 bg-black/20" />
             </div>
             <button 
               onClick={() => setDismissed(true)}
-              className="p-1 hover:bg-black/5 rounded-lg transition-colors"
+              className="hover:bg-black/10 p-0.5 rounded-full transition-colors flex items-center justify-center"
             >
-              <X className="w-4 h-4" />
+              <X className="w-3 h-3 text-black/60" />
             </button>
           </motion.div>
         )}
@@ -75,18 +81,20 @@ export const OfflineAlert = () => {
         {/* Back Online Confirmation */}
         {showRestored && isOnline && !showSlowWarning && (
           <motion.div
-            initial={{ y: -50, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            exit={{ y: -50, opacity: 0 }}
-            className="pointer-events-auto bg-emerald-600 text-white py-2.5 px-5 rounded-2xl flex items-center gap-3 shadow-2xl border border-emerald-500/50 backdrop-blur-md"
+            initial={{ scale: 0.8, y: -40, opacity: 0 }}
+            animate={{ scale: 1, y: 0, opacity: 1 }}
+            exit={{ scale: 0.8, opacity: 0, transition: { duration: 0.2 } }}
+            transition={{ type: "spring", damping: 20, stiffness: 400 }}
+            className="pointer-events-auto bg-emerald-600/95 text-white py-1.5 px-3.5 rounded-full flex items-center gap-2.5 shadow-lg shadow-emerald-900/20 border border-emerald-500/40 backdrop-blur-md"
           >
-            <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center">
-              <CheckCircle2 className="w-4 h-4" />
-            </div>
-            <div className="flex flex-col">
-              <span className="text-sm font-black tracking-tight leading-none mb-0.5">Back Online</span>
-              <span className="text-[10px] font-bold text-white/70 uppercase tracking-widest">Connection restored</span>
-            </div>
+            <motion.div
+              initial={{ scale: 0.5 }}
+              animate={{ scale: 1 }}
+              transition={{ type: "spring", delay: 0.1 }}
+            >
+              <CheckCircle2 className="w-3.5 h-3.5" />
+            </motion.div>
+            <span className="text-xs font-bold tracking-tight">Restored</span>
           </motion.div>
         )}
       </AnimatePresence>
