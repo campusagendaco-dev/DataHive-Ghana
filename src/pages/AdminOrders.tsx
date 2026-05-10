@@ -40,6 +40,7 @@ interface OrderRow {
   agent_name?: string;
   agent_email?: string;
   is_sub_agent?: boolean;
+  metadata?: any;
 }
 
 interface AgentProfile {
@@ -636,7 +637,21 @@ const AdminOrders = () => {
                     </div>
                   </td>
                   <td className="px-4 py-3 text-xs text-foreground/70 hidden md:table-cell">{order.network || "—"}</td>
-                  <td className="px-4 py-3 text-xs text-foreground/70 hidden md:table-cell">{order.package_size || "—"}</td>
+                  <td className="px-4 py-3 text-xs text-foreground/70 hidden md:table-cell">
+                    <div>{order.package_size || "—"}</div>
+                    {order.network === "VOUCHER" && order.metadata?.vouchers?.length > 0 && (
+                      <div className="mt-1 flex flex-col gap-0.5 max-w-[140px]">
+                        {order.metadata.vouchers.slice(0, 2).map((v: any, idx: number) => (
+                          <div key={idx} className="text-[9px] bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 px-1 rounded font-mono whitespace-nowrap overflow-hidden text-ellipsis" title={`${v.serial} | ${v.pin}`}>
+                            {v.serial} | {v.pin}
+                          </div>
+                        ))}
+                        {order.metadata.vouchers.length > 2 && (
+                          <div className="text-[8px] text-muted-foreground italic px-1">+{order.metadata.vouchers.length - 2} more pins</div>
+                        )}
+                      </div>
+                    )}
+                  </td>
                   <td className="px-4 py-3 text-right">
                     <span className="text-sm font-bold text-foreground">GH₵{Number(order.amount).toFixed(2)}</span>
                   </td>
@@ -740,7 +755,18 @@ const AdminOrders = () => {
               </div>
               <div>
                 <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-0.5">Package</p>
-                <p className="text-xs text-foreground/80 font-bold">{order.package_size || "—"}</p>
+                <div className="space-y-1">
+                  <p className="text-xs text-foreground/80 font-bold">{order.package_size || "—"}</p>
+                  {order.network === "VOUCHER" && order.metadata?.vouchers?.length > 0 && (
+                    <div className="flex flex-col gap-1">
+                      {order.metadata.vouchers.map((v: any, idx: number) => (
+                        <div key={idx} className="text-[9px] bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 px-1.5 py-0.5 rounded font-mono">
+                          {v.serial} | {v.pin}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
               <div>
                 <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-0.5">Recipient</p>
