@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/button";
 
 const LOW_BALANCE_THRESHOLD = 10; // GHS
 
+import { useConnectivity } from "@/hooks/useConnectivity";
 import { Wifi, WifiOff, CloudOff, Eye, EyeOff } from "lucide-react";
 import { useMaskedBalance } from "@/hooks/useMaskedBalance";
 
