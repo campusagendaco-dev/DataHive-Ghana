@@ -165,8 +165,6 @@ const Navbar = () => {
 
   return (
     <>
-  return (
-    <>
       {/* ─────────── Floating Glass Pill ─────────── */}
       <motion.div 
         className="fixed top-3 left-0 right-0 z-50 px-3 sm:px-5 pointer-events-none"
