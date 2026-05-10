@@ -298,7 +298,7 @@ const BuyData = () => {
   const colors = getNetworkCardColors(selectedNetwork);
 
   return (
-    <div className={`min-h-screen pt-20 transition-all duration-300 ${selectedPkg ? "pb-44" : "pb-24 sm:pb-20"}`}>
+    <div className="min-h-screen pt-20 pb-24 transition-all duration-300">
       <SEO 
         title="Buy Cheap Data Bundles — MTN, Telecel & AirtelTigo"
         description="Select your network and buy cheap non-expiry data bundles in Ghana. We support MTN, Telecel and AirtelTigo with instant delivery."
@@ -451,7 +451,7 @@ const BuyData = () => {
       {/* ── Pro Level Transaction Modal ── */}
       <AnimatePresence>
         {selectedPkg && (
-          <div className="fixed inset-0 z-[999] flex items-center justify-center p-4 sm:p-6 overflow-y-auto">
+          <div className="fixed inset-0 z-[999] flex flex-col items-center justify-start pt-8 sm:pt-16 p-4 overflow-y-auto">
             {/* High Definition Backdrop */}
             <motion.div 
               initial={{ opacity: 0 }}
@@ -463,7 +463,8 @@ const BuyData = () => {
             
             {/* Premium Modal Enclosure */}
             <motion.div
-              initial={{ opacity: 0, scale: 0.96, y: 30 }}
+              onClick={(e) => e.stopPropagation()}
+              initial={{ opacity: 0, scale: 0.96, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.97, y: 20 }}
               transition={{ 
@@ -472,7 +473,7 @@ const BuyData = () => {
                 stiffness: 300,
                 mass: 0.8 
               }}
-              className="relative w-full max-w-[360px] bg-[#0b0d13] border border-white/[0.06] shadow-[0_32px_80px_-20px_rgba(0,0,0,0.8)] rounded-[2.5rem] overflow-hidden flex flex-col my-auto select-none"
+              className="relative w-full max-w-[360px] bg-[#0b0d13] border border-white/[0.06] shadow-[0_32px_80px_-20px_rgba(0,0,0,0.8)] rounded-[2.5rem] overflow-hidden flex flex-col select-none"
             >
               {/* Dynamic Header Section */}
               <div className="relative w-full pt-8 pb-6 text-center rounded-b-[3rem] overflow-hidden z-10 shadow-[0_10px_30px_rgba(0,0,0,0.2)]">
