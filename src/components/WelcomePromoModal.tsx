@@ -1,22 +1,39 @@
 import { useState, useEffect } from "react";
 import { X, Gift, Copy, Check, Zap } from "lucide-react";
 import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
 
 export const WelcomePromoModal = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [promoData, setPromoData] = useState<{ code: string; discount: number } | null>(null);
 
   useEffect(() => {
-    // Don't show if user has already seen it in this session/permanently
-    const hasSeen = localStorage.getItem("welcome_promo_seen");
-    if (hasSeen) return;
+    const fetchActivePromo = async () => {
+      const hasSeen = localStorage.getItem("welcome_promo_seen");
+      if (hasSeen) return;
 
-    // Show after 15 seconds OR on exit intent/scroll? Let's do explicit 15s delay for high intent users
-    const timer = setTimeout(() => {
-      setIsOpen(true);
-    }, 15000);
+      const { data } = await supabase
+        .from("promo_codes")
+        .select("code, discount_percentage")
+        .eq("is_active", true)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
 
-    return () => clearTimeout(timer);
+      if (data) {
+        setPromoData({ code: data.code, discount: Number(data.discount_percentage) });
+        
+        // Trigger modal appearance after 15s since there is an active code
+        const timer = setTimeout(() => {
+          setIsOpen(true);
+        }, 15000);
+        
+        return () => clearTimeout(timer);
+      }
+    };
+
+    fetchActivePromo();
   }, []);
 
   const close = () => {
@@ -25,13 +42,14 @@ export const WelcomePromoModal = () => {
   };
 
   const copyCode = () => {
-    navigator.clipboard.writeText("SWIFTNEW");
+    if (!promoData) return;
+    navigator.clipboard.writeText(promoData.code);
     setCopied(true);
     toast.success("Promo code copied to clipboard!");
     setTimeout(() => setCopied(false), 2000);
   };
 
-  if (!isOpen) return null;
+  if (!isOpen || !promoData) return null;
 
   return (
     <div className="fixed inset-0 z-[150] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-in fade-in duration-300">
@@ -52,12 +70,12 @@ export const WelcomePromoModal = () => {
           </div>
           
           <h2 className="text-2xl font-black text-white mb-2 tracking-tight">Special Welcome Bonus! 🎁</h2>
-          <p className="text-sm text-white/60 mb-6">Get an instant discount bonus on your very first data purchase today.</p>
+          <p className="text-sm text-white/60 mb-6">Get an instant {promoData.discount}% discount on your very first data purchase today.</p>
           
           <div className="bg-white/5 border border-white/10 rounded-2xl p-4 flex items-center justify-between mb-6 group hover:border-amber-400/40 transition-colors">
             <div>
               <p className="text-[10px] font-black uppercase tracking-widest text-white/40 mb-0.5">Your Code</p>
-              <p className="text-xl font-black text-white tracking-wider">SWIFTNEW</p>
+              <p className="text-xl font-black text-white tracking-wider">{promoData.code}</p>
             </div>
             <button 
               onClick={copyCode}
