@@ -33,16 +33,15 @@ export function useWebAuthn() {
       }
 
       if (!browserSupportsWebAuthn()) {
-        setSupportReason("Hardware Error: Your browser does not support biometric APIs. Try Chrome, Safari, or Edge.");
+        setSupportReason("Hardware Error: Your browser does not support biometric APIs.");
         setIsSupported(false);
         return;
       }
 
       try {
-        // Deep check for actual hardware (TouchID/FaceID)
         const hasHardware = await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable();
         if (!hasHardware) {
-          setSupportReason("Device Error: No biometric hardware (Fingerprint/Face ID) detected on this device.");
+          setSupportReason("Device Error: No biometric hardware detected.");
           setIsSupported(false);
           return;
         }
@@ -57,25 +56,36 @@ export function useWebAuthn() {
     checkSupport();
   }, []);
 
-  const getToken = async (): Promise<string> => {
+  const getOptionalToken = async (): Promise<string | null> => {
     const { data } = await supabase.auth.getSession();
-    const token = data.session?.access_token;
-    if (!token) throw new Error("Not authenticated");
-    return token;
+    return data.session?.access_token || null;
   };
 
   const invoke = async (action: string, extra: Record<string, unknown> = {}) => {
-    const token = await getToken();
+    const token = await getOptionalToken();
+    
+    const headers: Record<string, string> = {};
+    if (token) {
+      headers["Authorization"] = `Bearer ${token}`;
+    }
+
     const { data, error } = await supabase.functions.invoke("webauthn-auth", {
       body: { action, ...extra },
-      headers: { Authorization: `Bearer ${token}` },
+      headers: headers,
     });
+    
     if (error) throw error;
     if (data?.error) throw new Error(data.error);
     return data;
   };
 
   const fetchCredentials = async () => {
+    const token = await getOptionalToken();
+    if (!token) {
+      setLoadingCredentials(false);
+      return;
+    }
+    
     setLoadingCredentials(true);
     const { data } = await supabase
       .from("user_credentials" as any)
@@ -88,7 +98,6 @@ export function useWebAuthn() {
   useEffect(() => { fetchCredentials(); }, []);
 
   const register = async (deviceName = "My Device"): Promise<void> => {
-    console.log("Registering biometric for RP ID:", window.location.hostname);
     const options = await invoke("registration-options", { 
       displayName: deviceName,
       requested_rp_id: window.location.hostname,
@@ -99,12 +108,35 @@ export function useWebAuthn() {
     await fetchCredentials();
   };
 
-  const authenticate = async (): Promise<boolean> => {
+  const authenticate = async (email?: string): Promise<boolean> => {
+    // 1. Request Options. If not logged in, MUST supply email.
     const options = await invoke("authentication-options", {
-      rpId: window.location.hostname
+      rpId: window.location.hostname,
+      email: email // Pass root level to resolveUserId helper in function
     });
+    
+    if (!options || options.error) {
+      throw new Error(options?.error || "Could not initialize biometric session.");
+    }
+
+    // 2. Trigger Browser Biometric Modal
     const response = await startAuthentication({ optionsJSON: options });
-    const result = await invoke("verify-authentication", { payload: { response } });
+
+    // 3. Verify backend and ingest implicit session if returned
+    const result = await invoke("verify-authentication", { 
+      email: email,
+      payload: { response } 
+    });
+    
+    // 4. Perform Automatic Native Session Ingestion
+    if (result?.session) {
+      const { error } = await supabase.auth.setSession({
+        access_token: result.session.access_token,
+        refresh_token: result.session.refresh_token
+      });
+      if (error) throw new Error("Session synchronization failed: " + error.message);
+    }
+
     return result?.verified === true;
   };
 

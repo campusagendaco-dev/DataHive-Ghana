@@ -5,7 +5,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ArrowRight, Eye, EyeOff, Loader2 } from "lucide-react";
+import { ArrowRight, Eye, EyeOff, Loader2, Fingerprint } from "lucide-react";
+import { useWebAuthn } from "@/hooks/useWebAuthn";
 import { useToast } from "@/hooks/use-toast";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -41,6 +42,8 @@ const AuthPage = () => {
   const { toast } = useToast();
   const [searchParams] = useSearchParams();
   const referralCode = searchParams.get("ref") || "";
+  const { authenticate, isSupported } = useWebAuthn();
+  const [biometricLoading, setBiometricLoading] = useState(false);
 
   const getPostLoginRoute = async () => {
     const {
@@ -134,6 +137,36 @@ const AuthPage = () => {
     if (error) {
       toast({ title: "Social sign in failed", description: error.message, variant: "destructive" });
       setOauthLoading(null);
+    }
+  };
+
+  const handleBiometricLogin = async () => {
+    if (!email.trim()) {
+      toast({ 
+        title: "Email Required", 
+        description: "Please enter your email address first to use biometrics.", 
+        variant: "destructive" 
+      });
+      return;
+    }
+    
+    setBiometricLoading(true);
+    try {
+      const success = await authenticate(email.trim());
+      if (success) {
+        toast({ title: "Success!", description: "Successfully signed in with biometrics." });
+        const route = await getPostLoginRoute();
+        navigate(route);
+      }
+    } catch (err: any) {
+      console.error("Biometric Login Error:", err);
+      toast({ 
+        title: "Biometric Failed", 
+        description: err.message || "Could not verify identity.", 
+        variant: "destructive" 
+      });
+    } finally {
+      setBiometricLoading(false);
     }
   };
 
@@ -296,11 +329,11 @@ const AuthPage = () => {
               </motion.div>
             </AnimatePresence>
 
-            <motion.div layout className="pt-2">
+            <motion.div layout className="pt-2 flex flex-col gap-2.5">
               <Button 
                 type="submit" 
                 className="w-full h-12 text-sm font-black shadow-lg shadow-primary/20 rounded-xl transition-all hover:shadow-primary/30 active:scale-[0.98]" 
-                disabled={loading || !!oauthLoading}
+                disabled={loading || !!oauthLoading || biometricLoading}
               >
                 {loading ? (
                   <Loader2 className="w-5 h-5 animate-spin" />
@@ -311,6 +344,25 @@ const AuthPage = () => {
                   </>
                 )}
               </Button>
+
+              {!isSignUp && isSupported && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={handleBiometricLogin}
+                  disabled={loading || !!oauthLoading || biometricLoading}
+                  className="w-full h-12 border border-primary/20 bg-background/50 hover:bg-primary/5 text-sm font-bold rounded-xl transition-all flex items-center justify-center gap-2"
+                >
+                  {biometricLoading ? (
+                    <Loader2 className="w-5 h-5 animate-spin text-primary" />
+                  ) : (
+                    <>
+                      <Fingerprint className="w-5 h-5 text-primary" />
+                      Sign In with Biometrics
+                    </>
+                  )}
+                </Button>
+              )}
             </motion.div>
           </form>
 
