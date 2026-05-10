@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Save, AlertCircle, Phone, MessageSquare, Percent, MessageCircle, Gift, Sparkles, Video, Upload, Trash2, Loader2, Globe, Database, Plus, ExternalLink, Activity, Shield } from "lucide-react";
+import { Save, AlertCircle, Phone, MessageSquare, Percent, MessageCircle, Gift, Sparkles, Video, Upload, Trash2, Loader2, Globe, Database, Plus, ExternalLink, Activity, Shield, GraduationCap } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Textarea } from "@/components/ui/textarea";
 import { logAudit } from "@/utils/auditLogger";
@@ -61,6 +61,10 @@ interface SystemSettings {
   agent_activation_fee: string;
   show_scrolling_ad: boolean;
   scrolling_ad_text: string;
+  wassce_price: string;
+  bece_price: string;
+  wassce_cost_price: string;
+  bece_cost_price: string;
 }
 
 const AdminSettings = () => {
@@ -116,6 +120,10 @@ const AdminSettings = () => {
     agent_activation_fee: "50.00",
     show_scrolling_ad: false,
     scrolling_ad_text: "",
+    wassce_price: "18.00",
+    bece_price: "15.00",
+    wassce_cost_price: "17.00",
+    bece_cost_price: "14.00",
   });
 
   const [currentIp, setCurrentIp] = useState("");
@@ -198,6 +206,10 @@ const AdminSettings = () => {
           home_page_video_url: d.home_page_video_url || "/assets/videos/ai_video.mp4",
           home_page_video_muted: d.home_page_video_muted !== false, // default true
           agent_activation_fee: String(d.agent_activation_fee || "50.00"),
+          wassce_price: String(d.wassce_price || "18.00"),
+          bece_price: String(d.bece_price || "15.00"),
+          wassce_cost_price: String(d.wassce_cost_price || "17.00"),
+          bece_cost_price: String(d.bece_cost_price || "14.00"),
         });
       }
       setLoading(false);
@@ -240,6 +252,10 @@ const AdminSettings = () => {
       home_page_video_url: (settings.home_page_video_url || "").trim(),
       home_page_video_muted: settings.home_page_video_muted,
       agent_activation_fee: parseFloat(settings.agent_activation_fee) || 50.00,
+      wassce_price: parseFloat(settings.wassce_price) || 18.00,
+      bece_price: parseFloat(settings.bece_price) || 15.00,
+      wassce_cost_price: parseFloat(settings.wassce_cost_price) || 17.00,
+      bece_cost_price: parseFloat(settings.bece_cost_price) || 14.00,
     };
 
     try {
@@ -536,6 +552,55 @@ const AdminSettings = () => {
                 <div className="space-y-2">
                   <Label>AT (%)</Label>
                   <Input type="number" step="0.5" value={settings.at_markup_percentage} onChange={(e) => setSettings({ ...settings, at_markup_percentage: e.target.value })} />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="border-primary/20">
+            <CardHeader>
+              <CardTitle className="text-lg flex items-center gap-2">
+                <GraduationCap className="w-5 h-5 text-primary" />
+                Result Checker Pricing
+              </CardTitle>
+              <CardDescription>Configure retail prices for customers and base cost price for profit calculation.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-4 p-4 bg-muted/30 border border-border rounded-2xl shadow-sm transition-all hover:border-primary/30">
+                  <Label className="text-sm font-black text-foreground flex items-center gap-2">
+                    <div className="w-2 h-2 rounded-full bg-primary" /> WASSCE
+                  </Label>
+                  <div className="space-y-2">
+                    <Label className="text-[10px] text-muted-foreground uppercase tracking-widest">Retail Price (GH₵)</Label>
+                    <Input type="number" step="0.1" value={settings.wassce_price} onChange={(e) => setSettings({ ...settings, wassce_price: e.target.value })} className="font-bold" />
+                  </div>
+                  <div className="space-y-2 border-t border-border/50 pt-2">
+                    <Label className="text-[10px] text-muted-foreground uppercase tracking-widest flex items-center gap-1"><Shield className="w-3 h-3" /> Cost Price (GH₵)</Label>
+                    <Input type="number" step="0.1" value={settings.wassce_cost_price} onChange={(e) => setSettings({ ...settings, wassce_cost_price: e.target.value })} className="font-mono text-xs opacity-80" />
+                  </div>
+                  <div className="flex justify-between items-center pt-1 text-[10px]">
+                    <span className="text-muted-foreground">Estimated Margin:</span>
+                    <span className="font-black text-emerald-500">₵{(parseFloat(settings.wassce_price || "0") - parseFloat(settings.wassce_cost_price || "0")).toFixed(2)}</span>
+                  </div>
+                </div>
+
+                <div className="space-y-4 p-4 bg-muted/30 border border-border rounded-2xl shadow-sm transition-all hover:border-amber-500/30">
+                  <Label className="text-sm font-black text-foreground flex items-center gap-2">
+                    <div className="w-2 h-2 rounded-full bg-amber-500" /> BECE
+                  </Label>
+                  <div className="space-y-2">
+                    <Label className="text-[10px] text-muted-foreground uppercase tracking-widest">Retail Price (GH₵)</Label>
+                    <Input type="number" step="0.1" value={settings.bece_price} onChange={(e) => setSettings({ ...settings, bece_price: e.target.value })} className="font-bold" />
+                  </div>
+                  <div className="space-y-2 border-t border-border/50 pt-2">
+                    <Label className="text-[10px] text-muted-foreground uppercase tracking-widest flex items-center gap-1"><Shield className="w-3 h-3" /> Cost Price (GH₵)</Label>
+                    <Input type="number" step="0.1" value={settings.bece_cost_price} onChange={(e) => setSettings({ ...settings, bece_cost_price: e.target.value })} className="font-mono text-xs opacity-80" />
+                  </div>
+                  <div className="flex justify-between items-center pt-1 text-[10px]">
+                    <span className="text-muted-foreground">Estimated Margin:</span>
+                    <span className="font-black text-emerald-500">₵{(parseFloat(settings.bece_price || "0") - parseFloat(settings.bece_cost_price || "0")).toFixed(2)}</span>
+                  </div>
                 </div>
               </div>
             </CardContent>
