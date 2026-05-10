@@ -485,10 +485,10 @@ const BuyData = () => {
                 stiffness: 300,
                 mass: 0.8 
               }}
-              className="relative w-full max-w-[360px] bg-[#0b0d13] border border-white/[0.06] shadow-[0_32px_80px_-20px_rgba(0,0,0,0.8)] rounded-[2.5rem] overflow-hidden flex flex-col select-none"
+              className="relative w-full max-w-[360px] bg-card border border-border shadow-[0_32px_80px_-20px_rgba(0,0,0,0.5)] dark:shadow-[0_32px_80px_-20px_rgba(0,0,0,0.8)] rounded-[2.5rem] overflow-hidden flex flex-col select-none text-card-foreground"
             >
               {/* Dynamic Header Section */}
-              <div className="relative w-full pt-8 pb-6 text-center rounded-b-[3rem] overflow-hidden z-10 shadow-[0_10px_30px_rgba(0,0,0,0.2)]">
+              <div className="relative w-full pt-8 pb-6 text-center rounded-b-[3rem] overflow-hidden z-10 shadow-[0_10px_30px_rgba(0,0,0,0.1)] dark:shadow-[0_10px_30px_rgba(0,0,0,0.2)]">
                 {/* Traditional Symbols Overlay (Embedded Culturally) */}
                 <div 
                   className="absolute inset-0 opacity-[0.15] pointer-events-none mix-blend-overlay z-0"
@@ -508,7 +508,7 @@ const BuyData = () => {
                 />
                 
                 {/* Absolute Background Shell (Gradient overlay to darken the top slightly) */}
-                <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-transparent to-[#0b0d13] z-[1]" />
+                <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-transparent to-card z-[1]" />
 
                 {/* Close Vector */}
                 <button 
@@ -586,7 +586,7 @@ const BuyData = () => {
               </div>
 
               {/* Interactive Surface */}
-              <div className="p-5 pb-6 space-y-4 bg-[#0b0d13] relative z-20">
+              <div className="p-5 pb-6 space-y-4 bg-card relative z-20">
                 
                 {/* Sequential Entrance Group */}
                 <motion.div
@@ -597,7 +597,7 @@ const BuyData = () => {
                 >
                   {/* Field Header */}
                   <div className="flex items-center justify-between px-1">
-                    <label className="text-[9px] font-black uppercase tracking-[0.2em] text-white/30">
+                    <label className="text-[9px] font-black uppercase tracking-[0.2em] text-muted-foreground/70">
                       Direct Delivery To
                     </label>
                   </div>
@@ -610,10 +610,10 @@ const BuyData = () => {
                       placeholder="Enter Phone (0XX XXXXXXX)"
                       value={phone} onChange={(e) => setPhone(e.target.value)}
                       maxLength={12}
-                      className="w-full h-[56px] bg-white/[0.02] border border-white/[0.08] rounded-[1.25rem] pl-4 pr-12 text-white placeholder-white/15 text-lg font-bold tracking-wide focus:outline-none focus:border-white/20 focus:bg-white/[0.04] focus:shadow-[0_0_0_4px_rgba(255,255,255,0.02)] transition-all duration-300 selection:bg-primary/30"
+                      className="w-full h-[56px] bg-background border border-border rounded-[1.25rem] pl-4 pr-12 text-foreground placeholder:text-muted-foreground/40 text-lg font-bold tracking-wide focus:outline-none focus:border-primary/40 focus:bg-accent/5 focus:shadow-[0_0_0_4px_hsl(var(--primary)/0.05)] transition-all duration-300 selection:bg-primary/30"
                       style={resolvedName ? { 
-                        borderColor: "rgba(52, 211, 153, 0.4)",
-                        background: "rgba(16, 185, 129, 0.04)",
+                        borderColor: "rgba(16, 185, 129, 0.4)",
+                        background: isDark ? "rgba(16, 185, 129, 0.04)" : "rgba(16, 185, 129, 0.02)",
                         boxShadow: "0 0 20px -5px rgba(16, 185, 129, 0.15)"
                       } : undefined}
                     />
@@ -622,17 +622,17 @@ const BuyData = () => {
                       <AnimatePresence mode="wait">
                         {resolvingName ? (
                           <motion.div key="loading" initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0 }}>
-                            <Loader2 className="w-4 h-4 animate-spin text-white/40" />
+                            <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
                           </motion.div>
                         ) : resolvedName ? (
                           <motion.div key="done" initial={{ opacity: 0, scale: 0.5 }} animate={{ opacity: 1, scale: 1.2, rotate: [0, -15, 15, 0] }} transition={{ type: "spring", bounce: 0.5 }}>
                             <div className="bg-emerald-500 rounded-full p-1 shadow-lg shadow-emerald-500/30">
-                              <CheckCircle2 className="w-3.5 h-3.5 text-black" />
+                              <CheckCircle2 className="w-3.5 h-3.5 text-white" />
                             </div>
                           </motion.div>
                         ) : (
                           <motion.div key="idle" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-                            <ShieldCheck className="w-4 h-4 text-white/10 group-hover:text-white/20 transition-colors" />
+                            <ShieldCheck className="w-4 h-4 text-muted-foreground/20 group-hover:text-muted-foreground/40 transition-colors" />
                           </motion.div>
                         )}
                       </AnimatePresence>
@@ -649,13 +649,13 @@ const BuyData = () => {
                         exit={{ opacity: 0, height: 0, scale: 0.9 }}
                         className="overflow-hidden"
                       >
-                        <div className="flex items-center gap-2.5 bg-emerald-500/5 border border-emerald-500/10 rounded-xl p-2.5 shadow-sm">
-                          <div className="shrink-0 w-7 h-7 rounded-lg bg-emerald-500/10 flex items-center justify-center text-emerald-400 font-bold text-xs">
+                        <div className="flex items-center gap-2.5 bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-2.5 shadow-sm">
+                          <div className="shrink-0 w-7 h-7 rounded-lg bg-emerald-500/20 flex items-center justify-center text-emerald-600 dark:text-emerald-400 font-bold text-xs">
                             {resolvedName.charAt(0)}
                           </div>
                           <div className="min-w-0">
-                            <p className="text-[8px] font-black uppercase tracking-widest text-emerald-500/60 leading-none mb-0.5">Identity Confirmed</p>
-                            <p className="text-xs font-black text-emerald-300 uppercase truncate leading-tight tracking-wide">
+                            <p className="text-[8px] font-black uppercase tracking-widest text-emerald-600/60 dark:text-emerald-500/60 leading-none mb-0.5">Identity Confirmed</p>
+                            <p className="text-xs font-black text-emerald-700 dark:text-emerald-300 uppercase truncate leading-tight tracking-wide">
                               {resolvedName}
                             </p>
                           </div>
@@ -688,17 +688,17 @@ const BuyData = () => {
                         initial={{ opacity: 0, height: 0 }}
                         animate={{ opacity: 1, height: "auto" }}
                         exit={{ opacity: 0, height: 0 }}
-                        className="space-y-1.5 overflow-hidden border-t border-white/[0.04] pt-2.5"
+                        className="space-y-1.5 overflow-hidden border-t border-border/50 pt-2.5"
                       >
-                        <label className="text-[9px] font-black uppercase tracking-[0.2em] text-white/30 px-1 block">
-                          Email <span className="text-white/15 normal-case font-medium">(Optional)</span>
+                        <label className="text-[9px] font-black uppercase tracking-[0.2em] text-muted-foreground/70 px-1 block">
+                          Email <span className="text-muted-foreground/40 normal-case font-medium">(Optional)</span>
                         </label>
                         <input
                           type="email" inputMode="email"
                           placeholder="For delivery receipt..."
                           value={email} onChange={(e) => setEmail(e.target.value)}
                           autoComplete="email"
-                          className="w-full h-[42px] bg-white/[0.01] border border-white/[0.06] rounded-lg px-3.5 text-white placeholder-white/10 text-sm focus:outline-none focus:border-white/10 focus:bg-white/[0.02] transition-all"
+                          className="w-full h-[42px] bg-background border border-border rounded-lg px-3.5 text-foreground placeholder:text-muted-foreground/40 text-sm focus:outline-none focus:border-primary/40 transition-all"
                         />
                       </motion.div>
                     )}
@@ -709,7 +709,7 @@ const BuyData = () => {
                     {!promoOpen && !validPromo ? (
                       <button 
                         onClick={() => { setPromoOpen(true); setTimeout(() => promoInputRef.current?.focus(), 80); }}
-                        className="inline-flex items-center gap-1.5 text-[9px] font-black uppercase tracking-wider text-white/30 hover:text-amber-400 hover:bg-white/[0.03] px-2.5 py-1.5 rounded-lg transition-all group"
+                        className="inline-flex items-center gap-1.5 text-[9px] font-black uppercase tracking-wider text-muted-foreground/70 hover:text-amber-500 hover:bg-accent/50 px-2.5 py-1.5 rounded-lg transition-all group"
                       >
                         <Tag className="w-3 h-3 group-hover:rotate-12 transition-transform" /> Code?
                       </button>
@@ -735,15 +735,15 @@ const BuyData = () => {
                               ref={promoInputRef}
                               type="text" placeholder="TYPE CODE"
                               value={promoCode} onChange={(e) => { setPromoCode(e.target.value.toUpperCase()); setPromoResult(null); }}
-                              className="flex-1 h-9 bg-white/[0.02] border border-white/[0.08] rounded-lg px-3 text-white placeholder-white/10 text-[10px] font-mono font-black tracking-widest uppercase focus:outline-none focus:border-amber-400/30 transition-colors"
+                              className="flex-1 h-9 bg-background border border-border rounded-lg px-3 text-foreground placeholder:text-muted-foreground/30 text-[10px] font-mono font-black tracking-widest uppercase focus:outline-none focus:border-amber-500/50 transition-colors"
                             />
                             <button 
                               onClick={handleApplyPromo} disabled={promoValidating || !promoCode.trim()}
-                              className="h-9 px-3 rounded-lg text-[9px] font-black bg-amber-400 text-black hover:bg-amber-300 disabled:opacity-30 disabled:cursor-not-allowed transition-all active:scale-95"
+                              className="h-9 px-3 rounded-lg text-[9px] font-black bg-amber-500 text-white dark:text-black hover:bg-amber-600 disabled:opacity-30 disabled:cursor-not-allowed transition-all active:scale-95"
                             >
                               {promoValidating ? <Loader2 className="w-3 h-3 animate-spin" /> : "APPLY"}
                             </button>
-                            <button onClick={() => { setPromoOpen(false); setPromoCode(""); setPromoResult(null); }} className="h-9 w-9 flex items-center justify-center rounded-lg bg-white/5 text-white/40 hover:text-white hover:bg-white/10 transition-all">
+                            <button onClick={() => { setPromoOpen(false); setPromoCode(""); setPromoResult(null); }} className="h-9 w-9 flex items-center justify-center rounded-lg bg-muted text-muted-foreground hover:text-foreground transition-all">
                               <X className="w-3.5 h-3.5" />
                             </button>
                           </div>
