@@ -3,13 +3,11 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { corsHeaders } from "../_shared/cors.ts";
 
 serve(async (req: Request) => {
-  // Giant safety net encompassing everything
   try {
     if (req.method === "OPTIONS") {
       return new Response(null, { headers: corsHeaders });
     }
 
-    // Safely read body to prevent parse crashes
     let body: any = {};
     try {
       body = await req.json();
@@ -22,9 +20,7 @@ serve(async (req: Request) => {
     let originHost = null;
     try {
       if (origin) originHost = new URL(origin).hostname;
-    } catch (e) {
-      // Safe ignore
-    }
+    } catch (e) {}
     
     let rpId = body.requested_rp_id || body.rpId || payload?.rpId || originHost || req.headers.get("x-forwarded-host") || req.headers.get("host")?.split(":")[0] || "swiftdatagh.shop";
 
@@ -46,7 +42,6 @@ serve(async (req: Request) => {
     );
 
     let user: any = null;
-    // Wrap auth lookup in its own safe try-catch!
     if (authHeader) {
       try {
         const supabaseClient = createClient(
@@ -57,7 +52,6 @@ serve(async (req: Request) => {
         const { data } = await supabaseClient.auth.getUser();
         user = data?.user || null;
       } catch (authErr) {
-        console.warn("Authorization header was invalid or expired. Proceeding anonymously.");
         user = null;
       }
     }
@@ -128,7 +122,7 @@ serve(async (req: Request) => {
           .limit(1)
           .single();
 
-        if (!challengeData) throw new Error("Challenge timed out or not found. Try again.");
+        if (!challengeData) throw new Error("Challenge timed out. Please retry.");
 
         const { error: storeError } = await supabaseAdmin.from("user_credentials").insert({
           user_id: user.id,
@@ -150,11 +144,14 @@ serve(async (req: Request) => {
 
       case "authentication-options": {
         const targetUserId = await resolveUserId();
+        const localKeyIds = body.localKeyIds || payload?.localKeyIds || []; // Hybrid fallback fetch
+        
         const challenge = btoa(String.fromCharCode(...crypto.getRandomValues(new Uint8Array(32))))
           .replace(/\+/g, "-").replace(/\//g, "_").replace(/=/g, "");
 
         let allowedCredentials: any[] = [];
         
+        // Scenario A: Target User provided (direct filtering)
         if (targetUserId) {
           const { data: credentials } = await supabaseAdmin
             .from("user_credentials")
@@ -165,25 +162,29 @@ serve(async (req: Request) => {
             id: c.credential_id,
             type: "public-key"
           })) || [];
+        } 
+        // Scenario B: Fallback for legacy non-resident keys cached in frontend LocalStorage
+        else if (Array.isArray(localKeyIds) && localKeyIds.length > 0) {
+          allowedCredentials = localKeyIds.map((id: string) => ({
+            id,
+            type: "public-key"
+          }));
         }
 
         if (targetUserId) {
-          // Insert challenge asynchronously, don't crash flow if audit logging fails
           try {
             await supabaseAdmin.from("webauthn_challenges").insert({
               user_id: targetUserId,
               challenge,
               action: "authenticate"
             });
-          } catch (e) {
-            console.error("Failed to store check challenge:", e);
-          }
+          } catch (e) {}
         }
 
         return new Response(JSON.stringify({
           challenge,
           timeout: 60000,
-          userVerification: "required", 
+          userVerification: "preferred", // Downgrade to preferred to maximize device compatibility
           allowCredentials: allowedCredentials
         }), {
           status: 200,
@@ -201,7 +202,7 @@ serve(async (req: Request) => {
           .maybeSingle();
 
         if (credErr || !cred) {
-          return new Response(JSON.stringify({ error: "This device has no active biometric keys setup." }), {
+          return new Response(JSON.stringify({ error: "The biometrics registered on this device do not match any account on our server." }), {
             status: 403,
             headers: { ...corsHeaders, "Content-Type": "application/json" },
           });
@@ -209,7 +210,6 @@ serve(async (req: Request) => {
         
         const matchedUserId = cred.user_id;
 
-        // Async update last used time
         try {
           await supabaseAdmin.from("user_credentials").update({
             last_used_at: new Date().toISOString()
@@ -255,19 +255,17 @@ serve(async (req: Request) => {
       }
 
       default:
-        return new Response(JSON.stringify({ error: "Invalid backend action submitted." }), {
+        return new Response(JSON.stringify({ error: "Action not recognized." }), {
           status: 400,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
     }
   } catch (error: any) {
-    console.error("CRITICAL EDGE FUNCTION CRASH:", error);
-    // ALWAYS return descriptive JSON now instead of raw text 500 so the client can parse it!
     return new Response(JSON.stringify({ 
-      error: error.message || "An unexpected error occurred on server.",
+      error: error.message || "Edge execution failure",
       stack: error.stack
     }), {
-      status: 200, // Using 200 with {error} payload is safer for fetch clients to parse exact reasons
+      status: 200, 
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
