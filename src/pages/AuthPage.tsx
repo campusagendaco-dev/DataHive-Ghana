@@ -9,6 +9,8 @@ import { ArrowRight, Eye, EyeOff, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { motion, AnimatePresence } from "framer-motion";
 
+import { TraditionalBackground } from "@/components/TraditionalBackground";
+
 const containerVariants = {
   hidden: { opacity: 0, y: 20 },
   visible: { 
@@ -139,6 +141,7 @@ const AuthPage = () => {
 
   return (
     <div className="min-h-screen pt-20 pb-16 px-4 flex items-center justify-center relative overflow-hidden">
+      <TraditionalBackground />
       
       {/* Ambient Background Glows */}
       <div className="absolute top-[-10%] right-[-10%] w-[40%] h-[40%] bg-primary/5 rounded-full blur-[120px] pointer-events-none" />

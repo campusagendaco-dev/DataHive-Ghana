@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ArrowRight, Eye, EyeOff } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { TraditionalBackground } from "@/components/TraditionalBackground";
 
 const AuthUser = () => {
   const [isSignUp, setIsSignUp] = useState(true);
@@ -72,8 +73,9 @@ const AuthUser = () => {
   };
 
   return (
-    <div className="min-h-screen pt-24 pb-16 px-4 flex items-center justify-center">
-      <div className="w-full max-w-md">
+    <div className="min-h-screen pt-24 pb-16 px-4 flex items-center justify-center relative overflow-hidden">
+      <TraditionalBackground />
+      <div className="w-full max-w-md relative z-10">
         <div className="text-center mb-8">
           <div className="flex items-center justify-center mb-4">
             <div className="w-16 h-16 rounded-full bg-[#162316] flex items-center justify-center shadow-lg">
