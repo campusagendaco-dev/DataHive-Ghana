@@ -25,6 +25,7 @@ import { TraditionalBackground } from "@/components/TraditionalBackground";
 import IpBlocked from "./pages/IpBlocked";
 import Maintenance from "./pages/Maintenance";
 import { SecurityGuard } from "@/components/SecurityGuard";
+import { UpdatePrompt } from "@/components/UpdatePrompt";
 
 // Route-level code splitting — each page chunk loads only when first visited
 const Index = lazy(() => import("./pages/Index"));
@@ -433,19 +434,12 @@ const App = () => {
     },
   });
 
-  // Watch for update trigger
-  useEffect(() => {
-    if (needRefresh) {
-      // Explicitly trigger service worker bypass to skip waiting and activate new version
-      updateServiceWorker(true);
-    }
-  }, [needRefresh, updateServiceWorker]);
-
   return (
     <QueryClientProvider client={queryClient}>
       <ThemeProvider>
         <TooltipProvider>
           <OfflineAlert />
+          <UpdatePrompt needRefresh={needRefresh} onUpdate={() => updateServiceWorker(true)} />
           <Toaster />
           <Sonner />
           <BrowserRouter>
