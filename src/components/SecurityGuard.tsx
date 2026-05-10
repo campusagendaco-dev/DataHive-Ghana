@@ -71,13 +71,15 @@ export function SecurityGuard({ children }: { children: React.ReactNode }) {
     return () => clearTimeout(timer);
   }, []);
 
-  // Check config from DB
+  // Check config from DB view (super fast and zero auth latency)
   useEffect(() => {
     const checkConfig = async () => {
       try {
-        const { data } = await supabase.functions.invoke("system-settings", {
-          body: { action: "get" }
-        });
+        const { data } = await supabase
+          .from("public_system_settings")
+          .select("enable_privacy_shield")
+          .maybeSingle();
+          
         if (data) {
           const val = data.enable_privacy_shield !== false;
           setIsEnabled(val);
@@ -85,6 +87,7 @@ export function SecurityGuard({ children }: { children: React.ReactNode }) {
           else document.body.classList.remove("shield-active");
         }
       } catch (e) {
+        // Fallback to enabled on network failure
         setIsEnabled(true);
         document.body.classList.add("shield-active");
       }
