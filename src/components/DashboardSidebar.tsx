@@ -31,11 +31,15 @@ import {
   Send,
   Bot,
   CalendarClock,
+  WifiOff,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { useConnectivity } from "@/hooks/useConnectivity";
+import { useState, useEffect } from "react";
+import { format } from "date-fns";
+import { Clock } from "lucide-react";
 
 
 const userNavItems = [
@@ -84,6 +88,12 @@ const DashboardSidebar = ({ open, onClose }: DashboardSidebarProps) => {
   const { theme, isDark } = useAppTheme();
   const { isOnline, quality } = useConnectivity();
   const isPaidAgent = Boolean(profile?.agent_approved || profile?.sub_agent_approved);
+  const [time, setTime] = useState(new Date());
+
+  useEffect(() => {
+    const tick = setInterval(() => setTime(new Date()), 1000);
+    return () => clearInterval(tick);
+  }, []);
 
 
   const topupRef = (profile as any)?.topup_reference;
@@ -168,12 +178,27 @@ const DashboardSidebar = ({ open, onClose }: DashboardSidebarProps) => {
               )}>
                 {isPaidAgent ? "Pro Agent" : "Regular"}
               </Badge>
-              <div className={cn(
-                "flex items-center gap-1 text-[10px] font-bold transition-colors",
-                !isOnline ? "text-red-500" : quality === "poor" ? "text-amber-500" : "text-green-500"
-              )}>
-                {!isOnline ? <WifiOff className="w-3 h-3" /> : <Activity className="w-3 h-3" />}
-                {!isOnline ? "Offline" : quality === "poor" ? "Weak Connection" : "Online"}
+              
+              <div className="flex items-center gap-2">
+                <div className={cn(
+                  "flex items-center gap-1 text-[10px] font-bold opacity-60",
+                  isDark ? "text-white/60" : "text-gray-500"
+                )}>
+                  <Clock className="w-3 h-3" />
+                  {format(time, "hh:mm:ss a")}
+                </div>
+                
+                <div className={cn(
+                  "w-1 h-1 rounded-full bg-white/10 hidden sm:block"
+                )} />
+
+                <div className={cn(
+                  "flex items-center gap-1 text-[10px] font-bold transition-colors",
+                  !isOnline ? "text-red-500" : quality === "poor" ? "text-amber-500" : "text-green-500"
+                )}>
+                  {!isOnline ? <WifiOff className="w-3 h-3" /> : <Activity className="w-3 h-3" />}
+                  {!isOnline ? "Offline" : "Online"}
+                </div>
               </div>
             </div>
           </div>
