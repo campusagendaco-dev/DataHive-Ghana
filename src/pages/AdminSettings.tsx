@@ -633,27 +633,91 @@ const AdminSettings = () => {
               <div className="space-y-3 pt-2 border-t border-white/5">
                 <Label className="flex items-center gap-2">
                   <Globe className="w-4 h-4 text-muted-foreground" />
-                  Custom Background Image URL (Overrides Symbols)
+                  Background Custom Image (Overrides Symbols)
                 </Label>
-                <div className="flex gap-2">
+
+                {settings.background_custom_image_url && (
+                  <div className="relative rounded-xl overflow-hidden border border-white/10 aspect-video sm:aspect-[21/9] bg-black/20 group">
+                    <img 
+                      src={settings.background_custom_image_url} 
+                      className="w-full h-full object-cover opacity-80" 
+                      alt="Background preview"
+                    />
+                    <div className="absolute inset-0 bg-black/60 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                      <Button 
+                        variant="destructive" 
+                        size="sm" 
+                        className="gap-2"
+                        onClick={() => setSettings({ ...settings, background_custom_image_url: "" })}
+                      >
+                        <Trash2 className="w-4 h-4" /> Remove Image
+                      </Button>
+                    </div>
+                  </div>
+                )}
+
+                <div className="flex flex-col sm:flex-row gap-2">
                   <Input
-                    placeholder="https://example.com/your-bg-image.jpg"
+                    placeholder="Paste image URL..."
                     value={settings.background_custom_image_url}
                     onChange={(e) => setSettings({ ...settings, background_custom_image_url: e.target.value })}
+                    className="flex-1"
                   />
-                  {settings.background_custom_image_url && (
-                    <Button
-                      variant="outline"
-                      size="icon"
-                      onClick={() => setSettings({ ...settings, background_custom_image_url: "" })}
-                      title="Reset"
+                  <div className="relative shrink-0">
+                    <Input
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      id="bg-image-upload"
+                      onChange={async (e) => {
+                        const file = e.target.files?.[0];
+                        if (!file) return;
+                        
+                        if (file.size > 5 * 1024 * 1024) { // 5MB limit
+                          toast({ title: "File too large", description: "Images should be under 5MB for optimal loading speed.", variant: "destructive" });
+                          return;
+                        }
+
+                        const { data: { user } } = await supabase.auth.getUser();
+                        if (!user) return;
+
+                        setSaving(true);
+                        try {
+                          const ext = file.name.split('.').pop();
+                          const fileName = `site-bg-${Date.now()}.${ext}`;
+                          
+                          const { error } = await supabase.storage
+                            .from('site-assets')
+                            .upload(fileName, file);
+
+                          if (error) throw error;
+
+                          const { data: { publicUrl } } = supabase.storage
+                            .from('site-assets')
+                            .getPublicUrl(fileName);
+
+                          setSettings({ ...settings, background_custom_image_url: publicUrl });
+                          toast({ title: "Image uploaded", description: "Preview applied. Remember to save all changes below." });
+                        } catch (err: any) {
+                          toast({ title: "Upload failed", description: err.message, variant: "destructive" });
+                        } finally {
+                          setSaving(false);
+                        }
+                      }}
+                    />
+                    <Button 
+                      variant="secondary" 
+                      onClick={() => document.getElementById('bg-image-upload')?.click()}
+                      disabled={saving}
+                      className="gap-2 w-full"
                     >
-                      <Trash2 className="w-4 h-4" />
+                      {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
+                      Upload Image
                     </Button>
-                  )}
+                  </div>
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  Providing a URL will load a solid fixed background across all pages instead of floating symbols. Leave empty to keep symbols.
+                  Paste a link or upload directly. Providing an image will load a solid fixed background instead of drifting symbols.
                 </p>
               </div>
             </CardContent>
