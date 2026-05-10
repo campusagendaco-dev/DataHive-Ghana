@@ -11,10 +11,13 @@ export function useMaskedBalance() {
     setIsMasked(prev => {
       const next = !prev;
       localStorage.setItem("swiftdata_balance_masked", String(next));
-      // Dispatch custom event to notify other components listening on same page
-      window.dispatchEvent(new Event("balance_mask_changed"));
       return next;
     });
+    
+    // Defer event dispatch to the next tick to ensure safety in React rendering cycles
+    setTimeout(() => {
+      window.dispatchEvent(new Event("balance_mask_changed"));
+    }, 0);
   }, []);
 
   useEffect(() => {
