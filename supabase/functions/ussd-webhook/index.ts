@@ -83,6 +83,19 @@ serve(async (req) => {
     PAYSTACK_SECRET_KEY = settings?.paystack_secret_key || "";
   }
 
+  // Security: Limit USSD function execution to verified callers if secret is active
+  const USSD_WEBHOOK_SECRET = Deno.env.get("USSD_WEBHOOK_SECRET");
+  if (USSD_WEBHOOK_SECRET) {
+    const providedKey = new URL(req.url).searchParams.get("key") || req.headers.get("X-Webhook-Secret");
+    if (providedKey !== USSD_WEBHOOK_SECRET) {
+      console.warn("[USSD Webhook] Intrusion attempt blocked — missing or invalid key.");
+      return new Response(JSON.stringify({ message: "Service authentication required", continueSession: false }), { 
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" }
+      });
+    }
+  }
+
   try {
     const payload = await req.json();
     const { sessionID, userID, newSession, msisdn, userData } = payload;

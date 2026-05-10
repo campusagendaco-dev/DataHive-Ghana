@@ -73,7 +73,7 @@ function getDisplayStatus(status: string, orderType?: string): DisplayStatus {
       };
     case "pending":
       return {
-        label: "Verifying Payment",
+        label: "Awaiting Checkout",
         shortLabel: "Verifying...",
         icon: Loader2,
         dot: "bg-amber-400",
@@ -507,7 +507,7 @@ const DashboardOrders = () => {
                         ) : order.status === "paid" || order.status === "processing" ? (
                           <><Loader2 className="w-3 h-3 shrink-0 animate-spin" /> Received &mdash; delivering…</>
                         ) : (
-                          <><Loader2 className="w-3 h-3 shrink-0 animate-spin" /> Verifying payment…</>
+                          <>Awaiting Checkout…</>
                         )}
                         {retryCount > 0 && <span className="opacity-60 ml-0.5">(#{retryCount})</span>}
                       </span>

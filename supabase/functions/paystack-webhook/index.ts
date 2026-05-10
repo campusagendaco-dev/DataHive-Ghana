@@ -1094,7 +1094,7 @@ serve(async (req) => {
     if (!DATA_PROVIDER_API_KEY || !DATA_PROVIDER_BASE_URL) {
       console.error("Data provider not configured for fulfillment");
       await supabaseAdmin.from("orders").update({
-        status: "fulfillment_failed",
+        status: "processing",
         failure_reason: "Data provider not configured",
       }).eq("id", orderId);
       const unconfiguredPhone = String(existingOrder?.customer_phone || "");
@@ -1136,7 +1136,7 @@ serve(async (req) => {
         });
       }
 
-      await supabaseAdmin.from("orders").update({ status: "fulfillment_failed", failure_reason: result.reason }).eq("id", orderId);
+      await supabaseAdmin.from("orders").update({ status: "processing", failure_reason: result.reason }).eq("id", orderId);
       const afaPhone = String(existingOrder?.customer_phone || "");
       await notifyFailureAndRefund(supabaseAdmin, afaPhone, verifiedAmount, "AFA Registration", reference, PAYSTACK_SECRET_KEY);
       return new Response(JSON.stringify({ received: true, fulfilled: false, failure_reason: result.reason }), {
@@ -1217,7 +1217,7 @@ serve(async (req) => {
         });
       }
 
-      await supabaseAdmin.from("orders").update({ status: "fulfillment_failed", failure_reason: airtimeResult.reason }).eq("id", orderId);
+      await supabaseAdmin.from("orders").update({ status: "processing", failure_reason: airtimeResult.reason }).eq("id", orderId);
       await notifyFailureAndRefund(supabaseAdmin, customerPhone, verifiedAmount, `${network} Airtime`, reference, PAYSTACK_SECRET_KEY);
       return new Response(JSON.stringify({ received: true, fulfilled: false, failure_reason: airtimeResult.reason }), {
         status: 200,
@@ -1227,8 +1227,8 @@ serve(async (req) => {
 
     if (!network || !packageSize || !customerPhone) {
       await supabaseAdmin.from("orders").update({
-        status: "fulfillment_failed",
-        failure_reason: "Missing order details for fulfillment.",
+        status: "processing",
+        failure_reason: `Could not parse package size from '${packageSize}'`,
       }).eq("id", orderId);
       await notifyFailureAndRefund(supabaseAdmin, customerPhone, verifiedAmount, packageSize || "your order", reference, PAYSTACK_SECRET_KEY);
       return new Response(JSON.stringify({ received: true, fulfilled: false, failure_reason: "Missing order details for fulfillment." }), {
@@ -1320,7 +1320,7 @@ serve(async (req) => {
       });
     }
 
-    await supabaseAdmin.from("orders").update({ status: "fulfillment_failed", failure_reason: result.reason }).eq("id", orderId);
+    await supabaseAdmin.from("orders").update({ status: "processing", failure_reason: result.reason }).eq("id", orderId);
     await notifyFailureAndRefund(supabaseAdmin, customerPhone, verifiedAmount, packageSize || "Data", reference, PAYSTACK_SECRET_KEY);
     return new Response(JSON.stringify({ received: true, fulfilled: false, failure_reason: result.reason }), {
       status: 200,

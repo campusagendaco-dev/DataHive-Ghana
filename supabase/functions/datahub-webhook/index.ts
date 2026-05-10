@@ -52,6 +52,20 @@ serve(async (req) => {
 
   const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
+  // Security: Verify webhook secret if configured in the vault
+  const DATAHUB_WEBHOOK_SECRET = Deno.env.get("DATAHUB_WEBHOOK_SECRET") || Deno.env.get("PROVIDER_WEBHOOK_SECRET");
+  if (DATAHUB_WEBHOOK_SECRET) {
+    const query = new URL(req.url).searchParams;
+    const providedSecret = req.headers.get("X-Webhook-Secret") || query.get("key") || query.get("secret");
+    if (providedSecret !== DATAHUB_WEBHOOK_SECRET) {
+      console.warn("[datahub-webhook] Unauthorized access attempt prevented.");
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+  }
+
   try {
     // Validate User-Agent as basic authenticity check
     const userAgent = req.headers.get("user-agent") || "";

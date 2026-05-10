@@ -14,6 +14,17 @@ serve(async (req: Request) => {
   const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
   const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
+  // Security: Verify webhook secret if configured
+  const BOSSU_WEBHOOK_SECRET = Deno.env.get("BOSSU_WEBHOOK_SECRET") || Deno.env.get("PROVIDER_WEBHOOK_SECRET");
+  if (BOSSU_WEBHOOK_SECRET) {
+    const query = new URL(req.url).searchParams;
+    const providedSecret = req.headers.get("X-Webhook-Secret") || query.get("key") || query.get("secret");
+    if (providedSecret !== BOSSU_WEBHOOK_SECRET) {
+      console.warn("[bossu-webhook] Unauthorized request blocked.");
+      return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401 });
+    }
+  }
+
   let body: any;
   try {
     body = await req.json();

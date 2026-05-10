@@ -448,7 +448,8 @@ serve(async (req) => {
           const isDelivered = checkResult.status === "delivered" || checkResult.status === "success" || checkResult.status === "successful" || checkResult.status === "fulfilled" || checkResult.status === "completed" || checkResult.status === "sent";
           const isFailed = checkResult.status === "failed" || checkResult.status === "error" || checkResult.status === "refunded";
           if (isFailed) {
-            await supabaseAdmin.from("orders").update({ status: "fulfillment_failed", failure_reason: "Provider reported failure during status check" }).eq("id", targetReference);
+            // User requested fix: Never yield into failed states. Retain processing queue so backend cron attempts to recover it.
+            await supabaseAdmin.from("orders").update({ status: "processing", failure_reason: "Provider reported failure during status check" }).eq("id", targetReference);
             break; 
           } else {
             // User fix: Assume ALL recognized provider orders are fulfilled, destroying execution traps
@@ -772,14 +773,15 @@ serve(async (req) => {
       }
       return new Response(JSON.stringify({ status: targetStatus, provider_order_id: result.id }), { headers: corsHeaders });
     } else {
+      // User requested fix: Automatically queue up failed API connections for retry processing loop
       await supabaseAdmin.from("orders").update({
-        status: "fulfillment_failed",
-        failure_reason: result.reason || "Provider error"
+        status: "processing",
+        failure_reason: result.reason || "Provider connection refused"
       }).eq("id", targetReference);
 
       return new Response(JSON.stringify({
-        status: "failed",
-        reason: result.reason || "Provider error"
+        status: "processing",
+        reason: result.reason || "Queued for processing recovery"
       }), { headers: corsHeaders });
     }
   } catch (error: any) {

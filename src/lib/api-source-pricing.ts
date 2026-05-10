@@ -8,7 +8,7 @@ export const getMultiplierFromSource = (_source: ApiSource): number => 1;
 export const applyPriceMultiplier = (price: number, multiplier: number): number =>
   Number((price * multiplier).toFixed(2));
 
-export async function fetchApiPricingContext(): Promise<{ source: ApiSource; multipliers: Record<string, number> }> {
+export async function fetchApiPricingContext(): Promise<{ source: ApiSource; multipliers: Record<string, number>; multiplier: number }> {
   try {
     const { data } = await supabase.from("system_settings").select("*").eq("id", 1).maybeSingle();
     
@@ -18,9 +18,10 @@ export async function fetchApiPricingContext(): Promise<{ source: ApiSource; mul
       AirtelTigo: 1 + (Number(data?.at_markup_percentage || 0) / 100),
     };
     
-    return { source: "primary", multipliers };
+    // Return fallback multiplier for older components
+    return { source: "primary", multipliers, multiplier: 1 };
   } catch (error) {
     console.error("Error fetching pricing context:", error);
-    return { source: "primary", multipliers: { MTN: 1, Telecel: 1, AirtelTigo: 1 } };
+    return { source: "primary", multipliers: { MTN: 1, Telecel: 1, AirtelTigo: 1 }, multiplier: 1 };
   }
 }

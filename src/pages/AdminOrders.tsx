@@ -671,7 +671,7 @@ const AdminOrders = () => {
                   </td>
                   <td className="px-4 py-3 text-center">
                     <Badge className={`text-[10px] border ${STATUS_COLORS[order.status] || "bg-white/10 text-white/40 border-white/10"}`}>
-                      {order.status === "pending" ? "verifying payment" : order.status.replace(/_/g, " ")}
+                      {order.status === "pending" ? "Awaiting Checkout" : order.status.replace(/_/g, " ")}
                     </Badge>
                     {order.failure_reason && (
                       <p className="text-[10px] text-red-400 mt-0.5 max-w-[120px] truncate mx-auto" title={order.failure_reason}>

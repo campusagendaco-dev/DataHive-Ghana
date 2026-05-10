@@ -86,7 +86,7 @@ const AgentStore = () => {
   const [globalSettings, setGlobalSettings] = useState<Record<string, GlobalPkgSetting>>({});
   const [parentAssignedPrices, setParentAssignedPrices] = useState<Record<string, Record<string, string | number>>>({});
   const [subAgentBaseFee, setSubAgentBaseFee] = useState<number | null>(null);
-  const [priceMultiplier, setPriceMultiplier] = useState(1);
+  const [priceMultipliers, setPriceMultipliers] = useState<Record<string, number>>({ MTN: 1, Telecel: 1, AirtelTigo: 1 });
 
   const phoneInputRef = useRef<HTMLInputElement>(null);
   const promoInputRef = useRef<HTMLInputElement>(null);
@@ -115,7 +115,7 @@ const AgentStore = () => {
             .eq("slug", slug)
             .maybeSingle(),
           supabase.from("global_package_settings").select("network, package_size, agent_price, sub_agent_price, public_price, is_unavailable"),
-          fetchApiPricingContext().catch(() => ({ source: "primary", multiplier: 1 })),
+          fetchApiPricingContext().catch(() => ({ source: "primary", multipliers: { MTN: 1, Telecel: 1, AirtelTigo: 1 }, multiplier: 1 })),
         ]);
 
         if (agentRes.error) {
@@ -127,7 +127,7 @@ const AgentStore = () => {
         const gsMap: Record<string, GlobalPkgSetting> = {};
         (pkgRes.data || []).forEach((r: any) => { gsMap[`${r.network}-${r.package_size}`] = r; });
         setGlobalSettings(gsMap);
-        setPriceMultiplier(pricingCtx.multiplier);
+        setPriceMultipliers(pricingCtx.multipliers || { MTN: 1, Telecel: 1, AirtelTigo: 1 });
 
         if (!agentRes.data) {
           setNotFound(true);
@@ -182,6 +182,7 @@ const AgentStore = () => {
   const resolveDisplayPrice = useCallback((network: string, size: string, fallbackPrice: number): number => {
     if (!agent) return fallbackPrice;
     
+    const multiplier = priceMultipliers[network] || 1;
     const parentAssigned = Number(parentAssignedPrices?.[network]?.[size]);
     const agentOwn = Number(agent.agent_prices?.[network]?.[size]);
     
@@ -191,9 +192,9 @@ const AgentStore = () => {
         Number.isFinite(parentAssigned) ? parentAssigned : 0,
         Number.isFinite(agentOwn) ? agentOwn : 0
       );
-      if (base > 0) return applyPriceMultiplier(base, priceMultiplier);
+      if (base > 0) return applyPriceMultiplier(base, multiplier);
     } else {
-      if (Number.isFinite(agentOwn) && agentOwn > 0) return applyPriceMultiplier(agentOwn, priceMultiplier);
+      if (Number.isFinite(agentOwn) && agentOwn > 0) return applyPriceMultiplier(agentOwn, multiplier);
     }
     
     const gs = globalSettings[`${network}-${size}`];
@@ -205,9 +206,9 @@ const AgentStore = () => {
       if (Number.isFinite(gsSub) && gsSub > 0) gsBase = gsSub;
     }
     
-    if (Number.isFinite(gsBase) && gsBase > 0) return applyPriceMultiplier(gsBase, priceMultiplier);
-    return applyPriceMultiplier(fallbackPrice, priceMultiplier);
-  }, [agent, globalSettings, parentAssignedPrices, priceMultiplier]);
+    if (Number.isFinite(gsBase) && gsBase > 0) return applyPriceMultiplier(gsBase, multiplier);
+    return applyPriceMultiplier(fallbackPrice, multiplier);
+  }, [agent, globalSettings, parentAssignedPrices, priceMultipliers]);
 
   const packages = (basePackages[selectedNetwork] || [])
     .map((pkg) => {

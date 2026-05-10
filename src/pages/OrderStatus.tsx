@@ -57,7 +57,7 @@ function getStatusMeta(status: OrderStatusType, failed: boolean, message?: strin
   if (status === "error") {
     return { color: "#EF4444", glow: "rgba(239,68,68,0.10)", label: "System Error", sub: message || "There was a problem connecting to the gateway.", badge: "Error" };
   }
-  return { color: "#6366F1", glow: "rgba(99,102,241,0.10)", label: "Verifying Payment", sub: message || "Waiting for secure payment confirmation...", badge: "Pending" };
+  return { color: "#D97706", glow: "rgba(217,119,6,0.10)", label: "Awaiting Payment", sub: message || "We are waiting for your checkout authorization on Paystack.", badge: "Pending" };
 }
 
 const OrderStatus = () => {
