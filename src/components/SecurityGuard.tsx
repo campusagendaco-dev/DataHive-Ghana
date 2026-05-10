@@ -1,17 +1,21 @@
 import React, { useEffect, useState, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ShieldAlert, Lock, Clock, LogOut } from "lucide-react";
+import { Lock, Clock, LogOut } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 
 // Constants for the Ghost Idle Timer
 const IDLE_TIMEOUT_MS = 15 * 60 * 1000; // 15 Minutes of complete inactivity
 const COUNTDOWN_SECONDS = 30; // Final warning duration before ejection
+const INITIAL_REVEAL_DURATION_MS = 300; // Cinematic 0.3s auto-reveal requested by user
 
 export function SecurityGuard({ children }: { children: React.ReactNode }) {
   const { user, signOut, profile } = useAuth();
+  
+  // Security Blocker States
   const [isBlurred, setIsBlurred] = useState(false);
   const [isEnabled, setIsEnabled] = useState(true);
+  const [isInitialReveal, setIsInitialReveal] = useState(true);
   
   // Idle Management State
   const [isWarning, setIsWarning] = useState(false);
@@ -58,6 +62,14 @@ export function SecurityGuard({ children }: { children: React.ReactNode }) {
       startCountdown();
     }, IDLE_TIMEOUT_MS);
   }, [user, isWarning, clearTimers, startCountdown]);
+
+  // 🎬 1. Automatic 0.3s Intro Reveal on Refresh
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setIsInitialReveal(false);
+    }, INITIAL_REVEAL_DURATION_MS);
+    return () => clearTimeout(timer);
+  }, []);
 
   // Check config from DB
   useEffect(() => {
@@ -141,16 +153,19 @@ export function SecurityGuard({ children }: { children: React.ReactNode }) {
     };
   }, [isEnabled, resetIdleTimer, clearTimers]);
 
+  // Consolidated Visual State
+  const isCurrentlyShielded = (isBlurred || isInitialReveal) && isEnabled;
+
   return (
     <div className="relative min-h-screen w-full overflow-hidden selection:bg-primary selection:text-black">
       {/* Main Application Layer */}
-      <div className={`transition-all duration-300 ${isBlurred ? "blur-xl grayscale scale-[0.98]" : "blur-0"}`}>
+      <div className={`transition-all duration-300 ${isCurrentlyShielded ? "blur-xl grayscale scale-[0.98]" : "blur-0"}`}>
         {children}
       </div>
 
-      {/* 🛡️ Layer 1: Task Switcher Privacy Overlay */}
+      {/* 🛡️ Layer 1: Identity Brand Shield Overlay */}
       <AnimatePresence>
-        {isBlurred && isEnabled && (
+        {isCurrentlyShielded && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -163,16 +178,23 @@ export function SecurityGuard({ children }: { children: React.ReactNode }) {
               animate={{ scale: 1, y: 0 }}
               className="flex flex-col items-center text-center px-6 max-w-md"
             >
-              <div className="w-20 h-20 rounded-2xl bg-primary/10 flex items-center justify-center mb-6 relative transform rotate-12">
-                <div className="absolute inset-0 rounded-2xl bg-primary/20 animate-ping opacity-20" />
-                <ShieldAlert className="w-10 h-10 text-primary transform -rotate-12" />
+              {/* 💎 Brand Logo integration with pulsing glow */}
+              <div className="relative w-24 h-24 mb-8 flex items-center justify-center group">
+                <div className="absolute inset-0 rounded-full bg-primary/30 animate-ping opacity-40 blur-md" />
+                <div className="absolute inset-0 rounded-3xl border border-primary/20 bg-primary/5 animate-pulse" />
+                <img 
+                  src="/logo.png" 
+                  alt="SwiftData Logo" 
+                  className="w-16 h-16 object-contain drop-shadow-2xl relative z-10 transition-transform group-hover:scale-110 duration-500" 
+                />
               </div>
+
               <h2 className="text-2xl font-black mb-2 text-foreground tracking-tight flex items-center gap-2">
                 <Lock className="w-5 h-5 text-primary" /> 
                 Secure Protection
               </h2>
-              <p className="text-muted-foreground text-sm font-medium leading-relaxed">
-                Your wallet and transaction privacy are enforced when you leave the app viewport.
+              <p className="text-muted-foreground text-sm font-medium leading-relaxed max-w-[280px]">
+                {isInitialReveal ? "Authenticating secure runtime environment..." : "Your wallet and account privacy are actively enforced."}
               </p>
             </motion.div>
           </motion.div>
