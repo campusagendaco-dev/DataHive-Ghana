@@ -1,4 +1,5 @@
-import { useRef } from "react";
+import { useRef, useState, useEffect } from "react";
+import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
@@ -14,7 +15,6 @@ const SafeQRCodeSVG = (props: any) => {
 };
 
 import { Store, ExternalLink, Copy, Download, Settings, QrCode, CheckCircle2 } from "lucide-react";
-import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 
