@@ -3,7 +3,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { basePackages } from "@/lib/data";
-import { useAppTheme } from "@/context/ThemeContext";
+import { useAppTheme } from "@/contexts/ThemeContext";
 import { cn } from "@/lib/utils";
 import {
   CalendarClock, Plus, Trash2, ToggleLeft, ToggleRight,
