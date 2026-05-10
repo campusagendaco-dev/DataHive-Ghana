@@ -28,7 +28,7 @@ export const TraditionalBackground = () => {
   };
 
   return (
-    <div className="fixed inset-0 w-full h-full overflow-hidden pointer-events-none z-0 select-none opacity-[0.04] dark:opacity-[0.1]">
+    <div className="fixed inset-0 w-full h-full overflow-hidden pointer-events-none z-0 select-none opacity-[0.1] dark:opacity-[0.2]">
       {symbols.map((sym, i) => (
         <motion.div
           key={i}

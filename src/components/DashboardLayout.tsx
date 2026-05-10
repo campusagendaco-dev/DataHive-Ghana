@@ -211,7 +211,7 @@ const DashboardLayout = () => {
 
         <main className={cn(
           "flex-1 overflow-y-auto overflow-x-hidden transition-all duration-300",
-          isDark ? "bg-black/40 backdrop-blur-sm" : "bg-white/40 backdrop-blur-sm"
+          isDark ? "bg-black/15 backdrop-blur-md" : "bg-white/20 backdrop-blur-md"
         )}>
           <div className="max-w-7xl mx-auto w-full">
             <Outlet />
