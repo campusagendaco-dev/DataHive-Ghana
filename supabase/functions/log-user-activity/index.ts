@@ -37,65 +37,74 @@ serve(async (req: Request) => {
     return new Response(null, { headers: corsHeaders });
   }
 
-  const authHeader = req.headers.get("Authorization");
-  if (!authHeader) {
-    return new Response(JSON.stringify({ error: "Unauthorized" }), {
-      status: 401,
+  try {
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // Extract real client IP — Cloudflare > nginx > forwarded chain
+    const ip =
+      req.headers.get("cf-connecting-ip") ||
+      req.headers.get("x-real-ip") ||
+      (req.headers.get("x-forwarded-for") || "").split(",")[0].trim() ||
+      null;
+
+    const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
+    const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
+    const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+
+    const supabaseUser = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+      global: { headers: { Authorization: authHeader } },
+    });
+
+    // Run auth check and geolocation lookup in parallel
+    const [userResult, location] = await Promise.all([
+      supabaseUser.auth.getUser(),
+      ip ? resolveLocation(ip) : Promise.resolve(null),
+    ]);
+
+    const { data: { user }, error } = userResult;
+    if (error || !user) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 200,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+    
+    // Log to security_logs
+    await supabaseAdmin.from("security_logs").insert({
+      user_id: user.id,
+      action: "login",
+      ip_address: ip,
+      metadata: { 
+        location: location,
+        user_agent: req.headers.get("user-agent")
+      }
+    });
+
+    // Also update standard activity log
+    await supabaseAdmin.rpc("log_user_activity", {
+      p_user_id: user.id,
+      p_ip: ip,
+      p_location: location,
+    });
+
+    return new Response(JSON.stringify({ ok: true, location }), {
+      status: 200,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
-  }
-
-  // Extract real client IP — Cloudflare > nginx > forwarded chain
-  const ip =
-    req.headers.get("cf-connecting-ip") ||
-    req.headers.get("x-real-ip") ||
-    (req.headers.get("x-forwarded-for") || "").split(",")[0].trim() ||
-    null;
-
-  const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
-  const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
-  const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-
-  const supabaseUser = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-    global: { headers: { Authorization: authHeader } },
-  });
-
-  // Run auth check and geolocation lookup in parallel
-  const [userResult, location] = await Promise.all([
-    supabaseUser.auth.getUser(),
-    ip ? resolveLocation(ip) : Promise.resolve(null),
-  ]);
-
-  const { data: { user }, error } = userResult;
-  if (error || !user) {
-    return new Response(JSON.stringify({ error: "Unauthorized" }), {
+  } catch (err) {
+    console.error("[Telemetry] Execution failed:", err);
+    // Return success true so that front-end login logic continues even if log fails!
+    return new Response(JSON.stringify({ ok: true, error_ignored: true }), {
       status: 200,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
-
-  const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
-  
-  // Log to security_logs
-  await supabaseAdmin.from("security_logs").insert({
-    user_id: user.id,
-    action: "login",
-    ip_address: ip,
-    metadata: { 
-      location: location,
-      user_agent: req.headers.get("user-agent")
-    }
-  });
-
-  // Also update standard activity log
-  await supabaseAdmin.rpc("log_user_activity", {
-    p_user_id: user.id,
-    p_ip: ip,
-    p_location: location,
-  });
-
-  return new Response(JSON.stringify({ ok: true, location }), {
-    status: 200,
-    headers: { ...corsHeaders, "Content-Type": "application/json" },
-  });
 });
