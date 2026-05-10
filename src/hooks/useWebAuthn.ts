@@ -56,22 +56,10 @@ export function useWebAuthn() {
     checkSupport();
   }, []);
 
-  const getOptionalToken = async (): Promise<string | null> => {
-    const { data } = await supabase.auth.getSession();
-    return data.session?.access_token || null;
-  };
-
   const invoke = async (action: string, extra: Record<string, unknown> = {}) => {
-    const token = await getOptionalToken();
-    
-    const headers: Record<string, string> = {};
-    if (token) {
-      headers["Authorization"] = `Bearer ${token}`;
-    }
-
+    // Supabase Client AUTOMATICALLY attaches the correct Auth Headers (Anon or Active Session)
     const { data, error } = await supabase.functions.invoke("webauthn-auth", {
       body: { action, ...extra },
-      headers: headers,
     });
     
     if (error) throw error;
@@ -80,8 +68,9 @@ export function useWebAuthn() {
   };
 
   const fetchCredentials = async () => {
-    const token = await getOptionalToken();
-    if (!token) {
+    // Need to check if we're logged in before loading credentials view
+    const { data: sess } = await supabase.auth.getSession();
+    if (!sess.session) {
       setLoadingCredentials(false);
       return;
     }

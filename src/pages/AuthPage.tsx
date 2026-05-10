@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ArrowRight, Eye, EyeOff, Loader2, Fingerprint } from "lucide-react";
 import { useWebAuthn } from "@/hooks/useWebAuthn";
+import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -42,8 +43,9 @@ const AuthPage = () => {
   const { toast } = useToast();
   const [searchParams] = useSearchParams();
   const referralCode = searchParams.get("ref") || "";
-  const { authenticate, isSupported } = useWebAuthn();
+  const { authenticate, register, isSupported } = useWebAuthn();
   const [biometricLoading, setBiometricLoading] = useState(false);
+  const [enableBiometricsOnSignUp, setEnableBiometricsOnSignUp] = useState(false);
 
   const getPostLoginRoute = async () => {
     const {
@@ -106,8 +108,18 @@ const AuthPage = () => {
       } else {
         const { error: signInError } = await signIn(email, password);
         if (!signInError) {
+          if (enableBiometricsOnSignUp) {
+            try {
+              toast({ title: "Sign Up Success!", description: "Please scan your fingerprint now to enable Biometric Login." });
+              await register("Primary Device");
+            } catch (regErr) {
+              console.error("Auto biometric setup failed:", regErr);
+              toast({ title: "Biometric Registration Skipped", description: "You can still enable it later from settings.", variant: "destructive" });
+            }
+          }
           toast({ title: "Welcome!", description: "Your account is ready." });
-          navigate("/dashboard");
+          const route = await getPostLoginRoute();
+          navigate(route);
         }
       }
     } else {
@@ -320,6 +332,29 @@ const AuthPage = () => {
                       required
                       minLength={6}
                     />
+                  </motion.div>
+                )}
+
+                {isSignUp && isSupported && (
+                  <motion.div layout className="flex items-start gap-2 bg-primary/5 p-3 rounded-xl border border-primary/10 mt-2">
+                    <Checkbox 
+                      id="enableBiometrics" 
+                      checked={enableBiometricsOnSignUp}
+                      onCheckedChange={(c) => setEnableBiometricsOnSignUp(!!c)}
+                      className="mt-0.5 border-primary/40 data-[state=checked]:bg-primary data-[state=checked]:border-primary"
+                    />
+                    <div className="grid gap-1.5 leading-none">
+                      <label
+                        htmlFor="enableBiometrics"
+                        className="text-xs font-bold flex items-center gap-1.5 cursor-pointer text-foreground"
+                      >
+                        <Fingerprint className="w-3.5 h-3.5 text-primary" />
+                        Enable Biometric Sign-in
+                      </label>
+                      <p className="text-[10px] text-muted-foreground">
+                        Sign in faster using your fingerprint or face next time.
+                      </p>
+                    </div>
                   </motion.div>
                 )}
               </motion.div>
