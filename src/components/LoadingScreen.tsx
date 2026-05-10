@@ -31,14 +31,14 @@ const LoadingScreen = () => {
         <div className="absolute w-[100px] h-[100px] rounded-full border-r border-primary/60 animate-spin" style={{ animationDuration: '2s', animationDirection: 'reverse' }} />
 
         {/* Logo Container with Gold Pulse */}
-        <div className="relative z-10 w-24 h-24 rounded-full bg-[#020402] border border-white/10 backdrop-blur-sm shadow-2xl overflow-hidden flex items-center justify-center">
+        <div className="relative z-10 w-24 h-24 rounded-full bg-[#020402] border border-white/10 backdrop-blur-sm shadow-2xl flex items-center justify-center overflow-hidden">
           <div className="absolute inset-0 rounded-full bg-primary/5 animate-ping opacity-20" />
           <img
             src="/logo.png"
             alt="SwiftData GH"
-            className="w-full h-full object-cover rounded-full"
+            className="w-full h-full object-contain p-4 relative z-10"
           />
-          <div className="absolute bottom-2 right-2 w-5 h-5 rounded-full bg-blue-600 flex items-center justify-center border-2 border-[#020402] shadow-[0_0_15px_rgba(37,99,235,0.4)]">
+          <div className="absolute bottom-2 right-2 w-5 h-5 rounded-full bg-blue-600 flex items-center justify-center border-2 border-[#020402] shadow-[0_0_15px_rgba(37,99,235,0.4)] z-20">
             <ShieldCheck className="w-3 h-3 text-white" />
           </div>
         </div>
