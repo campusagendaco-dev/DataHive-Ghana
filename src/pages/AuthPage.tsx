@@ -7,6 +7,25 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ArrowRight, Eye, EyeOff, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { motion, AnimatePresence } from "framer-motion";
+
+const containerVariants = {
+  hidden: { opacity: 0, y: 20 },
+  visible: { 
+    opacity: 1, 
+    y: 0,
+    transition: { 
+      duration: 0.5, 
+      staggerChildren: 0.08,
+      delayChildren: 0.1
+    }
+  }
+};
+
+const itemVariants = {
+  hidden: { opacity: 0, y: 10 },
+  visible: { opacity: 1, y: 0, transition: { type: "spring", stiffness: 300, damping: 30 } }
+};
 
 const AuthPage = () => {
   const [isSignUp, setIsSignUp] = useState(true);
@@ -119,140 +138,191 @@ const AuthPage = () => {
   };
 
   return (
-    <div className="min-h-screen pt-20 pb-16 px-4 flex items-center justify-center">
-      <div className="w-full max-w-md">
-        {/* Header */}
-        <div className="text-center mb-6">
-          <div className="flex items-center justify-center mb-4">
-            <div className="w-16 h-16 rounded-full bg-[#162316] flex items-center justify-center shadow-lg">
-              <span className="text-white font-black text-[11px] text-center leading-tight">SWIFT<br/>DATA</span>
-            </div>
-          </div>
-        </div>
+    <div className="min-h-screen pt-20 pb-16 px-4 flex items-center justify-center relative overflow-hidden">
+      
+      {/* Ambient Background Glows */}
+      <div className="absolute top-[-10%] right-[-10%] w-[40%] h-[40%] bg-primary/5 rounded-full blur-[120px] pointer-events-none" />
+      <div className="absolute bottom-[-10%] left-[-10%] w-[40%] h-[40%] bg-primary/5 rounded-full blur-[120px] pointer-events-none" />
 
-        <p className="text-center text-muted-foreground text-sm mb-4">
+      <motion.div 
+        className="w-full max-w-md relative z-10"
+        initial="hidden"
+        animate="visible"
+        variants={containerVariants}
+      >
+        {/* Header */}
+        <motion.div variants={itemVariants} className="text-center mb-6">
+          <div className="flex items-center justify-center mb-4">
+            <motion.div 
+              whileHover={{ scale: 1.05, rotate: 5 }}
+              className="w-16 h-16 rounded-full bg-[#162316] flex items-center justify-center shadow-xl border border-white/5"
+            >
+              <span className="text-white font-black text-[11px] text-center leading-tight tracking-wider">SWIFT<br/>DATA</span>
+            </motion.div>
+          </div>
+        </motion.div>
+
+        <motion.p variants={itemVariants} className="text-center text-muted-foreground text-sm mb-4 font-medium">
           {isSignUp
             ? "Create your account to access your dashboard"
             : "Sign in to continue to your dashboard"}
-        </p>
+        </motion.p>
 
         {/* Form Card */}
-        <div className="bg-card border border-border rounded-2xl p-6 sm:p-8">
-          {/* Enhanced Tab Switcher */}
-          <div className="flex p-1.5 bg-secondary/80 rounded-2xl mb-8 border border-border/50">
+        <motion.div 
+          variants={itemVariants}
+          className="bg-card border border-border shadow-2xl rounded-3xl p-6 sm:p-8 relative overflow-hidden backdrop-blur-md"
+          layout
+        >
+          {/* Enhanced Tab Switcher using Layout Animation */}
+          <div className="flex p-1.5 bg-secondary/80 rounded-2xl mb-8 border border-border/50 relative">
             <button
               onClick={() => { setIsSignUp(false); resetForm(); }}
-              className={`flex-1 py-3 text-xs font-black uppercase tracking-widest rounded-xl transition-all duration-300 ${
-                !isSignUp 
-                  ? "bg-card text-foreground shadow-md ring-1 ring-border translate-y-[-1px]" 
-                  : "text-muted-foreground hover:text-foreground"
+              className={`flex-1 relative z-10 py-3 text-xs font-black uppercase tracking-widest rounded-xl transition-colors duration-300 ${
+                !isSignUp ? "text-foreground" : "text-muted-foreground hover:text-foreground/80"
               }`}
             >
               Sign In
+              {!isSignUp && (
+                <motion.div
+                  layoutId="activeTab"
+                  className="absolute inset-0 bg-card rounded-xl shadow-md ring-1 ring-border z-[-1]"
+                  transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
+                />
+              )}
             </button>
             <button
               onClick={() => { setIsSignUp(true); resetForm(); }}
-              className={`flex-1 py-3 text-xs font-black uppercase tracking-widest rounded-xl transition-all duration-300 ${
-                isSignUp 
-                  ? "bg-primary text-primary-foreground shadow-[0_4px_20px_rgba(251,191,36,0.3)] translate-y-[-1px]" 
-                  : "text-muted-foreground hover:text-foreground"
+              className={`flex-1 relative z-10 py-3 text-xs font-black uppercase tracking-widest rounded-xl transition-colors duration-300 ${
+                isSignUp ? "text-primary-foreground" : "text-muted-foreground hover:text-foreground/80"
               }`}
             >
               Sign Up
+              {isSignUp && (
+                <motion.div
+                  layoutId="activeTab"
+                  className="absolute inset-0 bg-primary rounded-xl shadow-[0_4px_20px_rgba(251,191,36,0.3)] z-[-1]"
+                  transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
+                />
+              )}
             </button>
           </div>
 
-          <form onSubmit={handleSubmit} className="space-y-3.5">
-            {isSignUp && (
-              <div>
-                <Label htmlFor="fullName" className="text-xs">Full Name</Label>
-                <Input
-                  id="fullName"
-                  value={fullName}
-                  onChange={(e) => setFullName(e.target.value)}
-                  placeholder="Kwame Asante"
-                  className="mt-1 bg-secondary h-11"
-                  required
-                />
-              </div>
-            )}
+          <form onSubmit={handleSubmit} className="space-y-3.5 relative">
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={isSignUp ? "signup" : "signin"}
+                initial={{ opacity: 0, x: isSignUp ? 20 : -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: isSignUp ? -20 : 20 }}
+                transition={{ duration: 0.2 }}
+                className="space-y-3.5"
+              >
+                {isSignUp && (
+                  <motion.div layout>
+                    <Label htmlFor="fullName" className="text-xs font-bold">Full Name</Label>
+                    <Input
+                      id="fullName"
+                      value={fullName}
+                      onChange={(e) => setFullName(e.target.value)}
+                      placeholder="Kwame Asante"
+                      className="mt-1 bg-secondary h-11 border-transparent focus-visible:border-primary/30 focus-visible:ring-primary/10 rounded-xl transition-all"
+                      required
+                    />
+                  </motion.div>
+                )}
 
-            <div>
-              <Label htmlFor="email" className="text-xs">Email</Label>
-              <Input
-                id="email"
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="kwame@example.com"
-                className="mt-1 bg-secondary h-11"
-                required
-              />
-            </div>
+                <motion.div layout>
+                  <Label htmlFor="email" className="text-xs font-bold">Email</Label>
+                  <Input
+                    id="email"
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="kwame@example.com"
+                    className="mt-1 bg-secondary h-11 border-transparent focus-visible:border-primary/30 focus-visible:ring-primary/10 rounded-xl transition-all"
+                    required
+                  />
+                </motion.div>
 
-            <div>
-              <Label htmlFor="password" className="text-xs">Password</Label>
-              <div className="relative mt-1">
-                <Input
-                  id="password"
-                  type={showPassword ? "text" : "password"}
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="••••••••"
-                  className="bg-secondary pr-10 h-11"
-                  required
-                  minLength={6}
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
-                >
-                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                </button>
-              </div>
-              {!isSignUp && (
-                <button
-                  type="button"
-                  onClick={handleForgotPassword}
-                  className="mt-1.5 text-xs text-primary hover:underline"
-                >
-                  Forgot password?
-                </button>
-              )}
-            </div>
+                <motion.div layout>
+                  <Label htmlFor="password" className="text-xs font-bold">Password</Label>
+                  <div className="relative mt-1">
+                    <Input
+                      id="password"
+                      type={showPassword ? "text" : "password"}
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      placeholder="••••••••"
+                      className="bg-secondary pr-10 h-11 border-transparent focus-visible:border-primary/30 focus-visible:ring-primary/10 rounded-xl transition-all"
+                      required
+                      minLength={6}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                    >
+                      {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
+                  {!isSignUp && (
+                    <motion.button
+                      layout
+                      type="button"
+                      onClick={handleForgotPassword}
+                      className="mt-1.5 text-xs text-primary font-semibold hover:underline"
+                    >
+                      Forgot password?
+                    </motion.button>
+                  )}
+                </motion.div>
 
-            {isSignUp && (
-              <div>
-                <Label htmlFor="confirmPassword" className="text-xs">Confirm Password</Label>
-                <Input
-                  id="confirmPassword"
-                  type={showPassword ? "text" : "password"}
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                  placeholder="••••••••"
-                  className="mt-1 bg-secondary h-11"
-                  required
-                  minLength={6}
-                />
-              </div>
-            )}
+                {isSignUp && (
+                  <motion.div layout>
+                    <Label htmlFor="confirmPassword" className="text-xs font-bold">Confirm Password</Label>
+                    <Input
+                      id="confirmPassword"
+                      type={showPassword ? "text" : "password"}
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      placeholder="••••••••"
+                      className="mt-1 bg-secondary h-11 border-transparent focus-visible:border-primary/30 focus-visible:ring-primary/10 rounded-xl transition-all"
+                      required
+                      minLength={6}
+                    />
+                  </motion.div>
+                )}
+              </motion.div>
+            </AnimatePresence>
 
-            <Button type="submit" className="w-full h-11 text-sm font-semibold" disabled={loading || !!oauthLoading}>
-              {loading ? "Please wait..." : isSignUp ? "Create Account" : "Sign In"}
-              <ArrowRight className="ml-2 w-4 h-4" />
-            </Button>
+            <motion.div layout className="pt-2">
+              <Button 
+                type="submit" 
+                className="w-full h-12 text-sm font-black shadow-lg shadow-primary/20 rounded-xl transition-all hover:shadow-primary/30 active:scale-[0.98]" 
+                disabled={loading || !!oauthLoading}
+              >
+                {loading ? (
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                ) : (
+                  <>
+                    {isSignUp ? "Create Account" : "Sign In"}
+                    <ArrowRight className="ml-2 w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                  </>
+                )}
+              </Button>
+            </motion.div>
           </form>
 
           {/* Toggle Sign Up / Sign In (Removed old toggle) */}
 
           <div className="mt-3 text-center border-t border-border pt-3">
-            <Link to="/agent-program" className="text-xs text-primary hover:underline">
+            <Link to="/agent-program" className="text-xs font-black text-primary hover:underline tracking-tight">
               Want to become an agent? Learn more →
             </Link>
           </div>
-        </div>
-      </div>
+        </motion.div>
+      </motion.div>
     </div>
   );
 };
