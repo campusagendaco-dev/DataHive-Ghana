@@ -157,15 +157,17 @@ const BuyData = () => {
     return () => clearTimeout(timer);
   }, [phone, selectedNetwork, isPhoneValid, resolvedName, resolvingName, phoneDigits]);
 
-  const packages = (basePackages[selectedNetwork] || [])
-    .map((pkg) => {
-      const gs = globalSettings[`${selectedNetwork}-${pkg.size}`];
-      if (gs?.is_unavailable) return null;
-      const base = gs?.public_price ?? getPublicPrice(pkg.price);
-      const multiplier = priceMultipliers[selectedNetwork] || 1;
-      return { ...pkg, price: applyPriceMultiplier(base, multiplier) };
-    })
-    .filter(Boolean) as { size: string; price: number; validity: string; popular?: boolean }[];
+  const packages = useMemo(() => {
+    return (basePackages[selectedNetwork] || [])
+      .map((pkg) => {
+        const gs = globalSettings[`${selectedNetwork}-${pkg.size}`];
+        if (gs?.is_unavailable) return null;
+        const base = gs?.public_price ?? getPublicPrice(pkg.price);
+        const multiplier = priceMultipliers[selectedNetwork] || 1;
+        return { ...pkg, price: applyPriceMultiplier(base, multiplier) };
+      })
+      .filter(Boolean) as { size: string; price: number; validity: string; popular?: boolean }[];
+  }, [basePackages, selectedNetwork, globalSettings, priceMultipliers]);
 
   // Apply promo discount to price
   const validPromo = promoResult?.valid ? promoResult : null;
@@ -296,6 +298,49 @@ const BuyData = () => {
   };
 
   const colors = getNetworkCardColors(selectedNetwork);
+  
+  const memoizedGrid = useMemo(() => {
+    return (
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
+        {packages.map((pkg) => {
+          const isSelected = selectedPkg?.size === pkg.size;
+          return (
+            <button
+              key={pkg.size}
+              onClick={() => handleCardClick(pkg.size, pkg.price)}
+              className={`${colors.card} rounded-2xl p-4 sm:p-5 flex flex-col gap-2.5 border-2 text-left transition-all duration-200 relative ${
+                isSelected
+                  ? "border-white/80 shadow-2xl scale-[1.04]"
+                  : "border-transparent hover:border-white/30 hover:scale-[1.02]"
+              }`}
+            >
+              {/* Selected indicator */}
+              {isSelected && (
+                <span className="absolute top-2.5 right-2.5 w-5 h-5 rounded-full bg-white flex items-center justify-center shadow">
+                  <span className="w-2.5 h-2.5 rounded-full bg-black" />
+                </span>
+              )}
+              {pkg.popular && !isSelected && (
+                <span className="absolute top-2 right-2 text-[9px] font-black bg-black/25 text-white px-1.5 py-0.5 rounded">
+                  HOT
+                </span>
+              )}
+              <span className={`${colors.label} text-[11px] font-bold uppercase tracking-wide opacity-70`}>{selectedNetwork}</span>
+              
+              <div className="flex flex-col gap-0.5">
+                <p className={`${colors.size} text-3xl sm:text-4xl font-black leading-none tracking-tighter`}>{pkg.size}</p>
+                <p className={`${colors.size} text-base sm:text-lg font-black opacity-90`}>₵{pkg.price.toFixed(2)}</p>
+              </div>
+              
+              <div className="mt-auto pt-1">
+                <p className={`${colors.label} text-[9px] font-medium uppercase tracking-wider opacity-60`}>No Expiry</p>
+              </div>
+            </button>
+          );
+        })}
+      </div>
+    );
+  }, [packages, selectedPkg?.size, colors, handleCardClick, selectedNetwork]);
 
   return (
     <div className="min-h-screen pt-20 pb-24 transition-all duration-300">
@@ -397,44 +442,7 @@ const BuyData = () => {
             {Array.from({ length: 8 }).map((_, i) => <Skeleton key={i} className="h-[140px] rounded-2xl" />)}
           </div>
         ) : (
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
-            {packages.map((pkg) => {
-              const isSelected = selectedPkg?.size === pkg.size;
-              return (
-                <button
-                  key={pkg.size}
-                  onClick={() => handleCardClick(pkg.size, pkg.price)}
-                  className={`${colors.card} rounded-2xl p-4 sm:p-5 flex flex-col gap-2.5 border-2 text-left transition-all duration-200 relative ${
-                    isSelected
-                      ? "border-white/80 shadow-2xl scale-[1.04]"
-                      : "border-transparent hover:border-white/30 hover:scale-[1.02]"
-                  }`}
-                >
-                  {/* Selected indicator */}
-                  {isSelected && (
-                    <span className="absolute top-2.5 right-2.5 w-5 h-5 rounded-full bg-white flex items-center justify-center shadow">
-                      <span className="w-2.5 h-2.5 rounded-full bg-black" />
-                    </span>
-                  )}
-                  {pkg.popular && !isSelected && (
-                    <span className="absolute top-2 right-2 text-[9px] font-black bg-black/25 text-white px-1.5 py-0.5 rounded">
-                      HOT
-                    </span>
-                  )}
-                  <span className={`${colors.label} text-[11px] font-bold uppercase tracking-wide opacity-70`}>{selectedNetwork}</span>
-                  
-                  <div className="flex flex-col gap-0.5">
-                    <p className={`${colors.size} text-3xl sm:text-4xl font-black leading-none tracking-tighter`}>{pkg.size}</p>
-                    <p className={`${colors.size} text-base sm:text-lg font-black opacity-90`}>₵{pkg.price.toFixed(2)}</p>
-                  </div>
-                  
-                  <div className="mt-auto pt-1">
-                    <p className={`${colors.label} text-[9px] font-medium uppercase tracking-wider opacity-60`}>No Expiry</p>
-                  </div>
-                </button>
-              );
-            })}
-          </div>
+          memoizedGrid
         )}
 
         {/* Footer promo */}
