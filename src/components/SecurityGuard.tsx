@@ -141,32 +141,12 @@ export function SecurityGuard({ children }: { children: React.ReactNode }) {
     };
   }, [isEnabled, resetIdleTimer, clearTimers]);
 
-  // Dynamic Visual Watermark Logic
-  const watermarkText = user?.email 
-    ? `${user.email.split('@')[0].toUpperCase()} • ${profile?.phone || user.id.substring(0, 6)}` 
-    : null;
-
   return (
     <div className="relative min-h-screen w-full overflow-hidden selection:bg-primary selection:text-black">
       {/* Main Application Layer */}
       <div className={`transition-all duration-300 ${isBlurred ? "blur-xl grayscale scale-[0.98]" : "blur-0"}`}>
         {children}
       </div>
-
-      {/* 🕵️‍♂️ Layer 3: Visual Dynamic Watermark Grid (Only shown to logged in users) */}
-      {isEnabled && watermarkText && !isBlurred && (
-        <div className="fixed inset-0 z-[9999] pointer-events-none opacity-[0.025] dark:opacity-[0.04] overflow-hidden select-none mix-blend-difference flex items-center justify-center flex-wrap content-center gap-x-32 gap-y-48">
-          {Array.from({ length: 40 }).map((_, i) => (
-            <div 
-              key={i} 
-              className="transform -rotate-[35deg] text-sm font-black tracking-[0.2em] text-foreground whitespace-nowrap"
-              style={{ textShadow: "1px 1px 0 rgba(0,0,0,0.1)" }}
-            >
-              {watermarkText}
-            </div>
-          ))}
-        </div>
-      )}
 
       {/* 🛡️ Layer 1: Task Switcher Privacy Overlay */}
       <AnimatePresence>
