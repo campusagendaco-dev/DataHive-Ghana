@@ -421,11 +421,15 @@ const BuyData = () => {
                       HOT
                     </span>
                   )}
-                  <span className={`${colors.label} text-[11px] font-bold uppercase tracking-wide`}>{selectedNetwork}</span>
-                  <p className={`${colors.size} text-3xl sm:text-4xl font-black leading-none`}>{pkg.size}</p>
-                  <div className="flex items-end justify-between mt-auto pt-1">
-                    <p className={`${colors.size} text-sm sm:text-base font-black`}>₵{pkg.price.toFixed(2)}</p>
-                    <p className={`${colors.label} text-[10px] font-medium`}>No Expiry</p>
+                  <span className={`${colors.label} text-[11px] font-bold uppercase tracking-wide opacity-70`}>{selectedNetwork}</span>
+                  
+                  <div className="flex flex-col gap-0.5">
+                    <p className={`${colors.size} text-3xl sm:text-4xl font-black leading-none tracking-tighter`}>{pkg.size}</p>
+                    <p className={`${colors.size} text-base sm:text-lg font-black opacity-90`}>₵{pkg.price.toFixed(2)}</p>
+                  </div>
+                  
+                  <div className="mt-auto pt-1">
+                    <p className={`${colors.label} text-[9px] font-medium uppercase tracking-wider opacity-60`}>No Expiry</p>
                   </div>
                 </button>
               );
@@ -527,7 +531,7 @@ const BuyData = () => {
                   </div>
 
                   {/* Magnitude Display */}
-                  <h3 className="text-4xl font-black tracking-tighter text-white mb-1 drop-shadow-[0_4px_10px_rgba(0,0,0,0.3)]">
+                  <h3 className="text-4xl font-black tracking-tighter text-white drop-shadow-[0_4px_10px_rgba(0,0,0,0.3)]">
                     {selectedPkg.size}
                   </h3>
 
@@ -536,13 +540,13 @@ const BuyData = () => {
                     initial={{ scale: 0.5, opacity: 0, rotate: -45 }}
                     animate={{ scale: 1, opacity: 1, rotate: 0 }}
                     transition={{ delay: 0.2, type: "spring", bounce: 0.5 }}
-                    className="flex items-center justify-center my-2.5"
+                    className="flex items-center justify-center my-1"
                   >
                     <div className="relative">
                       {/* Ambient Ring Glow behind Icon */}
                       <div className="absolute inset-0 blur-xl opacity-50 rounded-full bg-amber-500/40 animate-pulse" />
                       <svg 
-                        width="40" height="40" viewBox="0 0 24 24" 
+                        width="36" height="36" viewBox="0 0 24 24" 
                         fill="currentColor" 
                         className="relative z-10 text-amber-400 drop-shadow-[0_4px_12px_rgba(245,158,11,0.5)]"
                       >
