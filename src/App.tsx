@@ -21,6 +21,7 @@ import NotificationPopup from "@/components/NotificationPopup";
 import { OfflineAlert } from "@/components/OfflineAlert";
 import { useRegisterSW } from "virtual:pwa-register/react";
 import LoadingScreen from "@/components/LoadingScreen";
+import { TraditionalBackground } from "@/components/TraditionalBackground";
 import IpBlocked from "./pages/IpBlocked";
 import Maintenance from "./pages/Maintenance";
 
@@ -294,6 +295,7 @@ const AppContent = () => {
 
   return (
     <>
+      {location.pathname !== "/" && <TraditionalBackground />}
       {!isDashboard && !isAgentStore && !isAdmin && <Navbar />}
       <Suspense fallback={<LoadingScreen />}>
       <Routes>
