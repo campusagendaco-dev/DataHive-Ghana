@@ -141,18 +141,12 @@ const AuthPage = () => {
   };
 
   const handleBiometricLogin = async () => {
-    if (!email.trim()) {
-      toast({ 
-        title: "Email Required", 
-        description: "Please enter your email address first to use biometrics.", 
-        variant: "destructive" 
-      });
-      return;
-    }
-    
     setBiometricLoading(true);
     try {
-      const success = await authenticate(email.trim());
+      // 1. Call with current input email, or let simplewebauthn trigger browser lookup without it
+      const loginEmail = email.trim() || undefined;
+      
+      const success = await authenticate(loginEmail);
       if (success) {
         toast({ title: "Success!", description: "Successfully signed in with biometrics." });
         const route = await getPostLoginRoute();
@@ -160,9 +154,11 @@ const AuthPage = () => {
       }
     } catch (err: any) {
       console.error("Biometric Login Error:", err);
+      // Provide a helpful hint if no email was entered and it failed
+      const hint = !email.trim() ? "\n\nHint: Try entering your email first if this is your first time using this device." : "";
       toast({ 
         title: "Biometric Failed", 
-        description: err.message || "Could not verify identity.", 
+        description: (err.message || "Could not verify identity.") + hint, 
         variant: "destructive" 
       });
     } finally {
