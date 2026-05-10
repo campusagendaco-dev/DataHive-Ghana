@@ -1,11 +1,39 @@
 import React, { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { ShieldAlert, Lock } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
 
 export function SecurityGuard({ children }: { children: React.ReactNode }) {
   const [isBlurred, setIsBlurred] = useState(false);
+  const [isEnabled, setIsEnabled] = useState(true); // Optimistic default
 
   useEffect(() => {
+    const checkConfig = async () => {
+      try {
+        const { data } = await supabase.functions.invoke("system-settings", {
+          body: { action: "get" }
+        });
+        if (data) {
+          const val = data.enable_privacy_shield !== false;
+          setIsEnabled(val);
+          if (val) document.body.classList.add("shield-active");
+          else document.body.classList.remove("shield-active");
+        }
+      } catch (e) {
+        setIsEnabled(true);
+        document.body.classList.add("shield-active");
+      }
+    };
+    checkConfig();
+  }, []);
+
+  useEffect(() => {
+    if (!isEnabled) {
+      document.body.classList.remove("shield-active");
+      return; 
+    }
+    document.body.classList.add("shield-active");
+
     // 🚫 1. Block Right Click Context Menu
     const handleContextMenu = (e: MouseEvent) => {
       e.preventDefault();

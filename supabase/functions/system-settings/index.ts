@@ -17,6 +17,7 @@ const DEFAULT_SETTINGS = {
   support_channel_link: "https://whatsapp.com/channel/0029Vb6Xwed60eBaztkH2B3m",
   sub_agent_base_fee: 80,
   agent_activation_fee: 50,
+  enable_privacy_shield: true,
 };
 
 const coerceText = (value: unknown): string => String(value ?? "").trim();
@@ -139,7 +140,7 @@ serve(async (req) => {
 
   const readSettings = async () => {
     const fullSelect =
-      "auto_api_switch, preferred_provider, backup_provider, holiday_mode_enabled, holiday_message, disable_ordering, dark_mode_enabled, customer_service_number, support_channel_link, active_api_source, secondary_price_markup_pct, sub_agent_base_fee, agent_activation_fee, traditional_background_enabled, background_custom_image_url";
+      "auto_api_switch, preferred_provider, backup_provider, holiday_mode_enabled, holiday_message, disable_ordering, dark_mode_enabled, customer_service_number, support_channel_link, active_api_source, secondary_price_markup_pct, sub_agent_base_fee, agent_activation_fee, traditional_background_enabled, background_custom_image_url, enable_privacy_shield";
     const legacySelect =
       "auto_api_switch, preferred_provider, backup_provider, holiday_mode_enabled, holiday_message, disable_ordering, dark_mode_enabled, customer_service_number, support_channel_link";
 
@@ -184,6 +185,7 @@ serve(async (req) => {
       agent_activation_fee: Number(data?.agent_activation_fee ?? DEFAULT_SETTINGS.agent_activation_fee),
       traditional_background_enabled: data?.traditional_background_enabled !== false,
       background_custom_image_url: coerceText(data?.background_custom_image_url),
+      enable_privacy_shield: data?.enable_privacy_shield !== false,
       table_ready: true,
       warning: null,
     };
@@ -285,6 +287,7 @@ serve(async (req) => {
       agent_activation_fee: agentActivationFee,
       traditional_background_enabled: payload?.traditional_background_enabled !== false,
       background_custom_image_url: coerceText(payload?.background_custom_image_url),
+      enable_privacy_shield: payload?.enable_privacy_shield !== false,
       updated_at: new Date().toISOString(),
       updated_by: user.id,
     };

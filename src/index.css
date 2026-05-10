@@ -373,13 +373,13 @@
 
 /* ── Secure Shield: Anti-Print & Anti-Snapshot Overrides ─── */
 @media print {
-  body * {
+  body.shield-active * {
     display: none !important;
   }
-  body {
+  body.shield-active {
     background: #000000 !important;
   }
-  body::before {
+  body.shield-active::before {
     content: "THIS CONTENT IS PROTECTED BY SWIFTDATA SECURE SHIELD. EXPORTING IS PROHIBITED.";
     display: flex !important;
     position: fixed;
@@ -397,7 +397,7 @@
 }
 
 /* Deter default text copy operations on non-input elements */
-.secure-area {
+body.shield-active .secure-area {
   -webkit-user-select: none;
   -moz-user-select: none;
   -ms-user-select: none;

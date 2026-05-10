@@ -67,6 +67,7 @@ interface SystemSettings {
   bece_cost_price: string;
   traditional_background_enabled: boolean;
   background_custom_image_url: string;
+  enable_privacy_shield: boolean;
 }
 
 const AdminSettings = () => {
@@ -128,6 +129,7 @@ const AdminSettings = () => {
     bece_cost_price: "14.00",
     traditional_background_enabled: true,
     background_custom_image_url: "",
+    enable_privacy_shield: true,
   });
 
   const [currentIp, setCurrentIp] = useState("");
@@ -214,6 +216,9 @@ const AdminSettings = () => {
           bece_price: String(d.bece_price || "15.00"),
           wassce_cost_price: String(d.wassce_cost_price || "17.00"),
           bece_cost_price: String(d.bece_cost_price || "14.00"),
+          traditional_background_enabled: d.traditional_background_enabled !== false,
+          background_custom_image_url: String(d.background_custom_image_url || ""),
+          enable_privacy_shield: d.enable_privacy_shield !== false,
         });
       }
       setLoading(false);
@@ -260,6 +265,9 @@ const AdminSettings = () => {
       bece_price: parseFloat(settings.bece_price) || 15.00,
       wassce_cost_price: parseFloat(settings.wassce_cost_price) || 17.00,
       bece_cost_price: parseFloat(settings.bece_cost_price) || 14.00,
+      traditional_background_enabled: settings.traditional_background_enabled,
+      background_custom_image_url: settings.background_custom_image_url,
+      enable_privacy_shield: settings.enable_privacy_shield,
     };
 
     try {
@@ -428,6 +436,20 @@ const AdminSettings = () => {
                 <Switch
                   checked={settings.store_visitor_popup_enabled}
                   onCheckedChange={(c) => setSettings({ ...settings, store_visitor_popup_enabled: c })}
+                />
+              </div>
+
+              <div className="flex items-start justify-between p-3 bg-amber-500/5 border border-amber-500/20 rounded-xl">
+                <div className="space-y-0.5">
+                  <Label className="flex items-center gap-2">
+                    <Shield className="w-4 h-4 text-amber-500" />
+                    Secure Privacy Shield
+                  </Label>
+                  <p className="text-xs text-muted-foreground">Disables right-click, blurs screen when minimized, and blocks printing.</p>
+                </div>
+                <Switch
+                  checked={settings.enable_privacy_shield}
+                  onCheckedChange={(c) => setSettings({ ...settings, enable_privacy_shield: c })}
                 />
               </div>
 
