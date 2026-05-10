@@ -95,7 +95,7 @@ export function useWebAuthn() {
       payload: { rpId: window.location.hostname } 
     });
     const response = await startRegistration({ optionsJSON: options });
-    await invoke("verify-registration", { response, deviceName });
+    await invoke("verify-registration", { payload: { response, deviceName } });
     await fetchCredentials();
   };
 
@@ -104,12 +104,12 @@ export function useWebAuthn() {
       rpId: window.location.hostname
     });
     const response = await startAuthentication({ optionsJSON: options });
-    const result = await invoke("verify-authentication", { response });
+    const result = await invoke("verify-authentication", { payload: { response } });
     return result?.verified === true;
   };
 
   const deleteCredential = async (credentialId: string): Promise<void> => {
-    await invoke("delete-credential", { credentialId });
+    await invoke("delete-credential", { payload: { credentialId } });
     await fetchCredentials();
   };
 

@@ -112,7 +112,7 @@ serve(async (req: Request) => {
         const { error: storeError } = await supabaseAdmin.from("user_credentials").insert({
           user_id: user.id,
           credential_id: response.id,
-          public_key: response.attestationObject, // Simplified storage
+          public_key: response.response?.attestationObject || "{}", // Extract string base64
           device_name: deviceName || "My Device",
           device_type: response.type
         });
