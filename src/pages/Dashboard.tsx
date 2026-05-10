@@ -159,12 +159,12 @@ const Dashboard = () => {
         
         <div className="flex items-center gap-2">
           {/* Live Premium Clock */}
-          <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-xl border border-white/5 bg-white/[0.02] backdrop-blur-md shadow-lg">
+          <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border border-white/5 bg-white/[0.02] backdrop-blur-md shadow-lg">
             <div className="relative flex items-center justify-center">
-              <Clock className="w-3.5 h-3.5 text-amber-400/80" />
+              <Clock className="w-3 h-3 text-amber-400/80" />
               <span className="absolute inset-0 rounded-full bg-amber-400/20 animate-ping pointer-events-none" />
             </div>
-            <span className="text-xs font-bold text-white/60 font-mono tracking-tight">
+            <span className="text-[10px] font-bold text-white/60 font-mono tracking-tight">
               {format(currentTime, "hh:mm:ss a")}
             </span>
           </div>
@@ -195,9 +195,16 @@ const Dashboard = () => {
 
         <div className="relative flex flex-col sm:flex-row sm:items-start gap-4">
           <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 mb-1">
-              <Activity className="w-3 h-3 text-white/40" />
-              <p className="text-white/40 text-xs uppercase tracking-widest font-bold">Wallet Balance</p>
+            <div className="flex items-center gap-2 mb-1 bg-white/5 px-2.5 py-1 rounded-xl w-fit border border-white/10">
+              <div className="relative flex items-center justify-center">
+                <Activity className="w-3 h-3 text-emerald-400" />
+                <div className="absolute inset-0 rounded-full bg-emerald-400/30 animate-ping" />
+              </div>
+              <p className="text-white/60 text-[10px] font-black tracking-widest uppercase flex items-center gap-1.5">
+                Live System 
+                <span className="w-1 h-1 rounded-full bg-white/20" />
+                {format(currentTime, "hh:mm:ss a")}
+              </p>
             </div>
 
             {loading
