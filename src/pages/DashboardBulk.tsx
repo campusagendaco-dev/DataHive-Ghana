@@ -29,7 +29,7 @@ const DashboardBulk = () => {
   const [selectedNetwork, setSelectedNetwork] = useState<"MTN" | "Telecel" | "AirtelTigo">("MTN");
   const [selectedSize, setSelectedSize]       = useState("");
   const [isProcessing, setIsProcessing]       = useState(false);
-  const [results, setResults]                 = useState<{ phone: string; status: "success" | "failed"; error?: string }[] | null>(null);
+  const [results, setResults]                 = useState<{ phone: string; size?: string; status: "success" | "failed"; error?: string }[] | null>(null);
   const [showSuccessOverlay, setShowSuccessOverlay] = useState(false);
   const [showB2B, setShowB2B]                 = useState(false);
   const [confirmOpen, setConfirmOpen]         = useState(false);
@@ -38,28 +38,62 @@ const DashboardBulk = () => {
   const packages = useMemo(() => basePackages[selectedNetwork] || [], [selectedNetwork]);
   const selectedPackage = packages.find(p => p.size === selectedSize);
 
-  const parsedNumbers = useMemo(() => {
+  // Parse each line as "phone [gb]"  e.g. "0241234567 2" or just "0241234567"
+  const parsedEntries = useMemo(() => {
     return inputNumbers
-      .split(/[\s,;\n]+/)
-      .map(n => n.replace(/\D+/g, ""))
-      .filter(n => n.length >= 9 && n.length <= 12);
+      .split(/\n/)
+      .map(line => line.trim())
+      .filter(Boolean)
+      .flatMap(line => {
+        // split on whitespace/comma — first token is phone, second is GB
+        const parts = line.split(/[\s,]+/);
+        const phone = parts[0].replace(/\D/g, "");
+        const gbRaw = parts[1]?.replace(/\D/g, "") || "";
+        if (phone.length < 9 || phone.length > 12) return [];
+        return [{ phone, gb: gbRaw }];
+      });
   }, [inputNumbers]);
 
-  const totalCost = (selectedPackage?.price || 0) * parsedNumbers.length;
-  const canSend   = parsedNumbers.length > 0 && !!selectedSize && !isProcessing;
+  // Resolve each entry's package: per-line GB → find matching package, else fall back to selected
+  const resolvedEntries = useMemo(() => {
+    return parsedEntries.map(({ phone, gb }) => {
+      let pkg = selectedPackage;
+      if (gb) {
+        const gbNum = parseInt(gb, 10);
+        const match = packages.find(p => {
+          const n = parseInt(p.size.replace(/\D/g, ""), 10);
+          return n === gbNum;
+        });
+        if (match) pkg = match;
+      }
+      return { phone, pkg };
+    });
+  }, [parsedEntries, selectedPackage, packages]);
 
-  // CSV upload
+  const validEntries = resolvedEntries.filter(e => !!e.pkg);
+  const totalCost    = validEntries.reduce((sum, e) => sum + (e.pkg?.price || 0), 0);
+  const canSend      = validEntries.length > 0 && !isProcessing;
+
+  // Parse CSV/Excel — reads "Phone Number, Data Size (GB)" column format
   const handleFileUpload = (file: File) => {
     const reader = new FileReader();
     reader.onload = (e) => {
       const text = e.target?.result as string;
-      const numbers = text
-        .split(/[\r\n,;]+/)
-        .map(n => n.replace(/\D+/g, "").trim())
-        .filter(n => n.length >= 9 && n.length <= 12)
-        .join("\n");
-      setInputNumbers(prev => prev ? prev + "\n" + numbers : numbers);
-      toast({ title: `Loaded ${numbers.split("\n").filter(Boolean).length} numbers from file` });
+      const lines = text.split(/[\r\n]+/).filter(Boolean);
+      const rows: string[] = [];
+      lines.forEach(line => {
+        // skip header rows
+        if (/phone|number|data|size|gb/i.test(line) && rows.length === 0) return;
+        // try CSV: col A = phone, col B = gb
+        const cols = line.split(/[,\t]+/);
+        const phone = cols[0]?.replace(/\D/g, "").trim();
+        const gb    = cols[1]?.replace(/\D/g, "").trim();
+        if (phone && phone.length >= 9 && phone.length <= 12) {
+          rows.push(gb ? `${phone} ${gb}` : phone);
+        }
+      });
+      setInputNumbers(prev => prev ? prev + "\n" + rows.join("\n") : rows.join("\n"));
+      toast({ title: `Loaded ${rows.length} entries from file` });
     };
     reader.readAsText(file);
   };
@@ -69,33 +103,33 @@ const DashboardBulk = () => {
     setIsProcessing(true);
     setResults([]);
 
-    const batchResults: { phone: string; status: "success" | "failed"; error?: string }[] = [];
+    const batchResults: { phone: string; size: string; status: "success" | "failed"; error?: string }[] = [];
 
-    for (let i = 0; i < parsedNumbers.length; i++) {
-      const phone = parsedNumbers[i];
+    for (let i = 0; i < validEntries.length; i++) {
+      const { phone, pkg } = validEntries[i];
       try {
         const { data, error } = await supabase.functions.invoke("wallet-buy-data", {
           body: {
             network: selectedNetwork,
-            package_size: selectedPackage!.size,
+            package_size: pkg!.size,
             customer_phone: phone,
-            amount: selectedPackage!.price,
+            amount: pkg!.price,
             reference: crypto.randomUUID(),
           },
         });
 
         if (error || data?.error) {
-          batchResults.push({ phone, status: "failed", error: data?.error || "Transaction failed" });
+          batchResults.push({ phone, size: pkg!.size, status: "failed", error: data?.error || "Transaction failed" });
         } else {
           if (data?.order_id) {
             supabase.functions.invoke("verify-payment", { body: { reference: data.order_id } }).catch(() => {});
           }
-          batchResults.push({ phone, status: "success" });
+          batchResults.push({ phone, size: pkg!.size, status: "success" });
         }
       } catch {
-        batchResults.push({ phone, status: "failed", error: "System error" });
+        batchResults.push({ phone, size: pkg!.size, status: "failed", error: "System error" });
       }
-      setResults([...batchResults]);
+      setResults([...batchResults] as any);
     }
 
     setIsProcessing(false);
@@ -122,10 +156,10 @@ const DashboardBulk = () => {
           </div>
           <button
             onClick={() => {
-              const csv = "phone\n0240000001\n0240000002\n0240000003";
+              const csv = "Phone Number,Data Size (GB)\n0241234567,1\n0551234567,2\n0591234567,5\n0248770024,10";
               const a = document.createElement("a");
               a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv" }));
-              a.download = "bulk_sample.csv";
+              a.download = "swiftdata_bulk_template.csv";
               a.click();
             }}
             className="flex items-center gap-1.5 px-3 h-8 rounded-xl text-[11px] font-bold border transition-all"
@@ -174,9 +208,9 @@ const DashboardBulk = () => {
                   <span className="w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-black text-black shrink-0" style={{ background: cfg.color }}>2</span>
                   <p className="text-xs font-black uppercase tracking-widest text-white/40">Recipients</p>
                 </div>
-                {parsedNumbers.length > 0 && (
+                {parsedEntries.length > 0 && (
                   <span className="text-[10px] font-black px-2.5 py-1 rounded-full" style={{ background: cfg.bg, color: cfg.color }}>
-                    {parsedNumbers.length} numbers
+                    {validEntries.length}/{parsedEntries.length} valid
                   </span>
                 )}
               </div>
@@ -221,7 +255,7 @@ const DashboardBulk = () => {
                   <textarea
                     value={inputNumbers}
                     onChange={(e) => setInputNumbers(e.target.value)}
-                    placeholder={"0240000001\n0550000002\n0271234567"}
+                    placeholder={"0241234567 2\n0551234567 5\n0591234567 10"}
                     rows={6}
                     className="w-full rounded-2xl px-4 py-3 text-sm font-mono text-white resize-none outline-none transition-all"
                     style={{ background: INPUT_BG, border: "1.5px solid rgba(255,255,255,0.08)", lineHeight: 1.7 }}
@@ -237,7 +271,10 @@ const DashboardBulk = () => {
                     </button>
                   )}
                 </div>
-                <p className="text-[10px] text-white/25">One number per line, or separate by comma/space. Valid prefixes: 024, 025, 053, 054, 055, 059.</p>
+                <div className="rounded-xl px-3 py-2.5 space-y-0.5" style={{ background: "rgba(251,191,36,0.06)", border: "1px solid rgba(251,191,36,0.12)" }}>
+                  <p className="text-[10px] font-black text-amber-400/70">Format: <span className="font-mono">0241234567 2</span> (phone then GB size per line)</p>
+                  <p className="text-[10px] text-white/30">Or use the global package below if all numbers get the same bundle. Valid prefixes: 024, 025, 053, 054, 055, 059.</p>
+                </div>
               </div>
             </div>
 
@@ -282,7 +319,7 @@ const DashboardBulk = () => {
                     { label: "Network",     value: selectedNetwork },
                     { label: "Package",     value: selectedSize || "—" },
                     { label: "Unit price",  value: selectedPackage ? `₵${selectedPackage.price.toFixed(2)}` : "—" },
-                    { label: "Recipients", value: `${parsedNumbers.length} numbers` },
+                    { label: "Recipients", value: `${validEntries.length} numbers` },
                   ].map(({ label, value }) => (
                     <div key={label} className="flex items-center justify-between">
                       <span className="text-xs text-white/35">{label}</span>
@@ -330,7 +367,10 @@ const DashboardBulk = () => {
                   <div className="max-h-52 overflow-y-auto divide-y divide-white/4">
                     {results.map((res, i) => (
                       <div key={i} className="flex items-center justify-between px-5 py-2.5">
-                        <span className="text-xs font-mono text-white/50">{res.phone}</span>
+                        <div>
+                          <span className="text-xs font-mono text-white/50">{res.phone}</span>
+                          {res.size && <span className="text-[10px] text-white/25 ml-2">{res.size}</span>}
+                        </div>
                         {res.status === "success" ? (
                           <CheckCircle2 className="w-4 h-4 text-emerald-400" />
                         ) : (
@@ -344,7 +384,7 @@ const DashboardBulk = () => {
                     {isProcessing && (
                       <div className="flex items-center gap-2 px-5 py-3">
                         <Loader2 className="w-3.5 h-3.5 animate-spin text-amber-400" />
-                        <span className="text-[11px] text-white/40">Processing {results.length + 1} of {parsedNumbers.length}…</span>
+                        <span className="text-[11px] text-white/40">Processing {results.length + 1} of {validEntries.length}…</span>
                       </div>
                     )}
                   </div>
@@ -444,7 +484,7 @@ const DashboardBulk = () => {
               {[
                 ["Network",    selectedNetwork],
                 ["Package",    selectedSize],
-                ["Recipients", `${parsedNumbers.length} numbers`],
+                ["Recipients", `${validEntries.length} numbers`],
                 ["Total Cost", `₵${totalCost.toFixed(2)}`],
               ].map(([l, v]) => (
                 <div key={l} className="flex justify-between text-sm">
