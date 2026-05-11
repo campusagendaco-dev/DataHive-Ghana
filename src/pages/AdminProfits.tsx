@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import {
   RefreshCw, Loader2, TrendingUp, Users, DollarSign,
-  Users2, Search, ChevronDown, ChevronUp, ArrowUpRight,
+  Users2, Search, ChevronDown, ChevronUp,
 } from "lucide-react";
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid,
@@ -21,6 +21,8 @@ interface OrderRow {
   profit: number;
   parent_profit: number;
   parent_agent_id: string | null;
+  cost_price: number | null;
+  order_type: string | null;
   status: string;
   network: string | null;
   package_size: string | null;
@@ -75,7 +77,7 @@ const AdminProfits = () => {
     const [ordersRes, profilesRes] = await Promise.all([
       supabase
         .from("orders")
-        .select("id, agent_id, amount, profit, parent_profit, parent_agent_id, status, network, package_size, customer_phone, created_at")
+        .select("id, agent_id, amount, profit, parent_profit, parent_agent_id, cost_price, order_type, status, network, package_size, customer_phone, created_at")
         .eq("status", "fulfilled")
         .order("created_at", { ascending: false }),
       supabase
@@ -106,6 +108,18 @@ const AdminProfits = () => {
   const totalAgentProfit = useMemo(() => filteredOrders.reduce((s, o) => s + Number(o.profit || 0), 0), [filteredOrders]);
   const totalParentProfit = useMemo(() => filteredOrders.reduce((s, o) => s + Number(o.parent_profit || 0), 0), [filteredOrders]);
   const totalAllAgentProfits = totalAgentProfit + totalParentProfit;
+
+  // Platform net margin: what the platform keeps after paying provider + agent commissions
+  // Only counted for orders where cost_price was tracked (post-fix orders)
+  const totalPlatformMargin = useMemo(() =>
+    filteredOrders
+      .filter(o => Number(o.cost_price) > 0)
+      .reduce((s, o) => s + Math.max(0,
+        Number(o.amount) - Number(o.cost_price || 0) - Number(o.profit || 0) - Number(o.parent_profit || 0)
+      ), 0),
+  [filteredOrders]);
+
+  const ordersWithCostPrice = useMemo(() => filteredOrders.filter(o => Number(o.cost_price) > 0).length, [filteredOrders]);
 
   // Build profile map
   const profileMap = useMemo(() => {
@@ -166,17 +180,22 @@ const AdminProfits = () => {
 
   // Daily chart data (last 14 days always for chart)
   const dailyData = useMemo(() => {
-    const days: Record<string, { date: string; "Agent Profits": number; "Sub-Agent Profits": number }> = {};
+    const days: Record<string, { date: string; "Agent Profits": number; "Sub-Agent Profits": number; "Platform Margin": number }> = {};
     for (let i = 13; i >= 0; i--) {
       const d = new Date(); d.setDate(d.getDate() - i);
       const key = d.toISOString().slice(0, 10);
-      days[key] = { date: d.toLocaleDateString("en-US", { month: "short", day: "numeric" }), "Agent Profits": 0, "Sub-Agent Profits": 0 };
+      days[key] = { date: d.toLocaleDateString("en-US", { month: "short", day: "numeric" }), "Agent Profits": 0, "Sub-Agent Profits": 0, "Platform Margin": 0 };
     }
     filteredOrders.forEach(o => {
       const key = o.created_at.slice(0, 10);
       if (!days[key]) return;
       days[key]["Agent Profits"] += Number(o.profit || 0);
       days[key]["Sub-Agent Profits"] += Number(o.parent_profit || 0);
+      if (Number(o.cost_price) > 0) {
+        days[key]["Platform Margin"] += Math.max(0,
+          Number(o.amount) - Number(o.cost_price || 0) - Number(o.profit || 0) - Number(o.parent_profit || 0)
+        );
+      }
     });
     return Object.values(days);
   }, [filteredOrders]);
@@ -216,13 +235,14 @@ const AdminProfits = () => {
       </div>
 
       {/* Top stats */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
         {[
           { label: "Total Revenue", value: `GH₵${totalRevenue.toFixed(2)}`, icon: DollarSign, color: "text-emerald-600 dark:text-emerald-400", bg: "bg-emerald-500/10", border: "border-emerald-500/20" },
-          { label: "All Agent Profits", value: `GH₵${totalAllAgentProfits.toFixed(2)}`, icon: TrendingUp, color: "text-amber-600 dark:text-amber-400", bg: "bg-amber-500/10", border: "border-amber-500/20" },
-          { label: "From Direct Sales", value: `GH₵${totalAgentProfit.toFixed(2)}`, icon: Users, color: "text-blue-600 dark:text-blue-400", bg: "bg-blue-500/10", border: "border-blue-500/20" },
-          { label: "From Sub-Agents", value: `GH₵${totalParentProfit.toFixed(2)}`, icon: Users2, color: "text-purple-600 dark:text-purple-400", bg: "bg-purple-500/10", border: "border-purple-500/20" },
-        ].map(({ label, value, icon: Icon, color, bg, border }) => (
+          { label: "Platform Net Margin", value: `GH₵${totalPlatformMargin.toFixed(2)}`, icon: TrendingUp, color: "text-teal-600 dark:text-teal-400", bg: "bg-teal-500/10", border: "border-teal-500/20", hint: ordersWithCostPrice > 0 ? `${ordersWithCostPrice} orders tracked` : "No cost data yet" },
+          { label: "All Agent Payouts", value: `GH₵${totalAllAgentProfits.toFixed(2)}`, icon: Users, color: "text-amber-600 dark:text-amber-400", bg: "bg-amber-500/10", border: "border-amber-500/20" },
+          { label: "Direct Commissions", value: `GH₵${totalAgentProfit.toFixed(2)}`, icon: Users, color: "text-blue-600 dark:text-blue-400", bg: "bg-blue-500/10", border: "border-blue-500/20" },
+          { label: "Sub-Agent Commissions", value: `GH₵${totalParentProfit.toFixed(2)}`, icon: Users2, color: "text-purple-600 dark:text-purple-400", bg: "bg-purple-500/10", border: "border-purple-500/20" },
+        ].map(({ label, value, icon: Icon, color, bg, border, hint }) => (
           <div key={label} className={`p-5 rounded-2xl border ${border} ${cardBg} shadow-xl relative overflow-hidden`}>
             <div className={`absolute top-0 right-0 w-20 h-20 ${bg} blur-2xl -mr-8 -mt-8 rounded-full`} />
             <div className={`w-8 h-8 rounded-xl ${bg} ${border} border flex items-center justify-center mb-3 relative z-10`}>
@@ -230,6 +250,7 @@ const AdminProfits = () => {
             </div>
             <p className={`font-display text-2xl font-black ${color} relative z-10`}>{value}</p>
             <p className={`text-xs mt-1 relative z-10 ${sub}`}>{label}</p>
+            {hint && <p className={`text-[10px] mt-0.5 relative z-10 ${muted}`}>{hint}</p>}
           </div>
         ))}
       </div>
@@ -237,10 +258,14 @@ const AdminProfits = () => {
       {/* Chart */}
       <div className={`rounded-2xl border p-6 ${cardBg}`}>
         <h3 className={`font-bold mb-1 ${head}`}>Daily Profit Breakdown — Last 14 Days</h3>
-        <p className={`text-xs mb-5 ${sub}`}>Agent direct profits vs. sub-agent margin profits, per day.</p>
+        <p className={`text-xs mb-5 ${sub}`}>Platform margin, agent commissions, and sub-agent referral payouts per day.</p>
         <ResponsiveContainer width="100%" height={240}>
           <AreaChart data={dailyData} margin={{ top: 5, right: 10, left: -10, bottom: 0 }}>
             <defs>
+              <linearGradient id="gPlatform" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="5%" stopColor="#14b8a6" stopOpacity={0.35} />
+                <stop offset="95%" stopColor="#14b8a6" stopOpacity={0} />
+              </linearGradient>
               <linearGradient id="gAgent" x1="0" y1="0" x2="0" y2="1">
                 <stop offset="5%" stopColor="#f59e0b" stopOpacity={0.3} />
                 <stop offset="95%" stopColor="#f59e0b" stopOpacity={0} />
@@ -254,7 +279,8 @@ const AdminProfits = () => {
             <XAxis dataKey="date" tick={{ fill: tickColor, fontSize: 11 }} axisLine={false} tickLine={false} />
             <YAxis tick={{ fill: tickColor, fontSize: 11 }} axisLine={false} tickLine={false} />
             <Tooltip content={<CustomTooltip isDark={isDark} />} />
-            <Legend formatter={(v) => <span style={{ color: isDark ? "rgba(255,255,255,0.6)" : "#4b5563", fontSize: 12 }}>{v}</span>} />
+            <Legend formatter={(v: string) => <span className={isDark ? "text-white/60 text-xs" : "text-gray-500 text-xs"}>{v}</span>} />
+            <Area type="monotone" dataKey="Platform Margin" stroke="#14b8a6" strokeWidth={2} fill="url(#gPlatform)" dot={false} />
             <Area type="monotone" dataKey="Agent Profits" stroke="#f59e0b" strokeWidth={2} fill="url(#gAgent)" dot={false} />
             <Area type="monotone" dataKey="Sub-Agent Profits" stroke="#a855f7" strokeWidth={2} fill="url(#gSub)" dot={false} />
           </AreaChart>
