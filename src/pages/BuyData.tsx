@@ -74,6 +74,7 @@ const BuyData = () => {
   const [holidayMessage, setHolidayMessage] = useState("");
   const [orderingDisabled, setOrderingDisabled] = useState(false);
   const [priceMultipliers, setPriceMultipliers] = useState<Record<string, number>>({ MTN: 1, Telecel: 1, AirtelTigo: 1 });
+  const [networkStatusMap, setNetworkStatusMap] = useState<Record<string, string>>({});
   const phoneInputRef = useRef<HTMLInputElement>(null);
   const promoInputRef = useRef<HTMLInputElement>(null);
 
@@ -92,14 +93,19 @@ const BuyData = () => {
   useEffect(() => {
     const load = async () => {
       setPkgLoading(true);
-      const [{ data }, { data: sys }, pricingCtx] = await Promise.all([
+      const [{ data }, { data: sys }, pricingCtx, { data: svc }] = await Promise.all([
         supabase.from("global_package_settings").select("network, package_size, public_price, is_unavailable"),
         supabase.functions.invoke("system-settings", { body: { action: "get" } }),
         fetchApiPricingContext(),
+        supabase.from("service_status").select("network, status"),
       ]);
       const map: Record<string, GlobalPkgSetting> = {};
       (data || []).forEach((r: any) => { map[`${r.network}-${r.package_size}`] = r; });
       setGlobalSettings(map);
+
+      const svcMap: Record<string, string> = {};
+      (svc || []).forEach((s: any) => { svcMap[s.network.toUpperCase()] = s.status; });
+      setNetworkStatusMap(svcMap);
       if (sys) {
         setHolidayMode(Boolean(sys.holiday_mode_enabled));
         setHolidayMessage(String(sys.holiday_message || "Holiday mode active. Orders will resume soon."));
@@ -255,6 +261,14 @@ const BuyData = () => {
       toast({ title: "Ordering disabled", description: holidayMessage, variant: "destructive" });
       return;
     }
+    
+    // Active System Check for Network Status
+    const netKey = selectedNetwork.toUpperCase().includes("AIRTEL") ? "AT_PREMIUM" : selectedNetwork.toUpperCase();
+    if (networkStatusMap[netKey] === "down") {
+      toast({ title: "Network Down", description: `${selectedNetwork} is currently unavailable. Please try another network.`, variant: "destructive" });
+      return;
+    }
+
     setBuying(true);
     const orderId = crypto.randomUUID();
     const callbackParams = new URLSearchParams({
@@ -430,19 +444,40 @@ const BuyData = () => {
                     aria-hidden
                   />
                 )}
-                <span className="relative z-10">{n}</span>
+                <span className="relative z-10 flex items-center justify-center gap-1.5">
+                  {n}
+                  {networkStatusMap[n.toUpperCase().includes("AIRTEL") ? "AT_PREMIUM" : n.toUpperCase()] === "down" && (
+                    <span className="w-2 h-2 rounded-full bg-red-500 border-2 border-white/30 shadow-[0_0_6px_rgba(239,68,68,0.8)]" title="Service Offline" />
+                  )}
+                  {networkStatusMap[n.toUpperCase().includes("AIRTEL") ? "AT_PREMIUM" : n.toUpperCase()] === "maintenance" && (
+                    <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" title="Service Maintenance" />
+                  )}
+                </span>
               </button>
             );
           })}
         </div>
 
-        {/* Package grid */}
-        {pkgLoading ? (
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
-            {Array.from({ length: 8 }).map((_, i) => <Skeleton key={i} className="h-[140px] rounded-2xl" />)}
+        {/* Active Service Barrier warning */}
+        {networkStatusMap[selectedNetwork.toUpperCase().includes("AIRTEL") ? "AT_PREMIUM" : selectedNetwork.toUpperCase()] === "down" ? (
+          <div className="flex flex-col items-center justify-center py-16 px-4 text-center border-2 border-dashed border-red-500/20 bg-red-500/[0.02] rounded-3xl transition-all">
+            <div className="w-16 h-16 bg-red-500/10 rounded-2xl flex items-center justify-center mb-4 border border-red-500/20 shadow-[0_10px_30px_rgba(239,68,68,0.1)]">
+               <AlertTriangle className="w-8 h-8 text-red-500" />
+            </div>
+            <h3 className="text-xl font-black text-foreground mb-2 uppercase italic">{selectedNetwork} Offline</h3>
+            <p className="text-sm text-muted-foreground max-w-md">
+              This network is currently undergoing critical maintenance. Purchases are temporarily paused to protect your funds. Please select another network or check back soon.
+            </p>
           </div>
         ) : (
-          memoizedGrid
+          /* Package grid */
+          pkgLoading ? (
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
+              {Array.from({ length: 8 }).map((_, i) => <Skeleton key={i} className="h-[140px] rounded-2xl" />)}
+            </div>
+          ) : (
+            memoizedGrid
+          )
         )}
 
         {/* Footer promo */}

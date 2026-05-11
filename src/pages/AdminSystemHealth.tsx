@@ -24,6 +24,8 @@ const AdminSystemHealth = () => {
     secondary: "checking",
     sms: "checking"
   });
+  const [serviceStatuses, setServiceStatuses] = useState<any[]>([]);
+  const [updatingNetwork, setUpdatingNetwork] = useState<string | null>(null);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -56,12 +58,39 @@ const AdminSystemHealth = () => {
         sms: "operational"
       });
 
+      // 3. Fetch Real ISP Carrier Statuses
+      const { data: serviceData } = await supabase
+        .from("service_status")
+        .select("*")
+        .order("network");
+      if (serviceData) setServiceStatuses(serviceData);
+
     } catch (err) {
       console.error("Health check failed:", err);
     } finally {
       setLoading(false);
     }
   }, []);
+
+  const handleUpdateStatus = async (network: string, newStatus: string) => {
+    setUpdatingNetwork(network);
+    try {
+      const { error } = await supabase
+        .from("service_status")
+        .update({ status: newStatus, updated_at: new Date().toISOString() })
+        .eq("network", network);
+      
+      if (error) throw error;
+      
+      setServiceStatuses((prev) => 
+        prev.map(s => s.network === network ? { ...s, status: newStatus, updated_at: new Date().toISOString() } : s)
+      );
+    } catch (error: any) {
+      console.error("Failed to update network status:", error);
+    } finally {
+      setUpdatingNetwork(null);
+    }
+  };
 
   useEffect(() => {
     fetchData();
@@ -141,6 +170,61 @@ const AdminSystemHealth = () => {
               </div>
            </Card>
          ))}
+      </div>
+
+      {/* ── CARRIER HEALTH SWITCHBOARD ── */}
+      <div className="space-y-4">
+         <div className="flex items-center gap-2 mb-2">
+           <Server className="w-5 h-5 text-amber-600" />
+           <h3 className="text-xl font-black text-foreground italic uppercase tracking-tighter">Network Switchboard</h3>
+         </div>
+         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {serviceStatuses.length === 0 && loading && (
+              [1,2,3].map(i => <div key={i} className="h-24 bg-muted rounded-2xl animate-pulse" />)
+            )}
+            {serviceStatuses.map((net) => (
+              <Card key={net.network} className={cn(
+                "border shadow-sm overflow-hidden transition-all",
+                net.status === 'down' ? "border-red-500/30 bg-red-500/[0.02]" : 
+                net.status === 'maintenance' ? "border-amber-500/30 bg-amber-500/[0.02]" : 
+                "border-border"
+              )}>
+                <div className="p-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-2">
+                      <div className={cn(
+                        "w-2 h-2 rounded-full",
+                        net.status === 'operational' ? "bg-emerald-500" : 
+                        net.status === 'maintenance' ? "bg-amber-500" : "bg-red-500"
+                      )} />
+                      <span className="font-black text-sm">{net.display_name}</span>
+                    </div>
+                    {updatingNetwork === net.network && <Loader2 className="w-3.5 h-3.5 animate-spin text-muted-foreground" />}
+                  </div>
+                  
+                  <div className="grid grid-cols-3 gap-2">
+                    {[
+                      { val: 'operational', label: 'ON', color: 'hover:bg-emerald-500/10 active:bg-emerald-500 text-emerald-600', active: 'bg-emerald-500 text-white hover:bg-emerald-600 border-transparent' },
+                      { val: 'maintenance', label: 'MAINT', color: 'hover:bg-amber-500/10 active:bg-amber-500 text-amber-600', active: 'bg-amber-500 text-white hover:bg-amber-600 border-transparent' },
+                      { val: 'down', label: 'OFFLINE', color: 'hover:bg-red-500/10 active:bg-red-500 text-red-600', active: 'bg-red-500 text-white hover:bg-red-600 border-transparent' }
+                    ].map((btn) => (
+                      <button
+                        key={btn.val}
+                        disabled={updatingNetwork !== null}
+                        onClick={() => handleUpdateStatus(net.network, btn.val)}
+                        className={cn(
+                          "text-[10px] font-black rounded-lg py-1.5 border transition-all",
+                          net.status === btn.val ? btn.active : `border-border bg-card hover:border-current ${btn.color}`
+                        )}
+                      >
+                        {btn.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </Card>
+            ))}
+         </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
