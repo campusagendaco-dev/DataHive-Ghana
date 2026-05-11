@@ -426,13 +426,12 @@ serve(async (req) => {
     const credentials = await getProviderCredentials(supabaseAdmin);
     const paystackSecretKey = credentials.paystackSecretKey;
     const orderType = (existingOrder?.order_type || "data") as string;
-
     const isQueuedError = /queued/i.test(String(existingOrder?.failure_reason || ""));
+    const isProviderOrder = !["agent_activation", "sub_agent_activation", "wallet_topup", "free_data_claim", "utility"].includes(orderType.toLowerCase());
 
     // --- 1. STATUS CHECK (For orders already being processed) ---
-    // We check status for ALL processing orders, even if provider_order_id is missing,
-    // EXCEPT orders that were queued locally due to low balance / errors
-    if (existingOrder?.status === "processing" && !isQueuedError) {
+    // Skip for non-data/airtime order types — they don't involve a data provider.
+    if (existingOrder?.status === "processing" && !isQueuedError && isProviderOrder) {
       const providers = await getActiveProviders(supabaseAdmin, orderType === "airtime" ? "airtime" : "data");
       let foundOnProvider = false;
       for (const provider of providers) {
@@ -478,9 +477,10 @@ serve(async (req) => {
     }
 
     // --- 1.5. PRE-VERIFICATION PROVIDER CHECK ---
-    // If the order is pending, check if DataMart/Admin already has it 
+    // If the order is pending, check if DataMart/Admin already has it
     // (handles race conditions or manual bypasses)
-    if (existingOrder?.status === "pending") {
+    // Skip for non-data/airtime order types — they don't involve a data provider
+    if (existingOrder?.status === "pending" && isProviderOrder) {
       const providers = await getActiveProviders(supabaseAdmin, orderType === "airtime" ? "airtime" : "data");
       for (const provider of providers) {
         const checkResult = await callProviderApi(provider, { 
