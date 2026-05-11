@@ -1,17 +1,62 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { corsHeaders } from "../_shared/cors.ts";
-import { getActiveProviders, callProviderApi } from "../_shared/providers.ts";
+import { getActiveProviders } from "../_shared/providers.ts";
 
 declare const Deno: any;
 
 // Heals orders stuck in 'processing' where the webhook was never received.
 // For each stuck order:
 //   1. Polls the provider's status API using our order reference.
-//   2. If provider says delivered → mark fulfilled + credit profits.
-//   3. If provider says failed    → mark fulfillment_failed.
-//   4. If provider has no record  → re-submit the order (provider never received it).
-// Called manually from the admin dashboard.
+//   2. Delivered  → mark fulfilled + credit profits.
+//   3. Failed     → mark fulfillment_failed.
+//   4. No record  → reset to 'paid' so process-retries re-submits.
+
+function buildStatusUrl(baseUrl: string, handlerType: string): string {
+  const clean = baseUrl.trim().replace(/\/+$/, "");
+  if (handlerType === "datahub") return `${clean}/order-status`;
+  if (handlerType === "datamart") return `${clean}/api/order-status`;
+  return `${clean}/api/status`;
+}
+
+async function pollProviderStatus(provider: any, orderId: string, providerOrderId: string | null): Promise<{ ok: boolean; status?: string }> {
+  const url = buildStatusUrl(provider.base_url, provider.handler_type || "standard");
+  const body = JSON.stringify({
+    reference: orderId,
+    order_id: providerOrderId || orderId,
+    transaction_id: providerOrderId || orderId,
+    orderReference: orderId,
+  });
+
+  try {
+    const res = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Accept": "application/json",
+        "Authorization": `Bearer ${provider.api_key}`,
+        "X-API-Key": provider.api_key,
+      },
+      body,
+      signal: AbortSignal.timeout(10000),
+    });
+
+    if (!res.ok) return { ok: false };
+    const text = await res.text();
+    const json = JSON.parse(text);
+
+    const techStatus = String(json?.status ?? json?.success ?? "").toLowerCase();
+    const dataStatus = String(json?.data?.status ?? json?.data?.orderStatus ?? "").toLowerCase();
+    const effective = dataStatus || techStatus;
+
+    const isSuccess = techStatus === "success" || techStatus === "true" || json?.success === true || json?.ok === true;
+    if (!isSuccess) return { ok: false };
+
+    return { ok: true, status: effective || techStatus };
+  } catch {
+    return { ok: false };
+  }
+}
 
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
@@ -22,16 +67,14 @@ serve(async (req) => {
 
   try {
     const body = await req.json().catch(() => ({}));
-    // Optional: pass specific order IDs, otherwise heal all stuck processing orders
     const targetIds: string[] | undefined = body.order_ids;
 
-    // Fetch stuck processing orders (no webhook received = still processing after 5+ min)
     let query = supabaseAdmin
       .from("orders")
       .select("id, network, package_size, customer_phone, amount, agent_id, profit, parent_profit, provider_order_id, order_type, created_at")
       .eq("status", "processing")
       .in("order_type", ["data", "airtime"])
-      .lt("created_at", new Date(Date.now() - 5 * 60 * 1000).toISOString()) // older than 5 min
+      .lt("created_at", new Date(Date.now() - 5 * 60 * 1000).toISOString())
       .order("created_at", { ascending: true })
       .limit(50);
 
@@ -48,19 +91,15 @@ serve(async (req) => {
     for (const order of stuckOrders || []) {
       const result: any = { id: order.id, network: order.network, package_size: order.package_size, action: "none" };
 
-      // Step 1: Poll provider status using our reference
-      let statusResult: any = { ok: false };
+      // Poll each active provider until one responds
+      let statusResult: { ok: boolean; status?: string } = { ok: false };
       for (const provider of providers) {
-        statusResult = await callProviderApi(provider, {
-          reference: order.id,
-          order_id: order.provider_order_id || order.id,
-          transaction_id: order.provider_order_id || order.id,
-        }, "status");
+        statusResult = await pollProviderStatus(provider, order.id, order.provider_order_id);
         if (statusResult.ok) break;
       }
 
       if (statusResult.ok) {
-        const s = String(statusResult.status || "").toLowerCase();
+        const s = (statusResult.status || "").toLowerCase();
         const isDelivered = ["delivered", "success", "successful", "fulfilled", "completed", "sent"].includes(s);
         const isFailed = ["failed", "error", "refunded", "cancelled", "rejected"].includes(s);
 
@@ -77,24 +116,22 @@ serve(async (req) => {
           result.action = "failed";
           result.reason = `Provider confirmed: ${statusResult.status}`;
         } else {
-          // Still processing on provider side — leave it
           result.action = "still_processing";
           result.reason = `Provider status: ${statusResult.status}`;
         }
       } else {
-        // Provider has no record of this order — it was never submitted. Re-submit it.
-        // Reset to 'paid' so the trigger + process-retries picks it up for a fresh attempt.
+        // Provider has no record — reset to paid for a fresh attempt
         await supabaseAdmin.from("orders").update({
           status: "paid",
           retry_count: 0,
-          failure_reason: "Re-queued: provider had no record, likely never received",
+          failure_reason: "Re-queued: provider had no record",
         }).eq("id", order.id);
         result.action = "requeued";
-        result.reason = "Provider had no record — reset to paid for fresh fulfillment attempt";
+        result.reason = "Provider had no record — reset to paid for fresh fulfillment";
       }
 
       results.push(result);
-      console.log(`[heal-processing] Order ${order.id}: ${result.action} — ${result.reason}`);
+      console.log(`[heal-processing] ${order.id}: ${result.action} — ${result.reason}`);
     }
 
     const summary = {
@@ -104,8 +141,6 @@ serve(async (req) => {
       requeued: results.filter(r => r.action === "requeued").length,
       still_processing: results.filter(r => r.action === "still_processing").length,
     };
-
-    console.log("[heal-processing] Summary:", summary);
 
     return new Response(JSON.stringify({ success: true, summary, results }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
