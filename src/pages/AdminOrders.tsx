@@ -75,6 +75,7 @@ const AdminOrders = () => {
   const [retrying, setRetrying] = useState<string | null>(null);
   const [retryingAll, setRetryingAll] = useState(false);
   const [forcingFulfill, setForcingFulfill] = useState(false);
+  const [healingProcessing, setHealingProcessing] = useState(false);
   const [typeFilter, setTypeFilter] = useState<FilterType>("all");
   const [statusFilter, setStatusFilter] = useState("all");
   const [networkFilter, setNetworkFilter] = useState("all");
@@ -281,6 +282,31 @@ const AdminOrders = () => {
     await fetchOrders();
   };
 
+  const handleHealProcessingOrders = async () => {
+    const processingOrders = allOrders.filter(o => o.status === "processing");
+    if (processingOrders.length === 0) {
+      toast({ title: "No processing orders", description: "Nothing to heal." });
+      return;
+    }
+    setHealingProcessing(true);
+    toast({ title: "Polling provider…", description: `Checking ${processingOrders.length} stuck orders against DataHub.` });
+    try {
+      const { data, error } = await supabase.functions.invoke("heal-processing-orders", {
+        body: { order_ids: processingOrders.map(o => o.id) },
+      });
+      if (error) throw error;
+      const { summary } = data;
+      toast({
+        title: "Heal complete",
+        description: `Fulfilled: ${summary.fulfilled} · Re-queued: ${summary.requeued} · Still processing: ${summary.still_processing} · Failed: ${summary.failed}`,
+      });
+    } catch (e: any) {
+      toast({ title: "Heal failed", description: e.message, variant: "destructive" });
+    }
+    setHealingProcessing(false);
+    await fetchOrders();
+  };
+
   const [resolvingNames, setResolvingNames] = useState<Record<string, boolean>>({});
 
   const handleResolveGuestName = async (orderId: string, phone: string, network: string | null) => {
@@ -460,6 +486,15 @@ const AdminOrders = () => {
           >
             {retryingAll ? <Loader2 className="w-4 h-4 animate-spin" /> : <PlayCircle className="w-4 h-4" />}
             {retryingAll ? "Retrying…" : `Retry All Actionable (${pending + failed + allOrders.filter(o => o.status === "processing").length})`}
+          </Button>
+          <Button
+            size="sm"
+            className="gap-2 bg-sky-500/10 hover:bg-sky-500/20 text-sky-400 border border-sky-500/20"
+            onClick={handleHealProcessingOrders}
+            disabled={healingProcessing || allOrders.filter(o => o.status === "processing").length === 0}
+          >
+            {healingProcessing ? <Loader2 className="w-4 h-4 animate-spin" /> : <UserCheck className="w-4 h-4" />}
+            {healingProcessing ? "Polling Provider…" : `Poll Provider Status (${allOrders.filter(o => o.status === "processing").length})`}
           </Button>
           <Button
             size="sm"
