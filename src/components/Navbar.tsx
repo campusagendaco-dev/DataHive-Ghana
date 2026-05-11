@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/carousel";
 import Autoplay from "embla-carousel-autoplay";
 import { motion, AnimatePresence } from "framer-motion";
+import { NotificationCenter } from "./NotificationCenter";
 
 const openTutorial = () => window.dispatchEvent(new CustomEvent("open-tutorial"));
 
@@ -274,6 +275,8 @@ const Navbar = () => {
 
                 <div className={`w-px h-4 ${dividerBg} mx-1`} />
 
+                <NotificationCenter isDark={isDark} />
+
                 <motion.button
                   onClick={toggleDark}
                   whileHover={{ scale: 1.1, rotate: 12 }}
@@ -338,6 +341,7 @@ const Navbar = () => {
 
               {/* ── Mobile right ── */}
               <div className="md:hidden flex items-center gap-1.5">
+                <NotificationCenter isDark={isDark} />
                 <motion.button
                   onClick={toggleDark}
                   whileTap={{ scale: 0.9, rotate: 15 }}
