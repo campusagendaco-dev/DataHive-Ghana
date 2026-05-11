@@ -60,6 +60,15 @@ serve(async (req) => {
 
     console.log(`[USER-AIRTIME] ${user.id}`);
 
+    // Fetch agent profile for sub-agent tracking
+    const { data: agentProfile } = await supabaseAdmin
+      .from("profiles")
+      .select("is_sub_agent, parent_agent_id")
+      .eq("user_id", user.id)
+      .maybeSingle();
+
+    const parentAgentId = agentProfile?.is_sub_agent ? (agentProfile?.parent_agent_id ?? null) : null;
+
     // 1. ATOMIC DEBIT (FOREGROUND)
     console.log(`[DEBIT-AIRTIME] Starting debit for ${requestedAmount}...`);
     const { data: debitResult, error: debitError } = await supabaseAdmin.rpc("debit_wallet", {
@@ -86,6 +95,9 @@ serve(async (req) => {
       network: network,
       amount: requestedAmount,
       order_type: "airtime",
+      profit: 0,
+      parent_agent_id: parentAgentId,
+      parent_profit: 0,
       status: "paid"
     });
 

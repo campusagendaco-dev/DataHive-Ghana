@@ -67,10 +67,30 @@ serve(async (req: Request) => {
 
     console.log(`[USER] ${user.id} (${user.email})`);
 
-    // Anti-Duplicate Protection (60 Minutes)
-    const sixtyMinutesAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
     const normalizedPhone = normalizeRecipient(customer_phone);
     const normalizedNet = normalizeNetworkForPricing(networkRaw);
+
+    // Fetch agent profile and package info in parallel for profit calculation
+    const [profileResult, pkgResult] = await Promise.all([
+      supabaseAdmin.from("profiles").select("is_sub_agent, parent_agent_id").eq("user_id", user.id).maybeSingle(),
+      supabaseAdmin.from("global_package_settings").select("agent_price, cost_price").eq("network", normalizedNet).eq("package_size", package_size).maybeSingle(),
+    ]);
+
+    const agentProfile = profileResult.data;
+    const pkgRow = pkgResult.data;
+    const adminBase = Number(pkgRow?.agent_price || 0);
+    const resolvedCostPrice = Number(pkgRow?.cost_price || 0) > 0 ? Number(pkgRow!.cost_price) : adminBase;
+
+    // Calculate parent referral commission if this is a sub-agent order
+    let parentAgentId: string | null = null;
+    let parentProfit = 0;
+    if (agentProfile?.is_sub_agent && agentProfile?.parent_agent_id && adminBase > 0) {
+      parentAgentId = agentProfile.parent_agent_id;
+      parentProfit = Math.max(0, parseFloat((Number(requestedAmount) - adminBase).toFixed(2)));
+    }
+
+    // Anti-Duplicate Protection (60 Minutes)
+    const sixtyMinutesAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
 
     const { data: duplicateOrder } = await supabaseAdmin
       .from("orders")
@@ -121,6 +141,10 @@ serve(async (req: Request) => {
       network: normalizeNetworkForPricing(networkRaw),
       package_size: package_size,
       amount: requestedAmount,
+      cost_price: resolvedCostPrice > 0 ? resolvedCostPrice : undefined,
+      profit: 0,
+      parent_agent_id: parentAgentId,
+      parent_profit: parentProfit,
       status: "paid"
     });
 
