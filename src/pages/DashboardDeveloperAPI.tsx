@@ -9,7 +9,8 @@ import { Input } from "@/components/ui/input";
 import {
   Key, Copy, RefreshCw, Loader2, ExternalLink,
   Shield, AlertTriangle, CheckCircle, Eye, EyeOff, Zap, Wallet,
-  Terminal, History, Bug, Users2, MessageCircle, Share2, Code2
+  Terminal, History, Bug, Users2, MessageCircle, Share2, Code2,
+  PlusCircle, ArrowRightLeft
 } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { Link } from "react-router-dom";
@@ -17,6 +18,11 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { useAppTheme } from "@/contexts/ThemeContext";
+import { 
+  Dialog, DialogContent, DialogDescription, DialogFooter, 
+  DialogHeader, DialogTitle, DialogTrigger 
+} from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
 
 async function sha256Hex(input: string): Promise<string> {
   const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(input));
@@ -45,6 +51,11 @@ const DashboardDeveloperAPI = () => {
   const [confirmRegen, setConfirmRegen] = useState(false);
   const [testMode, setTestMode] = useState(false);
   const [updatingTestMode, setUpdatingTestMode] = useState(false);
+
+  // API Top-up / Transfer State
+  const [isTransferModalOpen, setIsTransferModalOpen] = useState(false);
+  const [transferAmount, setTransferAmount] = useState("");
+  const [transferring, setTransferring] = useState(false);
 
   const BASE_URL = "https://lsocdjpflecduumopijn.supabase.co/functions/v1/developer-api";
 
@@ -145,6 +156,44 @@ const DashboardDeveloperAPI = () => {
     setUpdatingTestMode(false);
   };
 
+  const handleTransferToApi = async () => {
+    const amt = parseFloat(transferAmount);
+    if (!amt || amt <= 0) {
+      toast({ title: "Enter a valid amount", variant: "destructive" });
+      return;
+    }
+    if (amt > walletBalance) {
+      toast({ title: "Insufficient main wallet balance", variant: "destructive" });
+      return;
+    }
+
+    setTransferring(true);
+    try {
+      // Attempt direct RPC to perform the atomic DB transfer
+      const { data, error } = await supabase.rpc("user_transfer_to_api", {
+        p_amount: amt
+      });
+
+      if (error || !data) {
+        throw new Error(error?.message || "Could not complete transfer. Ensure you've applied the database functions.");
+      }
+
+      if (data.success === false) {
+        toast({ title: "Transfer Failed", description: data.error, variant: "destructive" });
+      } else {
+        setWalletBalance(data.main_balance);
+        setApiBalance(data.api_balance);
+        setIsTransferModalOpen(false);
+        setTransferAmount("");
+        toast({ title: "🎉 API Wallet Funded!", description: `GH₵${amt.toFixed(2)} has been transferred instantly.` });
+      }
+    } catch (err: any) {
+      toast({ title: "Server Error", description: err.message || "RPC execution failed.", variant: "destructive" });
+    } finally {
+      setTransferring(false);
+    }
+  };
+
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text);
     toast({ title: "Copied to clipboard" });
@@ -190,13 +239,97 @@ const DashboardDeveloperAPI = () => {
             <p className={cn("text-3xl font-black", isDark ? "text-white" : "text-indigo-950")}>GH₵{walletBalance.toFixed(2)}</p>
             <p className={cn("text-[10px] mt-1", isDark ? "text-white/40" : "text-indigo-700/60")}>Used for manual portal purchases</p>
           </div>
-          <div className={cn("border rounded-3xl p-6 backdrop-blur-md relative overflow-hidden group transition-all", isDark ? "bg-gradient-to-br from-sky-500/10 to-teal-500/10 border-sky-500/20" : "bg-sky-50/50 border-sky-100")}>
+          <div className={cn("border rounded-3xl p-6 backdrop-blur-md relative overflow-hidden group transition-all flex flex-col justify-between", isDark ? "bg-gradient-to-br from-sky-500/10 to-teal-500/10 border-sky-500/20" : "bg-sky-50/50 border-sky-100")}>
             <div className="absolute top-0 right-0 p-4 opacity-[0.03] group-hover:opacity-[0.08] transition-opacity">
               <Zap className={cn("w-24 h-24", isDark ? "text-white" : "text-sky-900")} />
             </div>
-            <p className="text-[10px] uppercase font-black tracking-widest text-sky-500 dark:text-sky-400 mb-2">API Wallet Balance</p>
-            <p className={cn("text-3xl font-black", isDark ? "text-white" : "text-sky-950")}>GH₵{apiBalance.toFixed(2)}</p>
-            <p className={cn("text-[10px] mt-1", isDark ? "text-white/40" : "text-sky-700/60")}>Deducted automatically for API-fulfilled orders</p>
+            <div>
+              <p className="text-[10px] uppercase font-black tracking-widest text-sky-500 dark:text-sky-400 mb-2 flex items-center gap-2">
+                API Wallet Balance 
+                <Badge variant="outline" className="h-4 text-[8px] font-black px-1 bg-sky-500/10 text-sky-400 border-sky-400/30">ACTIVE</Badge>
+              </p>
+              <div className="flex items-end justify-between gap-2">
+                <div>
+                  <p className={cn("text-3xl font-black", isDark ? "text-white" : "text-sky-950")}>GH₵{apiBalance.toFixed(2)}</p>
+                  <p className={cn("text-[10px] mt-1", isDark ? "text-white/40" : "text-sky-700/60")}>Deducted for automated API-fulfilled orders</p>
+                </div>
+
+                {/* Enhanced Top-Up Trigger Modal */}
+                <Dialog open={isTransferModalOpen} onOpenChange={setIsTransferModalOpen}>
+                  <DialogTrigger asChild>
+                    <Button 
+                      size="sm" 
+                      className="h-9 rounded-xl bg-sky-500 hover:bg-sky-400 text-white font-black text-[10px] tracking-widest uppercase px-4 gap-1.5 shadow-lg shadow-sky-500/20 border-none relative z-10"
+                    >
+                      <PlusCircle className="w-3.5 h-3.5" /> Top Up
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="sm:max-w-[400px] rounded-[2rem] bg-card border-border shadow-2xl p-0 overflow-hidden">
+                    <DialogHeader className="p-6 bg-gradient-to-br from-sky-500/5 to-teal-500/5 border-b border-border pb-6">
+                      <div className="flex items-center gap-3 mb-2">
+                        <div className="w-10 h-10 rounded-xl bg-sky-500/10 flex items-center justify-center text-sky-500 border border-sky-500/20">
+                          <Wallet className="w-5 h-5" />
+                        </div>
+                        <DialogTitle className="font-black text-xl">Fund API Wallet</DialogTitle>
+                      </div>
+                      <DialogDescription className="text-xs font-medium">
+                        Transfer funds instantly from your Main Wallet to your API Wallet for integration usage.
+                      </DialogDescription>
+                    </DialogHeader>
+                    <div className="p-6 space-y-5">
+                      {/* Balance Reference */}
+                      <div className="flex items-center justify-between p-3 rounded-xl bg-muted/40 border border-border text-xs">
+                        <span className="text-muted-foreground font-medium">Main Balance Available:</span>
+                        <span className="font-black text-foreground">GH₵{walletBalance.toFixed(2)}</span>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Transfer Amount (GH₵)</Label>
+                        <div className="relative">
+                          <span className="absolute left-4 top-1/2 -translate-y-1/2 font-black text-muted-foreground/60 text-sm">₵</span>
+                          <Input 
+                            type="number" 
+                            placeholder="0.00"
+                            value={transferAmount}
+                            onChange={(e) => setTransferAmount(e.target.value)}
+                            className="h-12 pl-10 font-black text-base rounded-xl bg-background border-border"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-4 gap-2">
+                        {[10, 20, 50, 100].map(v => (
+                          <button 
+                            key={v} 
+                            onClick={() => setTransferAmount(v.toString())}
+                            className="py-2 text-[10px] font-black border border-border rounded-lg bg-muted/30 hover:bg-sky-500 hover:text-white hover:border-sky-500 transition-all"
+                          >
+                            ₵{v}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    <DialogFooter className="p-6 bg-muted/30 border-t border-border">
+                      <Button 
+                        onClick={handleTransferToApi} 
+                        disabled={transferring || !transferAmount || parseFloat(transferAmount) <= 0}
+                        className="w-full h-12 bg-sky-500 hover:bg-sky-400 text-white font-black uppercase tracking-widest text-xs rounded-xl shadow-lg border-none gap-2"
+                      >
+                        {transferring ? (
+                          <>
+                            <Loader2 className="w-4 h-4 animate-spin" /> Processing...
+                          </>
+                        ) : (
+                          <>
+                            <ArrowRightLeft className="w-4 h-4" /> Complete Transfer
+                          </>
+                        )}
+                      </Button>
+                    </DialogFooter>
+                  </DialogContent>
+                </Dialog>
+              </div>
+            </div>
           </div>
         </div>
       )}
