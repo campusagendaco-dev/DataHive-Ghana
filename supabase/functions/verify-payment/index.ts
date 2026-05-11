@@ -461,15 +461,21 @@ serve(async (req) => {
     }
 
     // --- 1.2. AGE CHECK FALLBACK ---
-    // If processing for >20 min with no provider confirmation, reset to paid so retries pick it up
     if (existingOrder && existingOrder.status === "processing") {
       const isQueuedError = /queued/i.test(String(existingOrder.failure_reason || ""));
       const orderCreatedAt = new Date(existingOrder.created_at).getTime();
       const ageInMinutes = (Date.now() - orderCreatedAt) / 60000;
-      
+
+      // If the order already has a provider_order_id, it was submitted to the provider
+      // and we must wait for the webhook callback — never re-submit.
+      if (existingOrder.provider_order_id) {
+        console.log(`[verify-payment] Order ${targetReference} already submitted to provider (${existingOrder.provider_order_id}). Waiting for webhook.`);
+        return new Response(JSON.stringify({ status: "processing", message: "Waiting for provider webhook" }), { headers: corsHeaders });
+      }
+
       if (isQueuedError || ageInMinutes > 20) {
-        console.log(`[verify-payment] Order ${targetReference} was queued or stuck for ${ageInMinutes.toFixed(1)} mins. Instantly resuming purchase.`);
-        // We do NOT return early! We let the execution fall through to the purchase logic below!
+        console.log(`[verify-payment] Order ${targetReference} stuck for ${ageInMinutes.toFixed(1)} mins with no provider ID. Re-submitting.`);
+        // Fall through to re-submit to the provider
       } else {
         // Normal processing lock: wait for webhook
         return new Response(JSON.stringify({ status: "processing", message: "Still processing on provider" }), { headers: corsHeaders });

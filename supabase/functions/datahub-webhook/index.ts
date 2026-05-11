@@ -4,10 +4,7 @@ import { corsHeaders } from "../_shared/cors.ts";
 import { notifyApiClient } from "../_shared/webhooks.ts";
 
 // DataHub Ghana webhook handler
-// Receives: order.status_updated events from DatahubGHMainServer-Webhook/1.0
-// Docs: https://app.datahubgh.com/docs/api
-
-const DATAHUB_USER_AGENT = "DatahubGHMainServer-Webhook/1.0";
+// Receives order status callbacks from DataHub Ghana
 
 // Maps DataHub statuses to internal system statuses
 function mapDatahubStatus(status: string): "processing" | "fulfilled" | "fulfillment_failed" | null {
@@ -67,15 +64,9 @@ serve(async (req) => {
   }
 
   try {
-    // Validate User-Agent as basic authenticity check
+    // Log User-Agent for debugging (not used for auth — any bot can spoof it)
     const userAgent = req.headers.get("user-agent") || "";
-    if (!userAgent.includes(DATAHUB_USER_AGENT)) {
-      console.warn("[datahub-webhook] Rejected request from unknown User-Agent:", userAgent);
-      return new Response(JSON.stringify({ error: "Forbidden" }), {
-        status: 403,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
+    console.log("[datahub-webhook] Incoming User-Agent:", userAgent);
 
     const rawBody = await req.text();
     if (!rawBody) {
@@ -91,7 +82,9 @@ serve(async (req) => {
 
     console.log("[datahub-webhook] Received event:", event, JSON.stringify(data));
 
-    if (event !== "order.status_updated" && event !== "order.status.changed" || !data) {
+    // Accept any order-related status event; skip non-order events
+    const isOrderEvent = !event || event.toLowerCase().includes("order") || event.toLowerCase().includes("status");
+    if (!isOrderEvent || !data) {
       return new Response(JSON.stringify({ received: true, skipped: true }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
