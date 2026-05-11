@@ -66,6 +66,9 @@ verify_jwt = false
 verify_jwt = false
 
 
+[functions.heal-processing-orders]
+verify_jwt = false
+
 [functions.support-bot]
 verify_jwt = false
 
