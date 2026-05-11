@@ -4,6 +4,7 @@ import DashboardSidebar from "@/components/DashboardSidebar";
 import NotificationPopup from "@/components/NotificationPopup";
 import { Menu, User, Wallet, Bell, Search, PlusCircle, AlertTriangle, X, Sun, Moon } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
+import { NotificationCenter } from "./NotificationCenter";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
 import { useAppTheme } from "@/contexts/ThemeContext";
@@ -154,17 +155,7 @@ const DashboardLayout = () => {
             </button>
 
             {/* Notification Bell */}
-            <button 
-              aria-label="View notifications"
-              title="Notifications"
-              className={cn(
-                "relative p-2.5 rounded-xl border transition-all group",
-                isDark ? "bg-white/5 border-white/10 hover:bg-white/10 hover:border-white/20" : "bg-gray-50 border-gray-200 hover:bg-gray-100 hover:border-gray-300"
-              )}
-            >
-              <Bell className={cn("w-5 h-5 transition-colors", isDark ? "text-white/70 group-hover:text-white" : "text-gray-500 group-hover:text-gray-900")} />
-              <span className={cn("absolute top-2 right-2.5 w-2 h-2 rounded-full border-2", isDark ? "bg-red-500 border-[#0d140d]" : "bg-red-500 border-white")}></span>
-            </button>
+            <NotificationCenter isDark={isDark} />
 
             <div className="w-px h-8 bg-white/10 mx-1 hidden sm:block" />
 
