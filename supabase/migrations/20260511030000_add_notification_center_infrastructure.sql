@@ -26,8 +26,16 @@ CREATE POLICY "Users can update own notifications"
   USING (auth.uid() = user_id);
 
 -- 3. Enable Native Realtime for this table
--- Ensure it is part of the default publication
-ALTER PUBLICATION supabase_realtime ADD TABLE public.user_notifications;
+-- Ensure it is part of the default publication robustly
+DO $$ 
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_publication_tables 
+    WHERE pubname = 'supabase_realtime' AND schemaname = 'public' AND tablename = 'user_notifications'
+  ) THEN
+    ALTER PUBLICATION supabase_realtime ADD TABLE public.user_notifications;
+  END IF;
+END $$;
 
 -- 4. OPTIONAL: Feed systemic events directly into user_notifications from our existing triggers
 -- Overwrite the low balance trigger we just created to ALSO push to in-app notifications.

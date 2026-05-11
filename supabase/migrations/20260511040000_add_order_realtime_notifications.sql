@@ -7,26 +7,48 @@ BEGIN
     
     -- SCENARIO A: Order Successfully Fulfilled
     IF NEW.status = 'fulfilled' THEN
-       INSERT INTO public.user_notifications (user_id, title, message, type, link)
-       VALUES (
-         NEW.agent_id, 
-         '✅ Order Delivered', 
-         'Success! ' || COALESCE(NEW.package_size, '') || ' (' || UPPER(COALESCE(NEW.network, '')) || ') has been successfully delivered to ' || NEW.customer_phone || '.', 
-         'success', 
-         '/dashboard/transactions'
-       );
+       IF NEW.order_type = 'wallet_topup' THEN
+          INSERT INTO public.user_notifications (user_id, title, message, type, link)
+          VALUES (
+            NEW.agent_id, 
+            '💰 Wallet Credited', 
+            'Successfully credited GHS ' || NEW.amount || ' to your wallet via direct top-up.', 
+            'success', 
+            '/dashboard/transactions'
+          );
+       ELSE
+          INSERT INTO public.user_notifications (user_id, title, message, type, link)
+          VALUES (
+            NEW.agent_id, 
+            '✅ Order Delivered', 
+            'Success! ' || COALESCE(NEW.package_size, '') || ' (' || UPPER(COALESCE(NEW.network, '')) || ') has been successfully delivered to ' || NEW.customer_phone || '.', 
+            'success', 
+            '/dashboard/transactions'
+          );
+       END IF;
     END IF;
 
     -- SCENARIO B: Order Failed completely
     IF NEW.status = 'fulfillment_failed' THEN
-       INSERT INTO public.user_notifications (user_id, title, message, type, link)
-       VALUES (
-         NEW.agent_id, 
-         '❌ Order Failed', 
-         'Alert: The order for ' || NEW.customer_phone || ' failed to deliver. Your funds have been automatically restored to your wallet.', 
-         'error', 
-         '/dashboard/transactions'
-       );
+       IF NEW.order_type = 'wallet_topup' THEN
+          INSERT INTO public.user_notifications (user_id, title, message, type, link)
+          VALUES (
+            NEW.agent_id, 
+            '❌ Wallet Top-up Failed', 
+            'Alert: Your wallet top-up of GHS ' || NEW.amount || ' failed to process.', 
+            'error', 
+            '/dashboard/transactions'
+          );
+       ELSE
+          INSERT INTO public.user_notifications (user_id, title, message, type, link)
+          VALUES (
+            NEW.agent_id, 
+            '❌ Order Failed', 
+            'Alert: The order for ' || NEW.customer_phone || ' failed to deliver. Your funds have been automatically restored to your wallet.', 
+            'error', 
+            '/dashboard/transactions'
+          );
+       END IF;
     END IF;
 
   END IF;
