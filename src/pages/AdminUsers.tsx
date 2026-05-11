@@ -30,6 +30,7 @@ interface UserRow {
   parent_name?: string;
   total_sales_volume?: number;
   wallet_balance?: number;
+  api_wallet_balance?: number;
   is_suspended?: boolean;
   avatar_url?: string | null;
 }
@@ -94,15 +95,17 @@ const AdminUsers = () => {
       const [parentsRes, salesRes, walletsRes] = await Promise.all([
         parentIds.length > 0 ? supabase.from("profiles").select("user_id, full_name").in("user_id", parentIds) : Promise.resolve({ data: [] }),
         supabase.from("user_sales_stats").select("user_id, total_sales_volume").in("user_id", userIds),
-        supabase.from("wallets").select("agent_id, balance").in("agent_id", userIds),
+        supabase.from("wallets").select("agent_id, balance, api_balance").in("agent_id", userIds),
       ]);
       const parentMap = new Map((parentsRes.data || []).map((p: any) => [p.user_id, p.full_name]));
       const salesMap = new Map((salesRes.data || []).map((s: any) => [s.user_id, s.total_sales_volume]));
-      const walletMap = new Map((walletsRes.data || []).map((w: any) => [w.agent_id, w.balance]));
+      const walletMap = new Map((walletsRes.data || []).map((w: any) => [w.agent_id, w]));
       rows.forEach(r => {
         if (r.parent_agent_id) r.parent_name = parentMap.get(r.parent_agent_id) || "Unknown";
         r.total_sales_volume = salesMap.get(r.user_id) ?? 0;
-        r.wallet_balance = Number(walletMap.get(r.user_id) ?? 0);
+        const wallet = walletMap.get(r.user_id);
+        r.wallet_balance = Number(wallet?.balance ?? 0);
+        r.api_wallet_balance = Number(wallet?.api_balance ?? 0);
       });
     }
 
@@ -372,7 +375,8 @@ const AdminUsers = () => {
                 <th className="text-left p-4 font-semibold text-muted-foreground text-xs uppercase tracking-wider">User</th>
                 <th className="text-left p-4 font-semibold text-muted-foreground text-xs uppercase tracking-wider">Phone</th>
                 <th className="text-left p-4 font-semibold text-muted-foreground text-xs uppercase tracking-wider">Role</th>
-                <th className="text-left p-4 font-semibold text-muted-foreground text-xs uppercase tracking-wider">Wallet</th>
+                <th className="text-left p-4 font-semibold text-muted-foreground text-xs uppercase tracking-wider">Main Wallet</th>
+                <th className="text-left p-4 font-semibold text-muted-foreground text-xs uppercase tracking-wider">API Wallet</th>
                 <th className="text-left p-4 font-semibold text-muted-foreground text-xs uppercase tracking-wider">Sales</th>
                 <th className="text-left p-4 font-semibold text-muted-foreground text-xs uppercase tracking-wider hidden md:table-cell">Parent Agent</th>
                 <th className="text-left p-4 font-semibold text-muted-foreground text-xs uppercase tracking-wider">Actions</th>
@@ -414,6 +418,15 @@ const AdminUsers = () => {
                     <p className={`font-bold ${Number(user.wallet_balance) < 10 ? "text-red-600 dark:text-red-400" : "text-cyan-600 dark:text-cyan-400"}`}>
                       GH₵{(user.wallet_balance || 0).toFixed(2)}
                     </p>
+                  </td>
+                  <td className="p-4">
+                    {(user.is_agent || user.sub_agent_approved || (user.api_wallet_balance ?? 0) > 0) ? (
+                      <p className={`font-bold ${Number(user.api_wallet_balance) < 100 ? "text-amber-600 dark:text-amber-400" : "text-emerald-600 dark:text-emerald-400"}`}>
+                        GH₵{(user.api_wallet_balance || 0).toFixed(2)}
+                      </p>
+                    ) : (
+                      <span className="text-muted-foreground/30">—</span>
+                    )}
                   </td>
                   <td className="p-4">
                     <p className="font-bold text-emerald-600 dark:text-emerald-400">GH₵{(user.total_sales_volume || 0).toFixed(2)}</p>
@@ -492,10 +505,19 @@ const AdminUsers = () => {
                 </div>
               </div>
               <div className="text-right">
-                <p className={`font-black ${Number(user.wallet_balance || 0) < 10 ? "text-red-600 dark:text-red-400" : "text-cyan-600 dark:text-cyan-400"}`}>
+                <p className={`font-black leading-none ${Number(user.wallet_balance || 0) < 10 ? "text-red-600 dark:text-red-400" : "text-cyan-600 dark:text-cyan-400"}`}>
                   ₵{(user.wallet_balance || 0).toFixed(2)}
                 </p>
-                <p className="text-[9px] text-muted-foreground uppercase tracking-widest font-bold">Wallet</p>
+                <p className="text-[9px] text-muted-foreground uppercase tracking-widest font-bold mt-0.5">Main</p>
+                
+                {((user.api_wallet_balance ?? 0) > 0 || user.is_agent) && (
+                  <div className="mt-1.5">
+                    <p className="font-black leading-none text-emerald-600 dark:text-emerald-400 text-xs">
+                      ₵{(user.api_wallet_balance || 0).toFixed(2)}
+                    </p>
+                    <p className="text-[8px] text-muted-foreground uppercase font-bold">API</p>
+                  </div>
+                )}
               </div>
             </div>
 

@@ -55,6 +55,7 @@ interface SharedAccount {
 
 interface DrawerData {
   walletBalance: number;
+  apiBalance: number;
   orders: Order[];
   sharedIpAccounts: SharedAccount[];
   referrerName?: string;
@@ -96,6 +97,7 @@ const UserDetailDrawer = ({ user, onClose }: Props) => {
   const [savingNotes, setSavingNotes] = useState(false);
   const [topupAmount, setTopupAmount] = useState("");
   const [topupLoading, setTopupLoading] = useState(false);
+  const [walletType, setWalletType] = useState<"main" | "api">("main");
 
   useEffect(() => {
     setIsSuspended(user?.is_suspended ?? false);
@@ -152,23 +154,29 @@ const UserDetailDrawer = ({ user, onClose }: Props) => {
   const handleManualTopup = async (isDeduction = false) => {
     if (!user || !topupAmount || isNaN(Number(topupAmount))) return;
     const amount = Number(topupAmount) * (isDeduction ? -1 : 1);
+    const currentBalance = walletType === "api" ? (data?.apiBalance ?? 0) : (data?.walletBalance ?? 0);
     
-    if (isDeduction && Math.abs(amount) > (data?.walletBalance ?? 0)) {
+    if (isDeduction && Math.abs(amount) > currentBalance) {
        if (!window.confirm("This will result in a negative balance. Continue?")) return;
     }
 
     setTopupLoading(true);
     try {
+      const action = walletType === "api" ? "manual_api_topup" : "manual_topup";
       const { data: res, error } = await supabase.functions.invoke("admin-user-actions", {
-        body: { action: "manual_topup", user_id: user.user_id, amount: amount },
+        body: { action: action, user_id: user.user_id, amount: amount },
       });
       if (error || res?.error) throw new Error(res?.error || error?.message);
       
-      setData(prev => prev ? { ...prev, walletBalance: res.new_balance } : prev);
+      setData(prev => prev ? { 
+        ...prev, 
+        walletBalance: walletType === "main" ? res.new_balance : prev.walletBalance,
+        apiBalance: walletType === "api" ? res.new_balance : prev.apiBalance 
+      } : prev);
       setTopupAmount("");
       toast({ 
-        title: isDeduction ? "Wallet Debited" : "Wallet Credited", 
-        description: `${isDeduction ? "Removed" : "Added"} GH₵ ${Math.abs(amount).toFixed(2)} to ${user.full_name}'s wallet.` 
+        title: isDeduction ? `${walletType === "api" ? "API " : ""}Wallet Debited` : `${walletType === "api" ? "API " : ""}Wallet Credited`, 
+        description: `${isDeduction ? "Removed" : "Added"} GH₵ ${Math.abs(amount).toFixed(2)} to ${user.full_name}'s ${walletType} wallet.` 
       });
     } catch (err: any) {
       toast({ title: "Action failed", description: err.message, variant: "destructive" });
@@ -198,7 +206,7 @@ const UserDetailDrawer = ({ user, onClose }: Props) => {
 
     const load = async () => {
       const queries: Promise<any>[] = [
-        supabase.from("wallets").select("balance").eq("agent_id", user.user_id).maybeSingle(),
+        supabase.from("wallets").select("balance, api_balance").eq("agent_id", user.user_id).maybeSingle(),
         supabase.from("orders").select("id, order_type, network, package_size, customer_phone, amount, status, created_at")
           .eq("agent_id", user.user_id).order("created_at", { ascending: false }).limit(15),
         user.last_ip
@@ -213,6 +221,7 @@ const UserDetailDrawer = ({ user, onClose }: Props) => {
 
       setData({
         walletBalance: Number(walletRes.data?.balance ?? 0),
+        apiBalance: Number(walletRes.data?.api_balance ?? 0),
         orders: (ordersRes.data || []) as Order[],
         sharedIpAccounts: (sharedRes.data || []) as SharedAccount[],
         referrerName: referrerRes.data?.full_name ?? undefined,
@@ -357,9 +366,20 @@ const UserDetailDrawer = ({ user, onClose }: Props) => {
 
         {/* ── Stats ── */}
         <div className="px-6 pt-4">
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-2 gap-3 mb-3">
             {[
-              { icon: Wallet, label: "Wallet", value: loading ? "…" : `GH₵ ${(data?.walletBalance ?? 0).toFixed(2)}`, color: "text-cyan-400" },
+              { icon: Wallet, label: "Main Wallet", value: loading ? "…" : `GH₵ ${(data?.walletBalance ?? 0).toFixed(2)}`, color: "text-cyan-400" },
+              { icon: ShieldCheck, label: "API Wallet", value: loading ? "…" : `GH₵ ${(data?.apiBalance ?? 0).toFixed(2)}`, color: "text-emerald-400" },
+            ].map(({ icon: Icon, label, value, color }) => (
+              <div key={label} className="rounded-xl bg-white/[0.03] border border-white/5 p-3 text-center">
+                <Icon className={`w-4 h-4 mx-auto mb-1 ${color}`} />
+                <p className={`text-sm font-black ${color}`}>{value}</p>
+                <p className="text-[10px] text-white/30 uppercase tracking-wider mt-0.5">{label}</p>
+              </div>
+            ))}
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            {[
               { icon: ShoppingCart, label: "Orders", value: loading ? "…" : String(data?.orders.length ?? 0) + (data && data.orders.length === 15 ? "+" : ""), color: "text-violet-400" },
               { icon: Hash, label: "Logins", value: String(user.login_count ?? 0), color: "text-amber-400" },
             ].map(({ icon: Icon, label, value, color }) => (
@@ -378,6 +398,25 @@ const UserDetailDrawer = ({ user, onClose }: Props) => {
              <Wallet className="w-3 h-3" /> Manage Wallet
            </p>
            <div className="bg-white/[0.02] border border-white/5 rounded-2xl p-4 space-y-4">
+              
+              {/* Wallet Toggle */}
+              <div className="flex gap-1.5 p-1 bg-black/40 border border-white/5 rounded-xl mb-1">
+                <button
+                  type="button"
+                  onClick={() => setWalletType("main")}
+                  className={`flex-1 py-2 text-[10px] font-black uppercase tracking-wider rounded-lg transition-all ${walletType === "main" ? "bg-cyan-500 text-black" : "text-white/40 hover:text-white hover:bg-white/5"}`}
+                >
+                  Main Wallet
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setWalletType("api")}
+                  className={`flex-1 py-2 text-[10px] font-black uppercase tracking-wider rounded-lg transition-all ${walletType === "api" ? "bg-emerald-500 text-black" : "text-white/40 hover:text-white hover:bg-white/5"}`}
+                >
+                  API Wallet
+                </button>
+              </div>
+
               <div className="flex items-center gap-3">
                  <div className="relative flex-1">
                     <span className="absolute left-3 top-1/2 -translate-y-1/2 text-white/30 text-xs font-bold">GH₵</span>
