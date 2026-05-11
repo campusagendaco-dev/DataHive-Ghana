@@ -1,12 +1,12 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { generateSlug } from "@/lib/data";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import {
-  Store, User, Phone, Mail, MessageCircle, Users, Link2,
-  Palette, Smartphone, CreditCard, Globe, CheckCircle2, Loader2, Image,
+  Store, User, Phone, Mail, MessageCircle, Link2,
+  Palette, Smartphone, CreditCard, Globe, CheckCircle2, Loader2, Upload, X, Image,
 } from "lucide-react";
 
 const SECTION = ({ icon: Icon, title, description, children }: {
@@ -64,6 +64,8 @@ const DashboardSettings = () => {
   const { toast } = useToast();
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [uploadingLogo, setUploadingLogo] = useState(false);
+  const logoInputRef = useRef<HTMLInputElement>(null);
   const [form, setForm] = useState({
     store_name: "",
     full_name: "",
@@ -99,6 +101,34 @@ const DashboardSettings = () => {
   }, [profile]);
 
   const update = (key: string, value: string) => setForm((f) => ({ ...f, [key]: value }));
+
+  const handleLogoUpload = async (file: File) => {
+    const MAX_MB = 5;
+    if (file.size > MAX_MB * 1024 * 1024) {
+      toast({ title: `Image too large — max ${MAX_MB}MB`, variant: "destructive" });
+      return;
+    }
+    if (!file.type.startsWith("image/")) {
+      toast({ title: "Only image files are allowed", variant: "destructive" });
+      return;
+    }
+    setUploadingLogo(true);
+    try {
+      const ext = file.name.split(".").pop() || "png";
+      const path = `store-logos/${user?.id}-${Date.now()}.${ext}`;
+      const { error: uploadError } = await supabase.storage
+        .from("site-assets")
+        .upload(path, file, { upsert: true, contentType: file.type });
+      if (uploadError) throw uploadError;
+      const { data } = supabase.storage.from("site-assets").getPublicUrl(path);
+      update("store_logo_url", data.publicUrl);
+      toast({ title: "Logo uploaded!" });
+    } catch (e: any) {
+      toast({ title: "Upload failed", description: e.message, variant: "destructive" });
+    } finally {
+      setUploadingLogo(false);
+    }
+  };
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -269,28 +299,79 @@ const DashboardSettings = () => {
 
           {/* Branding */}
           <SECTION icon={Palette} title="Branding" description="Customize how your store looks">
-            <Field label="Store Logo URL" hint="Paste a direct link to your logo image (PNG or JPG)">
-              <div className="flex gap-2 items-center">
-                <div className="relative flex-1">
-                  <Image className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/20" />
-                  <StyledInput
-                    value={form.store_logo_url}
-                    onChange={(e) => update("store_logo_url", e.target.value)}
-                    placeholder="https://example.com/logo.png"
-                    maxLength={500}
-                    style={{ paddingLeft: "2.25rem" }}
-                  />
+            <Field label="Store Logo" hint="PNG, JPG or WebP — max 5MB">
+              {/* hidden file input */}
+              <input
+                ref={logoInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                aria-label="Upload store logo"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) handleLogoUpload(file);
+                  e.target.value = "";
+                }}
+              />
+
+              {form.store_logo_url ? (
+                /* Preview with replace / remove */
+                <div className="flex items-center gap-3">
+                  <div className="w-20 h-20 rounded-2xl border border-white/10 overflow-hidden bg-white flex items-center justify-center shrink-0">
+                    <img src={form.store_logo_url} alt="Logo" className="w-full h-full object-contain" />
+                  </div>
+                  <div className="flex flex-col gap-2 flex-1">
+                    <button
+                      type="button"
+                      onClick={() => logoInputRef.current?.click()}
+                      disabled={uploadingLogo}
+                      className="flex items-center gap-2 h-9 px-4 rounded-xl text-xs font-black text-amber-400 border border-amber-400/30 bg-amber-400/10 hover:bg-amber-400/20 transition-all disabled:opacity-50"
+                    >
+                      {uploadingLogo ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Upload className="w-3.5 h-3.5" />}
+                      {uploadingLogo ? "Uploading…" : "Replace Logo"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => update("store_logo_url", "")}
+                      className="flex items-center gap-2 h-9 px-4 rounded-xl text-xs font-bold text-white/40 border border-white/8 bg-white/4 hover:bg-white/8 transition-all"
+                    >
+                      <X className="w-3.5 h-3.5" /> Remove
+                    </button>
+                  </div>
                 </div>
-                {form.store_logo_url ? (
-                  <div className="w-11 h-11 rounded-2xl border border-white/10 overflow-hidden bg-white shrink-0 flex items-center justify-center">
-                    <img src={form.store_logo_url} alt="Logo" className="w-full h-full object-contain" onError={(e) => (e.currentTarget.style.display = "none")} />
-                  </div>
-                ) : (
-                  <div className="w-11 h-11 rounded-2xl border border-white/8 flex items-center justify-center shrink-0" style={{ background: "#1a1a24" }}>
-                    <Store className="w-4 h-4 text-white/20" />
-                  </div>
-                )}
-              </div>
+              ) : (
+                /* Drop zone */
+                <button
+                  type="button"
+                  onClick={() => logoInputRef.current?.click()}
+                  disabled={uploadingLogo}
+                  onDragOver={(e) => e.preventDefault()}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    const file = e.dataTransfer.files?.[0];
+                    if (file) handleLogoUpload(file);
+                  }}
+                  className="w-full h-28 rounded-2xl border-2 border-dashed flex flex-col items-center justify-center gap-2 transition-all disabled:opacity-50"
+                  style={{ borderColor: "rgba(255,255,255,0.12)", background: "#1a1a24" }}
+                >
+                  {uploadingLogo ? (
+                    <>
+                      <Loader2 className="w-6 h-6 text-amber-400 animate-spin" />
+                      <span className="text-xs font-bold text-white/40">Uploading…</span>
+                    </>
+                  ) : (
+                    <>
+                      <div className="w-10 h-10 rounded-2xl flex items-center justify-center" style={{ background: "rgba(251,191,36,0.12)" }}>
+                        <Upload className="w-5 h-5 text-amber-400" />
+                      </div>
+                      <div className="text-center">
+                        <p className="text-sm font-black text-white/70">Tap to upload logo</p>
+                        <p className="text-[10px] text-white/30">or drag and drop · PNG, JPG, WebP · max 5MB</p>
+                      </div>
+                    </>
+                  )}
+                </button>
+              )}
             </Field>
 
             <Field label="Primary Brand Color" hint="Used for buttons and accents on your store page">
