@@ -99,9 +99,11 @@ export const NotificationCenter = ({ isDark }: { isDark: boolean }) => {
 
     fetchNotifications();
 
-    // Enable Supabase Realtime Channel for instant push alerts
+    // Generate unique ephemeral channel ID to prevent race conditions in strict mode
+    const channelId = `user-notifs-${user.id}-${Math.random().toString(36).substring(7)}`;
+    
     const channel = supabase
-      .channel("custom-insert-channel")
+      .channel(channelId)
       .on(
         "postgres_changes",
         {
@@ -114,7 +116,7 @@ export const NotificationCenter = ({ isDark }: { isDark: boolean }) => {
           const newNotif = payload.new as UserNotification;
           setNotifications((prev) => [newNotif, ...prev]);
           
-          // Simple trigger sound effect if available or visual pulse logic
+          // Apply pulse animation to the red badge element directly
           const pulseEl = document.getElementById("notification-ring");
           if (pulseEl) {
             pulseEl.classList.add("animate-ping");
