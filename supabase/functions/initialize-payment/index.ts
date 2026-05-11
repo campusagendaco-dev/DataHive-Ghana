@@ -484,6 +484,8 @@ serve(async (req: Request) => {
 
     if (orderType === "wallet_topup") {
       const walletCredit = Number(metadata.wallet_credit);
+      const isApiWallet = metadata.wallet_type === "api";
+
       if (!Number.isFinite(walletCredit) || walletCredit < 10) {
         return new Response(JSON.stringify({ error: "Minimum wallet top-up is GHS 10.00" }), {
           status: 400,
@@ -491,11 +493,15 @@ serve(async (req: Request) => {
         });
       }
 
-      resolvedPaystackFee = parseFloat(calculatePaystackFee(walletCredit).toFixed(2));
+      // Zero fee for API wallet top-ups
+      resolvedPaystackFee = isApiWallet ? 0 : parseFloat(calculatePaystackFee(walletCredit).toFixed(2));
       const expectedTotal = parseFloat((walletCredit + resolvedPaystackFee).toFixed(2));
+
       if (!amountMatches(expectedTotal, amount) || walletCredit > amount) {
         return new Response(JSON.stringify({
-          error: `Invalid wallet top-up amount. Expected GHS ${expectedTotal.toFixed(2)}.`,
+          error: isApiWallet 
+            ? `Invalid API wallet top-up amount. Expected GHS ${expectedTotal.toFixed(2)}.`
+            : `Invalid wallet top-up amount. Expected GHS ${expectedTotal.toFixed(2)}.`,
         }), {
           status: 400,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -594,6 +600,7 @@ serve(async (req: Request) => {
         profit: normalizedProfit,
         parent_profit: normalizedParentProfit,
         status: "pending",
+        metadata: enrichedMetadata,
       };
       if (resolvedParentAgentId) orderRow.parent_agent_id = resolvedParentAgentId;
       if (metadata.customer_phone) orderRow.customer_phone = metadata.customer_phone;

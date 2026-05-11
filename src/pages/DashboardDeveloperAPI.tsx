@@ -10,8 +10,11 @@ import {
   Key, Copy, RefreshCw, Loader2, ExternalLink,
   Shield, AlertTriangle, CheckCircle, Eye, EyeOff, Zap, Wallet,
   Terminal, History, Bug, Users2, MessageCircle, Share2, Code2,
-  PlusCircle, ArrowRightLeft
+  PlusCircle, ArrowRightLeft, CreditCard
 } from "lucide-react";
+import { invokePublicFunctionAsUser } from "@/lib/public-function-client";
+import { getAppBaseUrl } from "@/lib/app-base-url";
+import { getFunctionErrorMessage } from "@/lib/function-errors";
 import { Switch } from "@/components/ui/switch";
 import { Link } from "react-router-dom";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -54,6 +57,7 @@ const DashboardDeveloperAPI = () => {
 
   // API Top-up / Transfer State
   const [isTransferModalOpen, setIsTransferModalOpen] = useState(false);
+  const [fundingMethod, setFundingMethod] = useState<"paystack" | "transfer">("paystack");
   const [transferAmount, setTransferAmount] = useState("");
   const [transferring, setTransferring] = useState(false);
 
@@ -109,6 +113,39 @@ const DashboardDeveloperAPI = () => {
   useEffect(() => {
     fetchApiKey();
   }, [fetchApiKey]);
+
+  // Handle return from Paystack funding redirect
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const reference = params.get("reference") || params.get("trxref");
+    
+    if (reference) {
+      invokePublicFunctionAsUser("verify-payment", { body: { reference } }).then(async (res) => {
+        const status = res.data?.status;
+        if (status === "fulfilled") {
+          toast({ title: "✅ API Wallet Credited Successfully!" });
+        } else {
+          toast({ title: "Payment Received", description: "Updating your balance..." });
+        }
+        
+        await fetchApiKey(); // Refresh balance
+        
+        // Poll for up to 10s if balance hasn't reflected instantly
+        let polls = 3;
+        const interval = setInterval(async () => {
+          await fetchApiKey();
+          polls--;
+          if (polls <= 0) clearInterval(interval);
+        }, 3000);
+
+        window.history.replaceState({}, "", window.location.pathname);
+      }).catch(async () => {
+        toast({ title: "Could not auto-verify payment", description: "Balance will update momentarily.", variant: "destructive" });
+        await fetchApiKey();
+        window.history.replaceState({}, "", window.location.pathname);
+      });
+    }
+  }, [toast, fetchApiKey]);
 
 
   const generateApiKey = async () => {
@@ -194,6 +231,39 @@ const DashboardDeveloperAPI = () => {
     }
   };
 
+  const handlePaystackApiFunding = async () => {
+    const amt = parseFloat(transferAmount);
+    if (!amt || amt < 10) {
+      toast({ title: "Minimum funding amount is GH₵10.00", variant: "destructive" });
+      return;
+    }
+
+    setTransferring(true);
+    try {
+      const { data, error } = await invokePublicFunctionAsUser("wallet-topup", {
+        body: {
+          amount: amt, // No fee added for API direct funding!
+          wallet_credit: amt,
+          wallet_type: "api", // Critically identifies this as the 0% fee route
+          callback_url: `${getAppBaseUrl()}/dashboard/developer-api`,
+        },
+      });
+
+      if (error || !data?.authorization_url) {
+        const description = data?.error || await getFunctionErrorMessage(error, "Could not initialize Paystack payment.");
+        toast({ title: "Failed to initialize payment", description, variant: "destructive" });
+        return;
+      }
+
+      // Redirect to Paystack checkout
+      window.location.href = data.authorization_url;
+    } catch (err: any) {
+      toast({ title: "Request failed", description: err.message, variant: "destructive" });
+    } finally {
+      // Wait state remains during redirect
+    }
+  };
+
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text);
     toast({ title: "Copied to clipboard" });
@@ -261,30 +331,58 @@ const DashboardDeveloperAPI = () => {
                       size="sm" 
                       className="h-9 rounded-xl bg-sky-500 hover:bg-sky-400 text-white font-black text-[10px] tracking-widest uppercase px-4 gap-1.5 shadow-lg shadow-sky-500/20 border-none relative z-10"
                     >
-                      <PlusCircle className="w-3.5 h-3.5" /> Top Up
+                      <PlusCircle className="w-3.5 h-3.5" /> Fund Wallet
                     </Button>
                   </DialogTrigger>
-                  <DialogContent className="sm:max-w-[400px] rounded-[2rem] bg-card border-border shadow-2xl p-0 overflow-hidden">
-                    <DialogHeader className="p-6 bg-gradient-to-br from-sky-500/5 to-teal-500/5 border-b border-border pb-6">
-                      <div className="flex items-center gap-3 mb-2">
+                  <DialogContent className="sm:max-w-[420px] rounded-[2rem] bg-card border-border shadow-2xl p-0 overflow-hidden">
+                    <DialogHeader className="p-6 bg-gradient-to-br from-sky-500/5 to-teal-500/5 border-b border-border pb-5">
+                      <div className="flex items-center gap-3 mb-1">
                         <div className="w-10 h-10 rounded-xl bg-sky-500/10 flex items-center justify-center text-sky-500 border border-sky-500/20">
-                          <Wallet className="w-5 h-5" />
+                          <Zap className="w-5 h-5" />
                         </div>
                         <DialogTitle className="font-black text-xl">Fund API Wallet</DialogTitle>
                       </div>
                       <DialogDescription className="text-xs font-medium">
-                        Transfer funds instantly from your Main Wallet to your API Wallet for integration usage.
+                        Select a funding method to instantly increase your integration balance.
                       </DialogDescription>
                     </DialogHeader>
+
+                    {/* Funding Selector Tabs */}
+                    <div className="flex border-b border-border bg-muted/10">
+                      <button 
+                        onClick={() => setFundingMethod("paystack")}
+                        className={cn("flex-1 py-3 text-[10px] font-black uppercase tracking-widest border-b-2 transition-all", fundingMethod === "paystack" ? "border-sky-500 text-foreground bg-sky-500/5" : "border-transparent text-muted-foreground hover:text-foreground")}
+                      >
+                        Direct Payment
+                      </button>
+                      <button 
+                        onClick={() => setFundingMethod("transfer")}
+                        className={cn("flex-1 py-3 text-[10px] font-black uppercase tracking-widest border-b-2 transition-all", fundingMethod === "transfer" ? "border-sky-500 text-foreground bg-sky-500/5" : "border-transparent text-muted-foreground hover:text-foreground")}
+                      >
+                        Transfer from Main
+                      </button>
+                    </div>
+
                     <div className="p-6 space-y-5">
-                      {/* Balance Reference */}
-                      <div className="flex items-center justify-between p-3 rounded-xl bg-muted/40 border border-border text-xs">
-                        <span className="text-muted-foreground font-medium">Main Balance Available:</span>
-                        <span className="font-black text-foreground">GH₵{walletBalance.toFixed(2)}</span>
-                      </div>
+                      {fundingMethod === "transfer" && (
+                        <div className="flex items-center justify-between p-3 rounded-xl bg-muted/40 border border-border text-xs animate-in fade-in slide-in-from-top-1">
+                          <span className="text-muted-foreground font-medium">Main Balance Available:</span>
+                          <span className="font-black text-foreground">GH₵{walletBalance.toFixed(2)}</span>
+                        </div>
+                      )}
+
+                      {fundingMethod === "paystack" && (
+                        <div className="flex items-center gap-3 p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 animate-in fade-in slide-in-from-top-1">
+                          <Shield className="w-4 h-4 text-emerald-500 shrink-0" />
+                          <div>
+                            <p className="text-[10px] font-black uppercase text-emerald-600 dark:text-emerald-400">0% Processing Fee</p>
+                            <p className="text-[9px] font-medium text-emerald-600/70 dark:text-emerald-400/70">API Direct Funding incurs no gateway platform fees.</p>
+                          </div>
+                        </div>
+                      )}
 
                       <div className="space-y-2">
-                        <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Transfer Amount (GH₵)</Label>
+                        <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Amount (GH₵)</Label>
                         <div className="relative">
                           <span className="absolute left-4 top-1/2 -translate-y-1/2 font-black text-muted-foreground/60 text-sm">₵</span>
                           <Input 
@@ -292,13 +390,13 @@ const DashboardDeveloperAPI = () => {
                             placeholder="0.00"
                             value={transferAmount}
                             onChange={(e) => setTransferAmount(e.target.value)}
-                            className="h-12 pl-10 font-black text-base rounded-xl bg-background border-border"
+                            className="h-12 pl-10 font-black text-base rounded-xl bg-background border-border focus-visible:ring-sky-500"
                           />
                         </div>
                       </div>
 
                       <div className="grid grid-cols-4 gap-2">
-                        {[10, 20, 50, 100].map(v => (
+                        {[20, 50, 100, 200].map(v => (
                           <button 
                             key={v} 
                             onClick={() => setTransferAmount(v.toString())}
@@ -309,22 +407,33 @@ const DashboardDeveloperAPI = () => {
                         ))}
                       </div>
                     </div>
+
                     <DialogFooter className="p-6 bg-muted/30 border-t border-border">
-                      <Button 
-                        onClick={handleTransferToApi} 
-                        disabled={transferring || !transferAmount || parseFloat(transferAmount) <= 0}
-                        className="w-full h-12 bg-sky-500 hover:bg-sky-400 text-white font-black uppercase tracking-widest text-xs rounded-xl shadow-lg border-none gap-2"
-                      >
-                        {transferring ? (
-                          <>
-                            <Loader2 className="w-4 h-4 animate-spin" /> Processing...
-                          </>
-                        ) : (
-                          <>
-                            <ArrowRightLeft className="w-4 h-4" /> Complete Transfer
-                          </>
-                        )}
-                      </Button>
+                      {fundingMethod === "paystack" ? (
+                        <Button 
+                          onClick={handlePaystackApiFunding} 
+                          disabled={transferring || !transferAmount || parseFloat(transferAmount) < 10}
+                          className="w-full h-12 bg-emerald-500 hover:bg-emerald-600 text-white font-black uppercase tracking-widest text-xs rounded-xl shadow-lg border-none gap-2 transition-colors"
+                        >
+                          {transferring ? (
+                            <><Loader2 className="w-4 h-4 animate-spin" /> Initializing...</>
+                          ) : (
+                            <><Zap className="w-4 h-4" /> Pay Instantly</>
+                          )}
+                        </Button>
+                      ) : (
+                        <Button 
+                          onClick={handleTransferToApi} 
+                          disabled={transferring || !transferAmount || parseFloat(transferAmount) <= 0}
+                          className="w-full h-12 bg-sky-500 hover:bg-sky-400 text-white font-black uppercase tracking-widest text-xs rounded-xl shadow-lg border-none gap-2"
+                        >
+                          {transferring ? (
+                            <><Loader2 className="w-4 h-4 animate-spin" /> Processing...</>
+                          ) : (
+                            <><ArrowRightLeft className="w-4 h-4" /> Complete Transfer</>
+                          )}
+                        </Button>
+                      )}
                     </DialogFooter>
                   </DialogContent>
                 </Dialog>

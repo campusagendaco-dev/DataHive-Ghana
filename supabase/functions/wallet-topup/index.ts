@@ -40,9 +40,10 @@ serve(async (req) => {
       });
     }
 
-    const { amount, wallet_credit, callback_url } = payload || {};
+    const { amount, wallet_credit, callback_url, wallet_type } = payload || {};
     const chargeAmount = Number(amount);
     const creditAmount = Number(wallet_credit || amount);
+    const isApiWallet = wallet_type === "api";
 
     if (!chargeAmount || chargeAmount < 10) {
       return new Response(JSON.stringify({ error: "Minimum top-up amount is GHS 10.00" }), {
@@ -53,12 +54,15 @@ serve(async (req) => {
     // Server-side validation of amount vs credit
     const feeRate = 0.03;
     const feeCap = 100;
-    const calculatedFee = Math.min(creditAmount * feeRate, feeCap);
+    // Zero fee for API wallet, standard fee for Main wallet
+    const calculatedFee = isApiWallet ? 0 : Math.min(creditAmount * feeRate, feeCap);
     const expectedTotal = Number((creditAmount + calculatedFee).toFixed(2));
 
     if (chargeAmount < expectedTotal - 0.01) {
       return new Response(JSON.stringify({ 
-        error: `Invalid amount. To credit GHS ${creditAmount.toFixed(2)}, you must pay GHS ${expectedTotal.toFixed(2)} (including Paystack fees).` 
+        error: isApiWallet 
+          ? `Invalid amount. Expected GHS ${creditAmount.toFixed(2)} (0% Fee).`
+          : `Invalid amount. To credit GHS ${creditAmount.toFixed(2)}, you must pay GHS ${expectedTotal.toFixed(2)} (including Paystack fees).` 
       }), {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -83,9 +87,10 @@ serve(async (req) => {
       agent_id: user.id,
       order_type: "wallet_topup",
       amount: creditAmount,
-      paystack_fee: paystackFee,
+      paystack_fee: paystackFee > 0 ? paystackFee : 0,
       profit: 0,
       status: "pending",
+      metadata: { wallet_type: isApiWallet ? "api" : "main" }
     });
 
     // Initialize Paystack payment
@@ -107,7 +112,13 @@ serve(async (req) => {
         amount: amountInPesewas,
         reference: orderId,
         callback_url: callback_url || undefined,
-        metadata: { order_id: orderId, order_type: "wallet_topup", agent_id: user.id, wallet_credit: creditAmount },
+        metadata: { 
+          order_id: orderId, 
+          order_type: "wallet_topup", 
+          agent_id: user.id, 
+          wallet_credit: creditAmount,
+          wallet_type: isApiWallet ? "api" : "main" 
+        },
         currency: "GHS",
       }),
     });
