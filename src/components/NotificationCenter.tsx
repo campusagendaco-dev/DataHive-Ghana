@@ -13,6 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { useNavigate } from "react-router-dom";
+import { toast } from "sonner";
 
 interface UserNotification {
   id: string;
@@ -115,6 +116,21 @@ export const NotificationCenter = ({ isDark }: { isDark: boolean }) => {
         (payload) => {
           const newNotif = payload.new as UserNotification;
           setNotifications((prev) => [newNotif, ...prev]);
+          
+          // TRG: Trigger instant in-app popup (Toast)
+          const notifyMethod = newNotif.type === "error" ? toast.error : 
+                              newNotif.type === "warning" ? toast.warning : 
+                              newNotif.type === "success" ? toast.success : 
+                              toast.info;
+          
+          notifyMethod(newNotif.title, {
+            description: newNotif.message,
+            duration: 6000,
+            action: newNotif.link ? {
+              label: "View",
+              onClick: () => navigate(newNotif.link!)
+            } : undefined
+          });
           
           // Apply pulse animation to the red badge element directly
           const pulseEl = document.getElementById("notification-ring");
