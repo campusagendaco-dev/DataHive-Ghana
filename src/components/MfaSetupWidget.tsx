@@ -52,6 +52,7 @@ const MfaSetupWidget = () => {
   }, [user, isMfaEnabled]);
 
   const handleBeginEnrollment = async () => {
+    console.log("[MFA] Initializing enrollment process...");
     setLoading(true);
     try {
       // Initiate TOTP factor creation in Supabase auth engine
@@ -188,6 +189,7 @@ const MfaSetupWidget = () => {
               </p>
             </div>
             <Button 
+              type="button"
               onClick={handleBeginEnrollment}
               disabled={loading}
               className="h-12 px-8 rounded-xl font-bold bg-indigo-600 hover:bg-indigo-500 shadow-lg shadow-indigo-600/10"
@@ -298,6 +300,7 @@ const MfaSetupWidget = () => {
                 <RefreshCw className="w-3 h-3 animate-spin duration-3000" /> Encryption sync live.
               </p>
               <Button 
+                type="button"
                 onClick={handleCancelEnrollment} 
                 variant="ghost" 
                 className="text-muted-foreground hover:text-red-400 hover:bg-red-400/5 text-xs font-bold rounded-xl"
@@ -334,6 +337,7 @@ const MfaSetupWidget = () => {
               </div>
               
               <Button 
+                type="button"
                 onClick={handleDisableMfa}
                 disabled={loading}
                 variant="outline" 
