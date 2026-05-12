@@ -97,7 +97,7 @@ const AdminUsers = () => {
         parentIds.length > 0 ? supabase.from("profiles").select("user_id, full_name").in("user_id", parentIds) : Promise.resolve({ data: [] }),
         supabase.from("user_sales_stats").select("user_id, total_sales_volume").in("user_id", userIds),
         supabase.from("wallets").select("agent_id, balance, api_balance").in("agent_id", userIds),
-        supabase.from("user_mfa_status").select("user_id, has_mfa").in("user_id", userIds).catch(() => ({ data: [] })),
+        Promise.resolve(supabase.from("user_mfa_status").select("user_id, has_mfa").in("user_id", userIds)).catch(() => ({ data: [] })),
       ]);
       const parentMap = new Map((parentsRes.data || []).map((p: any) => [p.user_id, p.full_name]));
       const salesMap = new Map((salesRes.data || []).map((s: any) => [s.user_id, s.total_sales_volume]));
