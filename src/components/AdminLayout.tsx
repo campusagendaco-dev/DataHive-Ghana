@@ -7,7 +7,8 @@ import {
   LayoutDashboard, Users, ShieldCheck, ShoppingCart, LogOut, Menu,
   Wallet, Bell, Package, CreditCard, Activity, Settings, ChevronRight,
   BarChart3, Ticket, LifeBuoy, FileSearch, Key, TrendingUp, Sun, Moon,
-  Sparkles, Image as ImageIcon, Users2
+  Sparkles, Image as ImageIcon, Users2, ScrollText,
+  Megaphone, Flag, MessageSquare, Banknote, UserCheck, LineChart
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
@@ -31,8 +32,12 @@ const NAV_SECTIONS = [
       { label: "Wallet Top-Up",icon: CreditCard,   path: "/admin/wallet-topup" },
       { label: "Withdrawals",  icon: Wallet,        path: "/admin/withdrawals" },
       { label: "Reconciliation", icon: CreditCard,   path: "/admin/reconciliation" },
-      { label: "Profits",      icon: TrendingUp,   path: "/admin/profits" },
-      { label: "Promo Banners", icon: ImageIcon,    path: "/admin/banners" },
+      { label: "Profits",          icon: TrendingUp,  path: "/admin/profits" },
+      { label: "Agent Performance", icon: UserCheck,   path: "/admin/agent-performance" },
+      { label: "P&L Report",        icon: LineChart,   path: "/admin/pnl" },
+      { label: "Credit Mgmt",       icon: Banknote,    path: "/admin/credit-management" },
+      { label: "Broadcast",         icon: Megaphone,   path: "/admin/broadcast" },
+      { label: "Promo Banners",     icon: ImageIcon,   path: "/admin/banners" },
     ],
   },
   {
@@ -48,8 +53,11 @@ const NAV_SECTIONS = [
     title: "System",
     items: [
       { label: "Security",      icon: ShieldCheck, path: "/admin/security" },
-      { label: "System Health", icon: Activity,   path: "/admin/system-health" },
-      { label: "Audit Logs",    icon: FileSearch, path: "/admin/audit-logs" },
+      { label: "System Health", icon: Activity,    path: "/admin/system-health" },
+      { label: "System Logs",    icon: ScrollText,    path: "/admin/system-logs" },
+      { label: "Feature Flags",  icon: Flag,          path: "/admin/feature-flags" },
+      { label: "SMS Templates",  icon: MessageSquare, path: "/admin/sms-templates" },
+      { label: "Audit Logs",     icon: FileSearch,    path: "/admin/audit-logs" },
       { label: "API Users",     icon: Key,        path: "/admin/api-users" },
       { label: "Settings",      icon: Settings,   path: "/admin/settings" },
     ],

@@ -82,6 +82,9 @@ const AdminOrders = () => {
   const [orderTypeFilter, setOrderTypeFilter] = useState("all");
   const [page, setPage] = useState(1);
   const [providers, setProviders] = useState<any[]>([]);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkStatus, setBulkStatus] = useState("");
+  const [bulkUpdating, setBulkUpdating] = useState(false);
 
   useEffect(() => {
     const fetchProviders = async () => {
@@ -280,6 +283,25 @@ const AdminOrders = () => {
 
     setForcingFulfill(false);
     await fetchOrders();
+  };
+
+  const handleBulkStatusUpdate = async () => {
+    if (!bulkStatus || selectedIds.size === 0) return;
+    setBulkUpdating(true);
+    const ids = Array.from(selectedIds);
+    const { error } = await supabase
+      .from("orders")
+      .update({ status: bulkStatus, failure_reason: null, updated_at: new Date().toISOString() })
+      .in("id", ids);
+    if (error) {
+      toast({ title: "Bulk update failed", description: error.message, variant: "destructive" });
+    } else {
+      toast({ title: `Updated ${ids.length} order${ids.length > 1 ? "s" : ""} to "${bulkStatus.replace(/_/g, " ")}"` });
+      setSelectedIds(new Set());
+      setBulkStatus("");
+      fetchOrders();
+    }
+    setBulkUpdating(false);
   };
 
   const handleHealProcessingOrders = async () => {
@@ -599,12 +621,50 @@ const AdminOrders = () => {
         </span>
       </div>
 
+      {/* Bulk Status Update Toolbar */}
+      <div className="flex items-center gap-2">
+        <input
+          type="checkbox"
+          title="Select all on this page"
+          className="w-4 h-4 accent-primary cursor-pointer"
+          checked={selectedIds.size > 0 && selectedIds.size === paginated.length}
+          ref={el => { if (el) el.indeterminate = selectedIds.size > 0 && selectedIds.size < paginated.length; }}
+          onChange={(e) => {
+            if (e.target.checked) setSelectedIds(new Set(paginated.map(o => o.id)));
+            else setSelectedIds(new Set());
+          }}
+        />
+        <span className="text-xs text-muted-foreground">{selectedIds.size > 0 ? `${selectedIds.size} selected` : "Select all on page"}</span>
+        <select
+          value={bulkStatus}
+          onChange={e => setBulkStatus(e.target.value)}
+          className="text-xs bg-secondary/50 border border-input rounded-lg px-3 py-2 text-foreground outline-none"
+        >
+          <option value="">Select Status</option>
+          <option value="fulfilled">Fulfilled</option>
+          <option value="processing">Processing</option>
+          <option value="paid">Paid</option>
+          <option value="fulfillment_failed">Failed</option>
+          <option value="pending">Pending</option>
+        </select>
+        <Button
+          size="sm"
+          disabled={selectedIds.size === 0 || !bulkStatus || bulkUpdating}
+          onClick={handleBulkStatusUpdate}
+          className="gap-2"
+        >
+          {bulkUpdating ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+          Update Selected ({selectedIds.size})
+        </Button>
+      </div>
+
       {/* Desktop Table */}
       <div className="hidden md:block rounded-xl border border-border overflow-hidden shadow-sm">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-border bg-muted/50">
+                <th className="px-4 py-3 w-8" aria-label="Select"></th>
                 <th className="text-left px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Date</th>
                 <th className="text-left px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Agent</th>
                 <th className="text-left px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Type</th>
@@ -621,7 +681,21 @@ const AdminOrders = () => {
             </thead>
             <tbody className="divide-y divide-border">
               {paginated.map((order) => (
-                <tr key={order.id} className="hover:bg-muted/30 transition-colors bg-card">
+                <tr key={order.id} className={`hover:bg-muted/30 transition-colors bg-card ${selectedIds.has(order.id) ? "bg-primary/5" : ""}`}>
+                  <td className="px-4 py-3 w-8">
+                    <input
+                      type="checkbox"
+                      title="Select order"
+                      className="w-4 h-4 accent-primary cursor-pointer"
+                      checked={selectedIds.has(order.id)}
+                      onChange={(e) => {
+                        const next = new Set(selectedIds);
+                        if (e.target.checked) next.add(order.id);
+                        else next.delete(order.id);
+                        setSelectedIds(next);
+                      }}
+                    />
+                  </td>
                   <td className="px-4 py-3 text-muted-foreground text-xs whitespace-nowrap">
                     {new Date(order.created_at).toLocaleDateString("en-GH", { day: "2-digit", month: "short" })}
                     <span className="block text-muted-foreground/60 text-[10px]">

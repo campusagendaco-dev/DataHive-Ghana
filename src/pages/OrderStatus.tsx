@@ -217,7 +217,7 @@ const OrderStatus = () => {
     navigate(`/my-orders?phone=${sanitized}`);
   };
 
-  const step = orderStatus === "fulfilled" ? 3 : (orderStatus === "processing" || orderStatus === "paid" ? 2 : 1);
+  const step = orderStatus === "fulfilled" ? 3 : orderStatus === "processing" ? 2 : orderStatus === "paid" ? 1 : 0;
 
   // --- RENDER SPECIFIC ORDER ---
   if (reference) {

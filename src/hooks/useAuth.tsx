@@ -59,15 +59,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [loading, setLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
   const envSiteUrl = (import.meta.env.VITE_SITE_URL as string | undefined)?.trim();
-  const isLocalDevHost =
-    window.location.hostname === "localhost" ||
-    window.location.hostname === "127.0.0.1" ||
-    window.location.hostname === "[::1]" ||
-    window.location.hostname.startsWith("192.168.") ||
-    window.location.hostname.startsWith("10.") ||
-    window.location.hostname.startsWith("172.");
-
-  const appBaseUrl = isLocalDevHost ? window.location.origin : (envSiteUrl || window.location.origin);
+  // Explicitly enforce main production domain for redirects as requested by user
+  const appBaseUrl = envSiteUrl || "https://swiftdatagh.shop";
 
   const normalizeEmailInput = (value: string) =>
     value

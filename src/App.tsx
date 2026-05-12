@@ -75,10 +75,17 @@ const AdminAuditLogs = lazy(() => import("./pages/AdminAuditLogs"));
 const AdminSecurity = lazy(() => import("./pages/AdminSecurity"));
 const AdminAPIUsers = lazy(() => import("./pages/AdminAPIUsers"));
 const AdminProfits = lazy(() => import("./pages/AdminProfits"));
+const AdminAgentPerformance = lazy(() => import("./pages/AdminAgentPerformance"));
+const AdminPnL = lazy(() => import("./pages/AdminPnL"));
 const AdminBanners = lazy(() => import("./pages/AdminBanners"));
 const AdminEngagement = lazy(() => import("./pages/AdminEngagement"));
 const AdminReconciliation = lazy(() => import("./pages/AdminReconciliation"));
 const AdminSubAgents = lazy(() => import("./pages/AdminSubAgents"));
+const AdminSystemLogs = lazy(() => import("./pages/AdminSystemLogs"));
+const AdminBroadcast = lazy(() => import("./pages/AdminBroadcast"));
+const AdminFeatureFlags = lazy(() => import("./pages/AdminFeatureFlags"));
+const AdminSmsTemplates = lazy(() => import("./pages/AdminSmsTemplates"));
+const AdminCreditManagement = lazy(() => import("./pages/AdminCreditManagement"));
 const SubAgentSignup = lazy(() => import("./pages/SubAgentSignup"));
 const SubAgentPending = lazy(() => import("./pages/SubAgentPending"));
 const DashboardDeveloperAPI = lazy(() => import("./pages/DashboardDeveloperAPI"));
@@ -398,8 +405,15 @@ const AppContent = () => {
           <Route path="security" element={<AdminSecurity />} />
           <Route path="api-users" element={<AdminAPIUsers />} />
           <Route path="profits" element={<AdminProfits />} />
+          <Route path="agent-performance" element={<AdminAgentPerformance />} />
+          <Route path="pnl" element={<AdminPnL />} />
           <Route path="banners" element={<AdminBanners />} />
           <Route path="engagement" element={<AdminEngagement />} />
+          <Route path="system-logs" element={<AdminSystemLogs />} />
+          <Route path="broadcast" element={<AdminBroadcast />} />
+          <Route path="feature-flags" element={<AdminFeatureFlags />} />
+          <Route path="sms-templates" element={<AdminSmsTemplates />} />
+          <Route path="credit-management" element={<AdminCreditManagement />} />
           <Route path="account-settings" element={<DashboardAccountSettings />} />
         </Route>
 

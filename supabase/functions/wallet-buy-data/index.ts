@@ -8,6 +8,7 @@ const corsHeaders = {
 };
 
 import { sendPaymentSms } from "../_shared/sms.ts";
+import { log } from "../_shared/logger.ts";
 
 // --- HELPERS ---
 function normalizeNetworkForPricing(network: string): "MTN" | "Telecel" | "AirtelTigo" {
@@ -28,6 +29,7 @@ function normalizeRecipient(phone: string): string {
 serve(async (req: Request) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
+  let supabaseAdmin: any;
   try {
     console.log(`[REQ] ${req.method} ${req.url}`);
 
@@ -39,7 +41,7 @@ serve(async (req: Request) => {
       throw new Error("Missing environment variables");
     }
 
-    const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, { auth: { persistSession: false } });
+    supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, { auth: { persistSession: false } });
 
     const payload = await req.json().catch(() => ({}));
     console.log("[PAYLOAD]", JSON.stringify(payload));
@@ -70,9 +72,27 @@ serve(async (req: Request) => {
     const normalizedPhone = normalizeRecipient(customer_phone);
     const normalizedNet = normalizeNetworkForPricing(networkRaw);
 
+    // Maintenance mode check
+    const { data: sysSettings } = await supabaseAdmin
+      .from("system_settings").select("maintenance_mode, maintenance_message").eq("id", 1).maybeSingle();
+    if (sysSettings?.maintenance_mode) {
+      return new Response(JSON.stringify({
+        error: sysSettings.maintenance_message || "System is under maintenance. Please try again shortly."
+      }), { status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
+    // Fraud / velocity check
+    const { data: velocityFlag } = await supabaseAdmin.rpc("check_order_velocity", {
+      p_phone: normalizedPhone, p_agent_id: user.id
+    });
+    if (velocityFlag) {
+      log(supabaseAdmin, { level: "warn", source: "wallet-buy-data", event: "fraud.blocked", message: `Order blocked — ${velocityFlag} flag for ${normalizedPhone}`, agent_id: user.id, data: { flag: velocityFlag, phone: normalizedPhone, network: networkRaw, package_size } });
+      return new Response(JSON.stringify({ error: velocityFlag === "blacklist" ? "This number is not eligible to receive data bundles." : "Order limit reached. Please wait before placing another order." }), { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
     // Fetch agent profile and package info in parallel for profit calculation
     const [profileResult, pkgResult] = await Promise.all([
-      supabaseAdmin.from("profiles").select("is_sub_agent, parent_agent_id").eq("user_id", user.id).maybeSingle(),
+      supabaseAdmin.from("profiles").select("is_sub_agent, parent_agent_id, credit_enabled, credit_limit, credit_used, wallet_balance").eq("user_id", user.id).maybeSingle(),
       supabaseAdmin.from("global_package_settings").select("agent_price, cost_price").eq("network", normalizedNet).eq("package_size", package_size).maybeSingle(),
     ]);
 
@@ -81,12 +101,18 @@ serve(async (req: Request) => {
     const adminBase = Number(pkgRow?.agent_price || 0);
     const resolvedCostPrice = Number(pkgRow?.cost_price || 0) > 0 ? Number(pkgRow!.cost_price) : adminBase;
 
-    // Calculate parent referral commission if this is a sub-agent order
+    // Calculate profit and parent referral commission
     let parentAgentId: string | null = null;
     let parentProfit = 0;
+    let agentProfit = 0;
+
     if (agentProfile?.is_sub_agent && agentProfile?.parent_agent_id && adminBase > 0) {
+      // Sub-agent: profit stays 0 (they sell at their own price); parent earns the margin
       parentAgentId = agentProfile.parent_agent_id;
       parentProfit = Math.max(0, parseFloat((Number(requestedAmount) - adminBase).toFixed(2)));
+    } else if (resolvedCostPrice > 0) {
+      // Regular agent: profit = selling price - cost price
+      agentProfit = Math.max(0, parseFloat((Number(requestedAmount) - resolvedCostPrice).toFixed(2)));
     }
 
     // Anti-Duplicate Protection (60 Minutes)
@@ -114,21 +140,38 @@ serve(async (req: Request) => {
       });
     }
 
-    // 1. ATOMIC DEBIT (FOREGROUND)
+    // 1. ATOMIC DEBIT (wallet first, credit fallback)
     console.log(`[DEBIT] Starting debit for ${requestedAmount}...`);
+    let paymentMethod = "wallet";
     const { data: debitResult, error: debitError } = await supabaseAdmin.rpc("debit_wallet", {
       p_agent_id: user.id,
       p_amount: requestedAmount,
     });
 
     if (debitError || !debitResult?.success) {
-      console.error(`[DEBIT_FAIL] ${user.id}:`, debitError || debitResult?.error);
-      return new Response(JSON.stringify({ error: debitResult?.error || "Insufficient balance or wallet error" }), {
-        status: 402,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      // Try credit/float if wallet insufficient
+      const agentP = agentProfile as any;
+      const creditAvailable = agentP?.credit_enabled
+        ? Math.max(0, (agentP.credit_limit || 0) - (agentP.credit_used || 0))
+        : 0;
+
+      if (creditAvailable >= Number(requestedAmount)) {
+        const { data: creditOk } = await supabaseAdmin.rpc("draw_agent_credit", {
+          p_agent_id: user.id, p_amount: requestedAmount,
+        });
+        if (!creditOk) {
+          return new Response(JSON.stringify({ error: "Insufficient wallet balance and credit limit reached." }), { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        }
+        paymentMethod = "credit";
+        log(supabaseAdmin, { level: "info", source: "wallet-buy-data", event: "credit.drawn", message: `Credit drawn GHS ${requestedAmount} for ${user.id}`, agent_id: user.id, data: { amount: requestedAmount, credit_available: creditAvailable } });
+      } else {
+        console.error(`[DEBIT_FAIL] ${user.id}:`, debitError || debitResult?.error);
+        return new Response(JSON.stringify({ error: debitResult?.error || "Insufficient balance or wallet error" }), {
+          status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
     }
-    console.log(`[DEBIT_SUCCESS] New balance: ${debitResult.new_balance}`);
+    if (paymentMethod === "wallet") console.log(`[DEBIT_SUCCESS] New balance: ${(debitResult as any).new_balance}`);
 
     const orderId = reference || crypto.randomUUID();
 
@@ -141,8 +184,9 @@ serve(async (req: Request) => {
       network: normalizeNetworkForPricing(networkRaw),
       package_size: package_size,
       amount: requestedAmount,
+      payment_method: paymentMethod,
       cost_price: resolvedCostPrice > 0 ? resolvedCostPrice : undefined,
-      profit: 0,
+      profit: agentProfit,
       parent_agent_id: parentAgentId,
       parent_profit: parentProfit,
       status: "paid"
@@ -150,7 +194,7 @@ serve(async (req: Request) => {
 
     if (insertError) {
       console.error(`[INSERT_FAIL] ${orderId}:`, insertError);
-      // Refund if insert fails
+      log(supabaseAdmin, { level: "error", source: "wallet-buy-data", event: "order.create_failed", message: `Order insert failed: ${insertError.message}`, order_id: orderId, agent_id: user.id, data: { network: networkRaw, package_size, amount: requestedAmount, error: insertError.message } });
       await supabaseAdmin.rpc("credit_wallet", { p_agent_id: user.id, p_amount: requestedAmount });
       return new Response(JSON.stringify({ error: "Failed to create order record" }), {
         status: 500,
@@ -158,6 +202,7 @@ serve(async (req: Request) => {
       });
     }
     console.log(`[INSERT_SUCCESS] Order ${orderId} created as PAID.`);
+    log(supabaseAdmin, { level: "info", source: "wallet-buy-data", event: "order.created", message: `Order created — ${networkRaw} ${package_size} for ${customer_phone}`, order_id: orderId, agent_id: user.id, data: { network: networkRaw, package_size, amount: requestedAmount, profit: agentProfit, parent_profit: parentProfit, cost_price: resolvedCostPrice } });
 
     // 3. TRIGGER SMS (NON-BLOCKING)
     sendPaymentSms(supabaseAdmin, customer_phone, "payment_success", {
@@ -176,8 +221,11 @@ serve(async (req: Request) => {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
 
-  } catch (error) {
+  } catch (error: any) {
     console.error("[CRASH]", error);
+    if (supabaseAdmin) {
+      log(supabaseAdmin, { level: "error", source: "wallet-buy-data", event: "error", message: `Unhandled crash: ${error?.message || String(error)}`, data: { stack: error?.stack?.slice(0, 500) } });
+    }
     return new Response(JSON.stringify({ error: "Internal processing error" }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },

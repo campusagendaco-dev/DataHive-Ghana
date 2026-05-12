@@ -6,6 +6,7 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "POST, GET, OPTIONS, PUT, DELETE",
 };
 import { getActiveProviders, logProviderError } from "../_shared/providers.ts";
+import { log } from "../_shared/logger.ts";
 
 // --- Utilities ---
 
@@ -108,6 +109,9 @@ function buildProviderUrls(baseUrl: string, endpoint: string = "purchase", handl
   } else if (handlerType === "datahub") {
     // DataHub has a fixed URL structure — always just append the alias directly
     const alias = endpoint === "purchase" ? "data-purchase" : (endpoint === "status" ? "order-status" : endpoint);
+    return [`${clean}/${alias}`];
+  } else if (handlerType === "spendless") {
+    const alias = endpoint === "purchase" ? "purchase" : (endpoint === "status" ? "order-status" : endpoint);
     return [`${clean}/${alias}`];
   } else {
     aliases = endpoint === "purchase"
@@ -269,7 +273,7 @@ async function callProviderApi(
           headers["X-Idempotency-Key"] = idempotencyKey;
         }
 
-        if (handlerType !== "datamart") {
+        if (handlerType !== "datamart" && handlerType !== "spendless") {
           headers["Authorization"] = `Bearer ${apiKey}`;
           headers["User-Agent"] = "SwiftDataGH/2.0";
         }
@@ -615,7 +619,13 @@ serve(async (req) => {
       .select("*")
       .maybeSingle();
 
-    if (claimError) console.error("[verify-payment] Lock error:", claimError);
+    if (claimError) {
+      console.error("[verify-payment] Lock error:", claimError);
+      return new Response(JSON.stringify({ 
+        status: "error", 
+        error: `Database update failed: ${claimError.message}` 
+      }), { status: 500, headers: corsHeaders });
+    }
 
     if (!claimedOrder) {
       // If we couldn't claim it, it might be already fulfilling or already finished.
@@ -728,39 +738,54 @@ serve(async (req) => {
     let result: any = { ok: false, reason: "No providers" };
     let successfulProviderId = null;
 
-    const primaryProvider = activeProviders[0];
-    if (primaryProvider) {
-      const handlerType = primaryProvider.handler_type || "standard";
-      const networkKey = handlerType === "datamart" 
-        ? (network.toUpperCase() === "MTN" ? "YELLO" : (network.toUpperCase() === "TELECEL" ? "TELECEL" : "AT_PREMIUM"))
+    const buildDataPayload = (provider: any) => {
+      const ht = provider.handler_type || "standard";
+      const netKey = (ht === "datamart" || ht === "spendless" || ht === "datahub")
+        ? (() => { const n = network.toUpperCase(); if (n === "MTN") return "YELLO"; if (n === "TELECEL") return "TELECEL"; return "AT_PREMIUM"; })()
         : mapDataNetworkKey(network);
+      if (ht === "datamart") return { phoneNumber: recipient, network: netKey, planId: packageSize, plan: packageSize, bundle: packageSize, capacity: String(parseCapacity(packageSize)), orderReference: targetReference, gateway: "wallet", reference: targetReference };
+      if (ht === "datahub" || ht === "spendless") return { networkKey: netKey, recipient, capacity: String(parseCapacity(packageSize)), reference: targetReference };
+      return requestBody;
+    };
 
-      const dataPayload = handlerType === "datamart"
-        ? {
-            phoneNumber: recipient,
-            network: networkKey,
-            planId: packageSize, // DataMart legacy
-            plan: packageSize,   // DataMart standard
-            bundle: packageSize, // Alias
-            capacity: String(parseCapacity(packageSize)),
-            orderReference: targetReference,
-            gateway: "wallet",
-            reference: targetReference
-          }
-        : handlerType === "datahub"
-        ? {
-            networkKey,
-            recipient,
-            capacity: String(parseCapacity(packageSize)),
-            reference: targetReference,
-          }
-        : requestBody;
+    // Auto-failover: try each active provider in priority order
+    for (const provider of activeProviders) {
+      const providerCallStart = Date.now();
+      result = await callProviderApi(provider, buildDataPayload(provider), "purchase");
+      const providerDuration = Date.now() - providerCallStart;
 
-      result = await callProviderApi(primaryProvider, dataPayload, "purchase");
       if (result.ok) {
-        successfulProviderId = primaryProvider.id;
+        successfulProviderId = provider.id;
+        // Reset consecutive failures on success
+        supabaseAdmin.from("providers").update({ consecutive_failures: 0 }).eq("id", provider.id);
+        log(supabaseAdmin, { level: "info", source: "verify-payment", event: "provider.called", message: `${provider.name} accepted order`, order_id: targetReference, provider_id: provider.id, duration_ms: providerDuration, data: { provider: provider.name, handler_type: provider.handler_type, provider_order_id: result.id, network, package_size: packageSize, recipient } });
+        break; // success — stop trying
       } else {
-        await logProviderError(supabaseAdmin, primaryProvider.id, targetReference, result.reason);
+        // Increment consecutive failures
+        const { data: prov } = await supabaseAdmin.from("providers").select("consecutive_failures").eq("id", provider.id).maybeSingle();
+        const newFailures = ((prov as any)?.consecutive_failures || 0) + 1;
+        const autoDisable = newFailures >= 5;
+        await supabaseAdmin.from("providers").update({
+          consecutive_failures: newFailures,
+          ...(autoDisable ? { is_active: false, disabled_reason: `Auto-disabled after ${newFailures} consecutive failures` } : {}),
+        }).eq("id", provider.id);
+
+        await logProviderError(supabaseAdmin, provider.id, targetReference, result.reason);
+        log(supabaseAdmin, { level: "error", source: "verify-payment", event: "provider.rejected", message: `${provider.name} rejected (${newFailures} failures)${autoDisable ? " — AUTO-DISABLED" : ""}: ${result.reason}`, order_id: targetReference, provider_id: provider.id, duration_ms: providerDuration, data: { provider: provider.name, reason: result.reason, consecutive_failures: newFailures, auto_disabled: autoDisable } });
+
+        if (autoDisable) {
+          // Insert admin alert
+          const { data: admins } = await supabaseAdmin.from("user_roles").select("user_id").eq("role", "admin");
+          if (admins?.length) {
+            await supabaseAdmin.from("user_notifications").insert(admins.map((a: any) => ({
+              user_id: a.user_id, title: `Provider Auto-Disabled: ${provider.name}`,
+              message: `${provider.name} was automatically disabled after ${newFailures} consecutive failures. Check System Logs.`,
+              type: "error", data: { link: "/admin/system-logs", provider_id: provider.id },
+            })));
+          }
+        }
+        // Continue to next provider (failover)
+        console.log(`[verify-payment] Failing over from ${provider.name} to next provider...`);
       }
     }
 
@@ -769,7 +794,7 @@ serve(async (req) => {
       const targetStatus = "fulfilled";
       const patch: any = { provider_id: successfulProviderId, provider_order_id: result.id, status: targetStatus, failure_reason: null };
       await supabaseAdmin.from("orders").update(patch).eq("id", targetReference);
-      
+
       if (targetStatus === "fulfilled") {
         try {
           await supabaseAdmin.rpc("credit_order_profits", { p_order_id: targetReference });
@@ -777,6 +802,7 @@ serve(async (req) => {
           console.error("[verify-payment] Profit credit failed:", e);
         }
       }
+      log(supabaseAdmin, { level: "info", source: "verify-payment", event: "order.fulfilled", message: `Order fulfilled — provider_order_id: ${result.id}`, order_id: targetReference, agent_id: claimedOrder.agent_id, provider_id: successfulProviderId, data: { provider_order_id: result.id, network, package_size: packageSize, amount: claimedOrder.amount } });
       return new Response(JSON.stringify({ status: targetStatus, provider_order_id: result.id }), { headers: corsHeaders });
     } else {
       // User requested fix: Automatically queue up failed API connections for retry processing loop
@@ -785,6 +811,7 @@ serve(async (req) => {
         failure_reason: result.reason || "Provider connection refused"
       }).eq("id", targetReference);
 
+      log(supabaseAdmin, { level: "warn", source: "verify-payment", event: "order.queued", message: `Order queued for retry: ${result.reason}`, order_id: targetReference, agent_id: claimedOrder.agent_id, data: { reason: result.reason, network, package_size: packageSize } });
       return new Response(JSON.stringify({
         status: "processing",
         reason: result.reason || "Queued for processing recovery"
@@ -792,13 +819,13 @@ serve(async (req) => {
     }
   } catch (error: any) {
     console.error("[verify-payment] CRITICAL ERROR:", error);
-    // Extract the most useful error message
     const errorMsg = error?.message || (typeof error === 'string' ? error : "Internal fulfillment error");
+    log(supabaseAdmin, { level: "error", source: "verify-payment", event: "error", message: `Critical error: ${errorMsg}`, data: { stack: error?.stack?.slice(0, 500) } });
     return new Response(JSON.stringify({
       error: errorMsg,
     }), {
-      status: 500, 
-      headers: { ...corsHeaders, "Content-Type": "application/json" } 
+      status: 500,
+      headers: { ...corsHeaders, "Content-Type": "application/json" }
     });
   }
 });

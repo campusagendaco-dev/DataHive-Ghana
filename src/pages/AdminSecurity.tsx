@@ -82,12 +82,12 @@ const SectionCard = ({ title, count, icon: Icon, color, children, onExport, defa
   const [open, setOpen] = useState(defaultOpen);
   return (
     <div className="rounded-2xl border border-border bg-card shadow-sm overflow-hidden">
-      <button
-        type="button"
-        onClick={() => setOpen(o => !o)}
-        className="w-full flex items-center justify-between px-5 py-4 hover:bg-muted/50 transition-colors"
-      >
-        <div className="flex items-center gap-3">
+      <div className="w-full flex items-center justify-between px-5 py-4 hover:bg-muted/50 transition-colors">
+        <button
+          type="button"
+          onClick={() => setOpen(o => !o)}
+          className="flex items-center gap-3 flex-1 text-left"
+        >
           <div className={`p-2 rounded-xl ${color.replace("text-", "bg-").replace("400", "500/10")} border ${color.replace("text-", "border-").replace("400", "500/20")}`}>
             <Icon className={`w-4 h-4 ${color}`} />
           </div>
@@ -97,20 +97,23 @@ const SectionCard = ({ title, count, icon: Icon, color, children, onExport, defa
               count > 0 ? `${color.replace("text-", "bg-").replace("400", "500/20")} ${color} ${color.replace("text-", "border-").replace("400", "500/30")}` : "bg-green-500/10 text-green-600 dark:text-green-400 border-green-500/20"
             }`}>{count}</span>
           )}
-        </div>
-        <div className="flex items-center gap-2">
+        </button>
+        <div className="flex items-center gap-2 shrink-0">
           {onExport && (
             <button
               type="button"
-              onClick={e => { e.stopPropagation(); onExport(); }}
+              title="Export CSV"
+              onClick={onExport}
               className="flex items-center gap-1 text-[10px] text-muted-foreground hover:text-foreground transition-colors px-2 py-1 rounded-lg hover:bg-muted"
             >
               <FileDown className="w-3 h-3" /> CSV
             </button>
           )}
-          {open ? <ChevronUp className="w-4 h-4 text-muted-foreground" /> : <ChevronDown className="w-4 h-4 text-muted-foreground" />}
+          <button type="button" title={open ? "Collapse" : "Expand"} onClick={() => setOpen(o => !o)} className="text-muted-foreground">
+            {open ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+          </button>
         </div>
-      </button>
+      </div>
       {open && <div className="border-t border-border p-5">{children}</div>}
     </div>
   );
@@ -486,7 +489,7 @@ const AdminSecurity = () => {
                       <span className="text-[10px] font-black bg-red-500/10 text-red-600 dark:text-red-400 border border-red-500/20 px-2 py-0.5 rounded-full shadow-sm">{cluster.accounts.length} accounts</span>
                     </button>
                     <div className="flex items-center gap-2 shrink-0">
-                      <button type="button" onClick={() => copyText(cluster.ip, "IP copied")}
+                      <button type="button" title="Copy IP" onClick={() => copyText(cluster.ip, "IP copied")}
                         className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-background transition-all shadow-sm">
                         <Copy className="w-3.5 h-3.5" />
                       </button>
@@ -621,7 +624,7 @@ const AdminSecurity = () => {
                     {l.last_ip ? (
                       <div className="flex items-center gap-1.5">
                         <span className="font-mono text-xs text-cyan-700 dark:text-cyan-400/80 font-bold">{l.last_ip}</span>
-                        <button type="button" onClick={() => copyText(l.last_ip!, "IP copied")} className="text-muted-foreground hover:text-foreground transition-colors"><Copy className="w-3 h-3" /></button>
+                        <button type="button" title="Copy IP" onClick={() => copyText(l.last_ip!, "IP copied")} className="text-muted-foreground hover:text-foreground transition-colors"><Copy className="w-3 h-3" /></button>
                       </div>
                     ) : <span className="text-muted-foreground/50">—</span>}
                   </td>
@@ -710,7 +713,7 @@ const AdminSecurity = () => {
         <div className="p-5 space-y-4">
           {/* Add form */}
           <div className="grid grid-cols-1 sm:grid-cols-4 gap-2">
-            <select value={blType} onChange={e => setBlType(e.target.value)}
+            <select title="Block type" value={blType} onChange={e => setBlType(e.target.value)}
               className="bg-background border border-border rounded-xl px-3 py-2 text-sm text-foreground outline-none focus:ring-2 focus:ring-red-500/20">
               <option value="ip">IP Address</option>
               <option value="domain">Email Domain</option>
@@ -807,7 +810,7 @@ const AdminSecurity = () => {
             <Input placeholder="Search users, IPs…" value={search} onChange={e => setSearch(e.target.value)}
               className="pl-9 h-9 w-52 bg-background border-border text-foreground placeholder:text-muted-foreground rounded-xl text-sm focus-visible:ring-amber-500/20 shadow-sm" />
           </div>
-          <button type="button" onClick={() => void fetchData(true)}
+          <button type="button" title="Refresh" onClick={() => void fetchData(true)}
             className="flex items-center justify-center w-9 h-9 rounded-xl bg-background border border-border text-muted-foreground hover:text-foreground hover:bg-muted transition-all shadow-sm">
             <RefreshCw className={`w-4 h-4 ${refreshing ? "animate-spin" : ""}`} />
           </button>

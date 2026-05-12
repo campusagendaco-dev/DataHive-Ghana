@@ -28,9 +28,10 @@ interface TargetFilters {
 
 interface SmsTemplate {
   id: string;
-  name: string;
-  title: string;
-  message: string;
+  key: string;
+  label: string;
+  body: string;
+  is_active: boolean;
   created_at: string;
 }
 
@@ -126,7 +127,7 @@ const AdminNotificationsPage = () => {
   const [notifications, setNotifications] = useState<NotificationRow[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const smsBody = title.trim() ? `${title.trim()}\n${message.trim()}` : message.trim();
+  const smsBody = (title ?? "").trim() ? `${(title ?? "").trim()}\n${(message ?? "").trim()}` : (message ?? "").trim();
   const smsChars = smsBody.length;
   const smsSegments = Math.ceil(smsChars / SMS_LIMIT) || 1;
 
@@ -164,9 +165,9 @@ const AdminNotificationsPage = () => {
   };
 
   const loadTemplate = (tmpl: SmsTemplate) => {
-    setTitle(tmpl.title);
-    setMessage(tmpl.message);
-    toast({ title: `Template "${tmpl.name}" loaded` });
+    setTitle(tmpl.label ?? "");
+    setMessage(tmpl.body ?? "");
+    toast({ title: `Template "${tmpl.label}" loaded` });
   };
 
   const resetEstimate = () => setEstimate(null);

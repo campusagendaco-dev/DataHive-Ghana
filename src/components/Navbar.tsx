@@ -17,6 +17,7 @@ import {
 import Autoplay from "embla-carousel-autoplay";
 import { motion, AnimatePresence } from "framer-motion";
 import { NotificationCenter } from "./NotificationCenter";
+import PromoCarousel from "@/components/PromoCarousel";
 
 const openTutorial = () => window.dispatchEvent(new CustomEvent("open-tutorial"));
 
@@ -607,7 +608,13 @@ const Navbar = () => {
 
               </div>
 
+              {/* ── Promo Carousel ── */}
+              <div className="px-3 pb-4">
+                <PromoCarousel />
+              </div>
+
               {/* ── Pinned ad banner ── */}
+              {(bannersLoading || menuBanners.length > 0) && (
               <div
                 className="absolute bottom-0 left-0 right-0 z-20 px-3 pb-3 pt-2"
                 style={{ borderTop: `1px solid ${drawerDivider}`, background: drawerBg, backdropFilter: "blur(36px)", WebkitBackdropFilter: "blur(36px)" }}
@@ -683,6 +690,7 @@ const Navbar = () => {
                   </div>
                 ) : null}
               </div>
+              )}
             </motion.div>
           </>
         )}

@@ -299,6 +299,110 @@ serve(async (req) => {
       } catch (err) {
         console.error("[sync:bossu] Balance fetch error:", err);
       }
+    } else if (handlerType === "spendless") {
+      console.log(`Syncing Spendless provider: ${provider.name}`);
+
+      const cleanBase = baseUrl.trim().replace(/\/+$/, "");
+      const spendlessHeaders = { "X-API-Key": apiKey, "Accept": "application/json" };
+
+      // 1. Sync Packages — try /packages and /data-packages
+      const packageUrls = [
+        `${cleanBase}/packages`,
+        `${cleanBase}/data-packages`,
+        `${cleanBase}/api/packages`,
+        `${cleanBase}/api/data-packages`,
+      ];
+
+      const networkKeyToDb: Record<string, string> = {
+        YELLO: "MTN",
+        MTN: "MTN",
+        TELECEL: "Telecel",
+        AT_PREMIUM: "AirtelTigo",
+        AT_BIGTIME: "AirtelTigo",
+      };
+
+      let pkgRes;
+      for (const url of packageUrls) {
+        console.log(`[sync:spendless] Trying package URL: ${url}`);
+        const r = await fetch(url, { headers: spendlessHeaders });
+        if (r.ok) { pkgRes = r; break; }
+      }
+
+      if (pkgRes) {
+        const result = await pkgRes.json();
+        const allPackages = [];
+        // Handle nested-by-network object or flat array
+        const rawData = result.data || result.packages || result;
+
+        if (Array.isArray(rawData)) {
+          for (const pkg of rawData) {
+            const netKey = String(pkg.network || pkg.networkKey || "").toUpperCase();
+            const dbNetwork = networkKeyToDb[netKey] || netKey;
+            const capacityGb = Number(pkg.capacity || (pkg.sizeInMB ? pkg.sizeInMB / 1024 : 0));
+            allPackages.push({
+              provider_id: provider.id,
+              network: dbNetwork,
+              package_name: pkg.name || pkg.package_name || (capacityGb >= 1 ? `${capacityGb}GB` : `${(capacityGb * 1024).toFixed(0)}MB`),
+              capacity_gb: capacityGb,
+              cost_price: Number(pkg.price || pkg.amount || 0),
+              external_id: String(pkg.id || pkg.planId || `${dbNetwork}_${capacityGb}`),
+              raw_data: pkg,
+              is_active: true,
+            });
+          }
+        } else if (rawData && typeof rawData === "object") {
+          for (const [netKey, pkgs] of Object.entries(rawData)) {
+            if (!Array.isArray(pkgs)) continue;
+            const dbNetwork = networkKeyToDb[netKey.toUpperCase()] || netKey;
+            for (const pkg of pkgs as any[]) {
+              const capacityGb = Number(pkg.capacity || (pkg.sizeInMB ? pkg.sizeInMB / 1024 : 0));
+              allPackages.push({
+                provider_id: provider.id,
+                network: dbNetwork,
+                package_name: pkg.name || pkg.package_name || (capacityGb >= 1 ? `${capacityGb}GB` : `${(capacityGb * 1024).toFixed(0)}MB`),
+                capacity_gb: capacityGb,
+                cost_price: Number(pkg.price || pkg.amount || 0),
+                external_id: String(pkg.id || pkg.planId || `${dbNetwork}_${capacityGb}`),
+                raw_data: pkg,
+                is_active: true,
+              });
+            }
+          }
+        }
+
+        if (allPackages.length > 0) {
+          const { error: upsertError } = await supabaseAdmin
+            .from("provider_packages")
+            .upsert(allPackages, { onConflict: "provider_id,network,package_name" });
+          if (upsertError) console.error("[sync:spendless] Package upsert error:", upsertError);
+          packagesSynced = allPackages.length;
+          console.log(`[sync:spendless] Synced ${packagesSynced} packages`);
+        } else {
+          console.warn("[sync:spendless] No packages parsed from response");
+        }
+      } else {
+        console.warn("[sync:spendless] Could not fetch packages from any URL");
+      }
+
+      // 2. Sync Balance
+      const balanceUrls = [
+        `${cleanBase}/balance`,
+        `${cleanBase}/api/balance`,
+      ];
+
+      for (const url of balanceUrls) {
+        console.log(`[sync:spendless] Trying balance URL: ${url}`);
+        const bRes = await fetch(url, { headers: spendlessHeaders });
+        if (bRes.ok) {
+          const bResult = await bRes.json();
+          const rawBal = bResult.data?.balance ?? bResult.data?.rawBalance ?? bResult.balance;
+          if (rawBal !== undefined) {
+            balance = typeof rawBal === "string" ? parseFloat(rawBal.replace(/[^\d.]/g, "")) : Number(rawBal);
+            console.log(`[sync:spendless] Balance: GHS ${balance}`);
+            break;
+          }
+        }
+      }
     } else {
       throw new Error(`Sync not implemented for handler type: ${handlerType}`);
     }

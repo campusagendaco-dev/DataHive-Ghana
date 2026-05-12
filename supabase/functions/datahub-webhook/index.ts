@@ -2,6 +2,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { corsHeaders } from "../_shared/cors.ts";
 import { notifyApiClient } from "../_shared/webhooks.ts";
+import { log } from "../_shared/logger.ts";
 
 // DataHub Ghana webhook handler
 // Receives order status callbacks from DataHub Ghana
@@ -85,10 +86,13 @@ serve(async (req) => {
     // Accept any order-related status event; skip non-order events
     const isOrderEvent = !event || event.toLowerCase().includes("order") || event.toLowerCase().includes("status");
     if (!isOrderEvent || !data) {
+      log(supabaseAdmin, { level: "info", source: "datahub-webhook", event: "webhook.skipped", message: `Non-order event skipped: ${event || "unknown"}`, data: { event, hasData: !!data } });
       return new Response(JSON.stringify({ received: true, skipped: true }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
+
+    log(supabaseAdmin, { level: "info", source: "datahub-webhook", event: "webhook.received", message: `Webhook received: ${event} — status: ${data.status}`, data: { event, reference: data.reference, orderNumber: data.orderNumber, status: data.status } });
 
     const datahubReference = data.reference;   // e.g. "ORDER_123456_..."
     const datahubOrderNumber = String(data.orderNumber || "");
@@ -118,6 +122,7 @@ serve(async (req) => {
 
     if (fetchError || !order) {
       console.warn("[datahub-webhook] Order not found for reference:", datahubReference, "orderNumber:", datahubOrderNumber);
+      log(supabaseAdmin, { level: "warn", source: "datahub-webhook", event: "order.not_found", message: `Order not found — ref: ${datahubReference}, orderNo: ${datahubOrderNumber}`, data: { datahubReference, datahubOrderNumber, datahubStatus } });
       return new Response(JSON.stringify({ error: "Order not found" }), {
         status: 404,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -145,15 +150,30 @@ serve(async (req) => {
       patch.failure_reason = `DataHub reported: ${datahubStatus}`;
     }
 
-    await supabaseAdmin.from("orders").update(patch).eq("id", order.id);
+    const { error: updateError } = await supabaseAdmin.from("orders").update(patch).eq("id", order.id);
+
+    if (updateError) {
+      console.error("[datahub-webhook] Failed to update order", order.id, ":", updateError.message);
+      log(supabaseAdmin, { level: "error", source: "datahub-webhook", event: "order.update_failed", message: `DB update failed for order ${order.id}: ${updateError.message}`, order_id: order.id, data: { datahubStatus, systemStatus, error: updateError.message } });
+      return new Response(JSON.stringify({ error: "Failed to update order" }), {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
 
     if (systemStatus === "fulfilled") {
       if (order.profit > 0 || order.parent_profit > 0) {
         await supabaseAdmin.rpc("credit_order_profits", { p_order_id: order.id });
       }
       await notifyApiClient(supabaseAdmin, order.id, "fulfilled");
+      log(supabaseAdmin, { level: "info", source: "datahub-webhook", event: "order.fulfilled", message: `Order fulfilled via DataHub webhook`, order_id: order.id, data: { datahubStatus, datahubReference, profit: order.profit, parent_profit: order.parent_profit } });
     } else if (systemStatus === "fulfillment_failed") {
       await notifyApiClient(supabaseAdmin, order.id, "fulfillment_failed");
+      // Auto-refund wallet orders — trigger fires via DB trigger, but call explicitly for immediate effect
+      await supabaseAdmin.rpc("refund_failed_order", { p_order_id: order.id });
+      log(supabaseAdmin, { level: "warn", source: "datahub-webhook", event: "order.failed", message: `Order marked failed by DataHub: ${datahubStatus}`, order_id: order.id, data: { datahubStatus, datahubReference } });
+    } else {
+      log(supabaseAdmin, { level: "info", source: "datahub-webhook", event: "order.updated", message: `Order status → ${systemStatus}`, order_id: order.id, data: { datahubStatus, systemStatus } });
     }
 
     console.log("[datahub-webhook] Order", order.id, "updated to", systemStatus);
@@ -165,6 +185,7 @@ serve(async (req) => {
 
   } catch (err: any) {
     console.error("[datahub-webhook] Error:", err.message);
+    log(supabaseAdmin, { level: "error", source: "datahub-webhook", event: "error", message: `Unhandled error: ${err.message}`, data: { stack: err.stack?.slice(0, 500) } });
     return new Response(JSON.stringify({ error: "Internal Error" }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
