@@ -9,7 +9,7 @@ import {
   Globe, Clock, Phone, ShieldCheck, Users2, User,
   Wallet, ShoppingCart, AlertTriangle, Gift, Hash,
   Loader2, CheckCircle2, XCircle, AlertCircle, Ban,
-  Plus, Minus, TrendingUp, Save
+  Plus, Minus, TrendingUp, Save, Key, Lock, RefreshCw
 } from "lucide-react";
 
 interface UserRow {
@@ -196,6 +196,56 @@ const UserDetailDrawer = ({ user, onClose }: Props) => {
       toast({ title: "Failed to save notes", description: err.message, variant: "destructive" });
     } finally {
       setSavingNotes(false);
+    }
+  };
+
+  const [mfaLoading, setMfaLoading] = useState(false);
+  const [pwLoading, setPwLoading] = useState(false);
+
+  const handleResetMfa = async () => {
+    if (!user) return;
+    if (!window.confirm(`⚠️ DANGER: Are you sure you want to COMPLETELY DISABLE Multi-Factor Authentication (MFA) for ${user.full_name || user.email}?\n\nThis will remove their active authenticator association and allow them to log in with only their password. Only do this if the user is locked out or has lost their mobile device.`)) {
+      return;
+    }
+
+    setMfaLoading(true);
+    try {
+      const { data: res, error } = await supabase.functions.invoke("admin-user-actions", {
+        body: { action: "reset_user_mfa", user_id: user.user_id },
+        headers: { Authorization: `Bearer ${session?.access_token}` },
+      });
+      if (error || res?.error) throw new Error(res?.error || error?.message);
+      
+      toast({ 
+        title: "MFA/2FA successfully disabled", 
+        description: `Removed ${res.reset_count || 0} active MFA factor(s). User can now log in without a 2FA code.` 
+      });
+    } catch (err: any) {
+      toast({ title: "MFA reset failed", description: err.message, variant: "destructive" });
+    } finally {
+      setMfaLoading(false);
+    }
+  };
+
+  const handleResetPassword = async () => {
+    if (!user) return;
+    const entered = window.prompt(`New password for ${user.email} (min 6 chars). Leave blank to auto-generate.`);
+    if (entered !== null && entered.trim() && entered.trim().length < 6) {
+      toast({ title: "Password too short", variant: "destructive" }); return;
+    }
+    setPwLoading(true);
+    try {
+      const { data: res, error } = await supabase.functions.invoke("admin-user-actions", {
+        body: { action: "reset_password", user_id: user.user_id, new_password: entered?.trim() || undefined },
+        headers: { Authorization: `Bearer ${session?.access_token}` },
+      });
+      if (error || res?.error) throw new Error(res?.error || error?.message);
+
+      toast({ title: "Password updated successfully", description: `Login: ${user.email}` });
+    } catch (err: any) {
+      toast({ title: "Failed to reset password", description: err.message, variant: "destructive" });
+    } finally {
+      setPwLoading(false);
     }
   };
 
@@ -453,6 +503,38 @@ const UserDetailDrawer = ({ user, onClose }: Props) => {
               <p className="text-[10px] text-white/30 italic px-1">
                 * Users will receive an SMS notification for manual top-ups.
               </p>
+           </div>
+        </div>
+
+        {/* ── Account Security ── */}
+        <div className="px-6 pt-5">
+           <p className="text-[10px] font-black uppercase tracking-widest text-rose-400 mb-3 flex items-center gap-1.5">
+             <Lock className="w-3 h-3" /> Security & Authentication
+           </p>
+           <div className="bg-white/[0.02] border border-white/5 rounded-2xl p-4">
+              <p className="text-[11px] text-white/40 mb-3 leading-relaxed">
+                If a user loses their authenticator device or gets locked out of their account, you can manually disable their Multi-Factor security or trigger a credentials reset.
+              </p>
+              <div className="grid grid-cols-2 gap-3">
+                 <Button
+                   variant="outline"
+                   onClick={handleResetMfa}
+                   disabled={mfaLoading}
+                   className="border-rose-500/20 text-rose-400 hover:bg-rose-500/10 rounded-xl h-10 text-xs gap-2 shadow-sm"
+                 >
+                   {mfaLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Lock className="w-3.5 h-3.5" />}
+                   Reset MFA/2FA
+                 </Button>
+                 <Button
+                   variant="outline"
+                   onClick={handleResetPassword}
+                   disabled={pwLoading}
+                   className="border-white/10 text-white/80 hover:bg-white/5 rounded-xl h-10 text-xs gap-2 shadow-sm"
+                 >
+                   {pwLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Key className="w-3.5 h-3.5" />}
+                   Reset Password
+                 </Button>
+              </div>
            </div>
         </div>
 

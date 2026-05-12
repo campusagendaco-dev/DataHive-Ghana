@@ -97,7 +97,8 @@ type AdminUserAction =
   | "bulk_fulfill_api_orders"
   | "generate_api_key"
   | "save_package_settings"
-  | "approve_all_pending_agents";
+  | "approve_all_pending_agents"
+  | "reset_user_mfa";
 
 
 
@@ -1300,6 +1301,45 @@ serve(async (req: Request) => {
         }
 
         return new Response(JSON.stringify({ success: true, saved: upserts.length }), {
+          status: 200,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      case "reset_user_mfa": {
+        if (!isValidUuid(user_id)) throw new Error("Invalid or missing user_id");
+        
+        // 1. List factors for this user via service-role admin api
+        const { data: factorData, error: listError } = await supabaseAdmin.auth.admin.listFactorsForUser({
+          userId: user_id
+        });
+
+        if (listError) {
+          console.error("Error listing MFA factors:", listError);
+          throw listError;
+        }
+
+        // 2. Loop through and delete all factors safely
+        const factors = factorData?.all || [];
+        let deletedCount = 0;
+        
+        for (const factor of factors) {
+          const { error: deleteError } = await supabaseAdmin.auth.admin.deleteFactor({
+            userId: user_id,
+            factorId: factor.id
+          });
+          if (deleteError) {
+            console.error(`Failed to delete factor ${factor.id}:`, deleteError);
+          } else {
+            deletedCount++;
+          }
+        }
+
+        return new Response(JSON.stringify({ 
+          success: true, 
+          reset_count: deletedCount, 
+          message: `Successfully cleared ${deletedCount} MFA factor(s) for user.` 
+        }), {
           status: 200,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
