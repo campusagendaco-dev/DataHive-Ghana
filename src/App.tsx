@@ -161,7 +161,7 @@ const SubAgentPendingGuard = ({ children }: { children: React.ReactNode }) => {
 
 /** Admin guard */
 const AdminGuard = ({ children }: { children: React.ReactNode }) => {
-  const { user, isAdmin, profile, loading, isMfaChallenged } = useAuth();
+  const { user, isAdmin, loading, isMfaChallenged, isMfaEnabled } = useAuth();
   const [ipAllowed, setIpAllowed] = useState<boolean | null>(null);
 
   useEffect(() => {
@@ -198,6 +198,11 @@ const AdminGuard = ({ children }: { children: React.ReactNode }) => {
   if (isMfaChallenged) return <Navigate to="/verify-mfa" replace />;
   if (!isAdmin) return <Navigate to="/" replace />;
   if (ipAllowed === false) return <Navigate to="/ip-blocked" replace />;
+
+  // Force all Administrators to configure and use MFA before entering Admin controls
+  if (!isMfaEnabled) {
+    return <Navigate to="/dashboard/account-settings?force_admin_mfa=true" replace />;
+  }
   
   return <>{children}</>;
 };

@@ -33,6 +33,7 @@ interface UserRow {
   api_wallet_balance?: number;
   is_suspended?: boolean;
   avatar_url?: string | null;
+  has_mfa?: boolean;
 }
 
 type RoleTab = "all" | "customers" | "agents" | "sub-agents";
@@ -92,20 +93,23 @@ const AdminUsers = () => {
     const userIds = rows.map(r => r.user_id);
     if (userIds.length > 0) {
       const parentIds = [...new Set(rows.filter(r => r.parent_agent_id).map(r => r.parent_agent_id as string))];
-      const [parentsRes, salesRes, walletsRes] = await Promise.all([
+      const [parentsRes, salesRes, walletsRes, mfaRes] = await Promise.all([
         parentIds.length > 0 ? supabase.from("profiles").select("user_id, full_name").in("user_id", parentIds) : Promise.resolve({ data: [] }),
         supabase.from("user_sales_stats").select("user_id, total_sales_volume").in("user_id", userIds),
         supabase.from("wallets").select("agent_id, balance, api_balance").in("agent_id", userIds),
+        supabase.from("user_mfa_status").select("user_id, has_mfa").in("user_id", userIds).catch(() => ({ data: [] })),
       ]);
       const parentMap = new Map((parentsRes.data || []).map((p: any) => [p.user_id, p.full_name]));
       const salesMap = new Map((salesRes.data || []).map((s: any) => [s.user_id, s.total_sales_volume]));
       const walletMap = new Map((walletsRes.data || []).map((w: any) => [w.agent_id, w]));
+      const mfaMap = new Map((mfaRes?.data || []).map((m: any) => [m.user_id, m.has_mfa]));
       rows.forEach(r => {
         if (r.parent_agent_id) r.parent_name = parentMap.get(r.parent_agent_id) || "Unknown";
         r.total_sales_volume = salesMap.get(r.user_id) ?? 0;
         const wallet = walletMap.get(r.user_id);
         r.wallet_balance = Number(wallet?.balance ?? 0);
         r.api_wallet_balance = Number(wallet?.api_balance ?? 0);
+        r.has_mfa = mfaMap.get(r.user_id) || false;
       });
     }
 
@@ -394,7 +398,12 @@ const AdminUsers = () => {
                      />
                   </td>
                   <td className="p-4">
-                    <p className="font-semibold text-foreground">{user.full_name || "—"}</p>
+                    <div className="flex items-center gap-1.5">
+                      <p className="font-semibold text-foreground">{user.full_name || "—"}</p>
+                      {user.has_mfa && (
+                        <ShieldCheck className="w-3.5 h-3.5 text-emerald-500 fill-emerald-500/10 shrink-0 animate-pulse-subtle" title="2FA Secured" />
+                      )}
+                    </div>
                     <p className="text-xs text-muted-foreground mt-0.5">{user.email}</p>
                   </td>
                   <td className="p-4">
@@ -500,7 +509,12 @@ const AdminUsers = () => {
                   />
                 </div>
                 <div>
-                  <p className="font-bold text-foreground leading-none">{user.full_name || "—"}</p>
+                  <div className="flex items-center gap-1.5">
+                    <p className="font-bold text-foreground leading-none">{user.full_name || "—"}</p>
+                    {user.has_mfa && (
+                      <ShieldCheck className="w-3.5 h-3.5 text-emerald-500 fill-emerald-500/10 shrink-0" />
+                    )}
+                  </div>
                   <p className="text-[10px] text-muted-foreground mt-1">{user.email}</p>
                 </div>
               </div>

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
@@ -34,6 +34,21 @@ const DashboardAccountSettings = () => {
   const [deviceName, setDeviceName] = useState("My Device");
   const [savingPin, setSavingPin] = useState(false);
   const [pin, setPin] = useState("");
+
+  const [searchParams] = useSearchParams();
+  const forceAdminMfa = searchParams.get("force_admin_mfa") === "true";
+
+  useEffect(() => {
+    if (forceAdminMfa) {
+      const timer = setTimeout(() => {
+        const el = document.getElementById("mfa-setup-section");
+        if (el) {
+          el.scrollIntoView({ behavior: "smooth", block: "center" });
+        }
+      }, 600);
+      return () => clearTimeout(timer);
+    }
+  }, [forceAdminMfa]);
 
   useEffect(() => {
     setFullName(profile?.full_name || "");
@@ -161,7 +176,26 @@ const DashboardAccountSettings = () => {
   };
 
   return (
-    <div className="p-2 sm:p-4 lg:p-6 space-y-4 max-w-4xl mx-auto pb-10">
+    <div className="p-2 sm:p-4 lg:p-6 space-y-6 max-w-4xl mx-auto pb-10">
+      {forceAdminMfa && (
+        <div className="rounded-2xl bg-rose-500/10 border-2 border-rose-500/30 p-4 sm:p-6 flex items-start gap-4 shadow-lg animate-pulse-subtle backdrop-blur-sm">
+          <div className="h-10 w-10 sm:h-12 sm:w-12 rounded-xl bg-rose-500/20 flex items-center justify-center shrink-0 border border-rose-500/30">
+            <Lock className="w-5 h-5 sm:w-6 sm:h-6 text-rose-400 animate-bounce" style={{ animationDuration: '3s' }} />
+          </div>
+          <div>
+            <h2 className="font-black text-rose-400 tracking-wide uppercase text-xs sm:text-sm flex items-center gap-2">
+              🔐 Administrator Security Requirement
+            </h2>
+            <p className="text-xs sm:text-sm text-white/80 font-medium mt-1.5 leading-relaxed">
+              Because your account holds global <strong>Administrator powers</strong>, you must lock your session behind <strong>Multi-Factor Authentication (MFA)</strong>. 
+            </p>
+            <p className="text-[11px] text-white/50 mt-2 italic">
+              Please complete the Authenticator App configuration down below to immediately regain access to the Admin Dashboard.
+            </p>
+          </div>
+        </div>
+      )}
+
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="font-display text-2xl font-black tracking-tight">Account Settings</h1>
@@ -477,7 +511,9 @@ const DashboardAccountSettings = () => {
           </Card>
 
           {/* ── Multi-Factor Authentication ── */}
-          <MfaSetupWidget />
+          <div id="mfa-setup-section" className="scroll-mt-20">
+            <MfaSetupWidget />
+          </div>
 
           {/* ── Transaction PIN ── */}
           <Card className="border-none bg-card shadow-sm mt-8">
