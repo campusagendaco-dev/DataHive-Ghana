@@ -24,6 +24,7 @@ const MfaSetupWidget = () => {
   
   // Current factor for unenrolling
   const [activeFactorId, setActiveFactorId] = useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string>("");
 
   // Initial status sync
   useEffect(() => {
@@ -52,9 +53,18 @@ const MfaSetupWidget = () => {
   }, [user, isMfaEnabled]);
 
   const handleBeginEnrollment = async () => {
-    console.log("[MFA] Initializing enrollment process...");
+    console.log("[MFA] Beginning enrollment script execution...");
+    setErrorMessage("");
     setLoading(true);
+    
     try {
+      // Diagnostic alert to verify physical DOM event capture
+      alert("🚀 Diagnosing Click: Click handler active! Contacting Supabase...");
+
+      if (!supabase?.auth?.mfa) {
+        throw new Error("Supabase Multi-Factor Authentication SDK is missing from the build client.");
+      }
+
       // Initiate TOTP factor creation in Supabase auth engine
       const { data, error } = await supabase.auth.mfa.enroll({
         factorType: "totp",
@@ -70,7 +80,11 @@ const MfaSetupWidget = () => {
       setStep("setup");
       toast.success("Authenticator profile created! Scan the QR code.");
     } catch (e: any) {
-      toast.error("Could not start 2FA setup", { description: e.message });
+      console.error("[MFA Setup Alert] Setup failure catch:", e);
+      const rawMsg = e?.message || e?.toString() || "Unknown enrollment exception.";
+      setErrorMessage(rawMsg);
+      toast.error("Could not start 2FA setup", { description: rawMsg });
+      alert("❌ Diagnostics Failed:\n\n" + rawMsg);
     } finally {
       setLoading(false);
     }
@@ -188,6 +202,17 @@ const MfaSetupWidget = () => {
                 Compatible with Google Authenticator, Authy, Microsoft Authenticator, and iCloud Passwords.
               </p>
             </div>
+            
+            {errorMessage && (
+              <div className="mb-5 p-4 bg-red-500/10 border border-red-500/20 text-red-400 text-xs font-bold rounded-xl flex items-center gap-3 animate-pulse">
+                <AlertTriangle className="w-5 h-5 shrink-0" />
+                <div className="flex-1">
+                  <p className="uppercase tracking-wider text-[10px] font-black text-red-300 mb-0.5">Backend Error Logs</p>
+                  <p className="font-mono opacity-90 break-all leading-relaxed">{errorMessage}</p>
+                </div>
+              </div>
+            )}
+
             <Button 
               type="button"
               onClick={handleBeginEnrollment}
