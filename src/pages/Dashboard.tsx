@@ -17,6 +17,7 @@ import WelcomeAnnouncement from "@/components/WelcomeAnnouncement";
 import ReferAndEarn from "@/components/ReferAndEarn";
 import DailyCheckIn from "@/components/DailyCheckIn";
 import PromoCarousel from "@/components/PromoCarousel";
+import CompleteProfileBanner from "@/components/CompleteProfileBanner";
 
 interface DashboardStats {
   walletBalance: number;
@@ -151,6 +152,7 @@ const Dashboard = () => {
     <div className="p-4 sm:p-6 max-w-5xl space-y-5">
 
       <FreeDataClaimBanner />
+      <CompleteProfileBanner />
 
       {/* ── Greeting row ── */}
       <div className="flex items-center justify-between">
