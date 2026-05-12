@@ -52,6 +52,7 @@ const BuyAirtime = lazy(() => import("./pages/BuyAirtime"));
 const AuthCallback = lazy(() => import("./pages/AuthCallback"));
 const ForgotPassword = lazy(() => import("./pages/ForgotPassword"));
 const VerifyOtp = lazy(() => import("./pages/VerifyOtp"));
+const VerifyMfa = lazy(() => import("./pages/VerifyMfa"));
 const ResetPassword = lazy(() => import("./pages/ResetPassword"));
 const AgentPending = lazy(() => import("./pages/AgentPending"));
 const AgentStore = lazy(() => import("./pages/AgentStore"));
@@ -108,9 +109,10 @@ const queryClient = new QueryClient();
 
 /** Authenticated dashboard guard that keeps admins on the admin dashboard and unapproved agents/sub-agents on pending */
 const DashboardGuard = ({ children }: { children: React.ReactNode }) => {
-  const { user, profile, isAdmin, loading } = useAuth();
+  const { user, profile, isAdmin, loading, isMfaChallenged } = useAuth();
   if (loading) return <LoadingScreen />;
   if (!user) return <Navigate to="/login" replace />;
+  if (isMfaChallenged) return <Navigate to="/verify-mfa" replace />;
   if (isAdmin) return <Navigate to="/admin" replace />;
   
   // Strict check for sub-agents
@@ -159,7 +161,7 @@ const SubAgentPendingGuard = ({ children }: { children: React.ReactNode }) => {
 
 /** Admin guard */
 const AdminGuard = ({ children }: { children: React.ReactNode }) => {
-  const { user, isAdmin, profile, loading } = useAuth();
+  const { user, isAdmin, profile, loading, isMfaChallenged } = useAuth();
   const [ipAllowed, setIpAllowed] = useState<boolean | null>(null);
 
   useEffect(() => {
@@ -193,6 +195,7 @@ const AdminGuard = ({ children }: { children: React.ReactNode }) => {
 
   if (loading || (isAdmin && ipAllowed === null)) return <LoadingScreen />;
   if (!user) return <Navigate to="/login" replace />;
+  if (isMfaChallenged) return <Navigate to="/verify-mfa" replace />;
   if (!isAdmin) return <Navigate to="/" replace />;
   if (ipAllowed === false) return <Navigate to="/ip-blocked" replace />;
   
@@ -326,6 +329,7 @@ const AppContent = () => {
         <Route path="/auth/callback" element={<AuthCallback />} />
         <Route path="/forgot-password" element={<ForgotPassword />} />
         <Route path="/verify-otp" element={<VerifyOtp />} />
+        <Route path="/verify-mfa" element={<VerifyMfa />} />
         <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="/auth" element={<Navigate to="/login" replace />} />
 

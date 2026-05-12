@@ -12,6 +12,7 @@ import { User, Mail, Phone, Shield, Camera, Lock, Eye, EyeOff, Fingerprint, Smar
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useWebAuthn } from "@/hooks/useWebAuthn";
 import { toast } from "sonner";
+import MfaSetupWidget from "@/components/MfaSetupWidget";
 
 const DashboardAccountSettings = () => {
   const { user, profile, refreshProfile, isAdmin } = useAuth();
@@ -474,6 +475,10 @@ const DashboardAccountSettings = () => {
               )}
             </CardContent>
           </Card>
+
+          {/* ── Multi-Factor Authentication ── */}
+          <MfaSetupWidget />
+
           {/* ── Transaction PIN ── */}
           <Card className="border-none bg-card shadow-sm mt-8">
             <CardHeader>

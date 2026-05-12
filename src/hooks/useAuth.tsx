@@ -48,6 +48,9 @@ interface AuthContextType {
   updatePassword: (password: string) => Promise<{ error: any }>;
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<void>;
+  isMfaEnabled: boolean;
+  isMfaChallenged: boolean;
+  refreshMfaStatus: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -58,6 +61,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [mfaStatus, setMfaStatus] = useState({ enabled: false, challenged: false });
   const envSiteUrl = (import.meta.env.VITE_SITE_URL as string | undefined)?.trim();
   // Explicitly enforce main production domain for redirects as requested by user
   const appBaseUrl = envSiteUrl || "https://swiftdatagh.shop";
@@ -98,6 +102,20 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
+  const refreshMfaStatus = async () => {
+    try {
+      const { data, error } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+      if (error) throw error;
+      
+      const challenged = data.currentLevel === "aal1" && data.nextLevel === "aal2";
+      const enabled = data.nextLevel === "aal2";
+      
+      setMfaStatus({ enabled, challenged });
+    } catch (e) {
+      console.error("[MFA] Fetch assurance levels error:", e);
+    }
+  };
+
   useEffect(() => {
     let mounted = true;
     const loadingSafetyTimeout = window.setTimeout(() => {
@@ -111,10 +129,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           setSession(session);
           setUser(session?.user ?? null);
           if (session?.user) {
-            // Fetch profile/roles in background so sign-in UX is not blocked by network latency.
             void Promise.all([
               fetchProfile(session.user.id),
               checkAdminRole(session.user.id),
+              refreshMfaStatus(),
             ]).catch((error) => {
               console.error("Background auth profile refresh failed:", error);
             });
@@ -127,6 +145,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           } else {
             setProfile(null);
             setIsAdmin(false);
+            setMfaStatus({ enabled: false, challenged: false });
           }
         } finally {
           if (mounted) setLoading(false);
@@ -143,6 +162,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           void Promise.all([
             fetchProfile(session.user.id),
             checkAdminRole(session.user.id),
+            refreshMfaStatus(),
           ]).catch((error) => {
             console.error("Initial auth profile refresh failed:", error);
           });
@@ -241,7 +261,25 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   return (
-    <AuthContext.Provider value={{ user, session, profile, loading, isAdmin, signUp, signIn, signInWithOAuth, requestPasswordReset, updatePassword, signOut, refreshProfile }}>
+    <AuthContext.Provider
+      value={{
+        user,
+        session,
+        profile,
+        loading,
+        isAdmin,
+        signUp,
+        signIn,
+        signInWithOAuth,
+        requestPasswordReset,
+        updatePassword,
+        signOut,
+        refreshProfile,
+        isMfaEnabled: mfaStatus.enabled,
+        isMfaChallenged: mfaStatus.challenged,
+        refreshMfaStatus,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );
