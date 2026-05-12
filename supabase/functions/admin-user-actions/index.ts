@@ -98,7 +98,10 @@ type AdminUserAction =
   | "generate_api_key"
   | "save_package_settings"
   | "approve_all_pending_agents"
-  | "reset_user_mfa";
+  | "reset_user_mfa"
+  | "get_admins"
+  | "grant_admin_role"
+  | "revoke_admin_role";
 
 
 
@@ -1340,6 +1343,124 @@ serve(async (req: Request) => {
           reset_count: deletedCount, 
           message: `Successfully cleared ${deletedCount} MFA factor(s) for user.` 
         }), {
+          status: 200,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      case "get_admins": {
+        const { data: admins, error: fetchErr } = await supabaseAdmin
+          .from("user_roles")
+          .select(`
+            user_id,
+            role,
+            allowed_ips,
+            profiles:user_id (
+              email,
+              full_name,
+              last_seen_at
+            )
+          `)
+          .eq("role", "admin");
+
+        if (fetchErr) throw fetchErr;
+
+        const ids = admins.map((a: any) => a.user_id);
+        let mfaMap: Record<string, boolean> = {};
+        if (ids.length > 0) {
+          const { data: factors } = await supabaseAdmin
+            .from("user_mfa_status")
+            .select("user_id, is_verified")
+            .in("user_id", ids);
+          
+          if (factors) {
+            mfaMap = Object.fromEntries(factors.map((f: any) => [f.user_id, !!f.is_verified]));
+          }
+        }
+
+        const enriched = admins.map((a: any) => ({
+          user_id: a.user_id,
+          role: a.role,
+          allowed_ips: a.allowed_ips,
+          email: a.profiles?.email || "",
+          full_name: a.profiles?.full_name || "",
+          last_seen_at: a.profiles?.last_seen_at || null,
+          is_mfa_verified: !!mfaMap[a.user_id]
+        }));
+
+        return new Response(JSON.stringify({ admins: enriched }), {
+          status: 200,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      case "grant_admin_role": {
+        if (!email) throw new Error("Email address is required");
+
+        const { data: profile, error: findErr } = await supabaseAdmin
+          .from("profiles")
+          .select("user_id, email, full_name")
+          .ilike("email", email.trim())
+          .maybeSingle();
+        
+        if (findErr) throw findErr;
+        if (!profile) {
+          return new Response(JSON.stringify({ error: `User account for '${email}' not found. They must sign up on the platform first.` }), {
+            status: 404,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+
+        const { error: grantErr } = await supabaseAdmin
+          .from("user_roles")
+          .upsert({
+            user_id: profile.user_id,
+            role: "admin"
+          });
+        
+        if (grantErr) throw grantErr;
+
+        await supabaseAdmin.from("admin_action_log").insert({
+          admin_email: actor.email || "system",
+          action: "grant_admin_role",
+          target_email: profile.email,
+          metadata: { target_name: profile.full_name, granted_by: actor.id }
+        });
+
+        return new Response(JSON.stringify({ success: true }), {
+          status: 200,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      case "revoke_admin_role": {
+        if (!isValidUuid(user_id)) throw new Error("Invalid target user_id");
+        
+        if (user_id === actor.id) {
+          return new Response(JSON.stringify({ error: "You cannot revoke your own admin access!" }), {
+            status: 400,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+
+        const { data: profile } = await supabaseAdmin.from("profiles").select("email").eq("user_id", user_id).single();
+
+        const { error: revokeErr } = await supabaseAdmin
+          .from("user_roles")
+          .delete()
+          .eq("user_id", user_id)
+          .eq("role", "admin");
+        
+        if (revokeErr) throw revokeErr;
+
+        await supabaseAdmin.from("admin_action_log").insert({
+          admin_email: actor.email || "system",
+          action: "revoke_admin_role",
+          target_email: profile?.email || user_id,
+          metadata: { revoked_by: actor.id }
+        });
+
+        return new Response(JSON.stringify({ success: true }), {
           status: 200,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });

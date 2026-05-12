@@ -8,7 +8,7 @@ import {
   Shield, Globe, AlertTriangle, Clock, RefreshCw, Loader2, CheckCircle2,
   Eye, Search, Zap, Gift, TrendingUp, FileDown, Activity, BookOpen, Hash,
   BarChart2, Ban, ChevronDown, ChevronUp, Copy, Lock, ShieldAlert,
-  UserX, MapPin, LogIn, AlertCircle, Flame, Filter,
+  UserX, MapPin, LogIn, AlertCircle, Flame, Filter, ShieldCheck,
 } from "lucide-react";
 
 /* ─── interfaces ──────────────────────────────────────────────────── */
@@ -37,6 +37,15 @@ interface ReferralGroup {
 interface FailedOrderUser {
   user_id: string; full_name: string; email: string;
   total: number; failed: number; rate: number;
+}
+interface SystemAdmin {
+  user_id: string;
+  role: string;
+  email: string;
+  full_name: string;
+  last_seen_at: string | null;
+  is_mfa_verified: boolean;
+  allowed_ips: string[] | null;
 }
 interface SignupDay   { date: string; count: number }
 interface AdminAction {
@@ -132,13 +141,14 @@ const TH = ({ children }: { children: ReactNode }) => (
 
 /* ─── main component ──────────────────────────────────────────────── */
 
-type TabId = "overview" | "threats" | "activity" | "access" | "audit";
+type TabId = "overview" | "threats" | "activity" | "access" | "admins" | "audit";
 
 const TABS: { id: TabId; label: string; icon: typeof Shield }[] = [
   { id: "overview",  label: "Overview",       icon: Shield      },
   { id: "threats",   label: "Threats",        icon: ShieldAlert },
   { id: "activity",  label: "Activity",       icon: Activity    },
   { id: "access",    label: "Access Control", icon: Lock        },
+  { id: "admins",    label: "Administrators", icon: ShieldCheck },
   { id: "audit",     label: "Audit Log",      icon: BookOpen    },
 ];
 
@@ -170,6 +180,12 @@ const AdminSecurity = () => {
   const [blType,   setBlType]   = useState("ip");
   const [blValue,  setBlValue]  = useState("");
   const [blReason, setBlReason] = useState("");
+
+  /* admin management state */
+  const [adminsList, setAdminsList] = useState<SystemAdmin[]>([]);
+  const [loadingAdmins, setLoadingAdmins] = useState(false);
+  const [newAdminEmail, setNewAdminEmail] = useState("");
+  const [addingAdmin, setAddingAdmin] = useState(false);
 
   /* ── fetch ──────────────────────────────────────────────────────── */
   const fetchData = useCallback(async (silent = false) => {
@@ -273,6 +289,50 @@ const AdminSecurity = () => {
     if (error || data?.error) throw new Error(data?.error || error?.message || "Unknown error");
     return data;
   }, [session]);
+
+  const fetchAdmins = useCallback(async () => {
+    setLoadingAdmins(true);
+    try {
+      const res = await invoke({ action: "get_admins" });
+      setAdminsList(res.admins || []);
+    } catch (e: any) {
+      toast({ title: "Fetch Failed", description: e.message, variant: "destructive" });
+    } finally {
+      setLoadingAdmins(false);
+    }
+  }, [invoke, toast]);
+
+  useEffect(() => {
+    if (tab === "admins") {
+      void fetchAdmins();
+    }
+  }, [tab, fetchAdmins]);
+
+  const handleAddAdmin = async () => {
+    if (!newAdminEmail.trim()) return;
+    setAddingAdmin(true);
+    try {
+      await invoke({ action: "grant_admin_role", email: newAdminEmail.trim() });
+      toast({ title: "Success", description: "Administrator granted successfully!" });
+      setNewAdminEmail("");
+      void fetchAdmins();
+    } catch (e: any) {
+      toast({ title: "Grant Failed", description: e.message, variant: "destructive" });
+    } finally {
+      setAddingAdmin(false);
+    }
+  };
+
+  const handleRevokeAdmin = async (targetUserId: string, nameOrEmail: string) => {
+    if (!confirm(`Are you absolutely sure you want to REVOKE administrator access for ${nameOrEmail}?`)) return;
+    try {
+      await invoke({ action: "revoke_admin_role", user_id: targetUserId });
+      toast({ title: "Access Revoked", description: "User is no longer an administrator." });
+      void fetchAdmins();
+    } catch (e: any) {
+      toast({ title: "Revoke Failed", description: e.message, variant: "destructive" });
+    }
+  };
 
   const handlePurge = async () => {
     if (!confirm("Delete all test accounts (@example.com / apitest)?")) return;
@@ -750,6 +810,151 @@ const AdminSecurity = () => {
     </div>
   );
 
+  const renderAdmins = () => (
+    <div className="space-y-6">
+      {/* Add Admin Form */}
+      <div className="rounded-2xl border border-border bg-card shadow-sm p-5">
+        <div className="flex items-center gap-2 mb-5">
+          <div className="p-2 rounded-xl bg-amber-500/10 border border-amber-500/20">
+            <ShieldCheck className="w-4 h-4 text-amber-600 dark:text-amber-500" />
+          </div>
+          <span className="font-black text-foreground text-sm">Grant Administrator Privileges</span>
+        </div>
+        <p className="text-xs text-muted-foreground mb-4">
+          Promote an existing registered user to permanent Administrator status. They will gain full access to system wallets, providers, and user management tools.
+        </p>
+        <div className="flex flex-col sm:flex-row gap-2 max-w-2xl">
+          <Input
+            placeholder="Enter account email (e.g. admin@swiftdatagh.shop)..."
+            value={newAdminEmail}
+            onChange={(e) => setNewAdminEmail(e.target.value)}
+            className="bg-background border-border text-foreground rounded-xl"
+            onKeyDown={(e) => { if (e.key === "Enter") void handleAddAdmin(); }}
+          />
+          <Button
+            onClick={handleAddAdmin}
+            disabled={addingAdmin || !newAdminEmail.trim()}
+            className="gap-2 bg-amber-600 hover:bg-amber-700 text-white rounded-xl font-black shadow-sm shrink-0"
+          >
+            {addingAdmin ? <Loader2 className="w-4 h-4 animate-spin" /> : <ShieldCheck className="w-4 h-4" />}
+            Grant Admin Role
+          </Button>
+        </div>
+      </div>
+
+      {/* Admins List */}
+      <div className="rounded-2xl border border-border bg-card shadow-sm overflow-hidden">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-border">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-xl bg-emerald-500/10 border border-emerald-500/20">
+              <Lock className="w-4 h-4 text-emerald-600 dark:text-emerald-500" />
+            </div>
+            <span className="font-black text-foreground text-sm">System Administrators</span>
+            <span className="text-[10px] font-black bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 px-2 py-0.5 rounded-full shadow-sm">
+              {adminsList.length}
+            </span>
+          </div>
+          <button type="button" onClick={() => void fetchAdmins()} title="Refresh List" className="text-muted-foreground hover:text-foreground transition-colors">
+            <RefreshCw className={`w-3.5 h-3.5 ${loadingAdmins ? "animate-spin" : ""}`} />
+          </button>
+        </div>
+
+        {loadingAdmins && adminsList.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-16 gap-3">
+            <Loader2 className="w-8 h-8 text-amber-500 animate-spin" />
+            <p className="text-xs font-bold text-muted-foreground uppercase">Fetching system roster...</p>
+          </div>
+        ) : adminsList.length === 0 ? (
+          <EmptyState icon={ShieldAlert} message="No administrators returned. Check edge log." />
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="bg-muted border-b border-border">
+                  <TH>Administrator</TH>
+                  <TH>🛡️ MFA Status</TH>
+                  <TH>Last Seen</TH>
+                  <TH>Security Lock</TH>
+                  <TH>Actions</TH>
+                </tr>
+              </thead>
+              <tbody>
+                {adminsList.map((adm) => {
+                  const isMe = adm.user_id === session?.user.id;
+                  return (
+                    <tr key={adm.user_id} className="border-b border-border hover:bg-muted/50 transition-colors">
+                      <td className="px-4 py-4">
+                        <div className="flex items-center gap-2.5">
+                          <div className={`w-8 h-8 rounded-full flex items-center justify-center font-black text-xs ${
+                            isMe ? "bg-amber-500/20 text-amber-600 dark:text-amber-400 border border-amber-500/30" : "bg-muted text-muted-foreground border border-border"
+                          }`}>
+                            {(adm.full_name || adm.email || "?").charAt(0).toUpperCase()}
+                          </div>
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <p className="font-black text-foreground text-sm leading-tight">{adm.full_name || "Unnamed"}</p>
+                              {isMe && (
+                                <span className="text-[9px] font-black uppercase px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20">
+                                  You
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-[11px] text-muted-foreground font-medium">{adm.email}</p>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-4 py-4">
+                        {adm.is_mfa_verified ? (
+                          <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 shadow-sm">
+                            <Shield className="w-3.5 h-3.5 fill-emerald-500/20" />
+                            <span className="text-[10px] font-black uppercase tracking-wider">2FA Secured</span>
+                          </div>
+                        ) : (
+                          <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-red-500/10 text-red-600 dark:text-red-400 border border-red-500/20 animate-pulse shadow-sm">
+                            <AlertCircle className="w-3.5 h-3.5" />
+                            <span className="text-[10px] font-black uppercase tracking-wider">No 2FA</span>
+                          </div>
+                        )}
+                      </td>
+                      <td className="px-4 py-4 text-xs font-medium text-muted-foreground">
+                        {fmt(adm.last_seen_at)}
+                      </td>
+                      <td className="px-4 py-4">
+                        {adm.allowed_ips && adm.allowed_ips.length > 0 ? (
+                          <span className="text-[10px] font-black text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
+                            <Lock className="w-3 h-3" /> {adm.allowed_ips.length} IP lockdown
+                          </span>
+                        ) : (
+                          <span className="text-[10px] text-muted-foreground font-medium flex items-center gap-1">
+                            <Globe className="w-3 h-3 opacity-60" /> Global Access
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-4 py-4">
+                        {!isMe ? (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => handleRevokeAdmin(adm.user_id, adm.full_name || adm.email)}
+                            className="h-8 text-[10px] font-black text-muted-foreground hover:text-red-500 hover:bg-red-500/5 px-3 rounded-lg uppercase tracking-wider shadow-sm"
+                          >
+                            Revoke
+                          </Button>
+                        ) : (
+                          <span className="text-[10px] text-muted-foreground/50 italic px-3">—</span>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+
   const renderAudit = () => (
     <div className="rounded-2xl border border-border bg-card shadow-sm overflow-hidden">
       <div className="flex items-center justify-between px-5 py-4 border-b border-border">
@@ -853,6 +1058,7 @@ const AdminSecurity = () => {
       {tab === "threats"   && renderThreats()}
       {tab === "activity"  && renderActivity()}
       {tab === "access"    && renderAccess()}
+      {tab === "admins"    && renderAdmins()}
       {tab === "audit"     && renderAudit()}
     </div>
   );
