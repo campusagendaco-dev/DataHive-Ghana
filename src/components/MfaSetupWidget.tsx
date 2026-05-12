@@ -58,9 +58,6 @@ const MfaSetupWidget = () => {
     setLoading(true);
     
     try {
-      // Diagnostic alert to verify physical DOM event capture
-      alert("🚀 Diagnosing Click: Click handler active! Contacting Supabase...");
-
       if (!supabase?.auth?.mfa) {
         throw new Error("Supabase Multi-Factor Authentication SDK is missing from the build client.");
       }
@@ -84,7 +81,6 @@ const MfaSetupWidget = () => {
       const rawMsg = e?.message || e?.toString() || "Unknown enrollment exception.";
       setErrorMessage(rawMsg);
       toast.error("Could not start 2FA setup", { description: rawMsg });
-      alert("❌ Diagnostics Failed:\n\n" + rawMsg);
     } finally {
       setLoading(false);
     }
@@ -185,7 +181,7 @@ const MfaSetupWidget = () => {
       {/* ── STEP 1: Idle / Unenrolled State ── */}
       {step === "idle" && (
         <Card className="border-none bg-card shadow-sm overflow-hidden relative group">
-          <div className="absolute inset-0 bg-gradient-to-br from-indigo-600/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+          <div className="absolute inset-0 bg-gradient-to-br from-indigo-600/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" />
           <CardHeader>
             <CardTitle className="text-lg font-bold flex items-center gap-2">
               <ShieldAlert className="w-5 h-5 text-indigo-400" />
