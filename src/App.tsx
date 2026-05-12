@@ -110,10 +110,16 @@ const queryClient = new QueryClient();
 /** Authenticated dashboard guard that keeps admins on the admin dashboard and unapproved agents/sub-agents on pending */
 const DashboardGuard = ({ children }: { children: React.ReactNode }) => {
   const { user, profile, isAdmin, loading, isMfaChallenged } = useAuth();
+  const location = useLocation();
+
   if (loading) return <LoadingScreen />;
   if (!user) return <Navigate to="/login" replace />;
   if (isMfaChallenged) return <Navigate to="/verify-mfa" replace />;
-  if (isAdmin) return <Navigate to="/admin" replace />;
+  
+  // Bypass admin enforcement ONLY when visiting account settings (essential for setting up mandatory MFA)
+  if (isAdmin && !location.pathname.includes("/dashboard/account-settings")) {
+    return <Navigate to="/admin" replace />;
+  }
   
   // Strict check for sub-agents
   if (profile?.is_sub_agent && !profile?.sub_agent_approved) {
