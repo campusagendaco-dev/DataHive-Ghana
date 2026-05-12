@@ -33,9 +33,17 @@ const VerifyMfa = () => {
 
         const verifiedFactors = factorsData.all.filter(f => f.status === "verified");
         if (verifiedFactors.length === 0) {
-          // User somehow navigated here but has no active MFA
-          toast.error("No active Authenticator found.");
-          navigate("/dashboard");
+          // Intelligent Self-Healing Recovery Loop Breaker!
+          // An administrator wiped the factors, but the user's current browser JWT still holds the stale "aal2" challenge flag.
+          // Silently routing to dashboard causes an infinite redirect loop.
+          // We must force a local session purge and direct the user back to the login page to complete a clean password-only authorization.
+          console.warn("[MFA Recovery] No active factors found on server. Clearing stale session.");
+          await supabase.auth.signOut({ scope: "local" });
+          
+          // Inform the user in simple terms
+          toast.success("Security settings reset! Please enter your password one more time to log in.", { duration: 6000 });
+          
+          navigate("/login");
           return;
         }
 
