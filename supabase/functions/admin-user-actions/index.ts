@@ -1312,8 +1312,8 @@ serve(async (req: Request) => {
       case "reset_user_mfa": {
         if (!isValidUuid(user_id)) throw new Error("Invalid or missing user_id");
         
-        // 1. List factors for this user via service-role admin api
-        const { data: factorData, error: listError } = await supabaseAdmin.auth.admin.listFactorsForUser({
+         // 1. List factors for this user via service-role admin api (using modern v2 API)
+        const { data: factorData, error: listError } = await supabaseAdmin.auth.admin.mfa.listFactors({
           userId: user_id
         });
 
@@ -1323,13 +1323,13 @@ serve(async (req: Request) => {
         }
 
         // 2. Loop through and delete all factors safely
-        const factors = factorData?.all || [];
+        const factors = factorData?.factors || [];
         let deletedCount = 0;
         
         for (const factor of factors) {
-          const { error: deleteError } = await supabaseAdmin.auth.admin.deleteFactor({
-            userId: user_id,
-            factorId: factor.id
+          const { error: deleteError } = await supabaseAdmin.auth.admin.mfa.deleteFactor({
+            id: factor.id,
+            userId: user_id
           });
           if (deleteError) {
             console.error(`Failed to delete factor ${factor.id}:`, deleteError);
@@ -1410,7 +1410,26 @@ serve(async (req: Request) => {
         
         if (findErr) throw findErr;
         if (!profile) {
-          return new Response(JSON.stringify({ error: `User account for '${email}' not found. They must sign up on the platform first.` }), {
+          // Intelligent auto-suggest fuzzy search!
+          // Pull the prefix before the @ symbol to check for potential typos
+          const prefix = email.trim().split("@")[0]?.toLowerCase() || "";
+          const { data: matches } = prefix.length > 2
+            ? await supabaseAdmin
+                .from("profiles")
+                .select("email")
+                .ilike("email", `%${prefix}%`)
+                .limit(5)
+            : { data: [] };
+
+          const suggestions = (matches || [])
+            .map((m: any) => m.email)
+            .filter((e: string) => e && e.toLowerCase() !== email.trim().toLowerCase());
+
+          const errorMsg = suggestions.length > 0
+            ? `User account not found. Did you mean one of these registered accounts: ${suggestions.join(", ")}?`
+            : `User account for '${email}' not found. They must sign up and create a profile on the platform first.`;
+
+          return new Response(JSON.stringify({ error: errorMsg }), {
             status: 404,
             headers: { ...corsHeaders, "Content-Type": "application/json" },
           });

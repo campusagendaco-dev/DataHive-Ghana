@@ -26,6 +26,7 @@ import IpBlocked from "./pages/IpBlocked";
 import Maintenance from "./pages/Maintenance";
 import { SecurityGuard } from "@/components/SecurityGuard";
 import { UpdatePrompt } from "@/components/UpdatePrompt";
+import { ChunkErrorBoundary } from "@/components/ChunkErrorBoundary";
 
 // Route-level code splitting — each page chunk loads only when first visited
 const Index = lazy(() => import("./pages/Index"));
@@ -321,6 +322,7 @@ const AppContent = () => {
       {location.pathname !== "/" && <TraditionalBackground />}
       <div className="relative z-10 min-h-screen flex flex-col">
         {!isDashboard && !isAgentStore && !isAdmin && <Navbar />}
+        <ChunkErrorBoundary>
         <Suspense fallback={<LoadingScreen />}>
       <Routes>
         {/* Public pages */}
@@ -435,6 +437,7 @@ const AppContent = () => {
         <Route path="*" element={<NotFound />} />
       </Routes>
       </Suspense>
+        </ChunkErrorBoundary>
       {!isDashboard && !isAgentStore && !isAdmin && <Footer />}
         {!isDashboard && !isAdmin && <TutorialModal />}
         <AudioUnlocker />

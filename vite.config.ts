@@ -41,6 +41,9 @@ export default defineConfig(({ mode }) => ({
         clientsClaim: true,
         maximumFileSizeToCacheInBytes: 5000000,
         globPatterns: ["**/*.{js,css,html,ico,png,svg}"],
+        // Never serve cached HTML for JS/CSS asset requests — prevents stale chunk errors
+        navigateFallback: "index.html",
+        navigateFallbackDenylist: [/\/assets\//],
         runtimeCaching: [
           {
             urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,

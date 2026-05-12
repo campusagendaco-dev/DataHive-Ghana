@@ -214,7 +214,20 @@ const UserDetailDrawer = ({ user, onClose }: Props) => {
         body: { action: "reset_user_mfa", user_id: user.user_id },
         headers: { Authorization: `Bearer ${session?.access_token}` },
       });
-      if (error || res?.error) throw new Error(res?.error || error?.message);
+      
+      if (error) {
+        try {
+          const bodyText = await (error as any).context?.text();
+          if (bodyText) {
+            const parsed = JSON.parse(bodyText);
+            if (parsed.error) throw new Error(parsed.error);
+          }
+        } catch (innerErr: any) {
+          if (innerErr.message && innerErr.message !== "Unexpected end of JSON input") throw innerErr;
+        }
+        throw new Error(error.message || "Edge function failed");
+      }
+      if (res?.error) throw new Error(res.error);
       
       toast({ 
         title: "MFA/2FA successfully disabled", 
@@ -239,7 +252,20 @@ const UserDetailDrawer = ({ user, onClose }: Props) => {
         body: { action: "reset_password", user_id: user.user_id, new_password: entered?.trim() || undefined },
         headers: { Authorization: `Bearer ${session?.access_token}` },
       });
-      if (error || res?.error) throw new Error(res?.error || error?.message);
+      
+      if (error) {
+        try {
+          const bodyText = await (error as any).context?.text();
+          if (bodyText) {
+            const parsed = JSON.parse(bodyText);
+            if (parsed.error) throw new Error(parsed.error);
+          }
+        } catch (innerErr: any) {
+          if (innerErr.message && innerErr.message !== "Unexpected end of JSON input") throw innerErr;
+        }
+        throw new Error(error.message || "Edge function failed");
+      }
+      if (res?.error) throw new Error(res.error);
 
       toast({ title: "Password updated successfully", description: `Login: ${user.email}` });
     } catch (err: any) {
