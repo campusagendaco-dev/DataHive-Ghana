@@ -286,7 +286,24 @@ const AdminSecurity = () => {
     const { data, error } = await supabase.functions.invoke("admin-user-actions", {
       body, headers: { Authorization: `Bearer ${session?.access_token}` },
     });
-    if (error || data?.error) throw new Error(data?.error || error?.message || "Unknown error");
+    
+    if (error) {
+      // Try extracting granular JSON error response if available in the context body
+      try {
+        const bodyText = await (error as any).context?.text();
+        if (bodyText) {
+          const parsed = JSON.parse(bodyText);
+          if (parsed.error) throw new Error(parsed.error);
+        }
+      } catch (innerErr: any) {
+        if (innerErr.message && innerErr.message !== "Unexpected end of JSON input") {
+          throw innerErr;
+        }
+      }
+      throw new Error(error.message || "Edge Function execution failed");
+    }
+    
+    if (data?.error) throw new Error(data.error);
     return data;
   }, [session]);
 

@@ -1351,42 +1351,47 @@ serve(async (req: Request) => {
       case "get_admins": {
         const { data: admins, error: fetchErr } = await supabaseAdmin
           .from("user_roles")
-          .select(`
-            user_id,
-            role,
-            allowed_ips,
-            profiles:user_id (
-              email,
-              full_name,
-              last_seen_at
-            )
-          `)
+          .select("user_id, role, allowed_ips")
           .eq("role", "admin");
 
         if (fetchErr) throw fetchErr;
 
-        const ids = admins.map((a: any) => a.user_id);
+        const ids = (admins || []).map((a: any) => a.user_id);
+        let profilesMap: Record<string, any> = {};
         let mfaMap: Record<string, boolean> = {};
+
         if (ids.length > 0) {
-          const { data: factors } = await supabaseAdmin
-            .from("user_mfa_status")
-            .select("user_id, is_verified")
-            .in("user_id", ids);
-          
-          if (factors) {
-            mfaMap = Object.fromEntries(factors.map((f: any) => [f.user_id, !!f.is_verified]));
+          const [profilesRes, mfaRes] = await Promise.all([
+            supabaseAdmin
+              .from("profiles")
+              .select("user_id, email, full_name, last_seen_at")
+              .in("user_id", ids),
+            supabaseAdmin
+              .from("user_mfa_status")
+              .select("user_id, is_verified")
+              .in("user_id", ids)
+          ]);
+
+          if (profilesRes.data) {
+            profilesMap = Object.fromEntries(profilesRes.data.map((p: any) => [p.user_id, p]));
+          }
+          if (mfaRes.data) {
+            mfaMap = Object.fromEntries(mfaRes.data.map((m: any) => [m.user_id, !!m.is_verified]));
           }
         }
 
-        const enriched = admins.map((a: any) => ({
-          user_id: a.user_id,
-          role: a.role,
-          allowed_ips: a.allowed_ips,
-          email: a.profiles?.email || "",
-          full_name: a.profiles?.full_name || "",
-          last_seen_at: a.profiles?.last_seen_at || null,
-          is_mfa_verified: !!mfaMap[a.user_id]
-        }));
+        const enriched = (admins || []).map((a: any) => {
+          const profile = profilesMap[a.user_id] || {};
+          return {
+            user_id: a.user_id,
+            role: a.role,
+            allowed_ips: a.allowed_ips,
+            email: profile.email || "",
+            full_name: profile.full_name || "",
+            last_seen_at: profile.last_seen_at || null,
+            is_mfa_verified: !!mfaMap[a.user_id]
+          };
+        });
 
         return new Response(JSON.stringify({ admins: enriched }), {
           status: 200,
@@ -1411,12 +1416,31 @@ serve(async (req: Request) => {
           });
         }
 
-        const { error: grantErr } = await supabaseAdmin
+        // Determine if user already has a record in user_roles
+        const { data: existingRole } = await supabaseAdmin
           .from("user_roles")
-          .upsert({
-            user_id: profile.user_id,
-            role: "admin"
-          });
+          .select("id, role")
+          .eq("user_id", profile.user_id)
+          .maybeSingle();
+
+        let grantErr;
+        if (existingRole) {
+          // Update existing record to admin
+          const { error } = await supabaseAdmin
+            .from("user_roles")
+            .update({ role: "admin" })
+            .eq("user_id", profile.user_id);
+          grantErr = error;
+        } else {
+          // Insert completely new role record
+          const { error } = await supabaseAdmin
+            .from("user_roles")
+            .insert({
+              user_id: profile.user_id,
+              role: "admin"
+            });
+          grantErr = error;
+        }
         
         if (grantErr) throw grantErr;
 
