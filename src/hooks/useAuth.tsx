@@ -123,25 +123,32 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }, 7000);
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
+      (event, session) => {
         try {
           if (!mounted) return;
           setSession(session);
           setUser(session?.user ?? null);
           if (session?.user) {
-            void Promise.all([
-              fetchProfile(session.user.id),
-              checkAdminRole(session.user.id),
-              refreshMfaStatus(),
-            ]).catch((error) => {
-              console.error("Background auth profile refresh failed:", error);
-            });
-            // Log IP on every fresh sign-in (not on token refreshes)
-            if (event === "SIGNED_IN") {
-              void supabase.functions.invoke("log-user-activity", {
-                headers: { Authorization: `Bearer ${session.access_token}` },
+            const userId = session.user.id;
+            const token = session.access_token;
+            
+            // Defer profile loading and functions out of Gotrue state machine lock scope
+            setTimeout(() => {
+              if (!mounted) return;
+              void Promise.all([
+                fetchProfile(userId),
+                checkAdminRole(userId),
+                refreshMfaStatus(),
+              ]).catch((error) => {
+                console.error("Background auth profile refresh failed:", error);
               });
-            }
+              // Log IP on every fresh sign-in (not on token refreshes)
+              if (event === "SIGNED_IN") {
+                void supabase.functions.invoke("log-user-activity", {
+                  headers: { Authorization: `Bearer ${token}` },
+                });
+              }
+            }, 0);
           } else {
             setProfile(null);
             setIsAdmin(false);

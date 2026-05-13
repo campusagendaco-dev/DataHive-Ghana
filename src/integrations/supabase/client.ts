@@ -15,5 +15,7 @@ export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABL
     storage: localStorage,
     persistSession: true,
     autoRefreshToken: true,
+    // A no-op custom lock to prevent browser navigator.locks hanging and warnings in dev/StrictMode
+    lock: async (_, __, fn) => await fn(),
   }
 });
