@@ -28,23 +28,23 @@ export class ChunkErrorBoundary extends Component<Props, State> {
   }
 
   render() {
-    if (this.state.hasError && this.state.retried) {
+    if (this.state.hasError) {
       return (
         <div className="fixed inset-0 z-[99999] flex items-center justify-center p-6 bg-[#030407]/95 backdrop-blur-md">
           <div className="text-center space-y-4 max-w-xs">
             <div className="w-14 h-14 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center mx-auto">
               <svg className="w-7 h-7 text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
               </svg>
             </div>
-            <h2 className="text-white font-black text-xl">New version available</h2>
-            <p className="text-white/40 text-sm">SwiftData was updated. Please refresh to load the latest version.</p>
+            <h2 className="text-white font-black text-xl">Application Error</h2>
+            <p className="text-white/40 text-sm">An unexpected issue occurred while loading this section. Please reload to try again.</p>
             <button
               type="button"
               onClick={() => window.location.reload()}
               className="w-full py-3 rounded-2xl bg-amber-400 text-black font-black text-sm hover:bg-amber-300 active:scale-95 transition-all"
             >
-              Refresh Now
+              Reload Page
             </button>
           </div>
         </div>
