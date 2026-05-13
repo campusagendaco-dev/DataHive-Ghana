@@ -24,7 +24,7 @@ const SEGMENTS: { value: Segment; label: string; desc: string }[] = [
 ];
 
 const TEMPLATES = [
-  { label: "Withdrawal Info",    title: "Profit Withdrawals Active 💸", body: "Good news! You can now withdraw your earned profits. Navigate to the Withdrawals tab on your dashboard to request a payout. Minimum withdrawal is GHS 25.00." },
+  { label: "Withdrawal Info",    title: "Profit Withdrawals Active 💸", body: "Good news! You can now withdraw your earned profits. Navigate to the Withdrawals tab on your dashboard to request a payout. Minimum withdrawal is GHS 25.00. Please try your withdrawal again." },
   { label: "Maintenance Notice",  title: "Scheduled Maintenance", body: "We will be performing scheduled maintenance on {date}. Services may be temporarily unavailable. We apologize for any inconvenience." },
   { label: "New Feature",         title: "New Feature Available!",body: "We've just launched a new feature! Log in to your SwiftData dashboard to check it out." },
   { label: "Promo Announcement",  title: "Special Promotion 🎉",  body: "For a limited time, enjoy special rates on {network} data bundles! Log in now to take advantage." },

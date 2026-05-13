@@ -746,24 +746,48 @@ serve(async (req: Request) => {
             headers: { ...corsHeaders, "Content-Type": "application/json" },
           });
         }
+        console.log(`Processing paystack_payout for ID: "${withdrawal_id}"`);
 
-        // 1. Fetch withdrawal and agent details
+        // 1. Fetch withdrawal record first
         const { data: withdrawal, error: fetchErr } = await supabaseAdmin
           .from("withdrawals")
-          .select(`
-            *,
-            profiles:agent_id (
-              full_name,
-              momo_number,
-              momo_network,
-              momo_account_name
-            )
-          `)
-          .eq("id", withdrawal_id)
+          .select("*")
+          .eq("id", withdrawal_id.trim())
           .maybeSingle();
 
-        if (fetchErr || !withdrawal) {
-          return new Response(JSON.stringify({ error: "Withdrawal request not found" }), {
+        if (fetchErr) {
+          console.error("Database fetch error (withdrawals):", fetchErr);
+          return new Response(JSON.stringify({ error: `Database error: ${fetchErr.message}` }), {
+            status: 500,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+
+        if (!withdrawal) {
+          console.error(`Withdrawal NOT FOUND in DB for ID: ${withdrawal_id}`);
+          return new Response(JSON.stringify({ error: `Withdrawal request not found in database for ID: ${withdrawal_id}` }), {
+            status: 404,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+
+        // 2. Fetch profile separately
+        const { data: profile, error: profileErr } = await supabaseAdmin
+          .from("profiles")
+          .select("full_name, momo_number, momo_network, momo_account_name")
+          .eq("user_id", withdrawal.agent_id)
+          .maybeSingle();
+
+        if (profileErr) {
+          console.error("Database fetch error (profiles):", profileErr);
+          return new Response(JSON.stringify({ error: `Profile error: ${profileErr.message}` }), {
+            status: 500,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+
+        if (!profile) {
+          return new Response(JSON.stringify({ error: "Agent profile not found" }), {
             status: 404,
             headers: { ...corsHeaders, "Content-Type": "application/json" },
           });
@@ -776,7 +800,6 @@ serve(async (req: Request) => {
           });
         }
 
-        const profile = withdrawal.profiles;
         const netAmount = Number(withdrawal.net_amount || withdrawal.amount);
 
         // 2. Map Network to Paystack Bank Code
@@ -793,6 +816,14 @@ serve(async (req: Request) => {
           });
         }
 
+        // 2b. Paystack Ghana MoMo requires 10-digit number starting with 0
+        const normalizeForPaystack = (phone: string) => {
+          const digits = phone.replace(/\D/g, "");
+          if (digits.startsWith("233") && digits.length > 10) return "0" + digits.slice(3);
+          if (!digits.startsWith("0") && digits.length === 9) return "0" + digits;
+          return digits;
+        };
+
         try {
           // 3. Create Transfer Recipient
           const recipientRes = await fetch("https://api.paystack.co/transferrecipient", {
@@ -804,7 +835,7 @@ serve(async (req: Request) => {
             body: JSON.stringify({
               type: "mobile_money",
               name: profile.momo_account_name || profile.full_name,
-              account_number: normalizePhone(profile.momo_number),
+              account_number: normalizeForPaystack(profile.momo_number),
               bank_code: bankCode,
               currency: "GHS"
             })
