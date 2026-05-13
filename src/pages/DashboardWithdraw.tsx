@@ -157,8 +157,14 @@ const DashboardWithdraw = () => {
       body: { amount: numAmount },
     });
 
+    // supabase.functions.invoke puts non-2xx responses in `error` with the body in error.context
+    const errorMsg = data?.error
+      || (error as any)?.context?.error
+      || error?.message
+      || "Withdrawal failed. Please try again.";
+
     if (error || data?.error) {
-      toast.error("Withdrawal failed", { description: data?.error || error?.message });
+      toast.error("Withdrawal failed", { description: errorMsg });
     } else {
       toast.success("Withdrawal request placed!", { description: "You will receive your funds within 24 hours." });
       setAmount("");
@@ -364,7 +370,7 @@ const DashboardWithdraw = () => {
                 }
                 setConfirmOpen(true);
               }}
-              disabled={!systemEnabled || withdrawing || biometricScanning || availableBalance < minWithdrawal}
+              disabled={!systemEnabled || withdrawing || biometricScanning || availableBalance < minWithdrawal || !profile?.momo_number || !profile?.momo_network}
               className="gap-2"
             >
               {biometricScanning
@@ -375,7 +381,12 @@ const DashboardWithdraw = () => {
               }
             </Button>
           </div>
-          <p className="text-xs text-muted-foreground mt-2">
+          {(!profile?.momo_number || !profile?.momo_network) && (
+            <p className="text-xs text-amber-500 mt-2 font-medium">
+              ⚠ Set your MoMo number and network in Account Settings before withdrawing.
+            </p>
+          )}
+          <p className="text-xs text-muted-foreground mt-1">
             A 1.5% processing fee applies to all withdrawals. Funds are sent within 24 hours.
             {hasBiometric && " · Biometric verification enabled."}
           </p>
