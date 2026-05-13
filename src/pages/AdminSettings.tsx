@@ -654,8 +654,60 @@ const AdminSettings = () => {
 
               <div className="space-y-3 pt-2 border-t border-white/5">
                 <Label className="flex items-center gap-2">
+                  <Sparkles className="w-4 h-4 text-primary" />
+                  Choose Background Preset
+                </Label>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                  {[
+                    { id: "traditional", label: "Ghana Drifting (Default)", url: "" },
+                    { id: "mb1", label: "Cyan & Gold V1", url: "/assets/backgrounds/bg_motherboard_1.png" },
+                    { id: "mb2", label: "Elegant Gold/White", url: "/assets/backgrounds/bg_motherboard_2.png" },
+                    { id: "mb3", label: "Neon Cyberpunk", url: "/assets/backgrounds/bg_motherboard_3.png" },
+                    { id: "mb4", label: "Blueprint Schematic", url: "/assets/backgrounds/bg_motherboard_4.png" },
+                    { id: "mb5", label: "Cyan & Gold V2", url: "/assets/backgrounds/bg_motherboard_5.png" },
+                    { id: "mb6", label: "Ghana-Circuit Fusion", url: "/assets/backgrounds/bg_motherboard_adinkra.png" },
+                    { id: "cult1", label: "Luxury Kente Cloth", url: "/assets/backgrounds/bg_ghana_kente.png" },
+                    { id: "cult2", label: "Gold Embossed Adinkra", url: "/assets/backgrounds/bg_ghana_gold_adinkra.png" },
+                    { id: "cult3", label: "Ghanaian Warm Earth", url: "/assets/backgrounds/bg_ghana_warm_earth.png" },
+                    { id: "rec1", label: "Abstract Data Flow", url: "/assets/backgrounds/bg_data_flow.png" },
+                    { id: "rec2", label: "Frosted Mesh Gradient", url: "/assets/backgrounds/bg_mesh_gradient.png" },
+                    { id: "rec3", label: "Premium Gold Ribbons", url: "/assets/backgrounds/bg_gold_ribbons.png" },
+                  ].map((preset) => {
+                    const isSelected = settings.background_custom_image_url === preset.url;
+                    return (
+                      <button
+                        key={preset.id}
+                        type="button"
+                        onClick={() => setSettings({ ...settings, background_custom_image_url: preset.url })}
+                        className={`relative rounded-xl overflow-hidden aspect-video bg-black/40 border-2 transition-all text-left group flex flex-col justify-end p-2 ${
+                          isSelected ? "border-primary ring-2 ring-primary/20 ring-offset-2 ring-offset-black" : "border-white/10 hover:border-white/30"
+                        }`}
+                      >
+                        {preset.url ? (
+                          <img 
+                            src={preset.url} 
+                            alt={preset.label}
+                            className="absolute inset-0 w-full h-full object-cover opacity-50 group-hover:opacity-70 transition-opacity"
+                          />
+                        ) : (
+                          <div className="absolute inset-0 bg-gradient-to-br from-amber-500/20 to-amber-900/20 flex items-center justify-center">
+                            <Sparkles className="w-6 h-6 text-amber-500 opacity-40" />
+                          </div>
+                        )}
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/30 to-transparent" />
+                        <span className="relative text-[9px] font-black text-white tracking-wide uppercase leading-tight truncate w-full">
+                          {preset.label}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div className="space-y-3 pt-2 border-t border-white/5">
+                <Label className="flex items-center gap-2">
                   <Globe className="w-4 h-4 text-muted-foreground" />
-                  Background Custom Image (Overrides Symbols)
+                  Custom Image URL / Preview (Overrides Symbols)
                 </Label>
 
                 {settings.background_custom_image_url && (

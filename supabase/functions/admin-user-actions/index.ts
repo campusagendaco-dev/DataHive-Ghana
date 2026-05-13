@@ -1368,7 +1368,7 @@ serve(async (req: Request) => {
               .in("user_id", ids),
             supabaseAdmin
               .from("user_mfa_status")
-              .select("user_id, is_verified")
+              .select("user_id, has_mfa")
               .in("user_id", ids)
           ]);
 
@@ -1376,7 +1376,7 @@ serve(async (req: Request) => {
             profilesMap = Object.fromEntries(profilesRes.data.map((p: any) => [p.user_id, p]));
           }
           if (mfaRes.data) {
-            mfaMap = Object.fromEntries(mfaRes.data.map((m: any) => [m.user_id, !!m.is_verified]));
+            mfaMap = Object.fromEntries(mfaRes.data.map((m: any) => [m.user_id, !!m.has_mfa]));
           }
         }
 
@@ -1401,18 +1401,28 @@ serve(async (req: Request) => {
 
       case "grant_admin_role": {
         if (!email) throw new Error("Email address is required");
+        const targetEmail = email.trim();
 
-        const { data: profile, error: findErr } = await supabaseAdmin
-          .from("profiles")
-          .select("user_id, email, full_name")
-          .ilike("email", email.trim())
-          .maybeSingle();
-        
-        if (findErr) throw findErr;
-        if (!profile) {
-          // Intelligent auto-suggest fuzzy search!
-          // Pull the prefix before the @ symbol to check for potential typos
-          const prefix = email.trim().split("@")[0]?.toLowerCase() || "";
+        console.log(`[Grant Admin] Resolving identity for: ${targetEmail}`);
+
+        // 1. Query direct Master Auth Directory (auth.users) as the SOURCE OF TRUTH
+        const { data: authData, error: authErr } = await supabaseAdmin.auth.admin.listUsers({
+          filter: `email = '${targetEmail}'`
+        });
+
+        if (authErr) {
+          console.error("[Grant Admin] Master Auth fetch failed:", authErr);
+          throw authErr;
+        }
+
+        const authUser = authData?.users?.[0] || null;
+
+        // If they aren't in global Auth, they definitely haven't registered yet!
+        if (!authUser) {
+          console.warn(`[Grant Admin] User not found in Master Auth. Fetching suggestions...`);
+          
+          // Fuzzy query suggestion engine
+          const prefix = targetEmail.split("@")[0]?.toLowerCase() || "";
           const { data: matches } = prefix.length > 2
             ? await supabaseAdmin
                 .from("profiles")
@@ -1423,11 +1433,11 @@ serve(async (req: Request) => {
 
           const suggestions = (matches || [])
             .map((m: any) => m.email)
-            .filter((e: string) => e && e.toLowerCase() !== email.trim().toLowerCase());
+            .filter((e: string) => e && e.toLowerCase() !== targetEmail.toLowerCase());
 
           const errorMsg = suggestions.length > 0
             ? `User account not found. Did you mean one of these registered accounts: ${suggestions.join(", ")}?`
-            : `User account for '${email}' not found. They must sign up and create a profile on the platform first.`;
+            : `User account for '${targetEmail}' not found. They must sign up and create a profile on the platform first.`;
 
           return new Response(JSON.stringify({ error: errorMsg }), {
             status: 404,
@@ -1435,27 +1445,86 @@ serve(async (req: Request) => {
           });
         }
 
-        // Determine if user already has a record in user_roles
+        const realUserId = authUser.id;
+        console.log(`[Grant Admin] Valid Master User ID resolved: ${realUserId}`);
+
+        // 2. Check the public database (profiles table)
+        const { data: existingProfile, error: findErr } = await supabaseAdmin
+          .from("profiles")
+          .select("user_id, email, full_name")
+          .ilike("email", targetEmail)
+          .maybeSingle();
+        
+        if (findErr) throw findErr;
+
+        let activeProfile = existingProfile;
+
+        // 3. GHOST PROFILE ALIGNMENT ALGORITHM
+        // If a profile exists but contains an old/mismatched User ID, it must be purged and aligned!
+        if (existingProfile && existingProfile.user_id !== realUserId) {
+          console.warn(`[Ghost Purge] ID Mismatch detected! Master=${realUserId}, Profile=${existingProfile.user_id}. Initiating repair...`);
+          
+          // Purge the stale orphaned profile row
+          const { error: purgeErr } = await supabaseAdmin
+            .from("profiles")
+            .delete()
+            .eq("user_id", existingProfile.user_id);
+
+          if (purgeErr) {
+            console.error("[Ghost Purge] Stale row delete failed:", purgeErr);
+          } else {
+            console.log("[Ghost Purge] Obsolete profile record successfully wiped.");
+          }
+          
+          activeProfile = null; // Reset reference to trigger fresh injection below
+        }
+
+        // 4. INJECT MISSING OR REPAIRED PROFILE ROW
+        if (!activeProfile) {
+          console.log(`[Identity Restore] Injecting synchronized profile record for user: ${realUserId}`);
+          
+          const { data: newProfile, error: createErr } = await supabaseAdmin
+            .from("profiles")
+            .insert({
+              user_id: realUserId,
+              email: authUser.email || targetEmail,
+              full_name: authUser.user_metadata?.full_name || "Administrator"
+            })
+            .select("user_id, email, full_name")
+            .maybeSingle();
+
+          if (createErr) {
+            console.error("[Identity Restore] Profile recovery crash:", createErr);
+            throw new Error("Failed to synchronize account profile. Technical detail: " + createErr.message);
+          }
+
+          if (!newProfile) {
+            throw new Error("Critical database pipeline failure. Could not bind new identity row.");
+          }
+
+          console.log("[Identity Restore] System data aligned flawlessly!");
+          activeProfile = newProfile;
+        }
+
+        // 5. Grant role to the VALID, ALIGNED User ID
         const { data: existingRole } = await supabaseAdmin
           .from("user_roles")
           .select("id, role")
-          .eq("user_id", profile.user_id)
+          .eq("user_id", realUserId)
           .maybeSingle();
 
         let grantErr;
         if (existingRole) {
-          // Update existing record to admin
           const { error } = await supabaseAdmin
             .from("user_roles")
             .update({ role: "admin" })
-            .eq("user_id", profile.user_id);
+            .eq("user_id", realUserId);
           grantErr = error;
         } else {
-          // Insert completely new role record
           const { error } = await supabaseAdmin
             .from("user_roles")
             .insert({
-              user_id: profile.user_id,
+              user_id: realUserId,
               role: "admin"
             });
           grantErr = error;
