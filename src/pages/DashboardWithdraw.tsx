@@ -55,6 +55,7 @@ const DashboardWithdraw = () => {
   const [enteredPin, setEnteredPin] = useState("");
   const [biometricScanning, setBiometricScanning] = useState(false);
   const [minWithdrawal, setMinWithdrawal] = useState(25);
+  const [maxWithdrawal, setMaxWithdrawal] = useState(5000);
   const [systemEnabled, setSystemEnabled] = useState(true);
   const [walletBalance, setWalletBalance] = useState(0);
 
@@ -75,11 +76,11 @@ const DashboardWithdraw = () => {
     ]);
 
     // Fetch settings separately — columns may not exist in older deployments; default gracefully
-    let settingsRes: { data: { min_withdrawal_amount?: number; withdrawal_system_enabled?: boolean } | null } = { data: null };
+    let settingsRes: { data: { min_withdrawal_amount?: number; max_withdrawal_amount?: number; withdrawal_system_enabled?: boolean } | null } = { data: null };
     try {
       const res = await supabase
         .from("public_system_settings")
-        .select("min_withdrawal_amount, withdrawal_system_enabled")
+        .select("min_withdrawal_amount, max_withdrawal_amount, withdrawal_system_enabled")
         .eq("id", 1)
         .maybeSingle();
       settingsRes = res;
@@ -108,6 +109,7 @@ const DashboardWithdraw = () => {
 
     if (settingsRes.data) {
       setMinWithdrawal(Number(settingsRes.data.min_withdrawal_amount) || 25);
+      setMaxWithdrawal(Number(settingsRes.data.max_withdrawal_amount) || 5000);
       setSystemEnabled(settingsRes.data.withdrawal_system_enabled !== false);
     }
     
@@ -311,7 +313,7 @@ const DashboardWithdraw = () => {
                 step="0.01"
                 min={minWithdrawal}
                 max={availableBalance}
-                placeholder={`Amount (min GHS ${minWithdrawal.toFixed(2)}, max GHS ${availableBalance.toFixed(2)})`}
+                placeholder={`Amount (min GHS ${minWithdrawal.toFixed(2)}, max GHS ${Math.min(maxWithdrawal, availableBalance).toFixed(2)})`}
                 value={amount}
                 onChange={(e) => setAmount(e.target.value)}
                 className="bg-secondary"
@@ -326,6 +328,10 @@ const DashboardWithdraw = () => {
                 }
                 if (n > availableBalance) {
                   toast.error("Amount exceeds available balance");
+                  return;
+                }
+                if (n > maxWithdrawal) {
+                  toast.error(`Maximum withdrawal is GHS ${maxWithdrawal.toFixed(2)}`);
                   return;
                 }
                 if (hasBiometric) {

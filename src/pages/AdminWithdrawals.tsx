@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import {
   Search, CheckCircle, Loader2, XCircle, Copy, Download,
   RefreshCw, ChevronLeft, ChevronRight, Wallet, TrendingUp,
-  AlertCircle, Banknote, CheckSquare, Square, Clock,
+  AlertCircle, Banknote, CheckSquare, Square, Clock, Settings2, Save,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/useAuth";
@@ -112,6 +112,42 @@ const AdminWithdrawals = () => {
   const [selectedIds,   setSelectedIds]   = useState<Set<string>>(new Set());
   const [bulkConfirming, setBulkConfirming] = useState(false);
 
+  // Withdrawal settings
+  const [showSettings,   setShowSettings]   = useState(false);
+  const [minAmount,      setMinAmount]      = useState("25");
+  const [maxAmount,      setMaxAmount]      = useState("5000");
+  const [savingSettings, setSavingSettings] = useState(false);
+
+  const fetchSettings = useCallback(async () => {
+    const { data } = await (supabase as any)
+      .from("system_settings")
+      .select("min_withdrawal_amount, max_withdrawal_amount")
+      .eq("id", 1)
+      .maybeSingle();
+    if (data) {
+      setMinAmount(String(data.min_withdrawal_amount ?? 25));
+      setMaxAmount(String(data.max_withdrawal_amount ?? 5000));
+    }
+  }, []);
+
+  const saveSettings = async () => {
+    const min = parseFloat(minAmount);
+    const max = parseFloat(maxAmount);
+    if (isNaN(min) || min < 1) { toast.error("Invalid minimum amount"); return; }
+    if (isNaN(max) || max < min) { toast.error("Maximum must be greater than minimum"); return; }
+    setSavingSettings(true);
+    const { error } = await (supabase as any)
+      .from("system_settings")
+      .update({ min_withdrawal_amount: min, max_withdrawal_amount: max })
+      .eq("id", 1);
+    if (error) {
+      toast.error("Failed to save", { description: error.message });
+    } else {
+      toast.success("Withdrawal limits updated", { description: `Min: GHS ${min.toFixed(2)} · Max: GHS ${max.toFixed(2)}` });
+    }
+    setSavingSettings(false);
+  };
+
   const fetchWithdrawals = useCallback(async (silent = false) => {
     if (silent) setRefreshing(true); else setLoading(true);
 
@@ -160,7 +196,7 @@ const AdminWithdrawals = () => {
     setRefreshing(false);
   }, []);
 
-  useEffect(() => { fetchWithdrawals(); }, [fetchWithdrawals]);
+  useEffect(() => { fetchWithdrawals(); fetchSettings(); }, [fetchWithdrawals, fetchSettings]);
 
   // Reset page & selection when filters change
   useEffect(() => { setPage(0); }, [search, statusFilter, networkFilter, dateFrom, dateTo]);
@@ -353,6 +389,50 @@ const AdminWithdrawals = () => {
           <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? "animate-spin" : ""}`} />
           Refresh
         </Button>
+      </div>
+
+      {/* ── Withdrawal Limits Settings ── */}
+      <div className="bg-card border border-border rounded-xl overflow-hidden">
+        <button
+          type="button"
+          onClick={() => setShowSettings(s => !s)}
+          className="w-full flex items-center justify-between p-4 hover:bg-muted/30 transition-colors"
+        >
+          <div className="flex items-center gap-2">
+            <Settings2 className="w-4 h-4 text-primary" />
+            <span className="text-sm font-bold">Withdrawal Limits</span>
+            <span className="text-xs text-muted-foreground">
+              Min: GHS {parseFloat(minAmount || "25").toFixed(2)} · Max: GHS {parseFloat(maxAmount || "5000").toFixed(2)}
+            </span>
+          </div>
+          <span className="text-xs text-muted-foreground">{showSettings ? "▲" : "▼"}</span>
+        </button>
+        {showSettings && (
+          <div className="px-4 pb-4 border-t border-border pt-4 grid grid-cols-1 sm:grid-cols-3 gap-4 items-end">
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Min Withdrawal (GHS)</label>
+              <Input
+                type="number" min="1" step="1"
+                value={minAmount}
+                onChange={e => setMinAmount(e.target.value)}
+                className="bg-secondary"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Max Withdrawal (GHS)</label>
+              <Input
+                type="number" min="1" step="1"
+                value={maxAmount}
+                onChange={e => setMaxAmount(e.target.value)}
+                className="bg-secondary"
+              />
+            </div>
+            <Button onClick={saveSettings} disabled={savingSettings} className="gap-2">
+              {savingSettings ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+              Save Limits
+            </Button>
+          </div>
+        )}
       </div>
 
       {/* ── Stats cards ── */}
