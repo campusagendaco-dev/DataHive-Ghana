@@ -267,7 +267,7 @@ const AdminWithdrawals = () => {
     setConfirming(withdrawalId);
     const withdrawal = withdrawals.find(w => w.id === withdrawalId);
 
-    const { data, error } = await supabase.functions.invoke("admin-user-actions", {
+    const { data, error } = await supabase.functions.invoke("admin-actions-new", {
       body: { action: "confirm_withdrawal", withdrawal_id: withdrawalId },
       headers: { Authorization: `Bearer ${session?.access_token}` },
     });
@@ -295,7 +295,7 @@ const AdminWithdrawals = () => {
     setPayingPaystack(withdrawalId);
     const withdrawal = withdrawals.find(w => w.id === withdrawalId);
 
-    const { data, error } = await supabase.functions.invoke("admin-user-actions", {
+    const { data, error } = await supabase.functions.invoke("admin-actions-new", {
       body: { action: "paystack_payout", withdrawal_id: withdrawalId },
       headers: { Authorization: `Bearer ${session?.access_token}` },
     });
@@ -324,7 +324,7 @@ const AdminWithdrawals = () => {
     }
     setRejecting(true);
 
-    const { data, error } = await supabase.functions.invoke("admin-user-actions", {
+    const { data, error } = await supabase.functions.invoke("admin-actions-new", {
       body: { action: "reject_withdrawal", withdrawal_id: withdrawalId, reason: rejectReason.trim() },
       headers: { Authorization: `Bearer ${session?.access_token}` },
     });
@@ -355,7 +355,7 @@ const AdminWithdrawals = () => {
 
     let success = 0, failed = 0;
     for (const id of selectedIds) {
-      const { data, error } = await supabase.functions.invoke("admin-user-actions", {
+      const { data, error } = await supabase.functions.invoke("admin-actions-new", {
         body: { action: "confirm_withdrawal", withdrawal_id: id },
         headers: { Authorization: `Bearer ${session?.access_token}` },
       });

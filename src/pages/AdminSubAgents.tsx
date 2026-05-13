@@ -115,7 +115,7 @@ const AdminSubAgents = () => {
 
   const handleApprove = async (userId: string) => {
     setApprovingId(userId);
-    const { data, error } = await supabase.functions.invoke("admin-user-actions", {
+    const { data, error } = await supabase.functions.invoke("admin-actions-new", {
       body: { action: "approve_sub_agent", user_id: userId },
       headers: { Authorization: `Bearer ${session?.access_token}` },
     });
@@ -137,7 +137,7 @@ const AdminSubAgents = () => {
     }
     setToppingUp(agent.user_id);
 
-    const { data, error } = await supabase.functions.invoke("admin-user-actions", {
+    const { data, error } = await supabase.functions.invoke("admin-actions-new", {
       body: { action: "manual_topup", user_id: agent.user_id, amount },
       headers: { Authorization: `Bearer ${session?.access_token}` },
     });

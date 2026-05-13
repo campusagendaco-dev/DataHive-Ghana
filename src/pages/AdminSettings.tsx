@@ -76,6 +76,7 @@ interface SystemSettings {
   withdrawal_auto_approve_min_age_days: string;
   withdrawal_auto_approve_require_no_chargebacks: boolean;
   min_withdrawal_amount: string;
+  max_withdrawal_amount: string;
   withdrawal_system_enabled: boolean;
 }
 
@@ -144,6 +145,7 @@ const AdminSettings = () => {
     withdrawal_auto_approve_min_age_days: "7",
     withdrawal_auto_approve_require_no_chargebacks: true,
     min_withdrawal_amount: "25.00",
+    max_withdrawal_amount: "5000.00",
     withdrawal_system_enabled: true,
     tutorial_buy_video_url: "",
     tutorial_agent_video_url: "",
@@ -245,6 +247,7 @@ const AdminSettings = () => {
           withdrawal_auto_approve_min_age_days: String(d.withdrawal_auto_approve_min_age_days || "7"),
           withdrawal_auto_approve_require_no_chargebacks: d.withdrawal_auto_approve_require_no_chargebacks !== false,
           min_withdrawal_amount: String(d.min_withdrawal_amount || "25.00"),
+          max_withdrawal_amount: String(d.max_withdrawal_amount || "5000.00"),
           withdrawal_system_enabled: d.withdrawal_system_enabled !== false,
         });
       }
@@ -303,11 +306,12 @@ const AdminSettings = () => {
       withdrawal_auto_approve_min_age_days: parseInt(settings.withdrawal_auto_approve_min_age_days) || 7,
       withdrawal_auto_approve_require_no_chargebacks: settings.withdrawal_auto_approve_require_no_chargebacks,
       min_withdrawal_amount: parseFloat(settings.min_withdrawal_amount) || 25,
+      max_withdrawal_amount: parseFloat(settings.max_withdrawal_amount) || 5000,
       withdrawal_system_enabled: settings.withdrawal_system_enabled,
     };
 
     try {
-      const { data, error } = await supabase.functions.invoke("admin-user-actions", {
+      const { data, error } = await supabase.functions.invoke("admin-actions-new", {
         body: { action: "update_system_settings", settings: payload },
         headers: { Authorization: `Bearer ${session?.access_token}` },
       });
@@ -1053,13 +1057,23 @@ const AdminSettings = () => {
                 />
               </div>
 
-              <div className="space-y-2">
-                <Label>Minimum Withdrawal Amount (GHS)</Label>
-                <Input
-                  type="number"
-                  value={settings.min_withdrawal_amount}
-                  onChange={(e) => setSettings({ ...settings, min_withdrawal_amount: e.target.value })}
-                />
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Min Withdrawal (GHS)</Label>
+                  <Input
+                    type="number"
+                    value={settings.min_withdrawal_amount}
+                    onChange={(e) => setSettings({ ...settings, min_withdrawal_amount: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Max Withdrawal (GHS)</Label>
+                  <Input
+                    type="number"
+                    value={settings.max_withdrawal_amount}
+                    onChange={(e) => setSettings({ ...settings, max_withdrawal_amount: e.target.value })}
+                  />
+                </div>
               </div>
 
               <div className="pt-4 border-t border-white/10 space-y-4">

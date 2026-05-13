@@ -130,7 +130,7 @@ const AdminUsers = () => {
 
   const handleApproveAgent = async (row: UserRow) => {
     setRowAction(row.user_id, "approve-agent");
-    const { data, error } = await supabase.functions.invoke("admin-user-actions", {
+    const { data, error } = await supabase.functions.invoke("admin-actions-new", {
       body: { action: "approve_agent", user_id: row.user_id },
       headers: { Authorization: `Bearer ${session?.access_token}` },
     });
@@ -151,7 +151,7 @@ const AdminUsers = () => {
     }
     setRowAction(row.user_id, "approve-sub");
 
-    const { data, error } = await supabase.functions.invoke("admin-user-actions", {
+    const { data, error } = await supabase.functions.invoke("admin-actions-new", {
       body: { action: "approve_sub_agent", user_id: row.user_id },
       headers: { Authorization: `Bearer ${session?.access_token}` },
     });
@@ -173,7 +173,7 @@ const AdminUsers = () => {
       toast({ title: "Password too short", variant: "destructive" }); return;
     }
     setRowAction(row.user_id, "reset");
-    const { data, error } = await supabase.functions.invoke("admin-user-actions", {
+    const { data, error } = await supabase.functions.invoke("admin-actions-new", {
       body: { action: "reset_password", user_id: row.user_id, new_password: entered?.trim() || undefined },
       headers: { Authorization: `Bearer ${session?.access_token}` },
     });
@@ -193,7 +193,7 @@ const AdminUsers = () => {
     if (!window.confirm(`Impersonate ${row.email}? You will be logged in as this user.`)) return;
     setRowAction(row.user_id, "impersonate");
     try {
-      const { data, error } = await supabase.functions.invoke("admin-user-actions", {
+      const { data, error } = await supabase.functions.invoke("admin-actions-new", {
         body: { action: "impersonate_user", user_id: row.user_id },
         headers: { Authorization: `Bearer ${session?.access_token}` },
       });
@@ -259,7 +259,7 @@ const AdminUsers = () => {
     if (!selectedUsers.length) return;
     setBulkActionLoading(true);
     try {
-      const { error } = await supabase.functions.invoke("admin-user-actions", {
+      const { error } = await supabase.functions.invoke("admin-actions-new", {
         body: { action: "bulk_suspend_users", user_ids: selectedUsers, suspend }
       });
       if (error) throw error;
