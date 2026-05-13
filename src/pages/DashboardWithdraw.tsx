@@ -370,7 +370,7 @@ const DashboardWithdraw = () => {
                 }
                 setConfirmOpen(true);
               }}
-              disabled={!systemEnabled || withdrawing || biometricScanning || availableBalance < minWithdrawal || !profile?.momo_number || !profile?.momo_network}
+              disabled={!systemEnabled || withdrawing || biometricScanning}
               className="gap-2"
             >
               {biometricScanning
