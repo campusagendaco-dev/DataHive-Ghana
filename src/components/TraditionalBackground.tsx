@@ -46,8 +46,9 @@ export const TraditionalBackground = memo(({ className = "fixed inset-0 z-0 opac
     fetchSettings();
 
     // Subscribe to real-time background settings changes
+    const channelName = `background-settings-live-${Math.random().toString(36).slice(2)}`;
     const channel = supabase
-      .channel("background-settings-live")
+      .channel(channelName)
       .on(
         "postgres_changes" as any,
         { event: "UPDATE", schema: "public", table: "system_settings" },
@@ -66,7 +67,7 @@ export const TraditionalBackground = memo(({ className = "fixed inset-0 z-0 opac
       .subscribe();
 
     return () => {
-      void channel.unsubscribe();
+      supabase.removeChannel(channel);
     };
   }, []);
 

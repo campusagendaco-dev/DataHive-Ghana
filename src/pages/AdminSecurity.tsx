@@ -271,14 +271,15 @@ const AdminSecurity = () => {
 
   /* live realtime */
   useEffect(() => {
-    const ch = supabase.channel("sec-rt")
+    const channelName = `sec-rt-${Math.random().toString(36).slice(2)}`;
+    const ch = supabase.channel(channelName)
       .on("postgres_changes" as any, { event: "UPDATE", schema: "public", table: "profiles" }, (payload: any) => {
         const p = payload.new as RecentLogin;
         if (!p.last_seen_at) return;
         setRecentLogins(prev => [p, ...prev.filter(l => l.user_id !== p.user_id)].slice(0, 30));
         setLiveAlerts(prev => [{ id: Math.random().toString(36).slice(2), message: `${p.full_name || p.email || "Unknown"} logged in${p.last_ip ? ` from ${p.last_ip}` : ""}${p.last_location ? ` · ${p.last_location}` : ""}`, time: new Date() }, ...prev].slice(0, 15));
       }).subscribe();
-    return () => { ch.unsubscribe(); };
+    return () => { supabase.removeChannel(ch); };
   }, []);
 
   /* ── actions ────────────────────────────────────────────────────── */
