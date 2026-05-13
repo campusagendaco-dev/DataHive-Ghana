@@ -216,7 +216,7 @@ const DashboardOrders = () => {
     }
   }, [fetchOrders]);
 
-  // Auto-retry pending/paid orders every 30 s (max 10 attempts per order)
+  // Auto-retry pending/paid orders sequentially every 30 s (max 10 attempts per order)
   useEffect(() => {
     if (!user) return;
     const interval = setInterval(() => {
@@ -224,12 +224,24 @@ const DashboardOrders = () => {
         const stuck = current.filter(
           (o) => o.status === "pending" || o.status === "paid"
         );
-        for (const o of stuck) {
-          const attempts = retryCountRef.current[o.id] ?? 0;
-          if (attempts >= 10) continue;
-          retryCountRef.current[o.id] = attempts + 1;
-          invokePublicFunctionAsUser("verify-payment", { body: { reference: o.id } }).catch(() => {});
-        }
+        
+        // Process sequentially outside of the state updater to avoid 429 rate limits
+        const processStuck = async () => {
+          for (const o of stuck) {
+            const attempts = retryCountRef.current[o.id] ?? 0;
+            if (attempts >= 10) continue;
+            retryCountRef.current[o.id] = attempts + 1;
+            try {
+              await invokePublicFunctionAsUser("verify-payment", { body: { reference: o.id } });
+            } catch (e) {
+              console.error("Auto-retry error:", e);
+            }
+            // Wait 1 second between requests to prevent HTTP 429 Too Many Requests
+            await new Promise(resolve => setTimeout(resolve, 1000));
+          }
+        };
+        
+        processStuck();
         return current;
       });
     }, 30_000);

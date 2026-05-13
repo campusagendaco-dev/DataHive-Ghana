@@ -91,6 +91,26 @@ async function getAirtimeCredentials(supabaseAdmin: any): Promise<{ apiKey: stri
   return { apiKey, baseUrl: (baseUrl || "").replace(/\/+$/, "") };
 }
 
+async function triggerPushNotification(supabaseAdmin: any, payload: { user_id: string; title: string; body: string; url?: string; icon?: string }) {
+  try {
+    const url = `${Deno.env.get("SUPABASE_URL")}/functions/v1/send-push-notification`;
+    const response = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`,
+      },
+      body: JSON.stringify(payload),
+    });
+    if (!response.ok) {
+      const text = await response.text();
+      console.error("[Push] Trigger failed:", text);
+    }
+  } catch (e) {
+    console.error("[Push] Trigger error:", e);
+  }
+}
+
 function buildProviderUrls(baseUrl: string, endpoint: string = "purchase", handlerType?: string): string[] {
   const clean = baseUrl.trim().replace(/\/+$/, "");
   if (!clean) return [];
@@ -748,6 +768,9 @@ serve(async (req) => {
 
     // Standard Data/Airtime Fulfillment
     const activeProviders = await getActiveProviders(supabaseAdmin, currentOrderType === "airtime" ? "airtime" : "data");
+    const { data: sysSettings } = await supabaseAdmin.from("system_settings").select("auto_api_switch").eq("id", 1).maybeSingle();
+    const autoApiSwitch = sysSettings?.auto_api_switch !== false;
+
     const network = claimedOrder.network || metadata?.network || "";
     const customerPhone = claimedOrder.customer_phone || metadata?.customer_phone || "";
     const packageSize = claimedOrder.package_size || metadata?.package_size || "";
@@ -772,13 +795,18 @@ serve(async (req) => {
     let result: any = { ok: false, reason: "No providers" };
     let successfulProviderId = null;
 
-    const buildDataPayload = (provider: any) => {
+    const buildDataPayload = (provider: any, overrideNetKey?: string) => {
       const ht = provider.handler_type || "standard";
-      const netKey = (ht === "datamart" || ht === "spendless" || ht === "datahub")
+      const defaultNetKey = (ht === "datamart" || ht === "spendless" || ht === "datahub")
         ? (() => { const n = network.toUpperCase(); if (n === "MTN") return "YELLO"; if (n === "TELECEL") return "TELECEL"; return "AT_PREMIUM"; })()
         : mapDataNetworkKey(network);
+      
+      const netKey = overrideNetKey || defaultNetKey;
       if (ht === "datamart") return { phoneNumber: recipient, network: netKey, planId: packageSize, plan: packageSize, bundle: packageSize, capacity: String(parseCapacity(packageSize)), orderReference: targetReference, gateway: "wallet", reference: targetReference };
       if (ht === "datahub" || ht === "spendless") return { networkKey: netKey, recipient, capacity: String(parseCapacity(packageSize)), reference: targetReference };
+      
+      // Pass override network to standard request body if provided
+      if (overrideNetKey) return { ...requestBody, networkKey: overrideNetKey };
       return requestBody;
     };
 
@@ -786,6 +814,18 @@ serve(async (req) => {
     for (const provider of activeProviders) {
       const providerCallStart = Date.now();
       result = await callProviderApi(provider, buildDataPayload(provider), "purchase");
+      
+      // Auto-fallback for AirtelTigo: If AT_PREMIUM fails with "Bundle not available", try AT_BIGTIME
+      if (!result.ok && /bundle not available|invalid bundle/i.test(result.reason) && (network.toUpperCase().includes("AIRTEL") || network.toUpperCase() === "AT")) {
+        const ht = provider.handler_type || "standard";
+        if (ht === "datamart" || ht === "spendless" || ht === "datahub" || ht === "bossu") {
+          console.log(`[verify-payment] Retrying ${provider.name} with AT_BIGTIME/AT for AirtelTigo bundle...`);
+          // Datamart/Datahub use AT_BIGTIME. Bossu uses AT.
+          const fallbackNetKey = (ht === "bossu" || ht === "standard") ? "AT" : "AT_BIGTIME";
+          result = await callProviderApi(provider, buildDataPayload(provider, fallbackNetKey), "purchase");
+        }
+      }
+
       const providerDuration = Date.now() - providerCallStart;
 
       if (result.ok) {
@@ -798,7 +838,7 @@ serve(async (req) => {
         // Increment consecutive failures
         const { data: prov } = await supabaseAdmin.from("providers").select("consecutive_failures").eq("id", provider.id).maybeSingle();
         const newFailures = ((prov as any)?.consecutive_failures || 0) + 1;
-        const autoDisable = newFailures >= 5;
+        const autoDisable = newFailures >= 5 && autoApiSwitch;
         await supabaseAdmin.from("providers").update({
           consecutive_failures: newFailures,
           ...(autoDisable ? { is_active: false, disabled_reason: `Auto-disabled after ${newFailures} consecutive failures` } : {}),
@@ -818,6 +858,12 @@ serve(async (req) => {
             })));
           }
         }
+        
+        if (!autoApiSwitch) {
+          console.log(`[verify-payment] Auto API switch is disabled. Not failing over from ${provider.name}.`);
+          break;
+        }
+
         // Continue to next provider (failover)
         console.log(`[verify-payment] Failing over from ${provider.name} to next provider...`);
       }
@@ -832,8 +878,20 @@ serve(async (req) => {
       if (targetStatus === "fulfilled") {
         try {
           await supabaseAdmin.rpc("credit_order_profits", { p_order_id: targetReference });
+          
+          // Trigger Push Notification for Agent
+          if (claimedOrder.agent_id && claimedOrder.agent_id !== '00000000-0000-0000-0000-000000000000') {
+            const profit = Number(claimedOrder.profit || 0).toFixed(2);
+            await triggerPushNotification(supabaseAdmin, {
+              user_id: claimedOrder.agent_id,
+              title: "🎉 New payment for Data selling",
+              body: `You just received GHS ${profit} from your recent data sale.`,
+              url: "/dashboard/orders",
+              icon: "https://lsocdjpflecduumopijn.supabase.co/storage/v1/object/public/assets/notification-icon.png"
+            });
+          }
         } catch (e) {
-          console.error("[verify-payment] Profit credit failed:", e);
+          console.error("[verify-payment] Profit credit or notification failed:", e);
         }
       }
       log(supabaseAdmin, { level: "info", source: "verify-payment", event: "order.fulfilled", message: `Order fulfilled — provider_order_id: ${result.id}`, order_id: targetReference, agent_id: claimedOrder.agent_id, provider_id: successfulProviderId, data: { provider_order_id: result.id, network, package_size: packageSize, amount: claimedOrder.amount } });

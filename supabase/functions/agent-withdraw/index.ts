@@ -23,6 +23,26 @@ async function sendWithdrawalSms(supabaseAdmin: any, userId: string, amount: num
   }
 }
 
+async function triggerPushNotification(supabaseAdmin: any, payload: { user_id: string; title: string; body: string; url?: string; icon?: string }) {
+  try {
+    const url = `${Deno.env.get("SUPABASE_URL")}/functions/v1/send-push-notification`;
+    const response = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`,
+      },
+      body: JSON.stringify(payload),
+    });
+    if (!response.ok) {
+      const text = await response.text();
+      console.error("[Push Withdraw] Trigger failed:", text);
+    }
+  } catch (e) {
+    console.error("[Push Withdraw] Trigger error:", e);
+  }
+}
+
 serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -106,6 +126,15 @@ serve(async (req: Request) => {
     }
 
     await sendWithdrawalSms(supabaseAdmin, agentId, amount);
+
+    // Trigger Push Notification for Withdrawal Request
+    await triggerPushNotification(supabaseAdmin, {
+      user_id: agentId,
+      title: "💸 Withdrawal Requested",
+      body: `Your request for GHS ${Number(amount).toFixed(2)} has been received and is being processed.`,
+      url: "/dashboard/withdrawals",
+      icon: "https://lsocdjpflecduumopijn.supabase.co/storage/v1/object/public/assets/notification-icon.png"
+    });
 
     return new Response(JSON.stringify({ success: true, withdrawal_id: result.withdrawal_id }), {
       status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },

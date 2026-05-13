@@ -240,6 +240,26 @@ async function sendWhatsAppFulfillmentNotification(to: string, type: string, net
   }
 }
 
+async function triggerPushNotification(supabaseAdmin: any, payload: { user_id: string; title: string; body: string; url?: string; icon?: string }) {
+  try {
+    const url = `${Deno.env.get("SUPABASE_URL")}/functions/v1/send-push-notification`;
+    const response = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`,
+      },
+      body: JSON.stringify(payload),
+    });
+    if (!response.ok) {
+      const text = await response.text();
+      console.error("[Push Webhook] Trigger failed:", text);
+    }
+  } catch (e) {
+    console.error("[Push Webhook] Trigger error:", e);
+  }
+}
+
 function getProviderFailureReason(status: number, body: string, contentType: string | null): string {
   let parsedMessage: string | null = null;
 
@@ -549,6 +569,15 @@ serve(async (req) => {
                 console.error("SMS_ERROR on withdrawal complete:", smsErr);
               }
             }
+
+            // Trigger Push Notification for Withdrawal Success
+            await triggerPushNotification(supabaseAdmin, {
+              user_id: withdrawal.agent_id,
+              title: "✅ Withdrawal Successful",
+              body: `Your withdrawal of GHS ${Number(withdrawal.amount).toFixed(2)} has been sent to your MoMo.`,
+              url: "/dashboard/withdrawals",
+              icon: "https://lsocdjpflecduumopijn.supabase.co/storage/v1/object/public/assets/notification-icon.png"
+            });
           }
         } else if (withdrawal) {
           console.warn("transfer.success received but withdrawal already in status:", withdrawal.status);
@@ -1056,6 +1085,15 @@ serve(async (req) => {
         
         // Notify API client about wallet funding
         await notifyWalletCredit(supabaseAdmin, order.agent_id, order.amount, walletType);
+
+        // Trigger Push Notification for Wallet Top-up
+        await triggerPushNotification(supabaseAdmin, {
+          user_id: order.agent_id,
+          title: "💰 Wallet Top-up Successful",
+          body: `You just received GHS ${Number(order.amount).toFixed(2)} in your ${walletType === 'api' ? 'API' : 'main'} wallet.`,
+          url: "/dashboard",
+          icon: "https://lsocdjpflecduumopijn.supabase.co/storage/v1/object/public/assets/notification-icon.png"
+        });
       }
       return new Response(JSON.stringify({ received: true, fulfilled: true }), {
         status: 200,
@@ -1210,6 +1248,18 @@ serve(async (req) => {
         if (customerPhone) await sendPaymentSms(supabaseAdmin, customerPhone, "payment_success");
         if (metadata.channel === "whatsapp" && metadata.wa_from) {
           await sendWhatsAppFulfillmentNotification(String(metadata.wa_from), "airtime", network, `GH₵${airtimeAmount}`, customerPhone);
+        }
+
+        // Trigger Push Notification for Agent Profit (Airtime)
+        if (existingOrder?.agent_id && (existingOrder.profit > 0)) {
+          const profit = Number(existingOrder.profit).toFixed(2);
+          await triggerPushNotification(supabaseAdmin, {
+            user_id: existingOrder.agent_id,
+            title: "🎉 New payment for Airtime",
+            body: `You just received GHS ${profit} profit from your airtime sale.`,
+            url: "/dashboard/orders",
+            icon: "https://lsocdjpflecduumopijn.supabase.co/storage/v1/object/public/assets/notification-icon.png"
+          });
         }
         return new Response(JSON.stringify({ received: true, fulfilled: true }), {
           status: 200,

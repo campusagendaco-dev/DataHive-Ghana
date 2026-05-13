@@ -125,7 +125,7 @@ serve(async (req: Request) => {
       });
     }
 
-    const minAllowedAmount = agentProfile?.is_sub_agent ? adminBase : resolvedCostPrice;
+    const minAllowedAmount = adminBase > 0 ? adminBase : resolvedCostPrice;
     if (amountNum < minAllowedAmount && minAllowedAmount > 0) {
       console.error(`[SECURITY] Blocked underpriced order from user ${user.id}. Received: ${amountNum}, Floor: ${minAllowedAmount}`);
       return new Response(JSON.stringify({ error: "Transaction rejected due to package price discrepancy." }), {
