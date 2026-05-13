@@ -137,6 +137,12 @@ const DashboardWithdraw = () => {
       return;
     }
 
+    if (numAmount > maxWithdrawal) {
+      toast.error(`Maximum withdrawal is GHS ${maxWithdrawal.toFixed(2)}`);
+      setWithdrawing(false);
+      return;
+    }
+
     const fee = parseFloat((numAmount * WITHDRAWAL_FEE_RATE).toFixed(2));
     const net = numAmount - fee;
 

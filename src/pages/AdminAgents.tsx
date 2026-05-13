@@ -184,7 +184,7 @@ const AdminAgents = () => {
 
   const handleApprove = async (userId: string) => {
     setApprovingId(userId);
-    const { data, error } = await supabase.functions.invoke("admin-actions-new", {
+    const { data, error } = await supabase.functions.invoke("admin-actions-v3", {
       body: { action: "approve_agent", user_id: userId },
       headers: { Authorization: `Bearer ${session?.access_token}` },
     });
@@ -201,7 +201,7 @@ const AdminAgents = () => {
 
   const handleRevoke = async (userId: string) => {
     setApprovingId(userId);
-    const { data, error } = await supabase.functions.invoke("admin-actions-new", {
+    const { data, error } = await supabase.functions.invoke("admin-actions-v3", {
       body: { action: "revoke_agent", user_id: userId },
       headers: { Authorization: `Bearer ${session?.access_token}` },
     });
@@ -218,7 +218,7 @@ const AdminAgents = () => {
 
   const handleForceActivate = async (agentId: string, name: string) => {
     setForcingId(agentId);
-    const { data, error } = await supabase.functions.invoke("admin-actions-new", {
+    const { data, error } = await supabase.functions.invoke("admin-actions-v3", {
       body: { action: "approve_agent", user_id: agentId },
       headers: { Authorization: `Bearer ${session?.access_token}` },
     });
@@ -243,7 +243,7 @@ const AdminAgents = () => {
     }
     setToppingUp(agent.user_id);
 
-    const { data, error } = await supabase.functions.invoke("admin-actions-new", {
+    const { data, error } = await supabase.functions.invoke("admin-actions-v3", {
       body: { action: "manual_topup", user_id: agent.user_id, amount },
       headers: { Authorization: `Bearer ${session?.access_token}` },
     });
@@ -274,7 +274,7 @@ const AdminAgents = () => {
     }
     setUpdatingLimit(agentId);
 
-    const { data, error } = await supabase.functions.invoke("admin-actions-new", {
+    const { data, error } = await supabase.functions.invoke("admin-actions-v3", {
       body: { action: "update_credit_limit", user_id: agentId, credit_limit: limit },
       headers: { Authorization: `Bearer ${session?.access_token}` },
     });
@@ -295,7 +295,7 @@ const AdminAgents = () => {
     }
     
     setForcingEmail(true);
-    const { data, error } = await supabase.functions.invoke("admin-actions-new", {
+    const { data, error } = await supabase.functions.invoke("admin-actions-v3", {
       body: { action: "approve_by_email", email: forceEmail.trim() },
       headers: { Authorization: `Bearer ${session?.access_token}` },
     });

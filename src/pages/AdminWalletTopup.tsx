@@ -43,7 +43,7 @@ const AdminWalletTopup = () => {
     setSearchResults([]);
     
     try {
-      const { data, error } = await supabase.functions.invoke("admin-actions-new", {
+      const { data, error } = await supabase.functions.invoke("admin-actions-v3", {
         body: { action: "find_user", search: term },
       });
 
@@ -91,7 +91,7 @@ const AdminWalletTopup = () => {
 
     setCrediting(true);
     const action = walletType === "api" ? "manual_api_topup" : "manual_topup";
-    const { data, error } = await supabase.functions.invoke("admin-actions-new", {
+    const { data, error } = await supabase.functions.invoke("admin-actions-v3", {
       body: { action, user_id: agent.user_id, amount },
     });
 

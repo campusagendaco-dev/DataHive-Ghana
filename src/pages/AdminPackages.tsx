@@ -94,7 +94,7 @@ const AdminPackages = () => {
       }
     }
 
-    const { data, error } = await supabase.functions.invoke("admin-actions-new", {
+    const { data, error } = await supabase.functions.invoke("admin-actions-v3", {
       body: { action: "save_package_settings", packages: upserts },
       headers: { Authorization: `Bearer ${session.access_token}` },
     });
@@ -169,7 +169,7 @@ const AdminPackages = () => {
     }));
 
     if (upserts.length > 0) {
-      const { data, error } = await supabase.functions.invoke("admin-actions-new", {
+      const { data, error } = await supabase.functions.invoke("admin-actions-v3", {
         body: { action: "save_package_settings", packages: upserts },
         headers: { Authorization: `Bearer ${session.access_token}` },
       });

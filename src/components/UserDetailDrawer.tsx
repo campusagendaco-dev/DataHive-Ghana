@@ -136,7 +136,7 @@ const UserDetailDrawer = ({ user, onClose }: Props) => {
     if (!user) return;
     setPromoting(true);
     try {
-      const { data: res, error } = await supabase.functions.invoke("admin-actions-new", {
+      const { data: res, error } = await supabase.functions.invoke("admin-actions-v3", {
         body: { action: "approve_agent", user_id: user.user_id },
         headers: { Authorization: `Bearer ${session?.access_token}` },
       });
@@ -163,7 +163,7 @@ const UserDetailDrawer = ({ user, onClose }: Props) => {
     setTopupLoading(true);
     try {
       const action = walletType === "api" ? "manual_api_topup" : "manual_topup";
-      const { data: res, error } = await supabase.functions.invoke("admin-actions-new", {
+      const { data: res, error } = await supabase.functions.invoke("admin-actions-v3", {
         body: { action: action, user_id: user.user_id, amount: amount },
       });
       if (error || res?.error) throw new Error(res?.error || error?.message);
@@ -210,7 +210,7 @@ const UserDetailDrawer = ({ user, onClose }: Props) => {
 
     setMfaLoading(true);
     try {
-      const { data: res, error } = await supabase.functions.invoke("admin-actions-new", {
+      const { data: res, error } = await supabase.functions.invoke("admin-actions-v3", {
         body: { action: "reset_user_mfa", user_id: user.user_id },
         headers: { Authorization: `Bearer ${session?.access_token}` },
       });
@@ -248,7 +248,7 @@ const UserDetailDrawer = ({ user, onClose }: Props) => {
     }
     setPwLoading(true);
     try {
-      const { data: res, error } = await supabase.functions.invoke("admin-actions-new", {
+      const { data: res, error } = await supabase.functions.invoke("admin-actions-v3", {
         body: { action: "reset_password", user_id: user.user_id, new_password: entered?.trim() || undefined },
         headers: { Authorization: `Bearer ${session?.access_token}` },
       });
