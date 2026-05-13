@@ -670,6 +670,7 @@ const AdminSettings = () => {
                     { id: "cult1", label: "Luxury Kente Cloth", url: "/assets/backgrounds/bg_ghana_kente.png" },
                     { id: "cult2", label: "Gold Embossed Adinkra", url: "/assets/backgrounds/bg_ghana_gold_adinkra.png" },
                     { id: "cult3", label: "Ghanaian Warm Earth", url: "/assets/backgrounds/bg_ghana_warm_earth.png" },
+                    { id: "cult4", label: "3D Gold Adinkra", url: "/assets/backgrounds/bg_ghana_3d.png" },
                     { id: "rec1", label: "Abstract Data Flow", url: "/assets/backgrounds/bg_data_flow.png" },
                     { id: "rec2", label: "Frosted Mesh Gradient", url: "/assets/backgrounds/bg_mesh_gradient.png" },
                     { id: "rec3", label: "Premium Gold Ribbons", url: "/assets/backgrounds/bg_gold_ribbons.png" },
