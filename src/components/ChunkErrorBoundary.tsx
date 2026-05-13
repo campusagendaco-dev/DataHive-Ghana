@@ -15,15 +15,36 @@ export class ChunkErrorBoundary extends Component<Props, State> {
   }
 
   componentDidCatch(error: Error) {
+    const msg = error?.message?.toLowerCase() || "";
     const isChunkError =
-      error?.message?.includes("Failed to fetch dynamically imported module") ||
-      error?.message?.includes("Importing a module script failed") ||
+      msg.includes("failed to fetch dynamically imported module") ||
+      msg.includes("expected a javascript-or-wasm module script") ||
+      msg.includes("importing a module script failed") ||
+      msg.includes("error loading dynamically imported module") ||
       error?.name === "ChunkLoadError";
 
-    if (isChunkError && !this.state.retried) {
-      this.setState({ retried: true });
-      // Hard reload to pick up fresh chunks
-      window.location.reload();
+    if (isChunkError) {
+      const retryKey = "chunk_boundary_retry_timestamp";
+      const lastRetry = sessionStorage.getItem(retryKey);
+      const now = Date.now();
+
+      // Attempt to recover automatically if we haven't retried in the last 20 seconds
+      if (!lastRetry || now - parseInt(lastRetry, 10) > 20000) {
+        sessionStorage.setItem(retryKey, now.toString());
+        
+        // Use the enhanced global recovery system to unregister SW, purge cache & reload
+        if (typeof (window as any).forceAssetRecovery === "function") {
+          (window as any).forceAssetRecovery(`ErrorBoundaryCatch: ${error.message}`);
+        } else {
+          // Fallback to simple reload if main.tsx hasn't exposed the helper
+          window.location.reload();
+        }
+        return;
+      }
+
+      // Persistent failures within 20 seconds — display user-facing fallback state
+      console.error("Persistent chunk loading error detected. Showing safety fallback screen.", error);
+      this.setState({ hasError: true });
     }
   }
 

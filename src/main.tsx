@@ -2,33 +2,76 @@ import { createRoot } from "react-dom/client";
 import App from "./App.tsx";
 import "./index.css";
 
-// Global Asset Recover: Intercepts dynamic JS module import failures (typical after new app deployments)
-// and seamlessly triggers an automatic page refresh to fetch the newest production assets.
+// Global Asset Recovery: Intercepts dynamic JS module import failures (typical after new app deployments or SW cache corruption)
+// and seamlessly triggers an automatic hard-refresh to fetch the newest production assets, while clearing problematic service workers.
+const forceAssetRecovery = async (sourceMsg?: string) => {
+  console.warn("Global Asset Recovery triggered:", sourceMsg);
+  
+  const lastReload = localStorage.getItem("asset-failure-reload");
+  const now = Date.now();
+  
+  // Debounce reload to prevent infinite reload loops (minimum 15 seconds interval)
+  if (!lastReload || now - parseInt(lastReload, 10) > 15000) {
+    localStorage.setItem("asset-failure-reload", now.toString());
+    
+    try {
+      // 1. Unregister service workers to wipe out stale registrations
+      if ("serviceWorker" in navigator) {
+        const registrations = await navigator.serviceWorker.getRegistrations();
+        for (const registration of registrations) {
+          await registration.unregister();
+          console.log("Successfully unregistered stale ServiceWorker:", registration.scope);
+        }
+      }
+      // 2. Force clear all browser caches to purge any old versions of index.html/assets
+      if ("caches" in window) {
+        const cacheKeys = await caches.keys();
+        await Promise.all(cacheKeys.map(key => caches.delete(key)));
+        console.log("Cleared all cache storages.");
+      }
+    } catch (err) {
+      console.error("Asset recovery cleanup failed:", err);
+    }
+    
+    // 3. Reload the page cleanly
+    window.location.reload();
+  }
+};
+
+// Expose globally so React Error Boundaries can leverage the exact same logic
+(window as any).forceAssetRecovery = forceAssetRecovery;
+
 window.addEventListener("error", (e) => {
   const msg = e.message?.toLowerCase() || "";
+  const target = e.target as HTMLElement;
+  const isScriptError = target && target.tagName === "SCRIPT";
+  
   if (
     msg.includes("failed to fetch dynamically imported module") ||
-    msg.includes("expected a javascript-or-wasm module script")
+    msg.includes("expected a javascript-or-wasm module script") ||
+    msg.includes("error loading dynamically imported module") ||
+    isScriptError
   ) {
-    const lastReload = localStorage.getItem("asset-failure-reload");
-    const now = Date.now();
-    if (!lastReload || now - parseInt(lastReload) > 15000) { // Debounce 15 seconds
-      localStorage.setItem("asset-failure-reload", now.toString());
-      window.location.reload();
+    // Only trigger for modules/scripts to avoid unrelated UI errors
+    if (msg.includes("module") || isScriptError) {
+      forceAssetRecovery(`ErrorEvent: ${msg || "Script failed to load"}`);
     }
   }
 }, true);
 
 window.addEventListener("unhandledrejection", (e) => {
   const msg = e.reason?.message?.toLowerCase() || "";
-  if (msg.includes("failed to fetch dynamically imported module")) {
-    const lastReload = localStorage.getItem("asset-failure-reload");
-    const now = Date.now();
-    if (!lastReload || now - parseInt(lastReload) > 15000) {
-      localStorage.setItem("asset-failure-reload", now.toString());
-      window.location.reload();
-    }
+  if (
+    msg.includes("failed to fetch dynamically imported module") ||
+    msg.includes("expected a javascript-or-wasm module script")
+  ) {
+    forceAssetRecovery(`UnhandledRejection: ${msg}`);
   }
+});
+
+// Catch Vite's explicit preload failure event
+window.addEventListener("vite:preloadError", (e: any) => {
+  forceAssetRecovery(`VitePreloadError: Failed to load ${e.payload || "chunk"}`);
 });
 
 createRoot(document.getElementById("root")!).render(<App />);
