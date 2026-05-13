@@ -95,7 +95,7 @@ export const TraditionalBackground = memo(({ className = "fixed inset-0 z-0 opac
 
   if (customBgUrl) {
     return (
-      <div className={`${className} ${baseClasses} relative w-full h-full overflow-hidden`}>
+      <div className={`${className} ${baseClasses}`}>
         {isSlideshow ? (
           SLIDESHOW_BACKGROUNDS.map((bg, idx) => {
             const isActive = idx === bgIndex;
