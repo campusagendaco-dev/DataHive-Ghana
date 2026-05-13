@@ -295,7 +295,7 @@ const AdminWithdrawals = () => {
     setPayingPaystack(withdrawalId);
     const withdrawal = withdrawals.find(w => w.id === withdrawalId);
 
-    const { data, error } = await supabase.functions.invoke("admin-actions-v3", {
+    const { data, error } = await supabase.functions.invoke(`admin-actions-v3?t=${Date.now()}`, {
       body: { action: "paystack_payout", withdrawal_id: withdrawalId },
       headers: { Authorization: `Bearer ${session?.access_token}` },
     });

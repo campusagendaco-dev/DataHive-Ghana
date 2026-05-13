@@ -311,7 +311,7 @@ const AdminSettings = () => {
     };
 
     try {
-      const { data, error } = await supabase.functions.invoke("admin-actions-v3", {
+      const { data, error } = await supabase.functions.invoke(`admin-actions-v3?t=${Date.now()}`, {
         body: { action: "update_system_settings", settings: payload },
         headers: { Authorization: `Bearer ${session?.access_token}` },
       });
