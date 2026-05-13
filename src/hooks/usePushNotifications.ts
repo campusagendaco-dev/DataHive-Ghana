@@ -27,11 +27,24 @@ export function usePushNotifications() {
   const [permissionState, setPermissionState] = useState<NotificationPermission | "unsupported">("default");
 
   useEffect(() => {
-    const isSupported = "serviceWorker" in navigator && "PushManager" in window && "showNotification" in ServiceWorkerRegistration.prototype;
-    setSupported(isSupported);
-    if (isSupported) {
-      setPermissionState(Notification.permission);
-    } else {
+    try {
+      const isSupported = 
+        typeof window !== "undefined" &&
+        "serviceWorker" in navigator && 
+        "PushManager" in window && 
+        "Notification" in window &&
+        typeof ServiceWorkerRegistration !== "undefined" &&
+        "showNotification" in ServiceWorkerRegistration.prototype;
+
+      setSupported(isSupported);
+      if (isSupported) {
+        setPermissionState(Notification.permission);
+      } else {
+        setPermissionState("unsupported");
+      }
+    } catch (err) {
+      console.warn("[Push] Detection failure — marking unsupported instead of crashing:", err);
+      setSupported(false);
       setPermissionState("unsupported");
     }
   }, []);
@@ -97,10 +110,38 @@ export function usePushNotifications() {
     }
   };
 
+  const unsubscribeUser = async () => {
+    if (!supported || !user) return false;
+    setLoading(true);
+    try {
+      const registration = await navigator.serviceWorker.ready;
+      const subscription = await registration.pushManager.getSubscription();
+      
+      if (subscription) {
+        await subscription.unsubscribe();
+        // Delete matching endpoint subscription from Supabase
+        await supabase
+          .from("push_subscriptions" as any)
+          .delete()
+          .eq("user_id", user.id)
+          .eq("endpoint", subscription.endpoint);
+      }
+
+      setPermissionState(Notification.permission);
+      setLoading(false);
+      return true;
+    } catch (err) {
+      console.error("[Push] Unsubscribe failure:", err);
+      setLoading(false);
+      return false;
+    }
+  };
+
   return {
     supported,
     loading,
     permissionState,
     subscribeUser,
+    unsubscribeUser,
   };
 }
