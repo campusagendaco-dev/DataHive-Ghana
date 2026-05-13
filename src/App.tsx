@@ -237,7 +237,8 @@ const AppContent = () => {
   // Minimum splash time — guarantees the loading animation is visible for at least 2 s
   const [splashReady, setSplashReady] = useState(false);
   useEffect(() => {
-    const t = setTimeout(() => setSplashReady(true), 2000);
+    // Short splash — just enough for auth to resolve, not a blank-screen risk
+    const t = setTimeout(() => setSplashReady(true), 400);
     return () => clearTimeout(t);
   }, []);
 
@@ -245,8 +246,11 @@ const AppContent = () => {
     let mounted = true;
 
     const loadMaintenance = async () => {
-      // Prevent polling errors when offline
-      if (!window.navigator.onLine) return;
+      // Prevent polling errors when offline — but still unblock the loading state
+      if (!window.navigator.onLine) {
+        if (mounted) setMaintenanceLoading(false);
+        return;
+      }
 
       try {
         const maintenanceResult = await Promise.race([
@@ -285,7 +289,7 @@ const AppContent = () => {
     loadMaintenance();
     const firstLoadSafetyTimeout = window.setTimeout(() => {
       if (mounted) setMaintenanceLoading(false);
-    }, 7000);
+    }, 4000);
 
     const interval = window.setInterval(loadMaintenance, 30000);
 
