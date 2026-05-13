@@ -8,9 +8,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { User, Mail, Phone, Shield, Camera, Lock, Eye, EyeOff, Fingerprint, Smartphone, Trash2, Key, Loader2, Plus, AlertTriangle } from "lucide-react";
+import { User, Mail, Phone, Shield, Camera, Lock, Eye, EyeOff, Fingerprint, Smartphone, Trash2, Key, Loader2, Plus, AlertTriangle, Bell } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useWebAuthn } from "@/hooks/useWebAuthn";
+import { usePushNotifications } from "@/hooks/usePushNotifications";
 import { toast } from "sonner";
 import MfaSetupWidget from "@/components/MfaSetupWidget";
 
@@ -30,6 +31,7 @@ const DashboardAccountSettings = () => {
   const [isAvatarPickerOpen, setIsAvatarPickerOpen] = useState(false);
 
   const { isSupported, supportReason, credentials, loadingCredentials, register, deleteCredential } = useWebAuthn();
+  const { supported: pushSupported, permissionState, subscribeUser, unsubscribeUser, loading: subLoading } = usePushNotifications();
   const [registering, setRegistering] = useState(false);
   const [deviceName, setDeviceName] = useState("My Device");
   const [savingPin, setSavingPin] = useState(false);
@@ -514,6 +516,84 @@ const DashboardAccountSettings = () => {
           <div id="mfa-setup-section" className="scroll-mt-20">
             <MfaSetupWidget />
           </div>
+
+          {/* ── Push Notifications ── */}
+          <Card className="border-none bg-card shadow-sm mt-8">
+            <CardHeader>
+              <CardTitle className="text-lg font-bold flex items-center gap-2">
+                <Bell className="w-5 h-5 text-indigo-400 animate-pulse" />
+                Mobile Push Notifications
+              </CardTitle>
+              <CardDescription>
+                Enable lock-screen and taskbar alerts to stay updated in real-time, even when SwiftData is closed.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {!pushSupported && (
+                <div className="rounded-xl bg-amber-500/10 border border-amber-500/20 p-4 text-sm text-amber-300 flex items-start gap-3">
+                  <AlertTriangle className="w-5 h-5 shrink-0 mt-0.5" />
+                  <p>Your current browser or device does not support background push notifications. On iOS, make sure to "Add to Home Screen" first.</p>
+                </div>
+              )}
+
+              {pushSupported && (
+                <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-4 rounded-xl bg-secondary/50 border border-white/5">
+                  <div className="space-y-1 flex-1">
+                    <div className="flex items-center gap-2">
+                      <p className="text-sm font-bold">Status:</p>
+                      {permissionState === "granted" ? (
+                        <span className="text-[10px] font-black text-emerald-400 uppercase tracking-widest bg-emerald-500/10 px-2.5 py-0.5 rounded-full">Subscribed</span>
+                      ) : permissionState === "denied" ? (
+                        <span className="text-[10px] font-black text-rose-400 uppercase tracking-widest bg-rose-500/10 px-2.5 py-0.5 rounded-full">Blocked</span>
+                      ) : (
+                        <span className="text-[10px] font-black text-amber-400 uppercase tracking-widest bg-amber-500/10 px-2.5 py-0.5 rounded-full">Not Configured</span>
+                      )}
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {permissionState === "granted" 
+                        ? "This device is actively listening for lock-screen sales and commission alerts!"
+                        : "Tap enable to subscribe this device to encrypted server signals."}
+                    </p>
+                  </div>
+
+                  <div className="shrink-0 flex items-center gap-2">
+                    {permissionState === "granted" ? (
+                      <Button
+                        type="button"
+                        onClick={async () => {
+                          await unsubscribeUser();
+                          toast.success("Device unsubscribed from notifications.");
+                        }}
+                        disabled={subLoading}
+                        variant="destructive"
+                        className="h-10 px-5 rounded-xl font-bold text-xs gap-2 shrink-0"
+                      >
+                        Disable Alerts
+                      </Button>
+                    ) : (
+                      <Button
+                        type="button"
+                        onClick={async () => {
+                          const ok = await subscribeUser();
+                          if (ok) toast.success("Push notifications activated successfully!");
+                        }}
+                        disabled={subLoading || permissionState === "denied"}
+                        className="h-10 px-6 bg-indigo-500 hover:bg-indigo-600 text-white rounded-xl font-bold shadow-lg shadow-indigo-500/15 gap-2 shrink-0"
+                      >
+                        {subLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Bell className="w-4 h-4" />}
+                        {permissionState === "denied" ? "Access Blocked" : "Enable Notifications"}
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              )}
+              {pushSupported && permissionState === "denied" && (
+                <p className="text-[10px] text-rose-400 font-medium bg-rose-500/5 border border-rose-500/10 p-2.5 rounded-lg">
+                  ⚠️ Notice: You have previously blocked notifications. To enable them, tap the 🔒 lock icon in your browser's URL bar and toggle notifications to "Allow".
+                </p>
+              )}
+            </CardContent>
+          </Card>
 
           {/* ── Transaction PIN ── */}
           <Card className="border-none bg-card shadow-sm mt-8">
