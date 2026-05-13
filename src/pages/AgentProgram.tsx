@@ -38,7 +38,7 @@ const AgentProgram = () => {
 
   useEffect(() => {
     supabase
-      .from("system_settings")
+      .from("public_system_settings")
       .select("agent_activation_fee, free_agent_promo_enabled, free_agent_promo_limit, free_agent_promo_claimed")
       .eq("id", 1)
       .maybeSingle()
