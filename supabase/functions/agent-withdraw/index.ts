@@ -60,8 +60,8 @@ serve(async (req: Request) => {
     const agentId = user.id;
     const { amount } = await req.json();
 
-    if (!amount || amount < 25) {
-      return new Response(JSON.stringify({ error: "Minimum withdrawal amount is GHS 25.00" }), {
+    if (!amount || Number(amount) <= 0) {
+      return new Response(JSON.stringify({ error: "Invalid withdrawal amount" }), {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
