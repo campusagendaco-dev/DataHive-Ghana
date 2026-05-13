@@ -59,6 +59,15 @@ const AdminPromotions = () => {
     free_data_max_claims: 100,
     free_data_claims_count: 0,
   });
+  
+  // Free agent promo campaign state
+  const [freeAgentPromo, setFreeAgentPromo] = useState({
+    free_agent_promo_enabled: false,
+    free_agent_promo_limit: 10,
+    free_agent_promo_claimed: 0,
+  });
+  const [savingFreeAgentPromo, setSavingFreeAgentPromo] = useState(false);
+
   const [freeDataMissing, setFreeDataMissing] = useState(false);
   const [savingFreeData, setSavingFreeData] = useState(false);
   const [claimCount, setClaimCount] = useState(0);
@@ -87,7 +96,7 @@ const AdminPromotions = () => {
   const fetchFreeDataSettings = useCallback(async () => {
     const { data, error } = await supabase
       .from("system_settings")
-      .select("free_data_enabled, free_data_network, free_data_package_size, free_data_max_claims, free_data_claims_count")
+      .select("free_data_enabled, free_data_network, free_data_package_size, free_data_max_claims, free_data_claims_count, free_agent_promo_enabled, free_agent_promo_limit, free_agent_promo_claimed")
       .eq("id", 1)
       .maybeSingle();
 
@@ -107,6 +116,12 @@ const AdminPromotions = () => {
         free_data_package_size: String((data as any).free_data_package_size || "1GB"),
         free_data_max_claims: Number((data as any).free_data_max_claims || 100),
         free_data_claims_count: Number((data as any).free_data_claims_count || 0),
+      });
+      
+      setFreeAgentPromo({
+        free_agent_promo_enabled: Boolean((data as any).free_agent_promo_enabled),
+        free_agent_promo_limit: Number((data as any).free_agent_promo_limit || 10),
+        free_agent_promo_claimed: Number((data as any).free_agent_promo_claimed || 0),
       });
     }
 
@@ -150,6 +165,48 @@ const AdminPromotions = () => {
       toast({ title: freeData.free_data_enabled ? "Free Data Campaign is LIVE!" : "Campaign paused" });
     }
     setSavingFreeData(false);
+  };
+
+  const handleSaveFreeAgentPromo = async () => {
+    setSavingFreeAgentPromo(true);
+    const { error } = await supabase
+      .from("system_settings")
+      .update({
+        free_agent_promo_enabled: freeAgentPromo.free_agent_promo_enabled,
+        free_agent_promo_limit: freeAgentPromo.free_agent_promo_limit,
+      } as any)
+      .eq("id", 1);
+
+    if (error) {
+      toast({ title: "Failed to save settings", description: error.message, variant: "destructive" });
+    } else {
+      if (currentUser) {
+        await logAudit(currentUser.id, "update_free_agent_promo", { 
+          enabled: freeAgentPromo.free_agent_promo_enabled, 
+          limit: freeAgentPromo.free_agent_promo_limit 
+        });
+      }
+      toast({ title: freeAgentPromo.free_agent_promo_enabled ? "Free Agent Promotion is LIVE!" : "Settings updated successfully" });
+    }
+    setSavingFreeAgentPromo(false);
+  };
+
+  const handleResetFreeAgentPromoClaims = async () => {
+    if (!confirm("Are you absolutely sure you want to reset the claimed free agent promo counter to 0?")) return;
+    
+    setSavingFreeAgentPromo(true);
+    const { error } = await supabase
+      .from("system_settings")
+      .update({ free_agent_promo_claimed: 0 } as any)
+      .eq("id", 1);
+
+    if (error) {
+      toast({ title: "Failed to reset counter", description: error.message, variant: "destructive" });
+    } else {
+      setFreeAgentPromo(prev => ({ ...prev, free_agent_promo_claimed: 0 }));
+      toast({ title: "Claims counter reset successfully!" });
+    }
+    setSavingFreeAgentPromo(false);
   };
 
   const handleCopy = (codeToCopy: string) => {
@@ -377,6 +434,97 @@ const AdminPromotions = () => {
             >
               {savingFreeData ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : freeData.free_data_enabled ? <ToggleRight className="w-4 h-4 mr-2" /> : <ToggleLeft className="w-4 h-4 mr-2" />}
               {freeData.free_data_enabled ? "Campaign is LIVE — Save Changes" : "Save (Campaign is OFF)"}
+            </Button>
+            <Button variant="ghost" size="sm" onClick={fetchFreeDataSettings} className="text-white/40 hover:text-white">
+              <RefreshCw className="w-3.5 h-3.5" />
+            </Button>
+          </div>
+        </div>
+      </div>
+
+      {/* ── Free Agent Promotion Campaign ── */}
+      <div className="rounded-2xl overflow-hidden border border-white/5">
+        {/* Header */}
+        <div className="p-6 bg-gradient-to-r from-blue-500/10 to-cyan-500/5 border-b border-white/5">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-2xl bg-blue-500/20 border border-blue-500/30 flex items-center justify-center">
+                <Users className="w-5 h-5 text-blue-400" />
+              </div>
+              <div>
+                <h2 className="font-bold text-white text-lg">Free Reseller Agent Promo</h2>
+                <p className="text-xs text-white/40">Offer 100% free agent activations until capacity fills up.</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-3">
+              {freeAgentPromo.free_agent_promo_enabled && freeAgentPromo.free_agent_promo_claimed < freeAgentPromo.free_agent_promo_limit ? (
+                <Badge className="bg-blue-500/20 text-blue-400 border-blue-500/30 gap-1.5">
+                  <span className="w-1.5 h-1.5 rounded-full bg-blue-400 animate-pulse" /> LIVE
+                </Badge>
+              ) : freeAgentPromo.free_agent_promo_enabled ? (
+                <Badge variant="outline" className="text-amber-400 border-amber-400/20 bg-amber-400/5">FULL</Badge>
+              ) : (
+                <Badge variant="outline" className="text-white/40 border-white/10">OFF</Badge>
+              )}
+              <Switch
+                checked={freeAgentPromo.free_agent_promo_enabled}
+                onCheckedChange={(v) => setFreeAgentPromo(prev => ({ ...prev, free_agent_promo_enabled: v }))}
+                className="data-[state=checked]:bg-blue-500"
+              />
+            </div>
+          </div>
+        </div>
+
+        <div className="p-6 bg-white/[0.01] space-y-5">
+          {/* Stats row */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div className="rounded-xl bg-white/5 border border-white/5 p-4 text-center">
+              <p className="text-xs text-white/40 mb-1">Successfully Claimed</p>
+              <p className="font-black text-2xl text-blue-400">{freeAgentPromo.free_agent_promo_claimed}</p>
+            </div>
+            <div className="rounded-xl bg-white/5 border border-white/5 p-4 text-center">
+              <p className="text-xs text-white/40 mb-1">Available Capacity</p>
+              <p className="font-black text-2xl text-white">{freeAgentPromo.free_agent_promo_limit}</p>
+            </div>
+            <div className="rounded-xl bg-white/5 border border-white/5 p-4 text-center">
+              <p className="text-xs text-white/40 mb-1">Spots Left</p>
+              <p className={`font-black text-2xl ${Math.max(0, freeAgentPromo.free_agent_promo_limit - freeAgentPromo.free_agent_promo_claimed) > 0 ? 'text-green-400' : 'text-red-400'}`}>
+                {Math.max(0, freeAgentPromo.free_agent_promo_limit - freeAgentPromo.free_agent_promo_claimed)}
+              </p>
+            </div>
+          </div>
+
+          {/* Settings */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-end">
+            <div>
+              <Label className="text-xs font-semibold text-white/60 uppercase tracking-wider mb-2 block">Set Free Spots Capacity (e.g., 10)</Label>
+              <Input
+                type="number"
+                min={1}
+                value={freeAgentPromo.free_agent_promo_limit}
+                onChange={(e) => setFreeAgentPromo(prev => ({ ...prev, free_agent_promo_limit: Math.max(1, parseInt(e.target.value) || 1) }))}
+                className="bg-white/5 border-white/10 text-white rounded-xl focus:border-blue-400/40 h-11"
+              />
+            </div>
+            <div>
+              <Button 
+                variant="outline" 
+                onClick={handleResetFreeAgentPromoClaims}
+                className="w-full border-red-500/20 bg-red-500/5 hover:bg-red-500/10 text-red-400 font-bold rounded-xl h-11 gap-2"
+              >
+                <RefreshCw className="w-4 h-4" /> Reset Claim Counter back to 0
+              </Button>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <Button
+              onClick={handleSaveFreeAgentPromo}
+              disabled={savingFreeAgentPromo || freeDataMissing}
+              className={`font-bold rounded-xl px-6 ${freeAgentPromo.free_agent_promo_enabled ? "bg-blue-500 hover:bg-blue-400 text-white" : "bg-white/10 hover:bg-white/20 text-white"}`}
+            >
+              {savingFreeAgentPromo ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : freeAgentPromo.free_agent_promo_enabled ? <ToggleRight className="w-4 h-4 mr-2" /> : <ToggleLeft className="w-4 h-4 mr-2" />}
+              {freeAgentPromo.free_agent_promo_enabled ? "Save Campaign Changes" : "Save (Campaign is OFF)"}
             </Button>
             <Button variant="ghost" size="sm" onClick={fetchFreeDataSettings} className="text-white/40 hover:text-white">
               <RefreshCw className="w-3.5 h-3.5" />

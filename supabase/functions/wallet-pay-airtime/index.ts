@@ -69,6 +69,16 @@ serve(async (req) => {
 
     const parentAgentId = agentProfile?.is_sub_agent ? (agentProfile?.parent_agent_id ?? null) : null;
 
+    // --- 🔴 SECURITY ENFORCEMENT: AMOUNT RANGE CHECK ---
+    const amountNum = Number(requestedAmount);
+    if (isNaN(amountNum) || amountNum <= 0) {
+      console.error(`[SECURITY] Blocked invalid airtime amount from user ${user.id}: ${requestedAmount}`);
+      return new Response(JSON.stringify({ error: "Invalid airtime amount. Order rejected." }), {
+        status: 200,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     // 1. ATOMIC DEBIT (FOREGROUND)
     console.log(`[DEBIT-AIRTIME] Starting debit for ${requestedAmount}...`);
     const { data: debitResult, error: debitError } = await supabaseAdmin.rpc("debit_wallet", {

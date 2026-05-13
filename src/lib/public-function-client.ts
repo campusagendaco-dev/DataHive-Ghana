@@ -11,6 +11,8 @@ const publicFunctionClient = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLI
     autoRefreshToken: false,
     detectSessionInUrl: false,
     storageKey: "swiftdata-public-function-client",
+    // Explicit no-op custom lock to mirror main client and neutralize console warnings
+    lock: async (_, __, fn) => await fn(),
   },
 });
 

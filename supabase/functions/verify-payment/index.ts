@@ -355,7 +355,41 @@ serve(async (req) => {
       });
     }
 
+    // ─── 🛡️ DOS & BRUTE-FORCE RATE LIMITING ─────────────────────────────────
+    const clientIp = req.headers.get("cf-connecting-ip") || req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown-ip";
+    
+    // Limit IP-based requests to 12 per minute
+    const { data: ipAllowed } = await supabaseAdmin.rpc("check_generic_rate_limit", {
+      p_key: `ip_verify_${clientIp}`,
+      p_rate_limit: 12
+    });
+    
+    if (!ipAllowed) {
+      console.warn(`[SECURITY] Blocked rate-limited IP on verify-payment: ${clientIp}`);
+      return new Response(JSON.stringify({ error: "Too many requests. Please slow down." }), {
+        status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     const { reference, phone } = body;
+
+    // Limit Target Phone-based requests to 4 per minute
+    if (phone) {
+      const cleanPhone = phone.replace(/\D+/g, "");
+      if (cleanPhone) {
+        const { data: phoneAllowed } = await supabaseAdmin.rpc("check_generic_rate_limit", {
+          p_key: `phone_verify_${cleanPhone}`,
+          p_rate_limit: 4
+        });
+        
+        if (!phoneAllowed) {
+          console.warn(`[SECURITY] Blocked rate-limited phone verification lookup: ${cleanPhone}`);
+          return new Response(JSON.stringify({ error: "Checking status too frequently. Please try again in a minute." }), {
+            status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+      }
+    }
 
     if (!reference && !phone) {
       return new Response(JSON.stringify({ error: "Order reference or phone number is required" }), {

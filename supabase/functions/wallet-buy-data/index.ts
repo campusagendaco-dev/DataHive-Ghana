@@ -115,6 +115,25 @@ serve(async (req: Request) => {
       agentProfit = Math.max(0, parseFloat((Number(requestedAmount) - resolvedCostPrice).toFixed(2)));
     }
 
+    // --- 🔴 SECURITY ENFORCEMENT: AMOUNT & PRICE FLOOR CHECK ---
+    const amountNum = Number(requestedAmount);
+    if (isNaN(amountNum) || amountNum <= 0) {
+      console.error(`[SECURITY] Blocked invalid amount from user ${user.id}: ${requestedAmount}`);
+      return new Response(JSON.stringify({ error: "Invalid order amount. Transaction rejected." }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const minAllowedAmount = agentProfile?.is_sub_agent ? adminBase : resolvedCostPrice;
+    if (amountNum < minAllowedAmount && minAllowedAmount > 0) {
+      console.error(`[SECURITY] Blocked underpriced order from user ${user.id}. Received: ${amountNum}, Floor: ${minAllowedAmount}`);
+      return new Response(JSON.stringify({ error: "Transaction rejected due to package price discrepancy." }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     // Anti-Duplicate Protection (60 Minutes)
     const sixtyMinutesAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
 
