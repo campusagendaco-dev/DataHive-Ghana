@@ -68,6 +68,9 @@ interface SystemSettings {
   traditional_background_enabled: boolean;
   background_custom_image_url: string;
   enable_privacy_shield: boolean;
+  tutorial_buy_video_url?: string;
+  tutorial_agent_video_url?: string;
+  tutorial_subagent_video_url?: string;
 }
 
 const AdminSettings = () => {
@@ -130,6 +133,9 @@ const AdminSettings = () => {
     traditional_background_enabled: true,
     background_custom_image_url: "",
     enable_privacy_shield: true,
+    tutorial_buy_video_url: "",
+    tutorial_agent_video_url: "",
+    tutorial_subagent_video_url: "",
   });
 
   const [currentIp, setCurrentIp] = useState("");
@@ -219,6 +225,9 @@ const AdminSettings = () => {
           traditional_background_enabled: d.traditional_background_enabled !== false,
           background_custom_image_url: String(d.background_custom_image_url || ""),
           enable_privacy_shield: d.enable_privacy_shield !== false,
+          tutorial_buy_video_url: String(d.tutorial_buy_video_url || ""),
+          tutorial_agent_video_url: String(d.tutorial_agent_video_url || ""),
+          tutorial_subagent_video_url: String(d.tutorial_subagent_video_url || ""),
         });
       }
       setLoading(false);
@@ -268,6 +277,9 @@ const AdminSettings = () => {
       traditional_background_enabled: settings.traditional_background_enabled,
       background_custom_image_url: settings.background_custom_image_url,
       enable_privacy_shield: settings.enable_privacy_shield,
+      tutorial_buy_video_url: (settings.tutorial_buy_video_url || "").trim(),
+      tutorial_agent_video_url: (settings.tutorial_agent_video_url || "").trim(),
+      tutorial_subagent_video_url: (settings.tutorial_subagent_video_url || "").trim(),
     };
 
     try {
@@ -925,6 +937,71 @@ const AdminSettings = () => {
                   </p>
                 </div>
               </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg flex items-center gap-2">
+                <Video className="w-5 h-5 text-amber-500" />
+                Welcome Guide Tutorial Videos
+              </CardTitle>
+              <CardDescription>
+                Customize the walkthrough videos linked inside the Welcome Guide Modal.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-5">
+              <div className="space-y-2">
+                <Label className="flex items-center gap-2">
+                  <Wifi className="w-4 h-4 text-amber-500" />
+                  "Buy Data" Video URL
+                </Label>
+                <Input 
+                  value={settings.tutorial_buy_video_url} 
+                  onChange={(e) => setSettings({ ...settings, tutorial_buy_video_url: e.target.value })}
+                  placeholder="e.g. YouTube embed link or MP4 URL"
+                />
+                <p className="text-[10px] text-muted-foreground leading-relaxed">
+                  Appears when a user selects "Buy a data bundle" in the tutorial.
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <Label className="flex items-center gap-2">
+                  <TrendingUp className="w-4 h-4 text-emerald-500" />
+                  "Become Agent" Video URL
+                </Label>
+                <Input 
+                  value={settings.tutorial_agent_video_url} 
+                  onChange={(e) => setSettings({ ...settings, tutorial_agent_video_url: e.target.value })}
+                  placeholder="e.g. YouTube embed link or MP4 URL"
+                />
+                <p className="text-[10px] text-muted-foreground leading-relaxed">
+                  Appears when a user selects "Become a data agent" in the tutorial.
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <Label className="flex items-center gap-2">
+                  <Users className="w-4 h-4 text-purple-500" />
+                  "Become Sub Agent" Video URL
+                </Label>
+                <Input 
+                  value={settings.tutorial_subagent_video_url} 
+                  onChange={(e) => setSettings({ ...settings, tutorial_subagent_video_url: e.target.value })}
+                  placeholder="e.g. YouTube embed link or MP4 URL"
+                />
+                <p className="text-[10px] text-muted-foreground leading-relaxed">
+                  Appears when a user selects "Become a sub-agent" in the tutorial.
+                </p>
+              </div>
+
+              <Alert className="bg-muted/30 border-border">
+                <AlertCircle className="h-4 w-4 text-amber-500" />
+                <AlertDescription className="text-xs leading-relaxed">
+                  You can paste standard YouTube links (e.g., <code>https://youtube.com/watch?v=...</code>), embed iframe links, or direct MP4 paths. The system will automatically format them correctly for the tutorial window.
+                </AlertDescription>
+              </Alert>
             </CardContent>
           </Card>
         </div>

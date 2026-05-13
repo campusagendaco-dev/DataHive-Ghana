@@ -4,7 +4,70 @@ import {
   X, ChevronRight, ChevronLeft, Wifi, CreditCard, CheckCircle2,
   Store, TrendingUp, Users, Zap, Phone, ShieldCheck, Star,
   ArrowRight, Smartphone, CircleDollarSign, BadgeCheck, Gift,
+  Play, BookOpen
 } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+
+const getEmbedUrl = (url?: string) => {
+  if (!url) return "";
+  
+  // Check if direct video format
+  if (url.match(/\.(mp4|webm|ogg)(\?.*)?$/i)) {
+    return url;
+  }
+
+  // Handle standard YouTube and shortened y2u links
+  const ytRegex = /(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/(?:[^\/\n\s]+\/\S+\/|(?:v|e(?:mbed)?)\/|\S*?[?&]v=)|youtu\.be\/)([a-zA-Z0-9_-]{11})/;
+  const match = url.match(ytRegex);
+  if (match && match[1]) {
+    return `https://www.youtube.com/embed/${match[1]}?autoplay=1&rel=0`;
+  }
+
+  return url;
+};
+
+const TutorialVideoPlayer = ({ url, accent }: { url?: string; accent: string }) => {
+  const embedUrl = getEmbedUrl(url);
+  const isDirectVideo = embedUrl && embedUrl.match(/\.(mp4|webm|ogg)(\?.*)?$/i);
+
+  if (!url) {
+    return (
+      <div 
+        className="w-full min-h-[220px] rounded-2xl border border-white/10 flex flex-col items-center justify-center p-6 text-center" 
+        style={{ background: "rgba(255,255,255,0.02)" }}
+      >
+        <div className="w-12 h-12 rounded-full flex items-center justify-center mb-3 animate-pulse" style={{ background: `${accent}15`, border: `1px solid ${accent}25` }}>
+          <Play className="w-5 h-5" style={{ color: accent }} />
+        </div>
+        <p className="text-white font-bold text-sm">Video Coming Soon</p>
+        <p className="text-white/40 text-xs mt-1 max-w-[200px] mx-auto leading-relaxed">
+          The video tutorial for this section is currently being prepared. Check back soon!
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="relative w-full rounded-2xl overflow-hidden border border-white/15 aspect-video bg-black/80 shadow-2xl animate-in fade-in zoom-in-95 duration-300">
+      {isDirectVideo ? (
+        <video 
+          src={embedUrl} 
+          className="w-full h-full object-cover" 
+          controls 
+          autoPlay
+          playsInline
+        />
+      ) : (
+        <iframe
+          src={embedUrl}
+          className="absolute inset-0 w-full h-full border-0"
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+          allowFullScreen
+        />
+      )}
+    </div>
+  );
+};
 
 const STORAGE_KEY = "swiftdata-tutorial-seen";
 
@@ -430,6 +493,31 @@ export default function TutorialModal() {
   const [flow, setFlow] = useState<Flow | null>(null);
   const [step, setStep] = useState(0);
   const [animDir, setAnimDir] = useState<"forward" | "back">("forward");
+  const [viewMode, setViewMode] = useState<"steps" | "video">("steps");
+  const [videoUrls, setVideoUrls] = useState<{ buy?: string; agent?: string; subagent?: string }>({});
+
+  useEffect(() => {
+    const fetchVideoUrls = async () => {
+      try {
+        const { data } = await supabase
+          .from("public_system_settings")
+          .select("tutorial_buy_video_url, tutorial_agent_video_url, tutorial_subagent_video_url")
+          .eq("id", 1)
+          .maybeSingle();
+        
+        if (data) {
+          setVideoUrls({
+            buy: data.tutorial_buy_video_url,
+            agent: data.tutorial_agent_video_url,
+            subagent: data.tutorial_subagent_video_url,
+          });
+        }
+      } catch (e) {
+        console.error("Failed to load tutorial videos", e);
+      }
+    };
+    fetchVideoUrls();
+  }, []);
 
   useEffect(() => {
     const seen = localStorage.getItem(STORAGE_KEY);
@@ -438,7 +526,7 @@ export default function TutorialModal() {
 
   // Allow external callers (e.g. Navbar) to open the tutorial via a custom event
   useEffect(() => {
-    const handler = () => { setFlow(null); setStep(0); setVisible(true); };
+    const handler = () => { setFlow(null); setStep(0); setViewMode("steps"); setVisible(true); };
     window.addEventListener("open-tutorial", handler);
     return () => window.removeEventListener("open-tutorial", handler);
   }, []);
@@ -456,7 +544,7 @@ export default function TutorialModal() {
   if (!visible) {
     return (
       <button
-        onClick={() => { setFlow(null); setStep(0); setVisible(true); }}
+        onClick={() => { setFlow(null); setStep(0); setViewMode("steps"); setVisible(true); }}
         className="fixed bottom-24 right-4 z-40 w-10 h-10 rounded-full border border-white/15 flex items-center justify-center text-white/50 hover:text-white hover:border-white/30 transition-all hover:scale-110 shadow-lg"
         style={{ background: "rgba(13,13,24,0.9)", backdropFilter: "blur(12px)" }}
         title="How it works"
@@ -536,7 +624,7 @@ export default function TutorialModal() {
           <div className="flex items-center justify-between px-5 pt-5 pb-3">
             <div className="flex items-center gap-2.5">
               {flow && (
-                <button onClick={() => { setFlow(null); setStep(0); }} className="text-white/40 hover:text-white/70 transition-colors p-1 -ml-1">
+                <button onClick={() => { setFlow(null); setStep(0); setViewMode("steps"); }} className="text-white/40 hover:text-white/70 transition-colors p-1 -ml-1">
                   <ChevronLeft className="w-4 h-4" />
                 </button>
               )}
@@ -559,19 +647,19 @@ export default function TutorialModal() {
                 icon={Wifi} accent="#f59e0b"
                 title="Buy a data bundle"
                 description="Purchase MTN, Telecel or AirtelTigo data — no account needed"
-                onClick={() => { setFlow("buy"); setStep(0); }}
+                onClick={() => { setFlow("buy"); setStep(0); setViewMode("steps"); }}
               />
               <PathCard
                 icon={TrendingUp} accent="#22c55e"
                 title="Become a data agent"
                 description="Get wholesale prices, your own store and earn on every sale"
-                onClick={() => { setFlow("agent"); setStep(0); }}
+                onClick={() => { setFlow("agent"); setStep(0); setViewMode("steps"); }}
               />
               <PathCard
                 icon={Users} accent="#a855f7"
                 title="Become a sub-agent"
                 description="Join under an existing agent and start your own reselling business"
-                onClick={() => { setFlow("subagent"); setStep(0); }}
+                onClick={() => { setFlow("subagent"); setStep(0); setViewMode("steps"); }}
               />
               <div className="pt-2 border-t border-white/8 flex items-center justify-between">
                 <p className="text-white/25 text-xs">SwiftData Ghana — #1 Data Bundles</p>
@@ -583,29 +671,64 @@ export default function TutorialModal() {
           {/* Step content */}
           {flow && currentStep && StepComponent && (
             <div className="px-5 pb-5">
-              {/* Step progress dots */}
-              <div className="flex items-center gap-1.5 mb-3">
-                {currentFlow!.steps.map((_, i) => (
-                  <StepDot key={i} active={i === step} done={i < step} />
-                ))}
-                <span className="text-white/25 text-xs ml-auto">{step + 1} / {totalSteps}</span>
+              {/* Tabbed View Toggle */}
+              <div className="flex gap-1 p-1 rounded-xl bg-white/5 border border-white/10 mb-4">
+                <button
+                  onClick={() => setViewMode("steps")}
+                  className={`flex-1 py-1.5 rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 transition-all ${
+                    viewMode === "steps"
+                      ? "bg-white/10 text-white shadow-sm"
+                      : "text-white/40 hover:text-white/60"
+                  }`}
+                >
+                  <BookOpen className="w-3.5 h-3.5" /> Interactive Guide
+                </button>
+                <button
+                  onClick={() => setViewMode("video")}
+                  className={`flex-1 py-1.5 rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 transition-all ${
+                    viewMode === "video"
+                      ? "bg-white/10 text-white shadow-sm"
+                      : "text-white/40 hover:text-white/60"
+                  }`}
+                >
+                  <Play className="w-3.5 h-3.5 text-red-400" /> Watch Video
+                </button>
               </div>
 
-              {/* Step header */}
-              <div className={animDir === "forward" ? "tutorial-enter-right" : "tutorial-enter-left"} key={`header-${step}`}>
-                <h3 className="text-white font-bold text-sm mb-0.5">{currentStep.title}</h3>
-                <p className="text-white/45 text-xs leading-snug">{currentStep.subtitle}</p>
-              </div>
-
-              {/* Illustration */}
-              <div
-                key={`step-${step}`}
-                className={`min-h-[220px] flex items-center justify-center ${animDir === "forward" ? "tutorial-enter-right" : "tutorial-enter-left"}`}
-              >
-                <div className="w-full">
-                  <StepComponent />
+              {viewMode === "video" ? (
+                <div className="py-4 min-h-[220px] flex items-center justify-center">
+                  <TutorialVideoPlayer 
+                    url={videoUrls[flow as keyof typeof videoUrls]} 
+                    accent={currentFlow!.accent} 
+                  />
                 </div>
-              </div>
+              ) : (
+                <>
+                  {/* Step progress dots */}
+                  <div className="flex items-center gap-1.5 mb-3">
+                    {currentFlow!.steps.map((_, i) => (
+                      <StepDot key={i} active={i === step} done={i < step} />
+                    ))}
+                    <span className="text-white/25 text-xs ml-auto">{step + 1} / {totalSteps}</span>
+                  </div>
+
+                  {/* Step header */}
+                  <div className={animDir === "forward" ? "tutorial-enter-right" : "tutorial-enter-left"} key={`header-${step}`}>
+                    <h3 className="text-white font-bold text-sm mb-0.5">{currentStep.title}</h3>
+                    <p className="text-white/45 text-xs leading-snug">{currentStep.subtitle}</p>
+                  </div>
+
+                  {/* Illustration */}
+                  <div
+                    key={`step-${step}`}
+                    className={`min-h-[220px] flex items-center justify-center ${animDir === "forward" ? "tutorial-enter-right" : "tutorial-enter-left"}`}
+                  >
+                    <div className="w-full">
+                      <StepComponent />
+                    </div>
+                  </div>
+                </>
+              )}
 
               {/* Navigation */}
               <div className="flex items-center gap-2 mt-1">
