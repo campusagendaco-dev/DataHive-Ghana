@@ -73,12 +73,17 @@ const DashboardWithdraw = () => {
     ]);
 
     // Fetch settings separately — columns may not exist in older deployments; default gracefully
-    const settingsRes = await supabase
-      .from("public_system_settings")
-      .select("min_withdrawal_amount, withdrawal_system_enabled")
-      .eq("id", 1)
-      .maybeSingle()
-      .catch(() => ({ data: null }));
+    let settingsRes: { data: { min_withdrawal_amount?: number; withdrawal_system_enabled?: boolean } | null } = { data: null };
+    try {
+      const res = await supabase
+        .from("public_system_settings")
+        .select("min_withdrawal_amount, withdrawal_system_enabled")
+        .eq("id", 1)
+        .maybeSingle();
+      settingsRes = res;
+    } catch {
+      // ignore — defaults will be used
+    }
 
     const profits = (ordersRes.data || []).reduce((sum, o: any) => sum + (o.profit || 0), 0);
     const parentProfits = (parentRes.data || []).reduce((sum, o: any) => sum + (o.parent_profit || 0), 0);
