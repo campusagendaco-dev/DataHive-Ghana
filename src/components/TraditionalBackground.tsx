@@ -44,6 +44,30 @@ export const TraditionalBackground = memo(({ className = "fixed inset-0 z-0 opac
     };
 
     fetchSettings();
+
+    // Subscribe to real-time background settings changes
+    const channel = supabase
+      .channel("background-settings-live")
+      .on(
+        "postgres_changes" as any,
+        { event: "UPDATE", schema: "public", table: "system_settings" },
+        (payload: any) => {
+          const updated = payload.new;
+          if (updated) {
+            if ("traditional_background_enabled" in updated) {
+              setEnabled(updated.traditional_background_enabled !== false);
+            }
+            if ("background_custom_image_url" in updated) {
+              setCustomBgUrl(updated.background_custom_image_url || null);
+            }
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      void channel.unsubscribe();
+    };
   }, []);
 
   const [bgIndex, setBgIndex] = useState(0);
