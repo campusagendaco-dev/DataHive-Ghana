@@ -13,7 +13,7 @@ interface Notification {
   created_at: string;
 }
 
-const NOTIFICATION_SOUND = "https://assets.mixkit.co/active_storage/sfx/1435/1435-preview.mp3";
+const NOTIFICATION_SOUND = "/sounds/notification_system.mp3";
 
 const NotificationPopup = () => {
   const { user, profile } = useAuth();

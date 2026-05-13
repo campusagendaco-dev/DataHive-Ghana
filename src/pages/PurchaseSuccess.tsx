@@ -42,7 +42,7 @@ const PurchaseSuccess = () => {
 
   // Play success sound on mount
   useState(() => {
-    const audio = new Audio("https://assets.mixkit.co/active_storage/sfx/2358/2358-preview.mp3");
+    const audio = new Audio("/sounds/success.mp3");
     audio.volume = 0.5;
     audio.play().catch(() => console.log("[PurchaseSuccess] Audio blocked"));
   });

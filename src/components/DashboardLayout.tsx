@@ -58,7 +58,17 @@ const DashboardLayout = () => {
     const channel = supabase
       .channel("wallet-balance-header")
       .on("postgres_changes", { event: "*", schema: "public", table: "wallets", filter: `agent_id=eq.${user.id}` }, (payload: any) => {
-        if (payload.new?.balance !== undefined) setWalletBalance(Number(payload.new.balance));
+        if (payload.new?.balance !== undefined) {
+          const newBal = Number(payload.new.balance);
+          const oldBal = Number(payload.old?.balance || 0);
+          
+          // Play crisp chime if balance increases (credit/sale)
+          if (newBal > oldBal) {
+            import("@/lib/sound").then(m => m.playSuccessSound());
+          }
+          
+          setWalletBalance(newBal);
+        }
       })
       .subscribe();
     return () => { supabase.removeChannel(channel); };
