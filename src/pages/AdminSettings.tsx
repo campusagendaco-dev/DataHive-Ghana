@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Save, AlertCircle, Phone, MessageSquare, Percent, MessageCircle, Gift, Sparkles, Video, Upload, Trash2, Loader2, Globe, Database, Plus, ExternalLink, Activity, Shield, GraduationCap } from "lucide-react";
+import { Save, AlertCircle, Phone, MessageSquare, Percent, MessageCircle, Gift, Sparkles, Video, Upload, Trash2, Loader2, Globe, Database, Plus, ExternalLink, Activity, Shield, GraduationCap, RefreshCw } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Textarea } from "@/components/ui/textarea";
 import { logAudit } from "@/utils/auditLogger";
@@ -684,15 +684,19 @@ const AdminSettings = () => {
                           isSelected ? "border-primary ring-2 ring-primary/20 ring-offset-2 ring-offset-black" : "border-white/10 hover:border-white/30"
                         }`}
                       >
-                        {preset.url ? (
+                        {preset.url && preset.url !== "/auto_switch" ? (
                           <img 
                             src={preset.url} 
                             alt={preset.label}
                             className="absolute inset-0 w-full h-full object-cover opacity-50 group-hover:opacity-70 transition-opacity"
                           />
                         ) : (
-                          <div className="absolute inset-0 bg-gradient-to-br from-amber-500/20 to-amber-900/20 flex items-center justify-center">
-                            <Sparkles className="w-6 h-6 text-amber-500 opacity-40" />
+                          <div className="absolute inset-0 bg-gradient-to-br from-indigo-900/20 to-purple-900/20 flex items-center justify-center">
+                            {preset.url === "/auto_switch" ? (
+                              <RefreshCw className="w-5 h-5 text-indigo-400 opacity-60 animate-spin" style={{ animationDuration: '3s' }} />
+                            ) : (
+                              <Sparkles className="w-6 h-6 text-amber-500 opacity-40" />
+                            )}
                           </div>
                         )}
                         <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/30 to-transparent" />
@@ -713,19 +717,32 @@ const AdminSettings = () => {
 
                 {settings.background_custom_image_url && (
                   <div className="relative rounded-xl overflow-hidden border border-white/10 aspect-video sm:aspect-[21/9] bg-black/20 group">
-                    <img 
-                      src={settings.background_custom_image_url} 
-                      className="w-full h-full object-cover opacity-80" 
-                      alt="Background preview"
-                    />
-                    <div className="absolute inset-0 bg-black/60 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                    {settings.background_custom_image_url === "/auto_switch" ? (
+                      <div className="w-full h-full flex flex-col items-center justify-center bg-gradient-to-br from-indigo-950/40 via-slate-900/60 to-purple-950/40 border border-indigo-500/20">
+                        <div className="relative flex items-center justify-center w-12 h-12 rounded-full bg-indigo-500/10 mb-2">
+                          <RefreshCw className="w-6 h-6 text-indigo-400 animate-spin" style={{ animationDuration: '5s' }} />
+                          <Sparkles className="absolute -top-1 -right-1 w-4 h-4 text-amber-400 animate-pulse" />
+                        </div>
+                        <h4 className="text-white font-black text-xs tracking-widest uppercase">Live Slideshow Active</h4>
+                        <p className="text-indigo-300/40 text-[10px] mt-0.5 max-w-xs text-center px-4 font-medium">
+                          Cycling all 12 premium background styles seamlessly every 15s.
+                        </p>
+                      </div>
+                    ) : (
+                      <img 
+                        src={settings.background_custom_image_url} 
+                        className="w-full h-full object-cover opacity-80" 
+                        alt="Background preview"
+                      />
+                    )}
+                    <div className="absolute inset-0 bg-black/60 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity z-10">
                       <Button 
                         variant="destructive" 
                         size="sm" 
                         className="gap-2"
                         onClick={() => setSettings({ ...settings, background_custom_image_url: "" })}
                       >
-                        <Trash2 className="w-4 h-4" /> Remove Image
+                        <Trash2 className="w-4 h-4" /> Remove Custom Background
                       </Button>
                     </div>
                   </div>
