@@ -8,12 +8,9 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import {
-  Send, Users, Filter, CheckCircle2, RefreshCw,
+  Send, Users, Filter, RefreshCw,
   Megaphone, Bell, MessageSquare, BarChart3,
 } from "lucide-react";
-import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from "@/components/ui/select";
 
 type Segment = "all_agents" | "top_agents" | "dormant_agents" | "sub_agents" | "active_7d";
 type Channel = "notification" | "sms" | "both";
@@ -134,8 +131,8 @@ export default function AdminBroadcast() {
       // SMS via edge function (fire and forget for large batches)
       if (channel === "sms" || channel === "both") {
         const phones = recipients.map((r: any) => r.phone).filter(Boolean);
-        supabase.functions.invoke("send-bulk-sms", {
-          body: { phones, message: `${title}: ${body}` },
+        supabase.functions.invoke("admin-send-sms", {
+          body: { retry_phones: phones, message: `${title}\n${body}` },
         }).catch(() => {});
       }
 
@@ -178,8 +175,6 @@ export default function AdminBroadcast() {
     })));
     setLogsLoaded(true);
   };
-
-  const selectedSegment = SEGMENTS.find((s) => s.value === segment);
 
   return (
     <div className="p-6 space-y-6">
