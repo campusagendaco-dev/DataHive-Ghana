@@ -66,12 +66,19 @@ const DashboardWithdraw = () => {
   const fetchData = useCallback(async () => {
     if (!user) return;
 
-    const [ordersRes, parentRes, withdrawalsRes, settingsRes] = await Promise.all([
+    const [ordersRes, parentRes, withdrawalsRes] = await Promise.all([
       supabase.from("orders").select("profit").eq("agent_id", user.id).eq("status", "fulfilled"),
       supabase.from("orders").select("parent_profit").eq("parent_agent_id", user.id).eq("status", "fulfilled"),
       supabase.from("withdrawals").select("*").eq("agent_id", user.id).order("created_at", { ascending: false }),
-      supabase.from("public_system_settings").select("min_withdrawal_amount, withdrawal_system_enabled").eq("id", 1).maybeSingle(),
     ]);
+
+    // Fetch settings separately — columns may not exist in older deployments; default gracefully
+    const settingsRes = await supabase
+      .from("public_system_settings")
+      .select("min_withdrawal_amount, withdrawal_system_enabled")
+      .eq("id", 1)
+      .maybeSingle()
+      .catch(() => ({ data: null }));
 
     const profits = (ordersRes.data || []).reduce((sum, o: any) => sum + (o.profit || 0), 0);
     const parentProfits = (parentRes.data || []).reduce((sum, o: any) => sum + (o.parent_profit || 0), 0);
