@@ -660,6 +660,7 @@ const AdminSettings = () => {
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                   {[
                     { id: "traditional", label: "Ghana Drifting (Default)", url: "" },
+                    { id: "slideshow", label: "🔄 Auto Slideshow", url: "/auto_switch" },
                     { id: "mb1", label: "Cyan & Gold V1", url: "/assets/backgrounds/bg_motherboard_1.png" },
                     { id: "mb2", label: "Elegant Gold/White", url: "/assets/backgrounds/bg_motherboard_2.png" },
                     { id: "mb3", label: "Neon Cyberpunk", url: "/assets/backgrounds/bg_motherboard_3.png" },
