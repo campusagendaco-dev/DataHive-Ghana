@@ -17,6 +17,7 @@ const LOW_BALANCE_THRESHOLD = 10; // GHS
 import { useConnectivity } from "@/hooks/useConnectivity";
 import { Wifi, WifiOff, CloudOff, Eye, EyeOff } from "lucide-react";
 import { useMaskedBalance } from "@/hooks/useMaskedBalance";
+import { usePushNotifications } from "@/hooks/usePushNotifications";
 
 const DashboardLayout = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -27,6 +28,8 @@ const DashboardLayout = () => {
   const [walletBalance, setWalletBalance] = useState<number>(0);
   const { isOnline, quality } = useConnectivity();
   const { isMasked, toggleMask, maskValue } = useMaskedBalance();
+  const { supported, permissionState, subscribeUser, loading: subLoading } = usePushNotifications();
+  const [pushDismissed, setPushDismissed] = useState(false);
 
   const isPaidAgent = Boolean(profile?.agent_approved || profile?.sub_agent_approved);
   const showLowBalanceAlert = isPaidAgent && !alertDismissed && walletBalance < LOW_BALANCE_THRESHOLD && walletBalance >= 0;
@@ -204,6 +207,36 @@ const DashboardLayout = () => {
               aria-label="Dismiss low balance alert"
               title="Dismiss"
               className="text-amber-400/60 hover:text-amber-300 transition-colors shrink-0"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        )}
+
+        {/* ── Push notification banner ── */}
+        {supported && permissionState === "default" && !pushDismissed && (
+          <div className={cn(
+            "shrink-0 flex items-center justify-between gap-3 px-4 sm:px-6 py-2.5 transition-all duration-300 animate-in slide-in-from-top-4 duration-500",
+            isDark ? "bg-indigo-500/10 border-b border-indigo-500/20" : "bg-indigo-50 border-b border-indigo-200"
+          )}>
+            <div className="flex items-center gap-2.5">
+              <Bell className="w-4 h-4 text-indigo-400 shrink-0 animate-bounce" />
+              <p className={cn("text-xs font-bold transition-colors", isDark ? "text-indigo-300" : "text-indigo-800")}>
+                Want real-time lock-screen alerts for your store sales?{" "}
+                <button
+                  onClick={subscribeUser}
+                  disabled={subLoading}
+                  className={cn("underline underline-offset-2 transition-colors font-black", isDark ? "text-white hover:text-indigo-200" : "text-indigo-950 hover:text-indigo-700")}
+                >
+                  {subLoading ? "Enabling..." : "Enable Notifications"}
+                </button>
+              </p>
+            </div>
+            <button
+              onClick={() => setPushDismissed(true)}
+              aria-label="Dismiss notification alert"
+              title="Dismiss"
+              className="text-indigo-400/60 hover:text-indigo-300 transition-colors shrink-0"
             >
               <X className="w-4 h-4" />
             </button>

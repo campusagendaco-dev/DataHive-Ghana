@@ -37,6 +37,7 @@ export default defineConfig(({ mode }) => ({
         ],
       },
       workbox: {
+        importScripts: ["push-sw.js"],
         skipWaiting: true,
         clientsClaim: true,
         maximumFileSizeToCacheInBytes: 5000000,
