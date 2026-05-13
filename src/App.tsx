@@ -56,6 +56,7 @@ const VerifyOtp = lazy(() => import("./pages/VerifyOtp"));
 const VerifyMfa = lazy(() => import("./pages/VerifyMfa"));
 const ResetPassword = lazy(() => import("./pages/ResetPassword"));
 const AgentPending = lazy(() => import("./pages/AgentPending"));
+const Onboarding = lazy(() => import("./pages/Onboarding"));
 const AgentStore = lazy(() => import("./pages/AgentStore"));
 const OrderStatus = lazy(() => import("./pages/OrderStatus"));
 const PurchaseSuccess = lazy(() => import("./pages/PurchaseSuccess"));
@@ -356,6 +357,7 @@ const AppContent = () => {
 
         {/* Agent flow */}
         <Route path="/agent/pending" element={<PendingGuard><AgentPending /></PendingGuard>} />
+        <Route path="/onboarding" element={<Onboarding />} />
 
         {/* User dashboard */}
         <Route path="/dashboard" element={<DashboardGuard><DashboardLayout /></DashboardGuard>}>
