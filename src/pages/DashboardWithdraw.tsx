@@ -66,7 +66,7 @@ const DashboardWithdraw = () => {
   const fetchData = useCallback(async () => {
     if (!user) return;
 
-    const [ordersRes, parentRes, withdrawalsRes] = await Promise.all([
+    const [ordersRes, parentRes, withdrawalsRes, settingsRes] = await Promise.all([
       supabase.from("orders").select("profit").eq("agent_id", user.id).eq("status", "fulfilled"),
       supabase.from("orders").select("parent_profit").eq("parent_agent_id", user.id).eq("status", "fulfilled"),
       supabase.from("withdrawals").select("*").eq("agent_id", user.id).order("created_at", { ascending: false }),
