@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Save, AlertCircle, Phone, MessageSquare, Percent, MessageCircle, Gift, Sparkles, Video, Upload, Trash2, Loader2, Globe, Database, Plus, ExternalLink, Activity, Shield, GraduationCap, RefreshCw } from "lucide-react";
+import { Save, AlertCircle, Phone, MessageSquare, Percent, MessageCircle, Gift, Sparkles, Video, Upload, Trash2, Trash, Loader2, Loader, Globe, Database, Plus, ExternalLink, Activity, Shield, GraduationCap, RefreshCw, Wifi, Users, TrendingUp } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Textarea } from "@/components/ui/textarea";
 import { logAudit } from "@/utils/auditLogger";
@@ -71,6 +71,12 @@ interface SystemSettings {
   tutorial_buy_video_url?: string;
   tutorial_agent_video_url?: string;
   tutorial_subagent_video_url?: string;
+  withdrawal_auto_approve_enabled: boolean;
+  withdrawal_auto_approve_max_amount: string;
+  withdrawal_auto_approve_min_age_days: string;
+  withdrawal_auto_approve_require_no_chargebacks: boolean;
+  min_withdrawal_amount: string;
+  withdrawal_system_enabled: boolean;
 }
 
 const AdminSettings = () => {
@@ -133,6 +139,12 @@ const AdminSettings = () => {
     traditional_background_enabled: true,
     background_custom_image_url: "",
     enable_privacy_shield: true,
+    withdrawal_auto_approve_enabled: false,
+    withdrawal_auto_approve_max_amount: "200.00",
+    withdrawal_auto_approve_min_age_days: "7",
+    withdrawal_auto_approve_require_no_chargebacks: true,
+    min_withdrawal_amount: "25.00",
+    withdrawal_system_enabled: true,
     tutorial_buy_video_url: "",
     tutorial_agent_video_url: "",
     tutorial_subagent_video_url: "",
@@ -228,6 +240,12 @@ const AdminSettings = () => {
           tutorial_buy_video_url: String(d.tutorial_buy_video_url || ""),
           tutorial_agent_video_url: String(d.tutorial_agent_video_url || ""),
           tutorial_subagent_video_url: String(d.tutorial_subagent_video_url || ""),
+          withdrawal_auto_approve_enabled: d.withdrawal_auto_approve_enabled || false,
+          withdrawal_auto_approve_max_amount: String(d.withdrawal_auto_approve_max_amount || "200.00"),
+          withdrawal_auto_approve_min_age_days: String(d.withdrawal_auto_approve_min_age_days || "7"),
+          withdrawal_auto_approve_require_no_chargebacks: d.withdrawal_auto_approve_require_no_chargebacks !== false,
+          min_withdrawal_amount: String(d.min_withdrawal_amount || "25.00"),
+          withdrawal_system_enabled: d.withdrawal_system_enabled !== false,
         });
       }
       setLoading(false);
@@ -280,6 +298,12 @@ const AdminSettings = () => {
       tutorial_buy_video_url: (settings.tutorial_buy_video_url || "").trim(),
       tutorial_agent_video_url: (settings.tutorial_agent_video_url || "").trim(),
       tutorial_subagent_video_url: (settings.tutorial_subagent_video_url || "").trim(),
+      withdrawal_auto_approve_enabled: settings.withdrawal_auto_approve_enabled,
+      withdrawal_auto_approve_max_amount: parseFloat(settings.withdrawal_auto_approve_max_amount) || 200,
+      withdrawal_auto_approve_min_age_days: parseInt(settings.withdrawal_auto_approve_min_age_days) || 7,
+      withdrawal_auto_approve_require_no_chargebacks: settings.withdrawal_auto_approve_require_no_chargebacks,
+      min_withdrawal_amount: parseFloat(settings.min_withdrawal_amount) || 25,
+      withdrawal_system_enabled: settings.withdrawal_system_enabled,
     };
 
     try {
@@ -1002,6 +1026,86 @@ const AdminSettings = () => {
                   You can paste standard YouTube links (e.g., <code>https://youtube.com/watch?v=...</code>), embed iframe links, or direct MP4 paths. The system will automatically format them correctly for the tutorial window.
                 </AlertDescription>
               </Alert>
+            </CardContent>
+          </Card>
+        </div>
+ 
+        {/* Withdrawal & Payout Management */}
+        <div className="space-y-6">
+          <Card className="border-amber-500/20 bg-amber-500/5">
+            <CardHeader>
+              <CardTitle className="text-lg flex items-center gap-2">
+                <RefreshCw className="w-5 h-5 text-amber-500" />
+                Withdrawal & Payout Management
+              </CardTitle>
+              <CardDescription>Configure how agents withdraw their profits.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex items-center justify-between p-3 rounded-xl bg-white/5 border border-white/10">
+                <div className="space-y-0.5">
+                  <Label className="text-sm font-bold">Withdrawal System Status</Label>
+                  <p className="text-xs text-muted-foreground">If disabled, agents cannot place new withdrawal requests.</p>
+                </div>
+                <Switch
+                  checked={settings.withdrawal_system_enabled}
+                  onCheckedChange={(c) => setSettings({ ...settings, withdrawal_system_enabled: c })}
+                  className="data-[state=checked]:bg-emerald-500"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label>Minimum Withdrawal Amount (GHS)</Label>
+                <Input
+                  type="number"
+                  value={settings.min_withdrawal_amount}
+                  onChange={(e) => setSettings({ ...settings, min_withdrawal_amount: e.target.value })}
+                />
+              </div>
+
+              <div className="pt-4 border-t border-white/10 space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <Label className="text-sm font-bold">Auto-Approve Withdrawals</Label>
+                    <p className="text-xs text-muted-foreground">Automatically mark small requests as processing.</p>
+                  </div>
+                  <Switch
+                    checked={settings.withdrawal_auto_approve_enabled}
+                    onCheckedChange={(c) => setSettings({ ...settings, withdrawal_auto_approve_enabled: c })}
+                  />
+                </div>
+
+                {settings.withdrawal_auto_approve_enabled && (
+                  <div className="grid grid-cols-2 gap-4 animate-in fade-in slide-in-from-top-2 duration-300">
+                    <div className="space-y-2">
+                      <Label>Max Auto Amount (GHS)</Label>
+                      <Input
+                        type="number"
+                        value={settings.withdrawal_auto_approve_max_amount}
+                        onChange={(e) => setSettings({ ...settings, withdrawal_auto_approve_max_amount: e.target.value })}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Min Account Age (Days)</Label>
+                      <Input
+                        type="number"
+                        value={settings.withdrawal_auto_approve_min_age_days}
+                        onChange={(e) => setSettings({ ...settings, withdrawal_auto_approve_min_age_days: e.target.value })}
+                      />
+                    </div>
+                  </div>
+                )}
+
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <Label className="text-sm font-bold">Require Clean Record</Label>
+                    <p className="text-xs text-muted-foreground">Block auto-approval if agent has recent failed orders.</p>
+                  </div>
+                  <Switch
+                    checked={settings.withdrawal_auto_approve_require_no_chargebacks}
+                    onCheckedChange={(c) => setSettings({ ...settings, withdrawal_auto_approve_require_no_chargebacks: c })}
+                  />
+                </div>
+              </div>
             </CardContent>
           </Card>
         </div>

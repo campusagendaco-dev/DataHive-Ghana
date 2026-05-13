@@ -66,15 +66,18 @@ serve(async (req: Request) => {
       });
     }
 
-    // Verify agent
+    // Verify agent or sub-agent
     const { data: profile } = await supabaseAdmin
       .from("profiles")
-      .select("momo_number, momo_network, momo_account_name, full_name, is_agent, agent_approved")
+      .select("momo_number, momo_network, momo_account_name, full_name, is_agent, is_sub_agent, agent_approved, sub_agent_approved")
       .eq("user_id", agentId)
       .maybeSingle();
 
-    if (!profile || !profile.is_agent || !profile.agent_approved) {
-      return new Response(JSON.stringify({ error: "Agent not found or not approved" }), {
+    const isApprovedAgent = profile?.is_agent && profile?.agent_approved;
+    const isApprovedSubAgent = profile?.is_sub_agent && profile?.sub_agent_approved;
+
+    if (!profile || (!isApprovedAgent && !isApprovedSubAgent)) {
+      return new Response(JSON.stringify({ error: "Access Denied. You must be an approved agent or sub-agent to withdraw." }), {
         status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }

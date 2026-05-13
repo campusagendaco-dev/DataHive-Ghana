@@ -32,7 +32,6 @@ interface Withdrawal {
   net_amount: number;
 }
 
-const MIN_WITHDRAWAL = 25;
 const WITHDRAWAL_FEE_RATE = 0.015; // 1.5%
 
 const statusConfig: Record<string, { icon: typeof CheckCircle; color: string; label: string }> = {
@@ -55,6 +54,8 @@ const DashboardWithdraw = () => {
   const [pinDialogOpen, setPinDialogOpen] = useState(false);
   const [enteredPin, setEnteredPin] = useState("");
   const [biometricScanning, setBiometricScanning] = useState(false);
+  const [minWithdrawal, setMinWithdrawal] = useState(25);
+  const [systemEnabled, setSystemEnabled] = useState(true);
 
   const { isSupported, credentials, authenticate } = useWebAuthn();
   const hasBiometric = isSupported && credentials.length > 0;
@@ -69,6 +70,7 @@ const DashboardWithdraw = () => {
       supabase.from("orders").select("profit").eq("agent_id", user.id).eq("status", "fulfilled"),
       supabase.from("orders").select("parent_profit").eq("parent_agent_id", user.id).eq("status", "fulfilled"),
       supabase.from("withdrawals").select("*").eq("agent_id", user.id).order("created_at", { ascending: false }),
+      supabase.from("public_system_settings").select("min_withdrawal_amount, withdrawal_system_enabled").eq("id", 1).maybeSingle(),
     ]);
 
     const profits = (ordersRes.data || []).reduce((sum, o: any) => sum + (o.profit || 0), 0);
@@ -88,6 +90,12 @@ const DashboardWithdraw = () => {
 
     setCompletedWithdrawals(completed);
     setPendingWithdrawals(pending);
+
+    if (settingsRes.data) {
+      setMinWithdrawal(Number(settingsRes.data.min_withdrawal_amount) || 25);
+      setSystemEnabled(settingsRes.data.withdrawal_system_enabled !== false);
+    }
+    
     setLoading(false);
   }, [user]);
 
@@ -100,8 +108,14 @@ const DashboardWithdraw = () => {
     setWithdrawing(true);
 
     const numAmount = parseFloat(amount);
-    if (isNaN(numAmount) || numAmount < MIN_WITHDRAWAL) {
-      toast.error(`Minimum withdrawal is GHS ${MIN_WITHDRAWAL.toFixed(2)}`);
+    if (!systemEnabled) {
+      toast.error("Withdrawals are temporarily disabled for maintenance.");
+      setWithdrawing(false);
+      return;
+    }
+
+    if (isNaN(numAmount) || numAmount < minWithdrawal) {
+      toast.error(`Minimum withdrawal is GHS ${minWithdrawal.toFixed(2)}`);
       setWithdrawing(false);
       return;
     }
@@ -144,6 +158,15 @@ const DashboardWithdraw = () => {
     <div className="space-y-6 p-6 md:p-8 max-w-4xl">
       <h1 className="font-display text-2xl font-bold">Withdrawals</h1>
 
+      {/* Maintenance Banner */}
+      {!systemEnabled && (
+        <div className="p-4 bg-amber-500/10 border border-amber-500/20 rounded-xl flex items-center gap-3 text-amber-500">
+          <Clock className="w-5 h-5 shrink-0" />
+          <p className="text-sm font-bold">Withdrawals are currently undergoing maintenance. Please check back later.</p>
+        </div>
+      )}
+
+      {/* Stats Cards */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
         <Card className="bg-card/50 border-border/50">
           <CardHeader className="flex flex-row items-center justify-between pb-1 px-4 pt-4">
@@ -271,9 +294,9 @@ const DashboardWithdraw = () => {
               <Input
                 type="number"
                 step="0.01"
-                min={MIN_WITHDRAWAL}
+                min={minWithdrawal}
                 max={availableBalance}
-                placeholder={`Amount (min GHS ${MIN_WITHDRAWAL.toFixed(2)}, max GHS ${availableBalance.toFixed(2)})`}
+                placeholder={`Amount (min GHS ${minWithdrawal.toFixed(2)}, max GHS ${availableBalance.toFixed(2)})`}
                 value={amount}
                 onChange={(e) => setAmount(e.target.value)}
                 className="bg-secondary"
@@ -282,8 +305,8 @@ const DashboardWithdraw = () => {
             <Button
               onClick={async () => {
                 const n = parseFloat(amount);
-                if (isNaN(n) || n < MIN_WITHDRAWAL) {
-                  toast.error(`Minimum withdrawal is GHS ${MIN_WITHDRAWAL.toFixed(2)}`);
+                if (isNaN(n) || n < minWithdrawal) {
+                  toast.error(`Minimum withdrawal is GHS ${minWithdrawal.toFixed(2)}`);
                   return;
                 }
                 if (n > availableBalance) {
@@ -320,7 +343,7 @@ const DashboardWithdraw = () => {
                 }
                 setConfirmOpen(true);
               }}
-              disabled={withdrawing || biometricScanning || availableBalance < MIN_WITHDRAWAL}
+              disabled={!systemEnabled || withdrawing || biometricScanning || availableBalance < minWithdrawal}
               className="gap-2"
             >
               {biometricScanning
