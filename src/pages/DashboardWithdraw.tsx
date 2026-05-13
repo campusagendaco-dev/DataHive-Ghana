@@ -56,20 +56,22 @@ const DashboardWithdraw = () => {
   const [biometricScanning, setBiometricScanning] = useState(false);
   const [minWithdrawal, setMinWithdrawal] = useState(25);
   const [systemEnabled, setSystemEnabled] = useState(true);
+  const [walletBalance, setWalletBalance] = useState(0);
 
   const { isSupported, credentials, authenticate } = useWebAuthn();
   const hasBiometric = isSupported && credentials.length > 0;
 
   const theoreticalBalance = parseFloat((totalProfit - (completedWithdrawals + pendingWithdrawals)).toFixed(2));
-  const availableBalance = Math.min(theoreticalBalance, profile?.wallet_balance || 0);
+  const availableBalance = Math.min(theoreticalBalance, walletBalance);
 
   const fetchData = useCallback(async () => {
     if (!user) return;
 
-    const [ordersRes, parentRes, withdrawalsRes] = await Promise.all([
+    const [ordersRes, parentRes, withdrawalsRes, walletRes] = await Promise.all([
       supabase.from("orders").select("profit").eq("agent_id", user.id).eq("status", "fulfilled"),
       supabase.from("orders").select("parent_profit").eq("parent_agent_id", user.id).eq("status", "fulfilled"),
       supabase.from("withdrawals").select("*").eq("agent_id", user.id).order("created_at", { ascending: false }),
+      supabase.from("wallets").select("balance").eq("agent_id", user.id).maybeSingle(),
     ]);
 
     // Fetch settings separately — columns may not exist in older deployments; default gracefully
@@ -102,6 +104,7 @@ const DashboardWithdraw = () => {
 
     setCompletedWithdrawals(completed);
     setPendingWithdrawals(pending);
+    setWalletBalance(Number(walletRes.data?.balance || 0));
 
     if (settingsRes.data) {
       setMinWithdrawal(Number(settingsRes.data.min_withdrawal_amount) || 25);
