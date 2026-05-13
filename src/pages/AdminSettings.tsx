@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase, SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
@@ -311,10 +311,19 @@ const AdminSettings = () => {
     };
 
     try {
-      const { data, error } = await supabase.functions.invoke(`admin-actions-v3?t=${Date.now()}`, {
-        body: { action: "update_system_settings", settings: payload },
-        headers: { Authorization: `Bearer ${session?.access_token}` },
+      const { data: { session } } = await supabase.auth.getSession();
+      const response = await fetch(`${SUPABASE_URL}/functions/v1/system-payout-v1?t=${Date.now()}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session?.access_token}`,
+          'apikey': SUPABASE_PUBLISHABLE_KEY
+        },
+        body: JSON.stringify({ action: "update_system_settings", settings: payload })
       });
+
+      const data = await response.json();
+      const error = !response.ok ? data : null;
 
       if (error || data?.error) {
         const errorMsg = data?.error || error?.message || "Unknown error";

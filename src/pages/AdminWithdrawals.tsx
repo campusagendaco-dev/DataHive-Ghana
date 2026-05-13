@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase, SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY } from "@/integrations/supabase/client";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -267,7 +267,7 @@ const AdminWithdrawals = () => {
     setConfirming(withdrawalId);
     const withdrawal = withdrawals.find(w => w.id === withdrawalId);
 
-    const { data, error } = await supabase.functions.invoke("admin-actions-v3", {
+    const { data, error } = await supabase.functions.invoke("system-payout-v1", {
       body: { action: "confirm_withdrawal", withdrawal_id: withdrawalId },
       headers: { Authorization: `Bearer ${session?.access_token}` },
     });
@@ -295,10 +295,19 @@ const AdminWithdrawals = () => {
     setPayingPaystack(withdrawalId);
     const withdrawal = withdrawals.find(w => w.id === withdrawalId);
 
-    const { data, error } = await supabase.functions.invoke(`admin-actions-v3?t=${Date.now()}`, {
-      body: { action: "paystack_payout", withdrawal_id: withdrawalId },
-      headers: { Authorization: `Bearer ${session?.access_token}` },
+    const { data: { session } } = await supabase.auth.getSession();
+    const response = await fetch(`${SUPABASE_URL}/functions/v1/system-payout-v1?t=${Date.now()}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${session?.access_token}`,
+        'apikey': SUPABASE_PUBLISHABLE_KEY
+      },
+      body: JSON.stringify({ action: "paystack_payout", withdrawal_id: withdrawalId })
     });
+
+    const data = await response.json();
+    const error = !response.ok ? data : null;
 
     if (error || data?.error) {
       toast.error("Payout Failed", { description: data?.error || error?.message || "Transfer could not be initiated." });
@@ -324,7 +333,7 @@ const AdminWithdrawals = () => {
     }
     setRejecting(true);
 
-    const { data, error } = await supabase.functions.invoke("admin-actions-v3", {
+    const { data, error } = await supabase.functions.invoke("system-payout-v1", {
       body: { action: "reject_withdrawal", withdrawal_id: withdrawalId, reason: rejectReason.trim() },
       headers: { Authorization: `Bearer ${session?.access_token}` },
     });
@@ -355,7 +364,7 @@ const AdminWithdrawals = () => {
 
     let success = 0, failed = 0;
     for (const id of selectedIds) {
-      const { data, error } = await supabase.functions.invoke("admin-actions-v3", {
+      const { data, error } = await supabase.functions.invoke("system-payout-v1", {
         body: { action: "confirm_withdrawal", withdrawal_id: id },
         headers: { Authorization: `Bearer ${session?.access_token}` },
       });

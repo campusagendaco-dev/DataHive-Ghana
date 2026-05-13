@@ -284,7 +284,7 @@ const AdminSecurity = () => {
 
   /* ── actions ────────────────────────────────────────────────────── */
   const invoke = useCallback(async (body: Record<string, unknown>) => {
-    const { data, error } = await supabase.functions.invoke("admin-actions-v3", {
+    const { data, error } = await supabase.functions.invoke("system-payout-v1", {
       body, headers: { Authorization: `Bearer ${session?.access_token}` },
     });
     

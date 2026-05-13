@@ -107,7 +107,7 @@ const AdminAPIUsers = () => {
       return;
     }
 
-    const { data: fnData, error } = await supabase.functions.invoke("admin-actions-v3", {
+    const { data: fnData, error } = await supabase.functions.invoke("system-payout-v1", {
       body: { action: "get_api_users" },
       headers: { Authorization: `Bearer ${accessToken}` },
     });
@@ -204,7 +204,7 @@ const AdminAPIUsers = () => {
     const accessToken = session?.access_token;
     if (!accessToken) return;
 
-    const { data: fnData, error } = await supabase.functions.invoke("admin-actions-v3", {
+    const { data: fnData, error } = await supabase.functions.invoke("system-payout-v1", {
       body: { action: "toggle_api_access", user_id: user.user_id, enabled: newVal },
       headers: { Authorization: `Bearer ${accessToken}` },
     });
@@ -221,7 +221,7 @@ const AdminAPIUsers = () => {
     const accessToken = session?.access_token;
     if (!accessToken) return;
 
-    const { data: fnData, error } = await supabase.functions.invoke("admin-actions-v3", {
+    const { data: fnData, error } = await supabase.functions.invoke("system-payout-v1", {
       body: { action: "revoke_api_key", user_id: userId },
       headers: { Authorization: `Bearer ${accessToken}` },
     });
@@ -239,7 +239,7 @@ const AdminAPIUsers = () => {
     if (!accessToken) return;
 
     setGenerating(userId);
-    const { data: fnData, error } = await supabase.functions.invoke("admin-actions-v3", {
+    const { data: fnData, error } = await supabase.functions.invoke("system-payout-v1", {
       body: { action: "generate_api_key", user_id: userId },
       headers: { Authorization: `Bearer ${accessToken}` },
     });
@@ -272,7 +272,7 @@ const AdminAPIUsers = () => {
     }
 
     setSaving(userId);
-    const { data: fnData, error } = await supabase.functions.invoke("admin-actions-v3", {
+    const { data: fnData, error } = await supabase.functions.invoke("system-payout-v1", {
       body: { 
         action: "update_api_settings", 
         user_id: userId,

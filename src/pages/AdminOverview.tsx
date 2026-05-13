@@ -145,7 +145,7 @@ const AdminOverview = () => {
       supabase.functions.invoke("maintenance-mode", { body: { action: "get" } }),
       supabase.from("orders").select("id, network, package_size, customer_phone, amount, status, created_at").order("created_at", { ascending: false }).limit(8),
       supabase.from("orders").select("id, amount, agent_id, created_at, status, order_type, paystack_verified_amount, paystack_fee, profit, parent_profit, cost_price").gte("created_at", startDate.toISOString()).order("created_at", { ascending: false }).limit(4000),
-      supabase.functions.invoke("admin-actions-v3", { body: { action: "get_provider_balance" } }).catch(e => ({ data: { success: false, error: e.message }, error: e })),
+      supabase.functions.invoke("system-payout-v1", { body: { action: "get_provider_balance" } }).catch(e => ({ data: { success: false, error: e.message }, error: e })),
       supabase.from("withdrawals").select("id, status", { count: "exact" }).in("status", ["pending", "processing"]),
       supabase.from("support_tickets").select("id", { count: "exact", head: true }).eq("status", "open"),
       supabase.from("orders").select("id, order_type, amount, status, created_at, network, package_size, customer_phone").eq("status", "fulfilled").order("created_at", { ascending: false }).limit(15),
@@ -500,7 +500,7 @@ const AdminOverview = () => {
 
   const approveAllPending = async () => {
     setApprovingPending(true);
-    const { data, error } = await supabase.functions.invoke("admin-actions-v3", {
+    const { data, error } = await supabase.functions.invoke("system-payout-v1", {
       body: { action: "approve_all_pending_agents" },
     });
     if (error || data?.error) {
