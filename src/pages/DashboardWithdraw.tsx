@@ -32,7 +32,8 @@ interface Withdrawal {
   net_amount: number;
 }
 
-const WITHDRAWAL_FEE_RATE = 0.015; // 1.5%
+const WITHDRAWAL_FEE_FLAT = 1.00;
+const WITHDRAWAL_FEE_PERCENT = 0.01; // 1%
 
 const statusConfig: Record<string, { icon: typeof CheckCircle; color: string; label: string }> = {
   completed: { icon: CheckCircle, color: "bg-green-500/20 text-green-400 border-green-500/30", label: "Completed" },
@@ -143,7 +144,7 @@ const DashboardWithdraw = () => {
       return;
     }
 
-    const fee = parseFloat((numAmount * WITHDRAWAL_FEE_RATE).toFixed(2));
+    const fee = parseFloat((WITHDRAWAL_FEE_FLAT + (numAmount * WITHDRAWAL_FEE_PERCENT)).toFixed(2));
     const net = numAmount - fee;
 
     if (profile?.last_security_update) {
@@ -393,7 +394,7 @@ const DashboardWithdraw = () => {
             </p>
           )}
           <p className="text-xs text-muted-foreground mt-1">
-            A 1.5% processing fee applies to all withdrawals. Funds are sent within 24 hours.
+            A processing fee of GHS 1.00 + 1% applies to all withdrawals. Funds are sent within 24 hours.
             {hasBiometric && " · Biometric verification enabled."}
           </p>
         </CardContent>
@@ -444,12 +445,12 @@ const DashboardWithdraw = () => {
                   <span className="font-bold">GHS {parseFloat(amount || "0").toFixed(2)}</span>
                 </div>
                 <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Processing Fee (1.5%):</span>
-                  <span className="font-bold text-red-400">- GHS {(parseFloat(amount || "0") * WITHDRAWAL_FEE_RATE).toFixed(2)}</span>
+                  <span className="text-muted-foreground">Processing Fee (GHS 1.00 + 1%):</span>
+                  <span className="font-bold text-red-400">- GHS {(WITHDRAWAL_FEE_FLAT + (parseFloat(amount || "0") * WITHDRAWAL_FEE_PERCENT)).toFixed(2)}</span>
                 </div>
                 <div className="pt-2 border-t border-border flex justify-between text-base">
                   <span className="font-semibold text-foreground">You will receive:</span>
-                  <span className="font-black text-emerald-400">GHS {(parseFloat(amount || "0") * (1 - WITHDRAWAL_FEE_RATE)).toFixed(2)}</span>
+                  <span className="font-black text-emerald-400">GHS {(parseFloat(amount || "0") - (WITHDRAWAL_FEE_FLAT + (parseFloat(amount || "0") * WITHDRAWAL_FEE_PERCENT))).toFixed(2)}</span>
                 </div>
               </div>
               <p className="text-xs text-muted-foreground">

@@ -51,8 +51,14 @@ serve(async (req) => {
       });
     }
 
-    // Server-side validation of amount vs credit
-    const feeRate = 0.03;
+    // Fetch dynamic fee configuration
+    const { data: settings } = await supabaseAdmin
+      .from("system_settings")
+      .select("paystack_deposit_fee_percent")
+      .eq("id", 1)
+      .maybeSingle();
+
+    const feeRate = Number(settings?.paystack_deposit_fee_percent ?? 0.03);
     const feeCap = 100;
     // Zero fee for API wallet, standard fee for Main wallet
     const calculatedFee = isApiWallet ? 0 : Math.min(creditAmount * feeRate, feeCap);

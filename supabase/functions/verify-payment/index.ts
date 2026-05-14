@@ -644,7 +644,16 @@ serve(async (req) => {
         }
 
         verifiedAmount = verifyData.data.amount / 100;
-        paystackFeeOnVerified = parseFloat(Math.min(verifiedAmount * 0.03 / 1.03, 100).toFixed(2)) || 0;
+        
+        // Fetch dynamic fee configuration for estimation
+        const { data: settings } = await supabaseAdmin
+          .from("system_settings")
+          .select("paystack_deposit_fee_percent")
+          .eq("id", 1)
+          .maybeSingle();
+        
+        const feeRate = Number(settings?.paystack_deposit_fee_percent ?? 0.03);
+        paystackFeeOnVerified = parseFloat(Math.min(verifiedAmount * (feeRate / (1 + feeRate)), 100).toFixed(2)) || 0;
         metadata = verifyData.data.metadata || {};
         if (typeof metadata === "string") try { metadata = JSON.parse(metadata); } catch { metadata = {}; }
         currentOrderType = (metadata?.order_type || currentOrderType) as string;
@@ -696,7 +705,10 @@ serve(async (req) => {
     if (currentOrderType === "wallet_topup") {
       const agentId = claimedOrder.agent_id || metadata?.agent_id;
       if (agentId) {
-        await supabaseAdmin.rpc("credit_wallet", { p_agent_id: agentId, p_amount: verifiedAmount });
+        // Use the requested credit amount (order.amount), not the full paid amount (verifiedAmount)
+        // This ensures the 3% processing fee is effectively charged.
+        const creditAmount = Number(claimedOrder.amount || verifiedAmount);
+        await supabaseAdmin.rpc("credit_wallet", { p_agent_id: agentId, p_amount: creditAmount });
         await supabaseAdmin.from("orders").update({ status: "fulfilled" }).eq("id", targetReference);
       }
       return new Response(JSON.stringify({ status: "fulfilled" }), { headers: corsHeaders });

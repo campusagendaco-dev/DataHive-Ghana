@@ -733,9 +733,16 @@ serve(async (req) => {
       
       const orderType = orderTypeFromMetadata || "data";
       const requestedWalletCredit = Number(metadata?.wallet_credit);
-      const walletCredit = Number.isFinite(requestedWalletCredit) && requestedWalletCredit > 0
+      let walletCredit = Number.isFinite(requestedWalletCredit) && requestedWalletCredit > 0
         ? Math.min(requestedWalletCredit, verifiedAmount)
         : verifiedAmount;
+
+      // Fallback: If wallet_credit is missing in metadata but it's a top-up, 
+      // assume the 3% fee was meant to be applied (unless it's an API wallet).
+      if (!requestedWalletCredit && orderType === "wallet_topup" && metadata?.wallet_type !== "api") {
+        walletCredit = Number((verifiedAmount / 1.03).toFixed(2));
+      }
+
       const normalizedAmount = orderType === "wallet_topup"
         ? walletCredit
         : (Number.isFinite(verifiedAmount) && verifiedAmount > 0 ? verifiedAmount : 0);

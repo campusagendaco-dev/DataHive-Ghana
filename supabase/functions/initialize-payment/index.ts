@@ -9,7 +9,7 @@ const corsHeaders = {
 
 declare const Deno: any;
 
-const PAYSTACK_FEE_RATE = 0.03;
+let PAYSTACK_FEE_RATE = 0.03;
 const PAYSTACK_FEE_CAP = 100;
 
 // Mirrors src/lib/data.ts — used when global_package_settings has no row for a package
@@ -119,9 +119,13 @@ serve(async (req: Request) => {
   try {
     const { data: settings } = await supabaseAdmin
       .from("system_settings")
-      .select("holiday_mode_enabled, holiday_message, disable_ordering, mtn_markup_percentage, telecel_markup_percentage, at_markup_percentage, agent_activation_fee")
+      .select("holiday_mode_enabled, holiday_message, disable_ordering, mtn_markup_percentage, telecel_markup_percentage, at_markup_percentage, agent_activation_fee, paystack_deposit_fee_percent")
       .eq("id", 1)
       .maybeSingle();
+
+    if (settings?.paystack_deposit_fee_percent !== undefined) {
+      PAYSTACK_FEE_RATE = Number(settings.paystack_deposit_fee_percent);
+    }
 
     if (settings?.disable_ordering) {
       // Read order type from body to decide whether to bypass — parse body early
