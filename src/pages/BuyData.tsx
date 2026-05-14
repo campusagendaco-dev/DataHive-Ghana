@@ -357,7 +357,7 @@ const BuyData = () => {
   }, [packages, selectedPkg?.size, colors, handleCardClick, selectedNetwork]);
 
   return (
-    <div className="min-h-screen pt-20 pb-24 transition-all duration-300">
+    <div className="min-h-screen pt-12 md:pt-20 pb-24 transition-all duration-300">
       <SEO 
         title="Buy Cheap Data Bundles — MTN, Telecel & AirtelTigo"
         description="Select your network and buy cheap non-expiry data bundles in Ghana. We support MTN, Telecel and AirtelTigo with instant delivery."
@@ -366,7 +366,7 @@ const BuyData = () => {
 
       />
       {/* Hero header */}
-      <div className="text-white py-10 px-4 mb-6" style={{ background: theme.heroHex }}>
+      <div className="text-white py-6 md:py-10 px-4 mb-4 md:mb-6" style={{ background: theme.heroHex }}>
         <div className="container mx-auto max-w-5xl">
           <div className="flex items-center gap-2 mb-2">
             <Zap className="w-4 h-4 text-amber-400" />

@@ -189,7 +189,7 @@ const AgentProgram = () => {
   };
 
   return (
-    <div className="min-h-screen pt-24 pb-16 px-4">
+    <div className="min-h-screen pt-12 md:pt-24 pb-16 px-4">
       <SEO 
         title="Become a Data Reseller Agent — Start Your Business"
         description="Launch your own data reselling business in Ghana. Unlock wholesale prices for MTN, Telecel & AirtelTigo and get your own branded store."
@@ -198,7 +198,7 @@ const AgentProgram = () => {
 
       />
       <div className="container mx-auto max-w-4xl">
-        <div className="text-center mb-16">
+        <div className="text-center mb-10 md:mb-16">
           <h1 className="font-display text-3xl md:text-5xl font-black mb-4">
             Become a <span className="text-gradient">SwiftData Reseller</span>
           </h1>
@@ -210,7 +210,7 @@ const AgentProgram = () => {
           </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-16">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-5 md:gap-6 mb-10 md:mb-16">
           {benefits(isPromoActive ? 0 : activationFee).map((b) => (
             <div key={b.title} className="flex gap-4 p-6 rounded-2xl glass-card hover:border-primary/30 transition-all">
               <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0">
@@ -226,7 +226,7 @@ const AgentProgram = () => {
           ))}
         </div>
 
-        <div className="mb-16">
+        <div className="mb-10 md:mb-16">
           <h2 className="font-display text-2xl font-black text-center mb-8">How It Works</h2>
           <div className="space-y-4 max-w-lg mx-auto">
             {steps(isPromoActive ? 0 : activationFee).map((step, i) => (

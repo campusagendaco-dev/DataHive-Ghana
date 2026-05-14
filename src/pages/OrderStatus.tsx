@@ -421,7 +421,7 @@ const OrderStatus = () => {
         <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-blue-500/5 rounded-full blur-[120px]" />
       </div>
 
-      <div className="relative max-w-lg mx-auto px-6 pt-24 pb-20">
+      <div className="relative max-w-lg mx-auto px-6 pt-12 md:pt-24 pb-20">
         <div className="flex items-center justify-between mb-10">
           <div>
             <h1 className="text-2xl font-black tracking-tight mb-1">Live Scanner</h1>
@@ -439,7 +439,7 @@ const OrderStatus = () => {
         </div>
 
         {/* Global Search Bar */}
-        <form onSubmit={handleSearch} className="relative group mb-10">
+        <form onSubmit={handleSearch} className="relative group mb-6 md:mb-10">
           <input 
             type="tel"
             value={searchPhone}

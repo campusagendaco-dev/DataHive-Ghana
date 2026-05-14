@@ -23,13 +23,13 @@ const Footer = () => {
   }, []);
 
   return (
-    <footer className="relative bg-[#0a0a0f] text-white pt-20 pb-8 overflow-hidden border-t border-white/5">
+    <footer className="relative bg-[#0a0a0f] text-white pt-12 md:pt-20 pb-8 overflow-hidden border-t border-white/5">
       {/* Decorative background elements */}
       <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[400px] bg-amber-500/10 blur-[120px] rounded-full pointer-events-none" />
       <div className="absolute bottom-0 right-0 w-[400px] h-[300px] bg-blue-500/10 blur-[100px] rounded-full pointer-events-none" />
       
       <div className="container relative z-10 mx-auto px-6">
-        <div className="grid grid-cols-1 md:grid-cols-12 gap-12 mb-16">
+        <div className="grid grid-cols-1 md:grid-cols-12 gap-8 md:gap-12 mb-10 md:mb-16">
           
           {/* Brand Column */}
           <div className="md:col-span-4">

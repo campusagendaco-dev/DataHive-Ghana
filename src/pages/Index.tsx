@@ -302,7 +302,7 @@ const Index = () => {
       <StoreVisitorPopup agentSlug="home" showSubAgentLink={false} />
 
       {/* ── Hero ──────────────────────────────────────────────────────────── */}
-      <section className="relative overflow-hidden pt-36 pb-28 px-4 min-h-[85vh] flex items-center justify-center">
+      <section className="relative overflow-hidden pt-24 pb-16 md:pt-36 md:pb-28 px-4 min-h-[70vh] md:min-h-[85vh] flex items-center justify-center">
         {/* Video Background */}
         <div className="absolute inset-0 z-0 overflow-hidden">
           <div className="absolute inset-0 bg-black/60 z-10" /> {/* Dark overlay */}
@@ -385,9 +385,8 @@ const Index = () => {
             </div>
           </div>
 
-          {/* Headline */}
           <h1
-            className="text-5xl sm:text-6xl md:text-7xl font-black leading-[1.04] tracking-tight mb-6 text-white"
+            className="text-3xl sm:text-6xl md:text-7xl font-black leading-[1.1] md:leading-[1.04] tracking-tight mb-6 text-white"
           >
             <span 
               className="block" 
@@ -485,7 +484,7 @@ const Index = () => {
       </div>
 
       {/* ── Network cards ──────────────────────────────────────────────────── */}
-      <section className="py-24 px-4">
+      <section className="py-12 md:py-24 px-4">
         <div className="container mx-auto max-w-5xl">
           <div className="text-center mb-14">
             <p className="text-amber-500 text-[11px] font-bold uppercase tracking-[0.2em] mb-3">All networks covered</p>
@@ -513,7 +512,7 @@ const Index = () => {
                 {/* Colored top accent bar */}
                 <div className={`h-[3px] ${net.top}`} />
 
-                <div className="p-6">
+                <div className="p-4 md:p-6">
                   {/* Network identity */}
                   <div className="flex items-center gap-3 mb-6">
                     <div className={`w-10 h-10 rounded-xl ${net.accent} flex items-center justify-center shrink-0`}>
@@ -570,7 +569,7 @@ const Index = () => {
       </section>
 
       {/* ── How it works ───────────────────────────────────────────────────── */}
-      <section className="py-24 px-4 border-t border-gray-200 dark:border-white/6">
+      <section className="py-12 md:py-24 px-4 border-t border-gray-200 dark:border-white/6">
         <div className="container mx-auto max-w-4xl">
           <div className="text-center mb-14">
             <p className="text-amber-500 text-[11px] font-bold uppercase tracking-[0.2em] mb-3">Simple process</p>
@@ -591,7 +590,7 @@ const Index = () => {
             <div className="hidden md:block absolute top-10 left-[calc(16.67%+1.25rem)] right-[calc(16.67%+1.25rem)] h-px border-t border-dashed border-gray-200 dark:border-white/10" />
 
             {STEPS.map(({ step, title, desc, color, border, bg }) => (
-              <div key={step} className="relative rounded-2xl border border-gray-200 dark:border-white/8 bg-white dark:bg-white/[0.025] p-7 text-center shadow-sm">
+              <div key={step} className="relative rounded-2xl border border-gray-200 dark:border-white/8 bg-white dark:bg-white/[0.025] p-5 md:p-7 text-center shadow-sm">
                 <div className={`w-14 h-14 rounded-2xl border ${border} ${bg} flex items-center justify-center mx-auto mb-5`}>
                   <span className={`text-xl font-black ${color}`}>{step}</span>
                 </div>
@@ -604,7 +603,7 @@ const Index = () => {
       </section>
 
       {/* ── Features ───────────────────────────────────────────────────────── */}
-      <section className="py-24 px-4 border-t border-gray-200 dark:border-white/6">
+      <section className="py-12 md:py-24 px-4 border-t border-gray-200 dark:border-white/6">
         <div className="container mx-auto max-w-5xl">
           <div className="text-center mb-14">
             <p className="text-amber-500 text-[11px] font-bold uppercase tracking-[0.2em] mb-3">Why SwiftData Ghana</p>
@@ -652,7 +651,7 @@ const Index = () => {
               transition: "opacity 0.55s cubic-bezier(0.22,1,0.36,1), transform 0.55s cubic-bezier(0.22,1,0.36,1)",
             }}
           >
-            <div className="relative rounded-3xl overflow-hidden border border-emerald-400/25 bg-emerald-400/5 dark:bg-emerald-400/[0.06] p-10 md:p-14 shadow-sm">
+            <div className="relative rounded-3xl overflow-hidden border border-emerald-400/25 bg-emerald-400/5 dark:bg-emerald-400/[0.06] p-6 md:p-14 shadow-sm">
               {/* Glow */}
               <div className="absolute -top-20 -right-20 w-[360px] h-[300px] bg-emerald-400/10 rounded-full blur-[100px] pointer-events-none" />
 
@@ -697,7 +696,7 @@ const Index = () => {
       </section>
 
       {/* ── Order tracker ──────────────────────────────────────────────────── */}
-      <section className="py-24 px-4 border-t border-gray-200 dark:border-white/6">
+      <section className="py-12 md:py-24 px-4 border-t border-gray-200 dark:border-white/6">
         <div className="container mx-auto max-w-3xl">
           <div className="text-center mb-10">
             <p className="text-amber-500 text-[11px] font-bold uppercase tracking-[0.2em] mb-3">Real-time tracking</p>
@@ -723,11 +722,11 @@ const Index = () => {
       </section>
 
       {/* ── Agent CTA ──────────────────────────────────────────────────────── */}
-      <section className="py-24 px-4 border-t border-gray-200 dark:border-white/6">
+      <section className="py-12 md:py-24 px-4 border-t border-gray-200 dark:border-white/6">
         <div className="container mx-auto max-w-5xl">
           <div
             ref={agent.ref}
-            className="relative rounded-3xl overflow-hidden border border-amber-400/25 p-10 md:p-14 bg-white dark:bg-transparent shadow-sm"
+            className="relative rounded-3xl overflow-hidden border border-amber-400/25 p-6 md:p-14 bg-white dark:bg-transparent shadow-sm"
             style={{
               opacity: agent.visible ? 1 : 0,
               transform: agent.visible ? "translateY(0)" : "translateY(24px)",
@@ -789,7 +788,7 @@ const Index = () => {
 
       {/* ── Guest Promo (Strategic Placement) ────────────────────────────────── */}
       {!user && (
-        <section className="py-24 px-4 bg-white dark:bg-white/[0.01]">
+        <section className="py-12 md:py-24 px-4 bg-white dark:bg-white/[0.01]">
           <div className="container mx-auto max-w-5xl">
             <div className="text-center mb-10">
               <p className="text-amber-500 text-[11px] font-bold uppercase tracking-[0.2em] mb-3">Special Offers</p>
