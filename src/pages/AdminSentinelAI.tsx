@@ -82,6 +82,7 @@ const AdminSentinelAI = () => {
     try {
       const { data, error } = await supabase.functions.invoke("sentinel-ai");
       if (error) throw error;
+      if (data?.error) throw new Error(data.message || data.error);
       toast.success(data.message || "Sentinel analysis complete");
       fetchSentinelData();
     } catch (error: any) {

@@ -5,7 +5,7 @@ import { log } from "../_shared/logger.ts";
 
 declare const Deno: any;
 
-const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY");
+const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY");
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
 
@@ -14,9 +14,21 @@ serve(async (req: Request) => {
     return new Response(null, { headers: corsHeaders });
   }
 
-  if (!GEMINI_API_KEY || !SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
-    return new Response(JSON.stringify({ error: "Missing configuration" }), {
-      status: 500,
+  if (!ANTHROPIC_API_KEY || !SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
+    console.error("Missing Config:", { 
+      hasAnthropic: !!ANTHROPIC_API_KEY, 
+      hasUrl: !!SUPABASE_URL, 
+      hasServiceRole: !!SUPABASE_SERVICE_ROLE_KEY 
+    });
+    return new Response(JSON.stringify({ 
+      error: "Missing configuration",
+      details: {
+        hasAnthropic: !!ANTHROPIC_API_KEY,
+        hasUrl: !!SUPABASE_URL,
+        hasServiceRole: !!SUPABASE_SERVICE_ROLE_KEY
+      }
+    }), {
+      status: 200,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
@@ -24,6 +36,7 @@ serve(async (req: Request) => {
   const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
   try {
+    console.log("Sentinel starting scan via Anthropic Engine...");
     // 0. Budget Check (Budget Guardian)
     const { data: settings } = await supabaseAdmin.from("system_settings").select("*").eq("id", 1).maybeSingle();
 
@@ -78,11 +91,11 @@ serve(async (req: Request) => {
     // 2. Fetch current system state
     const { data: providers } = await supabaseAdmin.from("providers").select("*");
 
-    const tokenCostPerScan = 0.0001; // Average cost for Gemini 1.5 Flash per scan
+    const tokenCostPerScan = 0.0001; 
     const { data: strategies } = await supabaseAdmin.from("sentinel_strategies").select("*").eq("is_active", true);
 
     // 3. Construct AI Prompt
-    const prompt = `
+    const systemPrompt = `
       You are SENTINEL — the autonomous intelligence core of SwiftData Ghana's fintech platform.
       You think like a senior Site Reliability Engineer combined with a seasoned business analyst.
       You don't just react to alerts — you reason carefully, weigh evidence, consider context,
@@ -95,25 +108,7 @@ serve(async (req: Request) => {
       - When in doubt, notify_admin rather than taking an irreversible action.
       - Always ask: "What is the most likely root cause?" before deciding on action.
 
-      ━━━ CURRENT SYSTEM STATE ━━━
-      Settings: ${JSON.stringify(settings)}
-      Providers: ${JSON.stringify(providers?.map((p: any) => ({ id: p.id, name: p.name, is_active: p.is_active, handler: p.handler_type })))}
-      Active Strategies: ${JSON.stringify(strategies?.map((s: any) => s.condition_prompt))}
-
-      ━━━ RECENT ERRORS (last 30 min) ━━━
-      ${JSON.stringify(errors.map((e: any) => ({ ts: e.ts, source: e.source, event: e.event, message: e.message, data: e.data })))}
-
-      ━━━ STUCK ORDERS (processing > 10 min) ━━━
-      ${JSON.stringify(stuckOrders?.map((o: any) => ({ id: o.id, amount: o.amount, customer: o.profiles?.full_name, phone: o.profiles?.phone })))}
-
-      ━━━ SECURITY SIGNALS (last 5 min) ━━━
-      ${JSON.stringify(threats?.map((t: any) => ({ ts: t.ts, event: t.event, message: t.message, ip: t.data?.ip })))}
-
-      ━━━ CHURNING AGENTS ━━━
-      ${JSON.stringify(churningAgents?.map((a: any) => ({ id: a.user_id, name: a.profiles?.full_name, days_inactive: a.days_since_last_order })))}
-
       ━━━ DECISION FRAMEWORK ━━━
-      Think through this systematically:
       1. Are the errors clustered around one provider/source, or scattered? Clustered = provider issue. Scattered = platform issue.
       2. Is this a spike or a sustained pattern? A single error is noise. 3+ similar errors in 30 min is a signal.
       3. For security: Is the same IP failing repeatedly? Is the rate abnormal? Only block with high confidence.
@@ -147,35 +142,56 @@ serve(async (req: Request) => {
       }
     `;
 
-    // 4. Call Gemini
-    const aiResponse = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`, {
+    const userMessage = `
+      ━━━ CURRENT SYSTEM STATE ━━━
+      Settings: ${JSON.stringify(settings)}
+      Providers: ${JSON.stringify(providers?.map((p: any) => ({ id: p.id, name: p.name, is_active: p.is_active, handler: p.handler_type })))}
+      Active Strategies: ${JSON.stringify(strategies?.map((s: any) => s.condition_prompt))}
+
+      ━━━ RECENT ERRORS (last 30 min) ━━━
+      ${JSON.stringify(errors.map((e: any) => ({ ts: e.ts, source: e.source, event: e.event, message: e.message, data: e.data })))}
+
+      ━━━ STUCK ORDERS (processing > 10 min) ━━━
+      ${JSON.stringify(stuckOrders?.map((o: any) => ({ id: o.id, amount: o.amount, customer: o.profiles?.full_name, phone: o.profiles?.phone })))}
+
+      ━━━ SECURITY SIGNALS (last 5 min) ━━━
+      ${JSON.stringify(threats?.map((t: any) => ({ ts: t.ts, event: t.event, message: t.message, ip: t.data?.ip })))}
+
+      ━━━ CHURNING AGENTS ━━━
+      ${JSON.stringify(churningAgents?.map((a: any) => ({ id: a.user_id, name: a.profiles?.full_name, days_inactive: a.days_since_last_order })))}
+    `;
+
+    // 4. Call Anthropic
+    const aiResponse = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "x-api-key": ANTHROPIC_API_KEY,
+        "anthropic-version": "2023-06-01",
+        "content-type": "application/json",
+      },
       body: JSON.stringify({
-        contents: [{ parts: [{ text: prompt }] }],
-        generationConfig: {
-          response_mime_type: "application/json",
-          temperature: 0.2,
-        }
-      })
+        model: "claude-haiku-4-5-20251001",
+        max_tokens: 1000,
+        system: systemPrompt,
+        messages: [{ role: "user", content: userMessage }],
+      }),
     });
 
     if (!aiResponse.ok) {
       const errText = await aiResponse.text();
-      throw new Error(`Gemini API error: ${aiResponse.status} — ${errText}`);
+      throw new Error(`Anthropic API error: ${aiResponse.status} — ${errText}`);
     }
 
     const aiData = await aiResponse.json();
-    const rawText = aiData?.candidates?.[0]?.content?.parts?.[0]?.text;
-    if (!rawText) throw new Error("Empty response from Gemini");
+    const rawText = aiData?.content?.[0]?.text;
+    if (!rawText) throw new Error("Empty response from Anthropic");
 
-    // Robust JSON extraction — handles markdown code blocks if Gemini adds them
+    // Robust JSON extraction
     let decision: any;
     try {
       const jsonMatch = rawText.match(/\{[\s\S]*\}/);
       decision = JSON.parse(jsonMatch ? jsonMatch[0] : rawText);
     } catch (_parseErr) {
-      // Fallback: treat as a safe no-op if response is unparseable
       decision = {
         diagnosis: "Sentinel received an unparseable AI response — standing down safely.",
         action: "none",
@@ -188,7 +204,6 @@ serve(async (req: Request) => {
     // 5. Execute Action
     let executionResult = null;
     if (decision.action !== "none") {
-      // Log the intent
       const { data: actionLog } = await supabaseAdmin
         .from("sentinel_actions")
         .insert({
@@ -302,7 +317,7 @@ serve(async (req: Request) => {
       stack: error.stack,
       details: error
     }), {
-      status: 500,
+      status: 200,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }

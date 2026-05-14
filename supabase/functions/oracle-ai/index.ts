@@ -94,7 +94,7 @@ serve(async (req: Request) => {
     if (!response.ok) {
       const err = await response.text();
       console.error("Anthropic error:", err);
-      throw new Error("AI request failed");
+      throw new Error(`Anthropic Error: ${response.status} - ${err}`);
     }
 
     const data = await response.json();
