@@ -87,8 +87,9 @@ export default function AIConcierge() {
   return (
     <motion.div 
       drag
-      dragConstraints={{ left: -window.innerWidth + 80, right: 0, top: -window.innerHeight + 80, bottom: 0 }}
-      className="fixed bottom-5 right-5 z-[9999] flex flex-col items-end gap-3 cursor-grab active:cursor-grabbing"
+      dragMomentum={false}
+      whileDrag={{ scale: 1.05, cursor: "grabbing" }}
+      className="fixed bottom-10 right-10 z-[9999] flex flex-col items-end gap-3 cursor-grab"
     >
 
       {/* ── Chat panel ── */}
