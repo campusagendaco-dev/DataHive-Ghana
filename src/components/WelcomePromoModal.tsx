@@ -13,6 +13,16 @@ export const WelcomePromoModal = () => {
       const hasSeen = localStorage.getItem("welcome_promo_seen");
       if (hasSeen) return;
 
+      // Check if welcome promo is enabled in system settings
+      const { data: settings } = await supabase
+        .from("public_system_settings")
+        .select("*")
+        .eq("id", 1)
+        .maybeSingle();
+
+      const isEnabled = settings ? (settings as any).welcome_promo_enabled !== false : true;
+      if (!isEnabled) return;
+
       const { data } = await supabase
         .from("promo_codes")
         .select("code, discount_percentage")
@@ -52,8 +62,8 @@ export const WelcomePromoModal = () => {
   if (!isOpen || !promoData) return null;
 
   return (
-    <div className="fixed inset-0 z-[150] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-in fade-in duration-300">
-      <div className="relative w-full max-w-md bg-[#0a0e0a] border border-amber-500/20 rounded-3xl p-6 overflow-hidden shadow-2xl animate-in zoom-in-95 slide-in-from-bottom-10 duration-500">
+    <div className="fixed inset-0 z-[150] flex items-start justify-center p-4 pt-12 md:pt-20 bg-black/70 backdrop-blur-sm animate-in fade-in duration-300">
+      <div className="relative w-full max-w-md bg-[#0a0e0a] border border-amber-500/20 rounded-3xl p-6 overflow-hidden shadow-2xl animate-in zoom-in-95 slide-in-from-top-10 duration-500">
         {/* Background Accents */}
         <div className="absolute -top-20 -right-20 w-40 h-40 bg-amber-400/20 rounded-full blur-3xl pointer-events-none" />
         

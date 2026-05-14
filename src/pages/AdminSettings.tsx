@@ -22,6 +22,7 @@ interface SystemSettings {
   disable_ordering: boolean;
   dark_mode_enabled: boolean;
   store_visitor_popup_enabled: boolean;
+  welcome_promo_enabled: boolean;
   customer_service_number: string;
   support_channel_link: string;
   sub_agent_base_fee: string;
@@ -94,6 +95,7 @@ const AdminSettings = () => {
     disable_ordering: false,
     dark_mode_enabled: false,
     store_visitor_popup_enabled: false,
+    welcome_promo_enabled: true,
     customer_service_number: "",
     support_channel_link: "https://whatsapp.com/channel/0029VbCx0q4KLaHfJaiHLN40",
     sub_agent_base_fee: "5.00",
@@ -195,6 +197,7 @@ const AdminSettings = () => {
           disable_ordering: d.disable_ordering || false,
           dark_mode_enabled: d.dark_mode_enabled || false,
           store_visitor_popup_enabled: d.store_visitor_popup_enabled || false,
+          welcome_promo_enabled: d.welcome_promo_enabled !== false,
           customer_service_number: d.customer_service_number || "",
           support_channel_link: d.support_channel_link || "https://whatsapp.com/channel/0029VbCx0q4KLaHfJaiHLN40",
           sub_agent_base_fee: String(d.sub_agent_base_fee || "5.00"),
@@ -280,6 +283,7 @@ const AdminSettings = () => {
       secondary_data_provider_api_key: (settings.secondary_data_provider_api_key || "").trim(),
       secondary_data_provider_base_url: (settings.secondary_data_provider_base_url || "").trim(),
       auto_failover_enabled: settings.auto_failover_enabled,
+      welcome_promo_enabled: settings.welcome_promo_enabled,
       show_announcement: settings.show_announcement,
       announcement_title: settings.announcement_title.trim(),
       announcement_message: settings.announcement_message.trim(),
@@ -485,6 +489,17 @@ const AdminSettings = () => {
                 <Switch
                   checked={settings.store_visitor_popup_enabled}
                   onCheckedChange={(c) => setSettings({ ...settings, store_visitor_popup_enabled: c })}
+                />
+              </div>
+
+              <div className="flex items-start justify-between">
+                <div className="space-y-0.5">
+                  <Label>Welcome Promo Modal</Label>
+                  <p className="text-xs text-muted-foreground">Show "100% discount" modal to first-time buyers.</p>
+                </div>
+                <Switch
+                  checked={settings.welcome_promo_enabled}
+                  onCheckedChange={(c) => setSettings({ ...settings, welcome_promo_enabled: c })}
                 />
               </div>
 

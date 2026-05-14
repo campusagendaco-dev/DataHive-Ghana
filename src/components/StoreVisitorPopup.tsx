@@ -81,7 +81,7 @@ const StoreVisitorPopup = ({ agentSlug, showSubAgentLink = true }: StoreVisitorP
             initial="hidden"
             animate="visible"
             exit="exit"
-            className="fixed z-[201] inset-x-4 bottom-4 sm:inset-auto sm:bottom-6 sm:right-6 sm:w-[390px]"
+            className="fixed z-[201] inset-x-4 bottom-4 sm:inset-auto sm:bottom-6 sm:right-6 sm:w-[380px]"
           >
             <div
               className="relative overflow-hidden rounded-3xl shadow-2xl shadow-black/80"
@@ -110,8 +110,8 @@ const StoreVisitorPopup = ({ agentSlug, showSubAgentLink = true }: StoreVisitorP
               {/* ── Hero ── */}
               <motion.div
                 variants={itemVariants}
-                className="relative overflow-hidden mx-6 mt-6 mb-4 rounded-2xl shadow-lg shadow-black/40"
-                style={{ background: "#0d0d00", border: "1px solid rgba(251,191,36,0.18)", minHeight: 200 }}
+                className="relative overflow-hidden mx-5 mt-5 mb-3 rounded-2xl shadow-lg shadow-black/40 flex flex-col justify-center"
+                style={{ background: "#0d0d00", border: "1px solid rgba(251,191,36,0.18)", minHeight: 180 }}
               >
                 {/* Diagonal yellow slash */}
                 <div
@@ -155,7 +155,7 @@ const StoreVisitorPopup = ({ agentSlug, showSubAgentLink = true }: StoreVisitorP
                 </div>
 
                 {/* Brand row */}
-                <div className="relative z-10 flex items-center gap-2.5 px-5 pt-5 mb-4">
+                <div className="relative z-10 flex items-center gap-2.5 px-5 pt-4 mb-2">
                   <motion.div 
                     initial={{ scale: 0.8 }}
                     animate={{ scale: 1 }}
@@ -213,7 +213,7 @@ const StoreVisitorPopup = ({ agentSlug, showSubAgentLink = true }: StoreVisitorP
               <motion.div
                 variants={itemVariants}
                 whileHover={{ scale: 1.02 }}
-                className="relative z-10 mx-6 mb-4 rounded-2xl flex items-center justify-between px-5 py-3.5 cursor-pointer shadow-md shadow-amber-500/10"
+                className="relative z-10 mx-5 mb-3 rounded-2xl flex items-center justify-between px-5 py-3 cursor-pointer shadow-md shadow-amber-500/10"
                 style={{ background: "#f59e0b" }}
               >
                 <span className="font-black text-black text-sm">Just share your link.</span>
@@ -226,7 +226,7 @@ const StoreVisitorPopup = ({ agentSlug, showSubAgentLink = true }: StoreVisitorP
               </motion.div>
 
               {/* ── Feature pills ── */}
-              <motion.div variants={itemVariants} className="relative z-10 px-6 pb-2 grid grid-cols-3 gap-2">
+              <motion.div variants={itemVariants} className="relative z-10 px-5 pb-2 grid grid-cols-3 gap-2">
                 {[
                   { icon: Store,       text: "Your store" },
                   { icon: Zap,         text: "Instant pay" },
@@ -247,7 +247,7 @@ const StoreVisitorPopup = ({ agentSlug, showSubAgentLink = true }: StoreVisitorP
               </motion.div>
 
               {/* ── CTA ── */}
-              <motion.div variants={itemVariants} className="relative z-10 p-5 pt-3 space-y-2">
+              <motion.div variants={itemVariants} className="relative z-10 p-5 pt-2 space-y-1.5">
                 <Link
                   to={ctaHref}
                   onClick={dismiss}
@@ -278,7 +278,7 @@ const StoreVisitorPopup = ({ agentSlug, showSubAgentLink = true }: StoreVisitorP
               </motion.div>
 
               {/* ── Footer ── */}
-              <motion.div variants={itemVariants} className="relative z-10 px-6 pb-4 flex items-center gap-2">
+              <motion.div variants={itemVariants} className="relative z-10 px-5 pb-4 flex items-center gap-2">
                 <div className="w-5 h-5 rounded-full bg-amber-400/15 border border-amber-400/25 flex items-center justify-center">
                   <motion.div 
                     animate={{ scale: [1, 1.2, 1], opacity: [1, 0.7, 1] }}
