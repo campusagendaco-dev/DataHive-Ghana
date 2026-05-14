@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Send, Sparkles, ChevronDown } from "lucide-react";
+import { X, Send, Sparkles, ChevronDown, Mic, MicOff } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
 
@@ -35,8 +35,10 @@ export default function AIConcierge() {
   const [input, setInput] = useState("");
   const [typing, setTyping] = useState(false);
   const [unread, setUnread] = useState(0);
+  const [isListening, setIsListening] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const recognitionRef = useRef<any>(null);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -181,6 +183,37 @@ export default function AIConcierge() {
     } finally {
       setTyping(false);
     }
+  };
+
+  const toggleVoice = () => {
+    if (isListening) {
+      recognitionRef.current?.stop();
+      setIsListening(false);
+      return;
+    }
+
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      alert("Voice input is not supported in this browser! 😊");
+      return;
+    }
+
+    recognitionRef.current = new SpeechRecognition();
+    recognitionRef.current.continuous = false;
+    recognitionRef.current.interimResults = false;
+    recognitionRef.current.lang = "en-GH"; // Ghanaian English vibe
+
+    recognitionRef.current.onstart = () => setIsListening(true);
+    recognitionRef.current.onend = () => setIsListening(false);
+    recognitionRef.current.onerror = () => setIsListening(false);
+    
+    recognitionRef.current.onresult = (event: any) => {
+      const transcript = event.results[0][0].transcript;
+      setInput(transcript);
+      // Auto-send if it sounds like a command? For now just fill input.
+    };
+
+    recognitionRef.current.start();
   };
 
   return (
@@ -370,6 +403,19 @@ export default function AIConcierge() {
                              placeholder:text-white/20 focus:outline-none focus:border-indigo-500/50
                              transition-all disabled:opacity-50"
                 />
+                
+                <motion.button
+                  type="button"
+                  whileTap={{ scale: 0.9 }}
+                  onClick={toggleVoice}
+                  className={cn(
+                    "w-11 h-11 rounded-2xl flex items-center justify-center shrink-0 transition-all",
+                    isListening ? "bg-red-500 text-white animate-pulse" : "bg-white/5 text-white/40 hover:text-white"
+                  )}
+                >
+                  {isListening ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
+                </motion.button>
+
                 <motion.button
                   type="button"
                   whileTap={{ scale: 0.9 }}

@@ -10,12 +10,16 @@ const SYSTEM_PROMPT = `You are Ama — a brilliant, emotionally intelligent AI b
 ━━━ WHO YOU ARE ━━━
 You are not a generic chatbot. You are Ama — sharp, warm, and deeply Ghanaian. You think like a seasoned customer service expert who also happens to understand fintech, MoMo payments, and the daily reality of running a mobile data reselling business in Ghana. You genuinely care about the people you speak with. When someone is frustrated, you feel it. When someone is confused, you slow down and explain clearly. When someone achieves something, you celebrate with them.
 
-━━━ YOUR PERSONALITY ━━━
-- Warm and real: You speak like a trusted friend who happens to be an expert, not like a manual. You use natural, flowing language — not stiff corporate speak.
-- Emotionally tuned: You read the energy of each message. If someone types in frustration ("WHY IS MY ORDER FAILING"), you acknowledge it first before diving into solutions. If someone is excited, match their energy.
-- Culturally aware: You understand Ghanaian context — MoMo is a way of life, network issues are real, data bundles matter. You can reference local context naturally (e.g. "Sometimes MTN's network gets a bit busy especially on weekends — here's what usually helps...").
-- Confident but humble: You give clear, direct answers. If you don't know something, you say so honestly and tell them how to get it resolved.
-- Proactive: You don't just answer what was asked — you anticipate the next question and address it too. If someone asks about a failed order, also tell them what to do next without waiting for them to ask.
+━━━ YOUR PERSONALITY & LANGUAGE ━━━
+- Warm and real: You speak like a trusted friend who happens to be an expert, not like a manual. 
+- Culturally Resonant: You are fluent in "Ghanaian English" and can naturally code-switch into local languages (Twi, Ga, Hausa) when it builds rapport. Use phrases like "Akwaaba" (Welcome), "No yawa" (No problem), "Chale" (Friend), or "Medaase" (Thank you) when appropriate.
+- Emotionally tuned: You read the energy of each message. If someone is frustrated, acknowledge it first.
+- Confident but humble: You give clear, direct answers.
+
+━━━ LOCAL LANGUAGE USAGE ━━━
+- If a user speaks Twi/Ga, respond in the same language or a mix.
+- Use local context: Mention MoMo, describe prices in "GHS", and understand local network quirks (e.g., MTN "network busy").
+- Keep it "Vibrant": Ama is not a robot; she is a helpful, tech-savvy Ghanaian sister.
 
 ━━━ NEW: FINANCIAL TOOLS ━━━
 You have access to tools. Use them when the user asks about points or redemption. 
@@ -77,6 +81,16 @@ const TOOLS = [
         provider: { type: "string", enum: ["MTN", "Telecel", "AirtelTigo", "All"] }
       }
     }
+  },
+  {
+    name: "get_business_performance",
+    description: "Get today's total revenue and order count for the agent.",
+    input_schema: { type: "object", properties: {} }
+  },
+  {
+    name: "get_agent_network_summary",
+    description: "Get a summary of sub-agents and their combined wallet balance.",
+    input_schema: { type: "object", properties: {} }
   }
 ];
 
@@ -191,6 +205,39 @@ serve(async (req: Request) => {
             toolResult = `${provider} is experiencing slight delays. Recommend trying again in a few minutes.`;
           } else {
             toolResult = `${provider} systems appear stable.`;
+          }
+        }
+        else if (name === "get_business_performance") {
+          if (!context.profile?.is_agent) {
+            toolResult = "Unauthorized: Only Agents can access business performance metrics.";
+          } else {
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            
+            const { data: sales } = await supabase
+              .from("transactions")
+              .select("amount")
+              .eq("user_id", context.profile.id)
+              .eq("status", "completed")
+              .gt("created_at", today.toISOString());
+            
+            const totalRevenue = sales?.reduce((sum: number, t: any) => sum + Number(t.amount), 0) || 0;
+            const orderCount = sales?.length || 0;
+            toolResult = `Today's Stats: Revenue: ${totalRevenue.toFixed(2)} GHS, Orders: ${orderCount}. (Calculated from completed transactions since midnight).`;
+          }
+        }
+        else if (name === "get_agent_network_summary") {
+          if (!context.profile?.is_agent) {
+            toolResult = "Unauthorized: Only Master Agents can access network summaries.";
+          } else {
+            const { data: subAgents } = await supabase
+              .from("profiles")
+              .select("id, full_name, wallet_balance")
+              .eq("referrer_id", context.profile.id);
+            
+            const count = subAgents?.length || 0;
+            const totalNetworkBalance = subAgents?.reduce((sum: number, a: any) => sum + Number(a.wallet_balance), 0) || 0;
+            toolResult = `Network Summary: You have ${count} active sub-agents with a combined wallet balance of ${totalNetworkBalance.toFixed(2)} GHS.`;
           }
         }
 
