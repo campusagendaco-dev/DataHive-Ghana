@@ -125,11 +125,12 @@ serve(async (req: Request) => {
       });
     }
 
-    // Enforce the true cost price as the absolute lowest floor to prevent system losses.
-    // If cost_price is 0 or undefined in the DB, we fallback to a loosely discounted agent_price 
-    // (e.g. 50% off) to accommodate any legitimate promo markups on the frontend.
+    // Enforce a loose safety floor (50% of cost or agent price) to prevent 
+    // malicious API abuse (e.g. paying 1 pesewa) while still fully allowing 
+    // legitimate loss-leader promotional discounts from the frontend.
     const dbCostPrice = Number(pkgRow?.cost_price || 0);
-    const absoluteFloor = dbCostPrice > 0 ? dbCostPrice : (adminBase * 0.5);
+    const referencePrice = dbCostPrice > 0 ? dbCostPrice : adminBase;
+    const absoluteFloor = referencePrice * 0.5;
 
     if (amountNum < absoluteFloor && absoluteFloor > 0) {
       console.error(`[SECURITY] Blocked underpriced order from user ${user.id}. Received: ${amountNum}, Absolute Floor: ${absoluteFloor}`);
