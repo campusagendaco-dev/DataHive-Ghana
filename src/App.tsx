@@ -11,7 +11,6 @@ import Footer from "@/components/Footer";
 import DashboardLayout from "@/components/DashboardLayout";
 import AdminLayout from "@/components/AdminLayout";
 import { ThemeProvider } from "@/contexts/ThemeContext";
-import ThemeSelector from "@/components/ThemeSelector";
 import WhatsAppButton from "@/components/WhatsAppButton";
 import FreeDataButton from "@/components/FreeDataButton";
 import TutorialModal from "@/components/TutorialModal";
@@ -27,6 +26,7 @@ import Maintenance from "./pages/Maintenance";
 import { SecurityGuard } from "@/components/SecurityGuard";
 import { UpdatePrompt } from "@/components/UpdatePrompt";
 import { ChunkErrorBoundary } from "@/components/ChunkErrorBoundary";
+import AIConcierge from "@/components/AIConcierge";
 
 // Route-level code splitting — each page chunk loads only when first visited
 const Index = lazy(() => import("./pages/Index"));
@@ -89,6 +89,7 @@ const AdminBroadcast = lazy(() => import("./pages/AdminBroadcast"));
 const AdminFeatureFlags = lazy(() => import("./pages/AdminFeatureFlags"));
 const AdminSmsTemplates = lazy(() => import("./pages/AdminSmsTemplates"));
 const AdminCreditManagement = lazy(() => import("./pages/AdminCreditManagement"));
+const AdminSentinelAI = lazy(() => import("./pages/AdminSentinelAI"));
 const SubAgentSignup = lazy(() => import("./pages/SubAgentSignup"));
 const SubAgentPending = lazy(() => import("./pages/SubAgentPending"));
 const DashboardDeveloperAPI = lazy(() => import("./pages/DashboardDeveloperAPI"));
@@ -439,6 +440,7 @@ const AppContent = () => {
           <Route path="feature-flags" element={<AdminFeatureFlags />} />
           <Route path="sms-templates" element={<AdminSmsTemplates />} />
           <Route path="credit-management" element={<AdminCreditManagement />} />
+          <Route path="sentinel" element={<AdminSentinelAI />} />
           <Route path="account-settings" element={<DashboardAccountSettings />} />
         </Route>
 
@@ -450,6 +452,7 @@ const AppContent = () => {
         {!isDashboard && !isAdmin && <TutorialModal />}
         <AudioUnlocker />
         <NotificationPopup />
+        <AIConcierge />
       </div>
     </>
   );
@@ -487,7 +490,6 @@ const App = () => {
               <SecurityGuard>
                 <AppContent />
               </SecurityGuard>
-              <ThemeSelector />
               <WhatsAppButton />
               <FreeDataButton />
               <InstallPrompt />
