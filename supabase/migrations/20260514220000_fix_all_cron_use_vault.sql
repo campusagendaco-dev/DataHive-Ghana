@@ -1,9 +1,10 @@
--- ============================================================
--- RESCHEDULE CRON JOBS using vault-backed service role key
--- (No hardcoded credentials — key stored in vault.secrets)
--- ============================================================
+-- ================================================================
+-- SECURITY PATCH: Update all remaining cron jobs to use vault
+-- Fixes cron-auto-retry, cron-error-alert, cron-balance-check,
+-- cron-daily-report — all had hardcoded service role JWT
+-- ================================================================
 
--- Remove old schedules
+-- Unschedule old jobs
 SELECT cron.unschedule(jobname) FROM cron.job
 WHERE jobname IN (
   'cron-auto-retry',
@@ -12,7 +13,7 @@ WHERE jobname IN (
   'cron-daily-report'
 );
 
--- ── Auto-retry stuck orders — every 5 minutes ──────────────────────────────
+-- Reschedule using vault
 SELECT cron.schedule(
   'cron-auto-retry',
   '*/5 * * * *',
@@ -31,7 +32,6 @@ SELECT cron.schedule(
   $$
 );
 
--- ── Error spike alert — every 10 minutes ───────────────────────────────────
 SELECT cron.schedule(
   'cron-error-alert',
   '*/10 * * * *',
@@ -50,7 +50,6 @@ SELECT cron.schedule(
   $$
 );
 
--- ── Provider balance check — every 15 minutes ──────────────────────────────
 SELECT cron.schedule(
   'cron-balance-check',
   '*/15 * * * *',
@@ -69,7 +68,6 @@ SELECT cron.schedule(
   $$
 );
 
--- ── Daily P&L report — every day at 07:00 UTC ──────────────────────────────
 SELECT cron.schedule(
   'cron-daily-report',
   '0 7 * * *',
