@@ -2,8 +2,9 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
   Menu, X, LogOut, LayoutDashboard, ShieldCheck,
   TrendingUp, Home, HelpCircle, ChevronRight,
-  User, Settings, Wallet, ClipboardList, Store, Sun, Moon, Zap,
+  User, Settings, Wallet, ClipboardList, Store, Sun, Moon, Zap, Palette,
 } from "lucide-react";
+import { THEMES } from "@/lib/themes";
 import { useState, useEffect, useRef } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { useAppTheme } from "@/contexts/ThemeContext";
@@ -31,8 +32,10 @@ const Navbar = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const { user, profile, isAdmin, signOut } = useAuth();
-   const { isDark, toggleDark } = useAppTheme();
+   const { isDark, toggleDark, theme, setThemeId } = useAppTheme();
    const drawerRef = useRef<HTMLDivElement>(null);
+   const themePickerRef = useRef<HTMLDivElement>(null);
+   const [themePickerOpen, setThemePickerOpen] = useState(false);
    const [menuBanners, setMenuBanners] = useState<any[]>([]);
    const [bannersLoading, setBannersLoading] = useState(true);
    const [api, setApi] = useState<CarouselApi>();
@@ -62,7 +65,17 @@ const Navbar = () => {
      });
    }, [api]);
  
-   useEffect(() => { setMenuOpen(false); }, [location.pathname]);
+   useEffect(() => { setMenuOpen(false); setThemePickerOpen(false); }, [location.pathname]);
+
+   useEffect(() => {
+     const handler = (e: MouseEvent) => {
+       if (themePickerRef.current && !themePickerRef.current.contains(e.target as Node)) {
+         setThemePickerOpen(false);
+       }
+     };
+     document.addEventListener("mousedown", handler);
+     return () => document.removeEventListener("mousedown", handler);
+   }, []);
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 12);
@@ -297,6 +310,59 @@ const Navbar = () => {
                     </motion.div>
                   </AnimatePresence>
                 </motion.button>
+
+                {/* Theme colour picker */}
+                <div ref={themePickerRef} className="relative">
+                  <motion.button
+                    type="button"
+                    onClick={() => setThemePickerOpen(v => !v)}
+                    whileHover={{ scale: 1.1 }}
+                    whileTap={{ scale: 0.9 }}
+                    className={`w-8 h-8 rounded-xl flex items-center justify-center transition-all duration-200 ${linkIdle}`}
+                    title="Change Theme"
+                  >
+                    <Palette className="w-3.5 h-3.5" style={{ color: theme.dot }} />
+                  </motion.button>
+
+                  <AnimatePresence>
+                    {themePickerOpen && (
+                      <motion.div
+                        initial={{ opacity: 0, scale: 0.92, y: -6 }}
+                        animate={{ opacity: 1, scale: 1, y: 0 }}
+                        exit={{ opacity: 0, scale: 0.92, y: -6 }}
+                        transition={{ type: "spring", stiffness: 420, damping: 28 }}
+                        className="absolute top-full right-0 mt-2 w-52 rounded-2xl p-3 z-[60]"
+                        style={{
+                          background: isDark ? "rgba(9,7,28,0.97)" : "rgba(255,255,255,0.98)",
+                          backdropFilter: "blur(24px)",
+                          border: isDark ? "1px solid rgba(255,255,255,0.09)" : "1px solid rgba(0,0,0,0.08)",
+                          boxShadow: isDark ? "0 20px 60px rgba(0,0,0,0.65)" : "0 12px 40px rgba(0,0,0,0.14)",
+                        }}
+                      >
+                        <p className={`text-[10px] font-black uppercase tracking-widest mb-2.5 px-1 ${isDark ? "text-white/30" : "text-gray-400"}`}>
+                          Choose Theme
+                        </p>
+                        <div className="grid grid-cols-3 gap-1.5">
+                          {THEMES.map((t) => (
+                            <button
+                              type="button"
+                              key={t.id}
+                              onClick={() => { setThemeId(t.id); setThemePickerOpen(false); }}
+                              className={`flex flex-col items-center gap-1.5 rounded-xl p-2 transition-all ${
+                                theme.id === t.id
+                                  ? isDark ? "bg-white/15 ring-1 ring-white/30" : "bg-gray-100 ring-1 ring-gray-300"
+                                  : isDark ? "hover:bg-white/10" : "hover:bg-gray-100"
+                              }`}
+                            >
+                              <span className="w-6 h-6 rounded-full border border-white/20 shrink-0 block" style={{ background: t.dot }} />
+                              <span className={`text-[9px] font-bold leading-none ${isDark ? "text-white/70" : "text-gray-600"}`}>{t.label}</span>
+                            </button>
+                          ))}
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </div>
 
                 {user && (
                   <Link
@@ -576,6 +642,32 @@ const Navbar = () => {
                     ))}
                   </>
                 )}
+
+                <div className="h-px my-2" style={{ background: drawerDivider }} />
+
+                {/* Appearance section */}
+                <p className={`text-[10px] font-bold uppercase tracking-widest px-3 py-1 ${isDark ? "text-white/20" : "text-gray-400"}`}>
+                  Appearance
+                </p>
+                <div className="px-1 py-1">
+                  <div className="grid grid-cols-3 gap-1.5">
+                    {THEMES.map((t) => (
+                      <button
+                        type="button"
+                        key={t.id}
+                        onClick={() => setThemeId(t.id)}
+                        className={`flex flex-col items-center gap-1.5 rounded-xl p-2 transition-all ${
+                          theme.id === t.id
+                            ? isDark ? "bg-white/15 ring-1 ring-white/30" : "bg-gray-100 ring-1 ring-gray-300"
+                            : isDark ? "hover:bg-white/10" : "hover:bg-gray-100"
+                        }`}
+                      >
+                        <span className="w-6 h-6 rounded-full border border-white/20 shrink-0 block" style={{ background: t.dot }} />
+                        <span className={`text-[9px] font-bold leading-none ${isDark ? "text-white/70" : "text-gray-600"}`}>{t.label}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
 
                 <div className="h-px my-2" style={{ background: drawerDivider }} />
 
