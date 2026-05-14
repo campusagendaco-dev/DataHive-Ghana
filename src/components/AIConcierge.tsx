@@ -111,21 +111,30 @@ export default function AIConcierge() {
               <div className="flex items-center gap-3">
                 {/* Avatar */}
                 <div className="relative shrink-0">
-                  <div
-                    className="w-10 h-10 rounded-2xl flex items-center justify-center text-sm font-black text-white"
-                    style={{ background: "linear-gradient(135deg,#6366f1 0%,#8b5cf6 50%,#a855f7 100%)" }}
+                  <motion.div
+                    animate={{ boxShadow: ["0 0 0px 0px rgba(251,191,36,0.0)", "0 0 16px 4px rgba(251,191,36,0.35)", "0 0 0px 0px rgba(251,191,36,0.0)"] }}
+                    transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
+                    className="w-11 h-11 rounded-2xl flex items-center justify-center text-xl"
+                    style={{ background: "linear-gradient(135deg,#92400e 0%,#b45309 25%,#7c3aed 65%,#4f46e5 100%)" }}
                   >
-                    A
-                  </div>
+                    🌺
+                  </motion.div>
                   <motion.span
-                    animate={{ scale: [1, 1.3, 1] }}
+                    animate={{ scale: [1, 1.4, 1], opacity: [1, 0.6, 1] }}
                     transition={{ duration: 2, repeat: Infinity }}
                     className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-emerald-400 border-2"
                     style={{ borderColor: "#0f0f1a" }}
                   />
                 </div>
                 <div>
-                  <p className="text-white font-black text-sm tracking-tight">Ama</p>
+                  <div className="flex items-center gap-1.5">
+                    <p className="text-white font-black text-sm tracking-tight">Ama</p>
+                    <motion.span
+                      animate={{ rotate: [0, 20, -20, 0] }}
+                      transition={{ duration: 2.5, repeat: Infinity, ease: "easeInOut" }}
+                      className="text-xs"
+                    >✨</motion.span>
+                  </div>
                   <div className="flex items-center gap-1.5">
                     <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
                     <p className="text-[10px] text-emerald-400 font-bold uppercase tracking-widest">Online · AI Assistant</p>
@@ -154,9 +163,9 @@ export default function AIConcierge() {
                   {/* Avatar dot */}
                   {m.role === "bot" && (
                     <div
-                      className="w-7 h-7 rounded-xl shrink-0 flex items-center justify-center text-[10px] font-black text-white self-end mb-4"
-                      style={{ background: "linear-gradient(135deg,#6366f1,#a855f7)" }}
-                    >A</div>
+                      className="w-7 h-7 rounded-xl shrink-0 flex items-center justify-center text-base self-end mb-4"
+                      style={{ background: "linear-gradient(135deg,#92400e,#7c3aed)" }}
+                    >🌺</div>
                   )}
 
                   <div className={cn("flex flex-col gap-1 max-w-[78%]", m.role === "user" ? "items-end" : "items-start")}>
@@ -188,9 +197,9 @@ export default function AIConcierge() {
                     className="flex items-center gap-2"
                   >
                     <div
-                      className="w-7 h-7 rounded-xl shrink-0 flex items-center justify-center text-[10px] font-black text-white"
-                      style={{ background: "linear-gradient(135deg,#6366f1,#a855f7)" }}
-                    >A</div>
+                      className="w-7 h-7 rounded-xl shrink-0 flex items-center justify-center text-base"
+                      style={{ background: "linear-gradient(135deg,#92400e,#7c3aed)" }}
+                    >🌺</div>
                     <div
                       className="px-4 py-3 rounded-2xl rounded-tl-sm flex gap-1.5 items-center"
                       style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.08)" }}
@@ -264,7 +273,7 @@ export default function AIConcierge() {
               {/* Footer */}
               <div className="flex items-center justify-center gap-1.5 mt-2.5">
                 <Sparkles className="w-2.5 h-2.5 text-white/20" />
-                <p className="text-[9px] text-white/20 font-medium tracking-wide">Powered by Claude AI · SwiftData</p>
+                <p className="text-[9px] text-white/20 font-medium tracking-wide">🌺 Ama · Powered by SwiftData AI</p>
               </div>
             </div>
           </motion.div>
@@ -274,36 +283,50 @@ export default function AIConcierge() {
       {/* ── Trigger button ── */}
       <motion.button
         type="button"
-        whileHover={{ scale: 1.06 }}
-        whileTap={{ scale: 0.94 }}
+        whileHover={{ scale: 1.08 }}
+        whileTap={{ scale: 0.92 }}
         onClick={() => setOpen(o => !o)}
-        className="relative w-[60px] h-[60px] rounded-[22px] flex items-center justify-center shadow-xl"
-        style={{ background: "linear-gradient(135deg,#6366f1 0%,#8b5cf6 50%,#a855f7 100%)" }}
+        className="relative w-[64px] h-[64px] rounded-[24px] flex items-center justify-center shadow-2xl"
+        style={{
+          background: "linear-gradient(135deg,#92400e 0%,#b45309 20%,#7c3aed 60%,#4f46e5 100%)",
+          boxShadow: "0 8px 32px rgba(124,58,237,0.45), 0 2px 8px rgba(0,0,0,0.4)",
+        }}
       >
-        {/* Ping rings */}
+        {/* Outer glow pulse */}
         <motion.span
-          animate={{ scale: [1, 1.6], opacity: [0.35, 0] }}
-          transition={{ duration: 2, repeat: Infinity, ease: "easeOut" }}
-          className="absolute inset-0 rounded-[22px]"
-          style={{ background: "linear-gradient(135deg,#6366f1,#a855f7)" }}
+          animate={{ scale: [1, 1.7], opacity: [0.4, 0] }}
+          transition={{ duration: 2.2, repeat: Infinity, ease: "easeOut" }}
+          className="absolute inset-0 rounded-[24px]"
+          style={{ background: "linear-gradient(135deg,#f59e0b,#7c3aed)" }}
+        />
+        {/* Second slower ring */}
+        <motion.span
+          animate={{ scale: [1, 1.4], opacity: [0.25, 0] }}
+          transition={{ duration: 2.2, repeat: Infinity, ease: "easeOut", delay: 0.8 }}
+          className="absolute inset-0 rounded-[24px]"
+          style={{ background: "linear-gradient(135deg,#f59e0b,#7c3aed)" }}
         />
 
         <AnimatePresence mode="wait">
           {open ? (
             <motion.div key="close"
-              initial={{ rotate: -90, opacity: 0 }} animate={{ rotate: 0, opacity: 1 }} exit={{ rotate: 90, opacity: 0 }}
-              transition={{ duration: 0.18 }}
+              initial={{ rotate: -90, opacity: 0, scale: 0.6 }} animate={{ rotate: 0, opacity: 1, scale: 1 }} exit={{ rotate: 90, opacity: 0, scale: 0.6 }}
+              transition={{ duration: 0.2 }}
             >
               <X className="w-6 h-6 text-white" />
             </motion.div>
           ) : (
             <motion.div key="open"
-              initial={{ rotate: 90, opacity: 0 }} animate={{ rotate: 0, opacity: 1 }} exit={{ rotate: -90, opacity: 0 }}
-              transition={{ duration: 0.18 }}
-              className="flex flex-col items-center gap-0.5"
+              initial={{ rotate: 30, opacity: 0, scale: 0.6 }} animate={{ rotate: 0, opacity: 1, scale: 1 }} exit={{ rotate: -30, opacity: 0, scale: 0.6 }}
+              transition={{ duration: 0.2 }}
+              className="flex flex-col items-center gap-0"
             >
-              <span className="text-white font-black text-[11px] tracking-tight leading-none">Ama</span>
-              <Sparkles className="w-3.5 h-3.5 text-white/70" />
+              <motion.span
+                animate={{ rotate: [0, -8, 8, 0] }}
+                transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
+                className="text-2xl leading-none"
+              >🌺</motion.span>
+              <span className="text-white/80 font-black text-[9px] tracking-widest uppercase leading-none mt-0.5">Ama</span>
             </motion.div>
           )}
         </AnimatePresence>
