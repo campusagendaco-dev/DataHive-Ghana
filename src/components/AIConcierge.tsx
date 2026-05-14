@@ -190,8 +190,11 @@ export default function AIConcierge() {
     <motion.div 
       drag
       dragMomentum={false}
+      initial={{ x: "-50%", y: -100, opacity: 0 }}
+      animate={{ x: "-50%", y: 0, opacity: 1 }}
       whileDrag={{ scale: 1.05, cursor: "grabbing" }}
-      className="fixed bottom-10 right-10 z-[9999] flex flex-col items-end gap-3 cursor-grab"
+      className="fixed top-10 left-1/2 z-[9999] flex flex-col items-center gap-3 cursor-grab"
+      style={{ translateX: "-50%" }}
     >
 
       {/* ── Chat panel ── */}
