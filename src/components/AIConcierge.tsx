@@ -129,7 +129,8 @@ export default function AIConcierge() {
       if (isSpeaking) {
         const utterance = new SpeechSynthesisUtterance(reply);
         utterance.lang = "en-GH";
-        utterance.rate = 0.9;
+        utterance.pitch = 1.3; // Higher pitch for younger girl voice
+        utterance.rate = 1.05; // Slightly faster, youthful pace
         window.speechSynthesis.speak(utterance);
       }
 
