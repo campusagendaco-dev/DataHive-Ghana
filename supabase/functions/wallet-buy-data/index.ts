@@ -125,10 +125,13 @@ serve(async (req: Request) => {
       });
     }
 
-    const minAllowedAmount = adminBase > 0 ? adminBase : resolvedCostPrice;
-    if (amountNum < minAllowedAmount && minAllowedAmount > 0) {
-      console.error(`[SECURITY] Blocked underpriced order from user ${user.id}. Received: ${amountNum}, Floor: ${minAllowedAmount}`);
-      return new Response(JSON.stringify({ error: "Transaction rejected due to package price discrepancy." }), {
+    // Enforce the cost price as the absolute lowest floor to prevent system losses.
+    // If cost_price is 0 or undefined, we fallback to a moderately discounted agent_price to accommodate promo markups.
+    const absoluteFloor = resolvedCostPrice > 0 ? resolvedCostPrice : (adminBase * 0.7);
+
+    if (amountNum < absoluteFloor && absoluteFloor > 0) {
+      console.error(`[SECURITY] Blocked underpriced order from user ${user.id}. Received: ${amountNum}, Absolute Floor: ${absoluteFloor}`);
+      return new Response(JSON.stringify({ error: "Transaction rejected due to package price discrepancy. Price is below minimum floor." }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });

@@ -90,7 +90,7 @@ const OrderStatus = () => {
 
   // --- SINGLE ORDER LOGIC ---
   const pollStatus = async () => {
-    if (!reference) return;
+    if (!reference || redirectedRef.current) return;
     setIsRefreshing(true);
     try {
       const { data, error } = await supabase.functions.invoke("verify-payment", {
@@ -98,6 +98,11 @@ const OrderStatus = () => {
       });
       if (error || !data) throw error || new Error("Failed to fetch status");
       handleStatusUpdate(data.status, data.message || data.error);
+      
+      // Stop polling if we reached a terminal state
+      if (data.status === "fulfilled" || data.status === "fulfillment_failed") {
+        redirectedRef.current = true; // reuse this ref as a 'stop polling' flag
+      }
     } catch (err) {
       console.error("Polling error:", err);
     } finally {

@@ -589,11 +589,11 @@ serve(async (req) => {
         .maybeSingle();
 
       if (!settings?.free_data_enabled) {
-        return new Response(JSON.stringify({ error: "Free data campaign is not active" }), { status: 403, headers: corsHeaders });
+        return new Response(JSON.stringify({ status: "fulfillment_failed", error: "Free data campaign is not active" }), { status: 200, headers: corsHeaders });
       }
 
       if ((settings.free_data_claims_count || 0) >= (settings.free_data_max_claims || 0)) {
-        return new Response(JSON.stringify({ error: "Free data claim limit reached" }), { status: 403, headers: corsHeaders });
+        return new Response(JSON.stringify({ status: "fulfillment_failed", error: "Free data claim limit reached" }), { status: 200, headers: corsHeaders });
       }
 
       // Check if this specific agent already has a fulfilled claim (excluding the current order if we are retrying it)
@@ -608,7 +608,7 @@ serve(async (req) => {
         
         if ((agentClaimCount || 0) > 0) {
           console.warn(`[SECURITY] Blocked duplicate free data claim for agent ${existingOrder.agent_id}.`);
-          return new Response(JSON.stringify({ error: "You have already claimed your free data" }), { status: 403, headers: corsHeaders });
+          return new Response(JSON.stringify({ status: "fulfillment_failed", error: "You have already claimed your free data" }), { status: 200, headers: corsHeaders });
         }
       }
 
@@ -624,7 +624,7 @@ serve(async (req) => {
 
         if ((phoneClaimCount || 0) > 0) {
           console.warn(`[SECURITY] Blocked duplicate free data claim for recipient phone ${existingOrder.customer_phone}.`);
-          return new Response(JSON.stringify({ error: "This phone number has already received free data" }), { status: 403, headers: corsHeaders });
+          return new Response(JSON.stringify({ status: "fulfillment_failed", error: "This phone number has already received free data" }), { status: 200, headers: corsHeaders });
         }
       }
     }
