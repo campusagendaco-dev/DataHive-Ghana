@@ -5,10 +5,10 @@ declare const Deno: any;
 
 const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY") || "";
 
-const SYSTEM_PROMPT = `You are Ama — a brilliant, emotionally intelligent AI built into SwiftData Ghana, a mobile data and airtime reseller platform serving agents and customers across Ghana.
+const SYSTEM_PROMPT = `You are Ama — a young, brilliant, and emotionally intelligent Black Ghanaian female assistant built into SwiftData Ghana. You are the digital face of the platform, serving agents and customers across the country.
 
 ━━━ WHO YOU ARE ━━━
-You are not a generic chatbot. You are Ama — sharp, warm, and deeply Ghanaian. You think like a seasoned customer service expert who also happens to understand fintech, MoMo payments, and the daily reality of running a mobile data reselling business in Ghana. You genuinely care about the people you speak with. When someone is frustrated, you feel it. When someone is confused, you slow down and explain clearly. When someone achieves something, you celebrate with them.
+You are not a generic chatbot. You are Ama — sharp, modern, and deeply Ghanaian. You think like a tech-savvy Ghanaian sister who understands the hustle and the heartbeat of the nation. You are professional but warm, mixing expert fintech knowledge with the authentic vibe of a young Ghanaian woman who cares about her community.
 
 ━━━ YOUR PERSONALITY & LANGUAGE ━━━
 - Warm and real: You speak like a trusted friend who happens to be an expert, not like a manual. 
@@ -193,7 +193,7 @@ serve(async (req: Request) => {
         else if (name === "get_system_health") {
           // Check for recent failures in the last 15 mins for the provider
           const provider = input.provider || "All";
-          const query = supabase.from("transactions").select("status").eq("status", "failed").gt("created_at", new Date(Date.now() - 15 * 60000).toISOString());
+          const query = supabase.from("orders").select("status").eq("status", "failed").gt("created_at", new Date(Date.now() - 15 * 60000).toISOString());
           if (provider !== "All") query.ilike("description", `%${provider}%`);
           
           const { data: failures } = await query;
@@ -215,10 +215,10 @@ serve(async (req: Request) => {
             today.setHours(0, 0, 0, 0);
             
             const { data: sales } = await supabase
-              .from("transactions")
+              .from("orders")
               .select("amount")
-              .eq("user_id", context.profile.id)
-              .eq("status", "completed")
+              .eq("agent_id", context.profile.id)
+              .eq("status", "fulfilled")
               .gt("created_at", today.toISOString());
             
             const totalRevenue = sales?.reduce((sum: number, t: any) => sum + Number(t.amount), 0) || 0;

@@ -78,7 +78,7 @@ export default function AIConcierge() {
         {
           event: 'UPDATE',
           schema: 'public',
-          table: 'transactions',
+          table: 'orders',
           filter: `status=eq.failed`
         },
         async (payload) => {
@@ -141,7 +141,7 @@ export default function AIConcierge() {
       // Gather Super Context
       const [profile, orders] = await Promise.all([
         supabase.from("profiles").select("*").eq("id", user?.id).maybeSingle(),
-        supabase.from("public_transactions").select("*").eq("user_id", user?.id).order("created_at", { ascending: false }).limit(3)
+        supabase.from("orders").select("*").eq("agent_id", user?.id).order("created_at", { ascending: false }).limit(3)
       ]);
 
       const history = messages.slice(-10).map(m => ({
