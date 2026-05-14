@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Send, Sparkles, ChevronDown, Mic, MicOff } from "lucide-react";
+import { X, Send, Sparkles, ChevronDown, Mic, MicOff, Volume2, VolumeX } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
 
@@ -36,6 +36,7 @@ export default function AIConcierge() {
   const [typing, setTyping] = useState(false);
   const [unread, setUnread] = useState(0);
   const [isListening, setIsListening] = useState(false);
+  const [isSpeaking, setIsSpeaking] = useState(true);
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const recognitionRef = useRef<any>(null);
@@ -140,7 +141,7 @@ export default function AIConcierge() {
       // Gather Super Context
       const [profile, orders] = await Promise.all([
         supabase.from("profiles").select("*").eq("id", user?.id).maybeSingle(),
-        supabase.from("transactions").select("*").eq("user_id", user?.id).order("created_at", { ascending: false }).limit(3)
+        supabase.from("public_transactions").select("*").eq("user_id", user?.id).order("created_at", { ascending: false }).limit(3)
       ]);
 
       const history = messages.slice(-10).map(m => ({
@@ -163,6 +164,14 @@ export default function AIConcierge() {
       const reply = data?.oracle_opinion || "I'm here to help! Please try again.";
       const botMsg: Message = { role: "bot", text: reply, ts: new Date() };
       setMessages(prev => [...prev, botMsg]);
+
+      // Speak back if enabled
+      if (isSpeaking) {
+        const utterance = new SpeechSynthesisUtterance(reply);
+        utterance.lang = "en-GH";
+        utterance.rate = 0.9;
+        window.speechSynthesis.speak(utterance);
+      }
 
       // Save bot reply to DB
       if (user) {
@@ -278,11 +287,29 @@ export default function AIConcierge() {
                     >✨</motion.span>
                   </div>
                   <div className="flex items-center gap-1.5">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-                    <p className="text-[10px] text-emerald-400 font-bold uppercase tracking-widest">Online · AI Assistant</p>
-                  </div>
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                  <p className="text-[10px] text-emerald-400 font-bold uppercase tracking-widest">Online · AI Assistant</p>
                 </div>
               </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setIsSpeaking(!isSpeaking)}
+                className={cn(
+                  "w-8 h-8 rounded-xl flex items-center justify-center transition-all",
+                  isSpeaking ? "text-amber-500 bg-amber-500/10" : "text-white/20 hover:text-white/40"
+                )}
+                title={isSpeaking ? "Mute Ama" : "Unmute Ama"}
+              >
+                {isSpeaking ? (
+                  <motion.div animate={{ scale: [1, 1.2, 1] }} transition={{ repeat: Infinity, duration: 2 }}>
+                    <Volume2 className="w-4 h-4" />
+                  </motion.div>
+                ) : (
+                  <VolumeX className="w-4 h-4" />
+                )}
+              </button>
               <button
                 type="button"
                 onClick={() => setOpen(false)}
@@ -291,6 +318,7 @@ export default function AIConcierge() {
                 <ChevronDown className="w-4 h-4" />
               </button>
             </div>
+          </div>
 
             {/* Messages */}
             <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3 scrollbar-none">
