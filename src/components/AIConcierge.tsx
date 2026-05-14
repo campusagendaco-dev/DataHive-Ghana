@@ -85,7 +85,11 @@ export default function AIConcierge() {
   };
 
   return (
-    <div className="fixed bottom-5 right-5 z-[9999] flex flex-col items-end gap-3">
+    <motion.div 
+      drag
+      dragConstraints={{ left: -window.innerWidth + 80, right: 0, top: -window.innerHeight + 80, bottom: 0 }}
+      className="fixed bottom-5 right-5 z-[9999] flex flex-col items-end gap-3 cursor-grab active:cursor-grabbing"
+    >
 
       {/* ── Chat panel ── */}
       <AnimatePresence>
@@ -98,11 +102,16 @@ export default function AIConcierge() {
             className="w-[360px] sm:w-[400px] flex flex-col rounded-[28px] overflow-hidden shadow-2xl"
             style={{
               height: "min(560px, 85dvh)",
-              background: "linear-gradient(160deg,#0f0f1a 0%,#0a0a12 60%,#080810 100%)",
+              background: "linear-gradient(160deg,rgba(15,15,26,0.95) 0%,rgba(10,10,18,0.98) 60%,#080810 100%)",
               border: "1px solid rgba(255,255,255,0.08)",
               boxShadow: "0 32px 80px rgba(0,0,0,0.7), 0 0 0 1px rgba(255,255,255,0.04) inset",
             }}
           >
+            {/* Traditional Background Vibe */}
+            <div className="absolute inset-0 opacity-[0.03] pointer-events-none mix-blend-overlay" 
+                 style={{ backgroundImage: "url('/assets/adinkra_pattern.png')", backgroundSize: "200px" }} />
+            <div className="absolute inset-0 opacity-[0.05] pointer-events-none" 
+                 style={{ backgroundImage: "url('/assets/backgrounds/bg_ghana_gold_adinkra.png')", backgroundSize: "cover", backgroundPosition: "center" }} />
             {/* Header */}
             <div
               className="flex items-center justify-between px-5 py-4 shrink-0"
@@ -114,10 +123,10 @@ export default function AIConcierge() {
                   <motion.div
                     animate={{ boxShadow: ["0 0 0px 0px rgba(251,191,36,0.0)", "0 0 16px 4px rgba(251,191,36,0.35)", "0 0 0px 0px rgba(251,191,36,0.0)"] }}
                     transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
-                    className="w-11 h-11 rounded-2xl flex items-center justify-center text-xl"
+                    className="w-11 h-11 rounded-2xl flex items-center justify-center overflow-hidden"
                     style={{ background: "linear-gradient(135deg,#92400e 0%,#b45309 25%,#7c3aed 65%,#4f46e5 100%)" }}
                   >
-                    🌺
+                    <img src="/assets/ama_avatar.png" alt="Ama" className="w-full h-full object-cover scale-110" />
                   </motion.div>
                   <motion.span
                     animate={{ scale: [1, 1.4, 1], opacity: [1, 0.6, 1] }}
@@ -163,9 +172,11 @@ export default function AIConcierge() {
                   {/* Avatar dot */}
                   {m.role === "bot" && (
                     <div
-                      className="w-7 h-7 rounded-xl shrink-0 flex items-center justify-center text-base self-end mb-4"
-                      style={{ background: "linear-gradient(135deg,#92400e,#7c3aed)" }}
-                    >🌺</div>
+                      className="w-7 h-7 rounded-xl shrink-0 flex items-center justify-center overflow-hidden self-end mb-4"
+                    style={{ background: "linear-gradient(135deg,#92400e,#7c3aed)" }}
+                  >
+                    <img src="/assets/ama_avatar.png" alt="Ama" className="w-full h-full object-cover" />
+                  </div>
                   )}
 
                   <div className={cn("flex flex-col gap-1 max-w-[78%]", m.role === "user" ? "items-end" : "items-start")}>
@@ -197,9 +208,11 @@ export default function AIConcierge() {
                     className="flex items-center gap-2"
                   >
                     <div
-                      className="w-7 h-7 rounded-xl shrink-0 flex items-center justify-center text-base"
+                      className="w-7 h-7 rounded-xl shrink-0 flex items-center justify-center overflow-hidden"
                       style={{ background: "linear-gradient(135deg,#92400e,#7c3aed)" }}
-                    >🌺</div>
+                    >
+                      <img src="/assets/ama_avatar.png" alt="Ama" className="w-full h-full object-cover" />
+                    </div>
                     <div
                       className="px-4 py-3 rounded-2xl rounded-tl-sm flex gap-1.5 items-center"
                       style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.08)" }}
@@ -321,11 +334,13 @@ export default function AIConcierge() {
               transition={{ duration: 0.2 }}
               className="flex flex-col items-center gap-0"
             >
-              <motion.span
+              <motion.div
                 animate={{ rotate: [0, -8, 8, 0] }}
                 transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
-                className="text-2xl leading-none"
-              >🌺</motion.span>
+                className="w-10 h-10 rounded-full overflow-hidden border-2 border-white/20 shadow-lg"
+              >
+                <img src="/assets/ama_avatar.png" alt="Ama" className="w-full h-full object-cover scale-110" />
+              </motion.div>
               <span className="text-white/80 font-black text-[9px] tracking-widest uppercase leading-none mt-0.5">Ama</span>
             </motion.div>
           )}
@@ -343,6 +358,6 @@ export default function AIConcierge() {
           )}
         </AnimatePresence>
       </motion.button>
-    </div>
+    </motion.div>
   );
 }
