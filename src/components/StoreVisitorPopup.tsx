@@ -41,7 +41,7 @@ const StoreVisitorPopup = ({ agentSlug, showSubAgentLink = true }: StoreVisitorP
 
   // Animation variants for children staggering
   const containerVariants = {
-    hidden: { opacity: 0, scale: 0.92, y: 40 },
+    hidden: { opacity: 0, scale: 0.92, y: -40 },
     visible: { 
       opacity: 1, 
       scale: 1, 
@@ -81,10 +81,10 @@ const StoreVisitorPopup = ({ agentSlug, showSubAgentLink = true }: StoreVisitorP
             initial="hidden"
             animate="visible"
             exit="exit"
-            className="fixed z-[201] inset-x-4 bottom-4 sm:inset-auto sm:bottom-6 sm:right-6 sm:w-[380px]"
+            className="fixed z-[201] top-6 inset-x-0 flex justify-center px-4"
           >
             <div
-              className="relative overflow-hidden rounded-3xl shadow-2xl shadow-black/80"
+              className="relative w-full max-w-[380px] overflow-hidden rounded-3xl shadow-2xl shadow-black/90"
               style={{ background: "#080800", border: "1px solid rgba(251,191,36,0.22)" }}
             >
               {/* ── Ambient glow ── */}
