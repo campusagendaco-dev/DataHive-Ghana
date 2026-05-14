@@ -5,6 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
 
 interface Message {
+  id?: string;
   role: "user" | "bot";
   text: string;
   ts: Date;
@@ -42,6 +43,70 @@ export default function AIConcierge() {
   }, [messages, typing]);
 
   useEffect(() => {
+    const initChat = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      // Load History
+      const { data: history } = await supabase
+        .from("chat_messages")
+        .select("*")
+        .order("created_at", { ascending: true })
+        .limit(20);
+
+      if (history && history.length > 0) {
+        setMessages(history.map(m => ({
+          id: m.id,
+          role: m.role as any,
+          text: m.content,
+          ts: new Date(m.created_at)
+        })));
+      }
+    };
+    initChat();
+  }, []);
+
+  // Phase 3: Proactive Sentinel - Watch for failed orders
+  useEffect(() => {
+    const channel = supabase
+      .channel('proactive-sentinel')
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'transactions',
+          filter: `status=eq.failed`
+        },
+        async (payload) => {
+          if (!open) {
+            setUnread(n => n + 1);
+            // Trigger a proactive message from Ama
+            const { data } = await supabase.functions.invoke("oracle-ai", {
+              body: {
+                context: { 
+                  userMessage: "SYSTEM_NOTIFICATION: My recent order just failed. Please proactively explain what happened and suggest a fix.", 
+                  currentPath: window.location.pathname,
+                  failedOrder: payload.new
+                },
+                history: messages.slice(-5).map(m => ({ role: m.role, content: m.text })),
+              },
+            });
+            
+            if (data?.oracle_opinion) {
+              setMessages(prev => [...prev, { role: "bot", text: data.oracle_opinion, ts: new Date() }]);
+            }
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [open, messages]);
+
+  useEffect(() => {
     if (open) {
       setUnread(0);
       setTimeout(() => inputRef.current?.focus(), 300);
@@ -53,25 +118,59 @@ export default function AIConcierge() {
     if (!msg || typing) return;
     setInput("");
 
+    const { data: { user } } = await supabase.auth.getUser();
+    
+    // Optimistic user message
     const userMsg: Message = { role: "user", text: msg, ts: new Date() };
     setMessages(prev => [...prev, userMsg]);
     setTyping(true);
 
     try {
-      const history = messages.slice(-8).map(m => ({
+      // Save user message to DB
+      if (user) {
+        await supabase.from("chat_messages").insert({
+          user_id: user.id,
+          role: "user",
+          content: msg
+        });
+      }
+
+      // Gather Super Context
+      const [profile, orders] = await Promise.all([
+        supabase.from("profiles").select("*").eq("id", user?.id).maybeSingle(),
+        supabase.from("transactions").select("*").eq("user_id", user?.id).order("created_at", { ascending: false }).limit(3)
+      ]);
+
+      const history = messages.slice(-10).map(m => ({
         role: m.role,
         content: m.text,
       }));
 
       const { data } = await supabase.functions.invoke("oracle-ai", {
         body: {
-          context: { userMessage: msg, currentPath: window.location.pathname },
+          context: { 
+            userMessage: msg, 
+            currentPath: window.location.pathname,
+            profile: profile.data,
+            recentOrders: orders.data
+          },
           history,
         },
       });
 
       const reply = data?.oracle_opinion || "I'm here to help! Please try again.";
-      setMessages(prev => [...prev, { role: "bot", text: reply, ts: new Date() }]);
+      const botMsg: Message = { role: "bot", text: reply, ts: new Date() };
+      setMessages(prev => [...prev, botMsg]);
+
+      // Save bot reply to DB
+      if (user) {
+        await supabase.from("chat_messages").insert({
+          user_id: user.id,
+          role: "bot",
+          content: reply
+        });
+      }
+
       if (!open) setUnread(n => n + 1);
     } catch {
       setMessages(prev => [...prev, {
