@@ -15,13 +15,12 @@ serve(async (req: Request) => {
   const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
   try {
-    // 1. Fetch executed actions that haven't been evaluated yet (effectiveness IS NULL)
-    // evaluated = effectiveness is not null
+    // 1. Fetch executed actions not yet evaluated (effectiveness = 0 means neutral/unevaluated)
     const { data: actionsToEvaluate, error: actionError } = await supabaseAdmin
       .from("sentinel_actions")
       .select("*")
       .eq("status", "executed")
-      .is("effectiveness", null)
+      .eq("effectiveness", 0)
       .lt("ts", new Date(Date.now() - 10 * 60 * 1000).toISOString())
       .limit(10);
 
