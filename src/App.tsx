@@ -11,6 +11,7 @@ import Footer from "@/components/Footer";
 import DashboardLayout from "@/components/DashboardLayout";
 import AdminLayout from "@/components/AdminLayout";
 import { ThemeProvider } from "@/contexts/ThemeContext";
+import ThemeSelector from "@/components/ThemeSelector";
 import WhatsAppButton from "@/components/WhatsAppButton";
 import FreeDataButton from "@/components/FreeDataButton";
 import TutorialModal from "@/components/TutorialModal";
@@ -489,6 +490,7 @@ const App = () => {
             <AuthProvider>
               <SecurityGuard>
                 <AppContent />
+                <ThemeSelector />
               </SecurityGuard>
               <WhatsAppButton />
               <FreeDataButton />
