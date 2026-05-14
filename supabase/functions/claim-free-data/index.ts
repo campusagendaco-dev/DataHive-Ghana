@@ -1,129 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { corsHeaders } from "../_shared/cors.ts";
-import { getActiveProviders } from "../_shared/providers.ts";
-
-function getEnv(...keys: string[]): string {
-  for (const k of keys) {
-    const v = Deno.env.get(k)?.trim();
-    if (v) return v;
-  }
-  return "";
-}
-
-function mapNetworkKey(network: string): string {
-  const n = network.trim().toUpperCase();
-  if (n === "AIRTELTIGO" || n === "AIRTEL TIGO" || n === "AT") return "AT_PREMIUM";
-  if (n === "TELECEL" || n === "VODAFONE") return "TELECEL";
-  if (n === "MTN") return "YELLO";
-  return n;
-}
-
-function parseCapacity(pkg: string): number {
-  const m = pkg.replace(/\s+/g, "").match(/(\d+(?:\.\d+)?)/);
-  return m ? parseFloat(m[1]) : 0;
-}
-
-function normalizeRecipient(phone: string): string {
-  const digits = phone.replace(/\D+/g, "");
-  if (digits.startsWith("233") && digits.length === 12) return `0${digits.slice(3)}`;
-  if (digits.length === 9) return `0${digits}`;
-  if (digits.length === 10 && digits.startsWith("0")) return digits;
-  return phone.trim();
-}
-
-function isHtml(ct: string | null, body: string): boolean {
-  const p = body.trim().slice(0, 200).toLowerCase();
-  return Boolean(ct?.includes("text/html") || p.startsWith("<!doctype") || p.startsWith("<html"));
-}
-
-async function callProvider(
-  baseUrl: string,
-  apiKey: string,
-  network: string,
-  packageSize: string,
-  phone: string,
-  webhookUrl: string,
-): Promise<{ ok: boolean; reason: string }> {
-  const clean = baseUrl.trim().replace(/\/+$/, "");
-  const candidates = new Set<string>();
-  const aliases = ["purchase", "order", "airtime", "buy", "data", "bundle", "topup", "package"];
-  let rootUrl = "";
-  try {
-    const parsed = new URL(clean);
-    rootUrl = parsed.origin;
-  } catch {
-    rootUrl = "";
-  }
-
-  for (const alias of aliases) {
-    candidates.add(`${clean}/api/${alias}`);
-    candidates.add(`${clean}/${alias}`);
-    if (rootUrl) {
-      candidates.add(`${rootUrl}/api/${alias}`);
-      candidates.add(`${rootUrl}/${alias}`);
-    }
-  }
-
-  const body: Record<string, unknown> = {
-    networkRaw: network,
-    networkKey: mapNetworkKey(network),
-    recipient: normalizeRecipient(phone),
-    capacity: parseCapacity(packageSize),
-  };
-  if (webhookUrl) body.webhook_url = webhookUrl;
-
-  for (const url of candidates) {
-    const ctrl = new AbortController();
-    const tid = setTimeout(() => ctrl.abort(), 25000);
-    try {
-      const res = await fetch(url, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "Accept": "application/json", "X-API-Key": apiKey },
-        body: JSON.stringify(body),
-        signal: ctrl.signal,
-      });
-      clearTimeout(tid);
-      const text = await res.text();
-      if (res.ok && !isHtml(res.headers.get("content-type"), text)) {
-        try {
-          const parsed = JSON.parse(text);
-          const s = String(parsed?.status || "").toLowerCase();
-          if (s === "false" || s === "error" || s === "failed") {
-            return { ok: false, reason: parsed?.message || "Provider rejected the order" };
-          }
-        } catch { /* non-JSON 2xx treated as ok */ }
-        return { ok: true, reason: "" };
-      }
-      if (res.status === 404 || isHtml(res.headers.get("content-type"), text)) continue;
-      const reason = `Provider error ${res.status}`;
-      return { ok: false, reason };
-    } catch (e) {
-      clearTimeout(tid);
-      if (url === [...candidates].at(-1)) {
-        return { ok: false, reason: e instanceof Error ? e.message : "Provider unreachable" };
-      }
-    }
-  }
-  return { ok: false, reason: `All provider endpoints failed for ${clean}. Tried ${candidates.size} variants (e.g. /api/purchase, /buy).` };
-}
-
-async function sendSms(phone: string, message: string) {
-  const apiKey = getEnv("TXTCONNECT_API_KEY");
-  const senderId = getEnv("TXTCONNECT_SENDER_ID") || "SwiftDataGh";
-  const digits = phone.replace(/\D+/g, "");
-  const to = digits.startsWith("0") && digits.length === 10
-    ? `233${digits.slice(1)}`
-    : (digits.startsWith("233") ? digits : digits);
-  if (!apiKey || !to) return;
-  try {
-    await fetch("https://api.txtconnect.net/dev/api/sms/send", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "Authorization": `Bearer ${apiKey}` },
-      body: JSON.stringify({ to, from: senderId, sms: message }),
-    });
-  } catch { /* non-critical */ }
-}
 
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
@@ -139,13 +16,13 @@ serve(async (req) => {
   const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
   try {
-    // Check ordering is enabled
     const { data: sysSettings } = await supabase
       .from("system_settings").select("disable_ordering, holiday_message").eq("id", 1).maybeSingle();
     if (sysSettings?.disable_ordering) {
       return new Response(JSON.stringify({
         error: sysSettings.holiday_message || "Ordering is currently disabled.",
-      }), { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        success: false
+      }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
     const payload = await req.json().catch(() => null);
@@ -155,7 +32,7 @@ serve(async (req) => {
     const packageSize = typeof payload?.package_size === "string" ? payload.package_size.trim() : "";
 
     if (!promoCode || !phone || !network || !packageSize) {
-      return new Response(JSON.stringify({ error: "Missing required fields: promo_code, phone, network, package_size", success: false }), {
+      return new Response(JSON.stringify({ error: "Missing required fields", success: false }), {
         status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
@@ -167,65 +44,14 @@ serve(async (req) => {
       });
     }
 
-    const ALLOWED_NETWORKS = ["MTN", "Telecel", "AirtelTigo"];
-    if (!ALLOWED_NETWORKS.includes(network)) {
-      return new Response(JSON.stringify({ error: "Invalid network", success: false }), {
-        status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    // Check package exists and is available
-    const normalizedNet = network;
-    const normalizedPkg = packageSize.replace(/\s+/g, "").toUpperCase();
-    const { data: pkgRow } = await supabase
-      .from("global_package_settings")
-      .select("public_price, agent_price, is_unavailable")
-      .eq("network", normalizedNet)
-      .eq("package_size", normalizedPkg)
-      .maybeSingle();
-
-    if (pkgRow?.is_unavailable) {
-      return new Response(JSON.stringify({ error: "This package is currently unavailable", success: false }), {
-        status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    const originalPrice = Number(pkgRow?.public_price) > 0
-      ? Number(pkgRow!.public_price)
-      : Number(pkgRow?.agent_price) || 0;
-
-    // Atomically claim the promo code via DB function
+    // Atomically claim the promo code
     const { data: claimRows, error: claimError } = await supabase.rpc("claim_promo_code", {
       p_code: promoCode,
       p_phone: phone,
     });
 
     if (claimError || !claimRows || claimRows.length === 0) {
-      // Distinguish "already claimed" vs "invalid code"
-      const { data: existingPromo } = await supabase
-        .from("promo_codes")
-        .select("id, current_uses, max_uses, is_active, expires_at")
-        .eq("code", promoCode)
-        .maybeSingle();
-
-      let reason = "Invalid or inactive promo code";
-      if (existingPromo) {
-        if (!existingPromo.is_active) reason = "This promo code is inactive";
-        else if (existingPromo.expires_at && new Date(existingPromo.expires_at) < new Date()) reason = "Promo code has expired";
-        else if (existingPromo.current_uses >= existingPromo.max_uses) reason = "Promo code has been fully claimed";
-        else {
-          // Check if already claimed by this phone
-          const { data: alreadyClaimed } = await supabase
-            .from("promo_claims")
-            .select("id")
-            .eq("promo_code_id", existingPromo.id)
-            .eq("claimed_by_phone", phone)
-            .maybeSingle();
-          if (alreadyClaimed) reason = "You have already claimed this code";
-        }
-      }
-
-      return new Response(JSON.stringify({ error: reason, success: false }), {
+      return new Response(JSON.stringify({ error: "Invalid or already claimed promo code", success: false }), {
         status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
@@ -233,16 +59,20 @@ serve(async (req) => {
     const claimResult = claimRows[0] as { promo_id: string; discount_percentage: number; is_free: boolean };
 
     if (!claimResult.is_free) {
-      // Partial discount codes should go through Paystack — this endpoint is free-data only
-      // Rollback by decrementing (best-effort)
-      await supabase
-        .from("promo_codes")
-        .update({ current_uses: supabase.rpc("claim_promo_code" as any, {}) as any })
-        .eq("id", claimResult.promo_id);
-      return new Response(JSON.stringify({ error: "This code is a discount code, not a free data code", success: false }), {
+      return new Response(JSON.stringify({ error: "This code is for discounts, not free data", success: false }), {
         status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
+
+    // Fetch original price for tracking
+    const { data: pkgRow } = await supabase
+      .from("global_package_settings")
+      .select("public_price, agent_price")
+      .eq("network", network)
+      .eq("package_size", packageSize.replace(/\s+/g, "").toUpperCase())
+      .maybeSingle();
+
+    const originalPrice = Number(pkgRow?.public_price) || Number(pkgRow?.agent_price) || 0;
 
     // Create order record
     const orderId = crypto.randomUUID();
@@ -255,72 +85,50 @@ serve(async (req) => {
       customer_phone: phone,
       amount: 0,
       profit: 0,
-      parent_profit: 0,
       status: "paid",
       promo_code_id: claimResult.promo_id,
       discount_amount: originalPrice,
     });
 
     // Update claim with order_id
-    await supabase
-      .from("promo_claims")
-      .update({ order_id: orderId })
-      .eq("promo_code_id", claimResult.promo_id)
-      .eq("claimed_by_phone", phone);
+    await supabase.from("promo_claims").update({ order_id: orderId }).eq("promo_code_id", claimResult.promo_id).eq("claimed_by_phone", phone);
 
-    // Trigger data provider - fetch dynamically from providers table first
-    const activeProviders = await getActiveProviders(supabase, "data");
-    const primaryProvider = activeProviders[0];
+    // DELEGATE fulfillment to verify-payment for standard provider logic
+    try {
+      const fulfillRes = await fetch(`${SUPABASE_URL}/functions/v1/verify-payment`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${Deno.env.get("SUPABASE_ANON_KEY")}`,
+        },
+        body: JSON.stringify({ reference: orderId }),
+      });
+      const fulfillData = await fulfillRes.json();
 
-    let lastError = "No active providers configured";
-    
-    // Try each active provider until one succeeds
-    for (const provider of activeProviders) {
-      const apiKey = provider.api_key || getEnv("PRIMARY_DATA_PROVIDER_API_KEY", "DATA_PROVIDER_API_KEY");
-      let baseUrl = provider.base_url || getEnv("PRIMARY_DATA_PROVIDER_BASE_URL", "DATA_PROVIDER_BASE_URL");
-      baseUrl = (baseUrl || "").replace(/\/+$/, "");
-      
-      if (!apiKey || !baseUrl) {
-        lastError = `Provider ${provider.name || "Unknown"} misconfigured`;
-        continue;
-      }
-
-      const result = await callProvider(baseUrl, apiKey, network, packageSize, phone, WEBHOOK_URL);
-
-      if (result.ok) {
-        await supabase.from("orders").update({ 
-          status: "fulfilled", 
-          failure_reason: null,
-          metadata: { ...((await supabase.from("orders").select("metadata").eq("id", orderId).maybeSingle()).data?.metadata || {}), fulfilled_by: provider.name }
-        }).eq("id", orderId);
-        
-        await sendSms(phone, `Your free ${packageSize} ${network} data bundle has been sent! Reference: ${orderId.slice(0, 8).toUpperCase()}. Thanks for using SwiftData GH.`);
-        
-        return new Response(JSON.stringify({ success: true, order_id: orderId, status: "fulfilled" }), {
+      if (fulfillData.status === "fulfilled" || fulfillData.status === "processing") {
+        return new Response(JSON.stringify({ success: true, order_id: orderId, status: fulfillData.status }), {
           status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
-      
-      lastError = result.reason;
-      console.warn(`Provider ${provider.name} failed for claim ${orderId}: ${result.reason}`);
+
+      return new Response(JSON.stringify({
+        success: false,
+        order_id: orderId,
+        error: fulfillData.reason || fulfillData.error || "Fulfillment failed. Contact support."
+      }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+
+    } catch (e) {
+      console.error("Fulfillment trigger error:", e);
+      return new Response(JSON.stringify({
+        success: false,
+        order_id: orderId,
+        error: "Claim recorded but fulfillment failed to start. Contact support."
+      }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
-
-    // If we reach here, all providers failed
-    await supabase.from("orders").update({
-      status: "fulfillment_failed",
-      failure_reason: lastError,
-    }).eq("id", orderId);
-
-    return new Response(JSON.stringify({
-      success: false,
-      order_id: orderId,
-      status: "fulfillment_failed",
-      error: `Data delivery failed: ${lastError}. Your claim was recorded — contact support with ref ${orderId.slice(0, 8).toUpperCase()}.`,
-    }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
   } catch (err) {
     console.error("claim-free-data error:", err);
-    return new Response(JSON.stringify({ error: err instanceof Error ? err.message : "Internal error" }), {
+    return new Response(JSON.stringify({ error: "Internal server error", success: false }), {
       status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
