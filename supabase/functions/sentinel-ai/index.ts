@@ -130,21 +130,20 @@ serve(async (req: Request) => {
       - notify_admin: When something needs human judgment — wallet mismatches, anomalies, critical errors
       - none: When the system is healthy or errors are transient noise
 
-      ━━━ OUTPUT FORMAT ━━━
-      Return ONLY a valid JSON object:
+      OUTPUT FORMAT - Return ONLY a valid JSON object with exactly these fields:
       {
-        "diagnosis": "Clear, human-readable explanation of what is happening and why",
-        "action": "switch_provider" | "notify_admin" | "adjust_settings" | "retry_order" | "customer_outreach" | "auto_refund" | "mask_service" | "block_ip" | "marketing_outreach" | "none",
+        "diagnosis": "string - clear human-readable explanation of root cause",
+        "action": "string - one of: switch_provider, notify_admin, adjust_settings, retry_order, customer_outreach, auto_refund, mask_service, block_ip, marketing_outreach, none",
         "parameters": {
-          "provider_id": "UUID if switching/masking",
-          "message": "Specific, human-written message for admin/customer — not generic",
-          "order_id": "UUID if outreach/refund",
-          "ip_address": "IP to block",
-          "target_user_id": "UUID for marketing",
-          "severity": "low" | "medium" | "high" | "critical"
+          "provider_id": "string or null",
+          "message": "string - specific human-written message, not generic",
+          "order_id": "string or null",
+          "ip_address": "string or null",
+          "target_user_id": "string or null",
+          "severity": "string - one of: low, medium, high, critical"
         },
-        "reasoning": "Step-by-step reasoning: what evidence you saw, what hypotheses you considered, why you chose this action over alternatives",
-        "confidence": "high" | "medium" | "low"
+        "reasoning": "string - step by step reasoning for this decision",
+        "confidence": "string - one of: high, medium, low"
       }
     `;
 
@@ -154,7 +153,10 @@ serve(async (req: Request) => {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         contents: [{ parts: [{ text: prompt }] }],
-        generationConfig: { response_mime_type: "application/json" }
+        generationConfig: {
+          response_mime_type: "application/json",
+          temperature: 0.2,
+        }
       })
     });
 
@@ -166,7 +168,22 @@ serve(async (req: Request) => {
     const aiData = await aiResponse.json();
     const rawText = aiData?.candidates?.[0]?.content?.parts?.[0]?.text;
     if (!rawText) throw new Error("Empty response from Gemini");
-    const decision = JSON.parse(rawText);
+
+    // Robust JSON extraction — handles markdown code blocks if Gemini adds them
+    let decision: any;
+    try {
+      const jsonMatch = rawText.match(/\{[\s\S]*\}/);
+      decision = JSON.parse(jsonMatch ? jsonMatch[0] : rawText);
+    } catch (_parseErr) {
+      // Fallback: treat as a safe no-op if response is unparseable
+      decision = {
+        diagnosis: "Sentinel received an unparseable AI response — standing down safely.",
+        action: "none",
+        parameters: { severity: "low", message: "" },
+        reasoning: rawText?.slice(0, 300) || "No reasoning available",
+        confidence: "low"
+      };
+    }
 
     // 5. Execute Action
     let executionResult = null;
@@ -278,8 +295,13 @@ serve(async (req: Request) => {
     });
 
   } catch (error: any) {
-    console.error("Sentinel Error:", error);
-    return new Response(JSON.stringify({ error: error.message }), {
+    console.error("Sentinel Critical Failure:", error);
+    return new Response(JSON.stringify({ 
+      error: "Sentinel Core Failure", 
+      message: error.message,
+      stack: error.stack,
+      details: error
+    }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
