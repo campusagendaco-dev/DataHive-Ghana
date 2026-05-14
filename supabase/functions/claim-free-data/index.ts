@@ -47,7 +47,7 @@ async function callProvider(
 ): Promise<{ ok: boolean; reason: string }> {
   const clean = baseUrl.trim().replace(/\/+$/, "");
   const candidates = new Set<string>();
-  const aliases = ["purchase", "order", "airtime", "buy"];
+  const aliases = ["purchase", "order", "airtime", "buy", "data", "bundle", "topup", "package"];
   let rootUrl = "";
   try {
     const parsed = new URL(clean);
@@ -105,7 +105,7 @@ async function callProvider(
       }
     }
   }
-  return { ok: false, reason: "All provider endpoints failed" };
+  return { ok: false, reason: `All provider endpoints failed for ${clean}. Tried ${candidates.size} variants (e.g. /api/purchase, /buy).` };
 }
 
 async function sendSms(phone: string, message: string) {
@@ -272,43 +272,50 @@ serve(async (req) => {
     const activeProviders = await getActiveProviders(supabase, "data");
     const primaryProvider = activeProviders[0];
 
-    const DATA_PROVIDER_API_KEY = primaryProvider?.api_key || getEnv("PRIMARY_DATA_PROVIDER_API_KEY", "DATA_PROVIDER_API_KEY");
-    let DATA_PROVIDER_BASE_URL = primaryProvider?.base_url || getEnv("PRIMARY_DATA_PROVIDER_BASE_URL", "DATA_PROVIDER_BASE_URL");
-    DATA_PROVIDER_BASE_URL = (DATA_PROVIDER_BASE_URL || "").replace(/\/+$/, "");
-    const WEBHOOK_URL = getEnv("DATA_PROVIDER_WEBHOOK_URL", "PRIMARY_DATA_PROVIDER_WEBHOOK_URL");
+    let lastError = "No active providers configured";
+    
+    // Try each active provider until one succeeds
+    for (const provider of activeProviders) {
+      const apiKey = provider.api_key || getEnv("PRIMARY_DATA_PROVIDER_API_KEY", "DATA_PROVIDER_API_KEY");
+      let baseUrl = provider.base_url || getEnv("PRIMARY_DATA_PROVIDER_BASE_URL", "DATA_PROVIDER_BASE_URL");
+      baseUrl = (baseUrl || "").replace(/\/+$/, "");
+      
+      if (!apiKey || !baseUrl) {
+        lastError = `Provider ${provider.name || "Unknown"} misconfigured`;
+        continue;
+      }
 
-    if (!DATA_PROVIDER_API_KEY || !DATA_PROVIDER_BASE_URL) {
-      await supabase.from("orders").update({
-        status: "fulfillment_failed",
-        failure_reason: "Data provider not configured",
-      }).eq("id", orderId);
-      return new Response(JSON.stringify({
-        success: false,
-        order_id: orderId,
-        error: "Data provider not configured — your claim was recorded. Contact support.",
-      }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      const result = await callProvider(baseUrl, apiKey, network, packageSize, phone, WEBHOOK_URL);
+
+      if (result.ok) {
+        await supabase.from("orders").update({ 
+          status: "fulfilled", 
+          failure_reason: null,
+          metadata: { ...((await supabase.from("orders").select("metadata").eq("id", orderId).maybeSingle()).data?.metadata || {}), fulfilled_by: provider.name }
+        }).eq("id", orderId);
+        
+        await sendSms(phone, `Your free ${packageSize} ${network} data bundle has been sent! Reference: ${orderId.slice(0, 8).toUpperCase()}. Thanks for using SwiftData GH.`);
+        
+        return new Response(JSON.stringify({ success: true, order_id: orderId, status: "fulfilled" }), {
+          status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      
+      lastError = result.reason;
+      console.warn(`Provider ${provider.name} failed for claim ${orderId}: ${result.reason}`);
     }
 
-    const result = await callProvider(DATA_PROVIDER_BASE_URL, DATA_PROVIDER_API_KEY, network, packageSize, phone, WEBHOOK_URL);
-
-    if (result.ok) {
-      await supabase.from("orders").update({ status: "fulfilled", failure_reason: null }).eq("id", orderId);
-      await sendSms(phone, `Your free ${packageSize} ${network} data bundle has been sent! Reference: ${orderId.slice(0, 8).toUpperCase()}. Thanks for using SwiftData GH.`);
-      return new Response(JSON.stringify({ success: true, order_id: orderId, status: "fulfilled" }), {
-        status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
+    // If we reach here, all providers failed
     await supabase.from("orders").update({
       status: "fulfillment_failed",
-      failure_reason: result.reason,
+      failure_reason: lastError,
     }).eq("id", orderId);
 
     return new Response(JSON.stringify({
       success: false,
       order_id: orderId,
       status: "fulfillment_failed",
-      error: `Data delivery failed: ${result.reason}. Your claim was recorded — contact support with ref ${orderId.slice(0, 8).toUpperCase()}.`,
+      error: `Data delivery failed: ${lastError}. Your claim was recorded — contact support with ref ${orderId.slice(0, 8).toUpperCase()}.`,
     }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
   } catch (err) {
