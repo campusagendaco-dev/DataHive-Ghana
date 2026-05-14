@@ -69,46 +69,6 @@ export default function AIConcierge() {
     initChat();
   }, []);
 
-  // Phase 3: Proactive Sentinel - Watch for failed orders
-  useEffect(() => {
-    const channel = supabase
-      .channel('proactive-sentinel')
-      .on(
-        'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'orders',
-          filter: `status=eq.failed`
-        },
-        async (payload) => {
-          if (!open) {
-            setUnread(n => n + 1);
-            // Trigger a proactive message from Ama
-            const { data } = await supabase.functions.invoke("oracle-ai", {
-              body: {
-                context: { 
-                  userMessage: "SYSTEM_NOTIFICATION: My recent order just failed. Please proactively explain what happened and suggest a fix.", 
-                  currentPath: window.location.pathname,
-                  failedOrder: payload.new
-                },
-                history: messages.slice(-5).map(m => ({ role: m.role, content: m.text })),
-              },
-            });
-            
-            if (data?.oracle_opinion) {
-              setMessages(prev => [...prev, { role: "bot", text: data.oracle_opinion, ts: new Date() }]);
-            }
-          }
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [open, messages]);
-
   useEffect(() => {
     if (open) {
       setUnread(0);
