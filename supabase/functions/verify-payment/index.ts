@@ -596,16 +596,18 @@ serve(async (req) => {
         return new Response(JSON.stringify({ error: "Free data claim limit reached" }), { status: 403, headers: corsHeaders });
       }
 
-      // Check if this specific agent already has a fulfilled claim
+      // Check if this specific agent already has a fulfilled claim (excluding the current order if we are retrying it)
       if (existingOrder?.agent_id) {
-        const { count } = await supabaseAdmin
+        const { data: existingClaims, count } = await supabaseAdmin
           .from("orders")
-          .select("id", { count: "exact", head: true })
+          .select("id, status, created_at")
           .eq("agent_id", existingOrder.agent_id)
           .eq("order_type", "free_data_claim")
-          .eq("status", "fulfilled");
+          .eq("status", "fulfilled")
+          .neq("id", targetReference); // Exclude current order
         
         if ((count || 0) > 0) {
+          console.warn(`[SECURITY] Blocked duplicate free data claim for agent ${existingOrder.agent_id}. Existing fulfilled order: ${existingClaims?.[0]?.id}`);
           return new Response(JSON.stringify({ error: "You have already claimed your free data" }), { status: 403, headers: corsHeaders });
         }
       }
