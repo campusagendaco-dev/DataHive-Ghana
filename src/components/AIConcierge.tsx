@@ -292,39 +292,20 @@ export default function AIConcierge() {
           </motion.div>
         )}
       </AnimatePresence>
-
-      {/* ── Trigger button ── */}
+       {/* ── Trigger button ── */}
       <motion.button
         type="button"
         whileHover={{ scale: 1.08 }}
         whileTap={{ scale: 0.92 }}
         onClick={() => setOpen(o => !o)}
-        className="relative w-[64px] h-[64px] rounded-[24px] flex items-center justify-center shadow-2xl"
-        style={{
-          background: "linear-gradient(135deg,#92400e 0%,#b45309 20%,#7c3aed 60%,#4f46e5 100%)",
-          boxShadow: "0 8px 32px rgba(124,58,237,0.45), 0 2px 8px rgba(0,0,0,0.4)",
-        }}
+        className="relative w-[60px] h-[60px] rounded-full flex items-center justify-center shadow-2xl border-2 border-amber-500/20 overflow-hidden bg-[#1a1a2e]"
       >
-        {/* Outer glow pulse */}
-        <motion.span
-          animate={{ scale: [1, 1.7], opacity: [0.4, 0] }}
-          transition={{ duration: 2.2, repeat: Infinity, ease: "easeOut" }}
-          className="absolute inset-0 rounded-[24px]"
-          style={{ background: "linear-gradient(135deg,#f59e0b,#7c3aed)" }}
-        />
-        {/* Second slower ring */}
-        <motion.span
-          animate={{ scale: [1, 1.4], opacity: [0.25, 0] }}
-          transition={{ duration: 2.2, repeat: Infinity, ease: "easeOut", delay: 0.8 }}
-          className="absolute inset-0 rounded-[24px]"
-          style={{ background: "linear-gradient(135deg,#f59e0b,#7c3aed)" }}
-        />
-
         <AnimatePresence mode="wait">
           {open ? (
             <motion.div key="close"
               initial={{ rotate: -90, opacity: 0, scale: 0.6 }} animate={{ rotate: 0, opacity: 1, scale: 1 }} exit={{ rotate: 90, opacity: 0, scale: 0.6 }}
               transition={{ duration: 0.2 }}
+              className="z-10 bg-black/40 w-full h-full flex items-center justify-center"
             >
               <X className="w-6 h-6 text-white" />
             </motion.div>
@@ -332,16 +313,9 @@ export default function AIConcierge() {
             <motion.div key="open"
               initial={{ rotate: 30, opacity: 0, scale: 0.6 }} animate={{ rotate: 0, opacity: 1, scale: 1 }} exit={{ rotate: -30, opacity: 0, scale: 0.6 }}
               transition={{ duration: 0.2 }}
-              className="flex flex-col items-center gap-0"
+              className="w-full h-full"
             >
-              <motion.div
-                animate={{ rotate: [0, -8, 8, 0] }}
-                transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
-                className="w-10 h-10 rounded-full overflow-hidden border-2 border-white/20 shadow-lg bg-[#2a2a3a]"
-              >
-                <img src="/assets/ama_avatar.png" alt="Ama" className="w-full h-full object-cover object-top scale-[1.6]" />
-              </motion.div>
-              <span className="text-white/80 font-black text-[9px] tracking-widest uppercase leading-none mt-0.5">Ama</span>
+              <img src="/assets/ama_avatar.png" alt="Ama" className="w-full h-full object-cover object-top scale-[1.6]" />
             </motion.div>
           )}
         </AnimatePresence>
