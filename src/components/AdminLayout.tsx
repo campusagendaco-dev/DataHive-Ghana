@@ -8,7 +8,7 @@ import {
   Wallet, Bell, Package, CreditCard, Activity, Settings, ChevronRight,
   BarChart3, Ticket, LifeBuoy, FileSearch, Key, TrendingUp, Sun, Moon,
   Sparkles, Image as ImageIcon, Users2, ScrollText,
-  Megaphone, Flag, MessageSquare, Banknote, UserCheck, LineChart
+  Megaphone, Flag, MessageSquare, Banknote, UserCheck, LineChart, Brain
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetDescription, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
@@ -54,6 +54,7 @@ const NAV_SECTIONS = [
     items: [
       { label: "Security",      icon: ShieldCheck, path: "/admin/security" },
       { label: "System Health", icon: Activity,    path: "/admin/system-health" },
+      { label: "Sentinel AI",   icon: Brain,       path: "/admin/sentinel" },
       { label: "System Logs",    icon: ScrollText,    path: "/admin/system-logs" },
       { label: "Feature Flags",  icon: Flag,          path: "/admin/feature-flags" },
       { label: "SMS Templates",  icon: MessageSquare, path: "/admin/sms-templates" },

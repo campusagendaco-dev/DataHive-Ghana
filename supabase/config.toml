@@ -65,6 +65,15 @@ verify_jwt = false
 [functions.dump-processing-orders]
 verify_jwt = false
 
+[functions.sentinel-ai]
+verify_jwt = false
+
+[functions.sentinel-evolve]
+verify_jwt = false
+
+[functions.oracle-ai]
+verify_jwt = false
+
 
 [functions.heal-processing-orders]
 verify_jwt = false
