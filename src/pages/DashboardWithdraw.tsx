@@ -64,7 +64,7 @@ const DashboardWithdraw = () => {
   const hasBiometric = isSupported && credentials.length > 0;
 
   const theoreticalBalance = parseFloat((totalProfit - (completedWithdrawals + pendingWithdrawals)).toFixed(2));
-  const availableBalance = Math.min(theoreticalBalance, walletBalance);
+  const availableBalance = theoreticalBalance;
 
   const fetchData = useCallback(async () => {
     if (!user) return;
@@ -91,7 +91,7 @@ const DashboardWithdraw = () => {
 
     const profits = (ordersRes.data || []).reduce((sum, o: any) => sum + (o.profit || 0), 0);
     const parentProfits = (parentRes.data || []).reduce((sum, o: any) => sum + (o.parent_profit || 0), 0);
-    setTotalProfit(profits + parentProfits);
+    setTotalProfit(parseFloat((profits + parentProfits).toFixed(2)));
 
     const wds = (withdrawalsRes.data || []) as Withdrawal[];
     setWithdrawals(wds);
