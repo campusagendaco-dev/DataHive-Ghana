@@ -123,10 +123,10 @@ export default function AIConcierge() {
                   <motion.div
                     animate={{ boxShadow: ["0 0 0px 0px rgba(251,191,36,0.0)", "0 0 16px 4px rgba(251,191,36,0.35)", "0 0 0px 0px rgba(251,191,36,0.0)"] }}
                     transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
-                    className="w-11 h-11 rounded-2xl flex items-center justify-center overflow-hidden"
+                    className="w-11 h-11 rounded-2xl flex items-center justify-center overflow-hidden bg-[#2a2a3a]"
                     style={{ background: "linear-gradient(135deg,#92400e 0%,#b45309 25%,#7c3aed 65%,#4f46e5 100%)" }}
                   >
-                    <img src="/assets/ama_avatar.png" alt="Ama" className="w-full h-full object-cover scale-110" />
+                    <img src="/assets/ama_avatar.png" alt="Ama" className="w-full h-full object-cover object-top scale-[1.6]" />
                   </motion.div>
                   <motion.span
                     animate={{ scale: [1, 1.4, 1], opacity: [1, 0.6, 1] }}
@@ -172,10 +172,10 @@ export default function AIConcierge() {
                   {/* Avatar dot */}
                   {m.role === "bot" && (
                     <div
-                      className="w-7 h-7 rounded-xl shrink-0 flex items-center justify-center overflow-hidden self-end mb-4"
+                      className="w-7 h-7 rounded-xl shrink-0 flex items-center justify-center overflow-hidden self-end mb-4 bg-[#2a2a3a]"
                     style={{ background: "linear-gradient(135deg,#92400e,#7c3aed)" }}
                   >
-                    <img src="/assets/ama_avatar.png" alt="Ama" className="w-full h-full object-cover" />
+                    <img src="/assets/ama_avatar.png" alt="Ama" className="w-full h-full object-cover object-top scale-[1.6]" />
                   </div>
                   )}
 
@@ -208,10 +208,10 @@ export default function AIConcierge() {
                     className="flex items-center gap-2"
                   >
                     <div
-                      className="w-7 h-7 rounded-xl shrink-0 flex items-center justify-center overflow-hidden"
+                      className="w-7 h-7 rounded-xl shrink-0 flex items-center justify-center overflow-hidden bg-[#2a2a3a]"
                       style={{ background: "linear-gradient(135deg,#92400e,#7c3aed)" }}
                     >
-                      <img src="/assets/ama_avatar.png" alt="Ama" className="w-full h-full object-cover" />
+                      <img src="/assets/ama_avatar.png" alt="Ama" className="w-full h-full object-cover object-top scale-[1.6]" />
                     </div>
                     <div
                       className="px-4 py-3 rounded-2xl rounded-tl-sm flex gap-1.5 items-center"
@@ -337,9 +337,9 @@ export default function AIConcierge() {
               <motion.div
                 animate={{ rotate: [0, -8, 8, 0] }}
                 transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
-                className="w-10 h-10 rounded-full overflow-hidden border-2 border-white/20 shadow-lg"
+                className="w-10 h-10 rounded-full overflow-hidden border-2 border-white/20 shadow-lg bg-[#2a2a3a]"
               >
-                <img src="/assets/ama_avatar.png" alt="Ama" className="w-full h-full object-cover scale-110" />
+                <img src="/assets/ama_avatar.png" alt="Ama" className="w-full h-full object-cover object-top scale-[1.6]" />
               </motion.div>
               <span className="text-white/80 font-black text-[9px] tracking-widest uppercase leading-none mt-0.5">Ama</span>
             </motion.div>
