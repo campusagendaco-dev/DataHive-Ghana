@@ -3,7 +3,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import {
   Globe, Clock, Phone, ShieldCheck, Users2, User,
@@ -347,6 +347,9 @@ const UserDetailDrawer = ({ user, onClose }: Props) => {
         <div className="p-6 border-b border-white/5">
           <SheetHeader>
             <SheetTitle className="sr-only">User Detail</SheetTitle>
+            <SheetDescription className="sr-only">
+              Detailed information and management options for user {user.full_name || user.user_id}.
+            </SheetDescription>
           </SheetHeader>
           <div className="flex items-start gap-4">
             <Avatar className="w-14 h-14 rounded-2xl border-2 border-primary/20 shrink-0">

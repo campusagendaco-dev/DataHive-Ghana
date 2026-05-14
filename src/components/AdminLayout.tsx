@@ -11,7 +11,7 @@ import {
   Megaphone, Flag, MessageSquare, Banknote, UserCheck, LineChart
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Sheet, SheetContent, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
+import { Sheet, SheetContent, SheetDescription, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 
 const NAV_SECTIONS = [
   {
@@ -233,6 +233,9 @@ const AdminLayout = () => {
             </SheetTrigger>
             <SheetContent side="left" className="p-0 w-[85vw] max-w-[260px] bg-transparent border-none">
               <SheetTitle className="sr-only">Navigation Menu</SheetTitle>
+              <SheetDescription className="sr-only">
+                Access administrative navigation links and tools.
+              </SheetDescription>
               <SidebarContent onNavigate={() => setOpen(false)} />
             </SheetContent>
           </Sheet>
