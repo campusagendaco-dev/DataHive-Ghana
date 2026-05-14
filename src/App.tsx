@@ -278,9 +278,11 @@ const AppContent = () => {
           setMaintenance({ is_enabled: false, message: "" });
           setIpBlocked(false);
         }
-      } catch {
+      } catch (e) {
         if (!mounted) return;
+        // Silent fail for network/connection errors
         setMaintenance({ is_enabled: false, message: "" });
+        setIpBlocked(false);
       } finally {
         if (mounted) setMaintenanceLoading(false);
       }

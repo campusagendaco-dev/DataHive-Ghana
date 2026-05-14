@@ -17,6 +17,22 @@ const publicFunctionClient = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLI
 });
 
 export async function invokePublicFunction(functionName: string, options?: { body?: unknown; headers?: Record<string, string> }) {
+  let retries = 0;
+  const maxRetries = 2;
+  
+  while (retries <= maxRetries) {
+    try {
+      const result = await publicFunctionClient.functions.invoke(functionName, options);
+      // If we got a result (even an error), return it
+      return result;
+    } catch (error) {
+      if (retries === maxRetries) throw error;
+      console.warn(`Function ${functionName} failed (retry ${retries + 1}):`, error);
+      retries++;
+      // Wait a bit before retrying
+      await new Promise(resolve => setTimeout(resolve, 500 * retries));
+    }
+  }
   return await publicFunctionClient.functions.invoke(functionName, options);
 }
 

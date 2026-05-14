@@ -155,22 +155,22 @@ serve(async (req) => {
     const packageSize = typeof payload?.package_size === "string" ? payload.package_size.trim() : "";
 
     if (!promoCode || !phone || !network || !packageSize) {
-      return new Response(JSON.stringify({ error: "Missing required fields: promo_code, phone, network, package_size" }), {
-        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      return new Response(JSON.stringify({ error: "Missing required fields: promo_code, phone, network, package_size", success: false }), {
+        status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
     const validPhone = phone.length >= 9 && phone.length <= 12;
     if (!validPhone) {
-      return new Response(JSON.stringify({ error: "Invalid phone number" }), {
-        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      return new Response(JSON.stringify({ error: "Invalid phone number", success: false }), {
+        status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
     const ALLOWED_NETWORKS = ["MTN", "Telecel", "AirtelTigo"];
     if (!ALLOWED_NETWORKS.includes(network)) {
-      return new Response(JSON.stringify({ error: "Invalid network" }), {
-        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      return new Response(JSON.stringify({ error: "Invalid network", success: false }), {
+        status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
@@ -185,8 +185,8 @@ serve(async (req) => {
       .maybeSingle();
 
     if (pkgRow?.is_unavailable) {
-      return new Response(JSON.stringify({ error: "This package is currently unavailable" }), {
-        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      return new Response(JSON.stringify({ error: "This package is currently unavailable", success: false }), {
+        status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
@@ -225,8 +225,8 @@ serve(async (req) => {
         }
       }
 
-      return new Response(JSON.stringify({ error: reason }), {
-        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      return new Response(JSON.stringify({ error: reason, success: false }), {
+        status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
@@ -239,8 +239,8 @@ serve(async (req) => {
         .from("promo_codes")
         .update({ current_uses: supabase.rpc("claim_promo_code" as any, {}) as any })
         .eq("id", claimResult.promo_id);
-      return new Response(JSON.stringify({ error: "This code is a discount code, not a free data code" }), {
-        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      return new Response(JSON.stringify({ error: "This code is a discount code, not a free data code", success: false }), {
+        status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
