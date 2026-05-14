@@ -125,9 +125,11 @@ serve(async (req: Request) => {
       });
     }
 
-    // Enforce the cost price as the absolute lowest floor to prevent system losses.
-    // If cost_price is 0 or undefined, we fallback to a moderately discounted agent_price to accommodate promo markups.
-    const absoluteFloor = resolvedCostPrice > 0 ? resolvedCostPrice : (adminBase * 0.7);
+    // Enforce the true cost price as the absolute lowest floor to prevent system losses.
+    // If cost_price is 0 or undefined in the DB, we fallback to a loosely discounted agent_price 
+    // (e.g. 50% off) to accommodate any legitimate promo markups on the frontend.
+    const dbCostPrice = Number(pkgRow?.cost_price || 0);
+    const absoluteFloor = dbCostPrice > 0 ? dbCostPrice : (adminBase * 0.5);
 
     if (amountNum < absoluteFloor && absoluteFloor > 0) {
       console.error(`[SECURITY] Blocked underpriced order from user ${user.id}. Received: ${amountNum}, Absolute Floor: ${absoluteFloor}`);
