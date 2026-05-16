@@ -606,7 +606,7 @@ serve(async (req: Request) => {
 
         if (orderError) throw orderError;
 
-        await sendManualCreditSms(user_id, amount);
+        sendManualCreditSms(user_id, amount).catch(console.error);
 
         return new Response(JSON.stringify({ success: true, new_balance: newBalance }), {
           status: 200,
@@ -643,7 +643,7 @@ serve(async (req: Request) => {
 
         if (orderError) throw orderError;
 
-        await sendManualApiCreditSms(user_id, amount);
+        sendManualApiCreditSms(user_id, amount).catch(console.error);
 
         return new Response(JSON.stringify({ success: true, new_balance: newBalance }), {
           status: 200,

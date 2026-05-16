@@ -82,6 +82,18 @@ serve(async (req: Request) => {
       type: p.provider_type
     }));
 
+    // 3.5 Network Performance
+    const networkStats = ["MTN", "TELECEL", "AT", "GLO"].map(net => {
+      const netOrders = ordersToAnalyze?.filter(o => o.network === net) || [];
+      const failures = netOrders.filter(o => o.status === 'failed' || o.status === 'fulfillment_failed').length;
+      return {
+        network: net,
+        total: netOrders.length,
+        failures: failures,
+        failure_rate: netOrders.length > 0 ? Number((failures / netOrders.length).toFixed(2)) : 0
+      };
+    });
+
     // 4. Construct the "God Mode" Prompt
     const systemPrompt = `
       You are SENTINEL PRIME — the ultimate autonomous controller for Swift Vendor.
@@ -89,14 +101,18 @@ serve(async (req: Request) => {
       ━━━ CORE DIRECTIVES ━━━
       1. FRAUD DETECTION: Identify high risk scores (>80).
       2. FINANCIAL INTEGRITY: Monitor wallet_balance on profiles table. Flag suspicious self-top-ups.
-      3. LIQUIDITY BALANCING: Ensure only providers with HIGH BALANCE are prioritized (Priority 1).
-      4. FAILOVER: If Priority 1 provider has balance < 50, switch to the highest balance alternative.
-      5. NOTIFICATION: Any autonomous action MUST trigger an admin notification.
-      6. TRANSPARENCY: If an agent reports a discrepancy, direct them to use the "Wallet Statement" on their dashboard for proof.
+      3. VELOCITY ATTACKS: Watch for agents making multiple rapid small top-ups (e.g. GHS 1.00 to 5.00 repeated within minutes), which suggests card testing or gateway exploitation.
+      4. BALANCE STACKING: Flag accounts with high inflows but zero data sales.
+      5. LIQUIDITY BALANCING: Ensure only providers with HIGH BALANCE are prioritized (Priority 1).
+      6. FAILOVER: If Priority 1 provider has balance < 50, switch to the highest balance alternative.
+      7. NETWORK OUTAGE: If a network's failure rate > 0.50 (50%) and total > 5, output a 'broadcast_outage' action to alert all active agents of the downtime.
+      8. NOTIFICATION: Any autonomous action MUST trigger an admin notification.
+      9. TRANSPARENCY: If an agent reports a discrepancy, direct them to use the "Wallet Statement" on their dashboard for proof.
 
       ━━━ AVAILABLE ACTIONS ━━━
       - lock_terminal: { "target": "uuid", "reason": "string" }
       - switch_priority: { "provider_id": "uuid", "new_priority": 1, "reason": "string" }
+      - broadcast_outage: { "network": "string", "reason": "string" }
       - notify_admin: { "message": "string" }
 
       OUTPUT FORMAT: JSON ONLY.
@@ -111,6 +127,7 @@ serve(async (req: Request) => {
       CURRENT NETWORK STATE:
       Agents: ${JSON.stringify(agentStats)}
       Providers: ${JSON.stringify(providerHealth)}
+      Networks: ${JSON.stringify(networkStats)}
       System Settings: ${JSON.stringify(settings)}
     `;
 
@@ -219,6 +236,23 @@ serve(async (req: Request) => {
           
           await notifyAdmin(`Network Healed: ${action.params.provider_name || 'Provider'} restored to Priority 1 after health verification.`);
           actionMetadata.reason = "Autonomous system recovery";
+        }
+
+        if (action.type === 'broadcast_outage') {
+          const network = action.params.network || "A network";
+          const { data: allAgents } = await supabaseAdmin.from("profiles").select("phone").eq("is_agent", true).not("phone", "is", null);
+          const phones = allAgents?.map(a => a.phone) || [];
+          
+          if (phones.length > 0) {
+            const { apiKey, senderId } = await getSmsConfig(supabaseAdmin);
+            if (apiKey) {
+              const msg = `SwiftData Alert: We have detected instability with the ${network} network. Purchases may fail. Please inform customers. We are monitoring closely.`;
+              // In production, batch these. For now, map over them:
+              await Promise.all(phones.map(phone => sendSmsViaTxtConnect(apiKey, senderId, phone, msg).catch(e => console.error(e))));
+            }
+          }
+          await notifyAdmin(`Outage broadcasted to ${phones.length} agents for network: ${network}`);
+          actionMetadata.reason = "High failure rate detected automatically";
         }
 
         if (action.type === 'notify_admin') {

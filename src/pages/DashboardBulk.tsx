@@ -102,36 +102,44 @@ const DashboardBulk = () => {
     setConfirmOpen(false);
     setIsProcessing(true);
     setResults([]);
+ 
+    try {
+      const payload = {
+        orders: validEntries.map(e => ({
+          customer_phone: e.phone,
+          network: selectedNetwork,
+          package_size: e.pkg!.size,
+          amount: e.pkg!.price
+        }))
+      };
 
-    const batchResults: { phone: string; size: string; status: "success" | "failed"; error?: string }[] = [];
+      const { data, error } = await supabase.functions.invoke("agent-bulk-orders", {
+        body: payload
+      });
 
-    for (let i = 0; i < validEntries.length; i++) {
-      const { phone, pkg } = validEntries[i];
-      try {
-        const { data, error } = await supabase.functions.invoke("wallet-buy-data", {
-          body: {
-            network: selectedNetwork,
-            package_size: pkg!.size,
-            customer_phone: phone,
-            amount: pkg!.price,
-            reference: crypto.randomUUID(),
-          },
-        });
-
-        if (error || data?.error) {
-          batchResults.push({ phone, size: pkg!.size, status: "failed", error: data?.error || "Transaction failed" });
-        } else {
-          if (data?.order_id) {
-            supabase.functions.invoke("verify-payment", { body: { reference: data.order_id } }).catch(() => {});
-          }
-          batchResults.push({ phone, size: pkg!.size, status: "success" });
-        }
-      } catch {
-        batchResults.push({ phone, size: pkg!.size, status: "failed", error: "System error" });
+      if (error || data?.error) {
+        toast({ title: "Bulk Dispatch Failed", description: data?.error || error?.message || "Transaction failed", variant: "destructive" });
+        setIsProcessing(false);
+        return;
       }
-      setResults([...batchResults] as any);
-    }
 
+      // Success processing
+      const batchResults: { phone: string; size?: string; status: "success" | "failed"; error?: string }[] = [];
+      const errorMap = new Map((data.errors || []).map((e: any) => [e.phone, e.error]));
+
+      validEntries.forEach(e => {
+        if (errorMap.has(e.phone)) {
+           batchResults.push({ phone: e.phone, size: e.pkg?.size, status: "failed", error: errorMap.get(e.phone) });
+        } else {
+           batchResults.push({ phone: e.phone, size: e.pkg?.size, status: "success" });
+        }
+      });
+
+      setResults(batchResults);
+    } catch (err: any) {
+       toast({ title: "System Error", description: err.message, variant: "destructive" });
+    }
+ 
     setIsProcessing(false);
     setShowSuccessOverlay(true);
   };

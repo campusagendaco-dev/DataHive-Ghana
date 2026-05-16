@@ -1086,7 +1086,7 @@ serve(async (req) => {
         if (walletType === "api") {
           await supabaseAdmin.rpc("api.credit_api_wallet", { p_user_id: order.agent_id, p_amount: order.amount });
         } else {
-          await supabaseAdmin.rpc("credit_wallet", { p_agent_id: order.agent_id, p_amount: order.amount });
+          await supabaseAdmin.rpc("repay_credit", { p_agent_id: order.agent_id, p_amount: order.amount });
         }
         await supabaseAdmin.from("orders").update({ status: "fulfilled", failure_reason: null }).eq("id", orderId);
         

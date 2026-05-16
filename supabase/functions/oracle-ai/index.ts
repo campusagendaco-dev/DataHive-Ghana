@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { corsHeaders } from "../_shared/cors.ts";
 
 declare const Deno: any;
@@ -20,6 +21,12 @@ You are not a generic chatbot. You are Ama — sharp, modern, and deeply Ghanaia
 - If a user speaks Twi/Ga, respond in the same language or a mix.
 - Use local context: Mention MoMo, describe prices in "GHS", and understand local network quirks (e.g., MTN "network busy").
 - Keep it "Vibrant": Ama is not a robot; she is a helpful, tech-savvy Ghanaian sister.
+
+━━━ KNOWLEDGE VAULT ━━━
+- COMMISSIONS: Agents earn commissions on every data bundle sale. Commissions are automatically added to the "Profit" field of each order.
+- PROCESSING ORDERS: If an order is stuck in "Processing" for more than 5 minutes, it usually means the provider is slow. The system will auto-retry up to 3 times.
+- WITHDRAWALS: Withdrawal requests are reviewed by admins and typically processed within 2-4 hours during business days.
+- DATA PRICING: Our prices are dynamic and reflect current network wholesale rates. Agents always get the best wholesale price available.
 
 ━━━ NEW: FINANCIAL TOOLS ━━━
 You have access to tools. Use them when the user asks about points or redemption. 
@@ -51,7 +58,8 @@ Use the get_system_health tool to check if a provider (MTN, Telecel, AirtelTigo)
 - Never promise or mention refunds — say the system handles it automatically if relevant
 - For order failures: tell them the system retries automatically; they can also use the Retry button on their Orders page
 - For wallet issues: top-ups reflect within 1–2 minutes after Paystack confirms payment
-- You do NOT have live order/wallet data — direct them to their dashboard for real-time status
+- You DO have access to the user's live profile, balance, and recent order history ONLY when they are explicitly provided in the user context block. If this information is NOT provided in the context, do NOT invent or guess it. Say: "I don't have access to your real-time account data right now—please check your dashboard."
+- STRICT TRUTH: Do not make up or guess any financial stats, transaction statuses, or balances. If a tool or context does not give you a specific number or status, state clearly that you do not have that information.
 - If an issue needs human hands (missing large payment, account suspension, manual refund), say: "I'll flag this for our support team — they'll follow up shortly. A support agent will review your conversation and reply soon."
 
 ━━━ EMOTIONAL INTELLIGENCE GUIDE ━━━
@@ -91,6 +99,30 @@ const TOOLS = [
     name: "get_agent_network_summary",
     description: "Get a summary of sub-agents and their combined wallet balance.",
     input_schema: { type: "object", properties: {} }
+  },
+  {
+    name: "purchase_data_bundle",
+    description: "Purchase a data bundle for a specific phone number using the user's wallet. You MUST extract the network, phone number, and package size (e.g. '1GB', '500MB') from the user's message.",
+    input_schema: {
+      type: "object",
+      properties: {
+        network: { type: "string", enum: ["MTN", "Telecel", "AirtelTigo"] },
+        phone_number: { type: "string", description: "The 10 digit recipient phone number" },
+        package_size: { type: "string", description: "The package size, e.g. 1GB, 500MB, 10GB" }
+      },
+      required: ["network", "phone_number", "package_size"]
+    }
+  },
+  {
+    name: "investigate_dispute",
+    description: "Investigate a specific data bundle order that the user claims failed. This tool checks the live provider status and automatically refunds the user's wallet if the provider confirms the failure. Requires the user's phone number or the specific order ID.",
+    input_schema: {
+      type: "object",
+      properties: {
+        order_id: { type: "string", description: "The UUID of the order, if known." },
+        phone_number: { type: "string", description: "The customer phone number the data was meant for." }
+      }
+    }
   }
 ];
 
@@ -100,6 +132,13 @@ serve(async (req: Request) => {
   }
 
   try {
+    const SUPABASE_URL = Deno.env.get("SUPABASE_URL") || "";
+    const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
+    const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+
+    // Also alias supabaseAdmin as supabase so existing code referencing supabase works.
+    const supabase = supabaseAdmin;
+
     if (!ANTHROPIC_API_KEY) {
       return new Response(JSON.stringify({
         oracle_opinion: "AI assistant is not configured yet. Please contact support.",
@@ -293,6 +332,106 @@ serve(async (req: Request) => {
             const count = subAgents?.length || 0;
             const totalNetworkBalance = subAgents?.reduce((sum: number, a: any) => sum + Number(a.wallet_balance), 0) || 0;
             toolResult = `Network Summary: You have ${count} active sub-agents with a combined wallet balance of ${totalNetworkBalance.toFixed(2)} GHS.`;
+          }
+        }
+        else if (name === "purchase_data_bundle") {
+          const { network, phone_number, package_size } = input;
+          if (!context.profile) {
+            toolResult = "Purchase failed: User must be logged in to purchase data.";
+          } else {
+            try {
+              // Get the price
+              const { data: pkg } = await supabaseAdmin.from("global_package_settings")
+                .select("public_price, agent_price, sub_agent_price")
+                .eq("network", network)
+                .ilike("package_size", package_size)
+                .maybeSingle();
+
+              if (!pkg) {
+                toolResult = `Purchase failed: Could not find a package matching "${package_size}" for ${network}.`;
+              } else {
+                const amount = context.profile.is_agent ? (pkg.agent_price || pkg.public_price) : pkg.public_price;
+                
+                // Call wallet-buy-data internally
+                const res = await fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/wallet-buy-data`, {
+                  method: "POST",
+                  headers: {
+                    "Authorization": req.headers.get("Authorization") || "",
+                    "Content-Type": "application/json"
+                  },
+                  body: JSON.stringify({
+                    network,
+                    package_size,
+                    customer_phone: phone_number,
+                    amount,
+                    reference: crypto.randomUUID()
+                  })
+                });
+                
+                const buyData = await res.json();
+                if (buyData.error) {
+                  toolResult = `Purchase failed: ${buyData.error}`;
+                } else {
+                  toolResult = `Purchase successful! Order ID: ${buyData.order_id}. The ${network} ${package_size} bundle for ${phone_number} is processing and will be delivered shortly.`;
+                }
+              }
+            } catch (err: any) {
+              toolResult = `Purchase failed due to system error: ${err.message}`;
+            }
+          }
+        }
+        else if (name === "investigate_dispute") {
+          const { order_id, phone_number } = input;
+          if (!context.profile?.id) {
+            toolResult = "Investigation failed: User not authenticated.";
+          } else {
+            try {
+               let query = supabaseAdmin.from("orders").select("*").eq("agent_id", context.profile.id);
+               if (order_id) query = query.eq("id", order_id);
+               else if (phone_number) query = query.eq("customer_phone", phone_number).order("created_at", { ascending: false }).limit(1);
+               else throw new Error("Need an order ID or phone number to investigate.");
+               
+               const { data: orders } = await query;
+               const order = orders?.[0];
+               
+               if (!order) {
+                 toolResult = "Could not find any recent order matching those details in your account.";
+               } else {
+                 if (order.status === "fulfilled") {
+                   toolResult = `Order ${order.id.slice(0,8)} for ${order.network} ${order.package_size} shows as successfully fulfilled by the provider. No refund can be issued automatically. Please contact support if the customer insists they didn't receive it.`;
+                 } else if (order.status === "failed" || order.status === "fulfillment_failed") {
+                   // Ensure it's refunded
+                   const { data: refundRes, error: refundErr } = await supabaseAdmin.rpc("credit_wallet", { p_agent_id: order.agent_id, p_amount: order.amount });
+                   if (!refundErr) {
+                     await supabaseAdmin.from("orders").update({ status: "refunded" }).eq("id", order.id);
+                     toolResult = `Confirmed! Order ${order.id.slice(0,8)} failed. I have automatically refunded ${order.amount} GHS to your wallet.`;
+                   } else {
+                     toolResult = `Order ${order.id.slice(0,8)} failed, but I couldn't process the refund automatically. An admin has been notified.`;
+                   }
+                 } else if (order.status === "refunded") {
+                   toolResult = `Order ${order.id.slice(0,8)} has already been refunded to your wallet.`;
+                 } else {
+                   // Call verify-payment to sync status
+                   const verifyRes = await fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/verify-payment`, {
+                     method: "POST", headers: { "Authorization": req.headers.get("Authorization") || "", "Content-Type": "application/json" },
+                     body: JSON.stringify({ reference: order.id })
+                   });
+                   const verifyData = await verifyRes.json();
+                   
+                   if (verifyData.status === "fulfilled") {
+                     toolResult = `I checked the live provider logs. Order ${order.id.slice(0,8)} was actually successful! The status has been updated.`;
+                   } else if (verifyData.status === "failed" || verifyData.status === "fulfillment_failed") {
+                     await supabaseAdmin.rpc("credit_wallet", { p_agent_id: order.agent_id, p_amount: order.amount });
+                     await supabaseAdmin.from("orders").update({ status: "refunded" }).eq("id", order.id);
+                     toolResult = `I checked the live provider logs and the order failed. I have automatically refunded ${order.amount} GHS to your wallet.`;
+                   } else {
+                     toolResult = `Order ${order.id.slice(0,8)} is still marked as '${verifyData.status || order.status}'. The provider is still processing it. Please check back in a few minutes.`;
+                   }
+                 }
+               }
+            } catch (err: any) {
+               toolResult = "Investigation failed due to an error: " + err.message;
+            }
           }
         }
 

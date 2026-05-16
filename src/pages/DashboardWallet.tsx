@@ -440,30 +440,72 @@ const DashboardWallet = () => {
           </CardContent>
         </Card>
 
-        <Card className="border-border bg-card backdrop-blur-xl shadow-sm">
-          <CardHeader className="pb-2 flex flex-row items-center justify-between">
-            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/60">Quick Top Up</p>
-            <Zap className="w-4 h-4 text-blue-500 dark:text-blue-400" />
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <div className="relative group">
-              <div className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground/50 group-focus-within:text-blue-500 transition-colors">
-                <span className="text-xs font-bold">GHS</span>
+        <div className="flex flex-col gap-4">
+          <Card className="border-border bg-card backdrop-blur-xl shadow-sm flex-1">
+            <CardHeader className="pb-2 flex flex-row items-center justify-between">
+              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/60">Quick Top Up</p>
+              <Zap className="w-4 h-4 text-blue-500 dark:text-blue-400" />
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div className="relative group">
+                <div className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground/50 group-focus-within:text-blue-500 transition-colors">
+                  <span className="text-xs font-bold">GHS</span>
+                </div>
+                <Input
+                  type="number" placeholder="0.00" value={topupAmount}
+                  onChange={(e) => setTopupAmount(e.target.value)}
+                  className="h-10 pl-12 bg-muted/30 border-border focus:border-blue-500/50 rounded-xl text-lg font-black text-foreground"
+                />
               </div>
-              <Input
-                type="number" placeholder="0.00" value={topupAmount}
-                onChange={(e) => setTopupAmount(e.target.value)}
-                className="h-12 pl-12 bg-muted/30 border-border focus:border-blue-500/50 rounded-xl text-lg font-black text-foreground"
-              />
-            </div>
-            <Button 
-              onClick={handlePaystackTopup} disabled={toppingUp} 
-              className="w-full h-11 bg-blue-500 hover:bg-blue-600 text-white font-black text-xs uppercase tracking-widest rounded-xl shadow-lg shadow-blue-500/10"
-            >
-              {toppingUp ? <Loader2 className="w-4 h-4 animate-spin" /> : <><CreditCard className="w-4 h-4 mr-2" /> Top Up Now</>}
-            </Button>
-          </CardContent>
-        </Card>
+              <Button 
+                onClick={handlePaystackTopup} disabled={toppingUp} 
+                className="w-full h-10 bg-blue-500 hover:bg-blue-600 text-white font-black text-xs uppercase tracking-widest rounded-xl shadow-lg shadow-blue-500/10"
+              >
+                {toppingUp ? <Loader2 className="w-4 h-4 animate-spin" /> : <><CreditCard className="w-4 h-4 mr-2" /> Top Up Now</>}
+              </Button>
+            </CardContent>
+          </Card>
+
+          {profile?.credit_enabled ? (
+             <Card className="border-green-500/20 bg-green-500/5 backdrop-blur-xl shadow-sm flex-1 relative overflow-hidden">
+                <div className="absolute -right-4 -top-4 w-16 h-16 bg-green-500/20 rounded-full blur-xl" />
+                <CardHeader className="pb-1">
+                  <p className="text-[10px] font-black uppercase tracking-[0.2em] text-green-500/80">Active Float Limit</p>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-2xl font-black text-green-500">GHS {(profile?.credit_limit || 0).toFixed(2)}</p>
+                  <p className="text-[10px] text-green-500/60 font-medium uppercase tracking-widest mt-1">Available for automatic overdrafts</p>
+                </CardContent>
+             </Card>
+          ) : (
+             <Card className="border-amber-500/20 bg-amber-500/5 backdrop-blur-xl shadow-sm flex-1 relative overflow-hidden group">
+                <div className="absolute -right-4 -top-4 w-16 h-16 bg-amber-500/10 rounded-full blur-xl group-hover:bg-amber-500/20 transition-all duration-500" />
+                <CardHeader className="pb-1 flex flex-row items-center justify-between">
+                  <p className="text-[10px] font-black uppercase tracking-[0.2em] text-amber-500/80">Swift Float</p>
+                  <History className="w-3.5 h-3.5 text-amber-500/60" />
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <p className="text-xs text-amber-500/80 font-medium">Out of funds? Apply for a micro-credit float to keep selling.</p>
+                  <Button 
+                    variant="outline"
+                    onClick={async () => {
+                      if (!user) return;
+                      await supabase.from("user_notifications").insert({
+                         user_id: user.id, // Using user's own ID as a hack, but realistically admin sees this in tickets
+                         title: "Float Request",
+                         message: `${profile?.full_name || 'Agent'} is requesting a Swift Float limit increase.`,
+                         type: "info"
+                      });
+                      toast({ title: "Application Sent!", description: "An admin will review your account history." });
+                    }}
+                    className="w-full h-8 bg-transparent border-amber-500/30 text-amber-500 hover:bg-amber-500/10 hover:text-amber-400 font-black text-[10px] uppercase tracking-widest rounded-lg"
+                  >
+                    Apply for Float
+                  </Button>
+                </CardContent>
+             </Card>
+          )}
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-8">

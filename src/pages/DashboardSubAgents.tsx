@@ -162,6 +162,30 @@ const DashboardSubAgents = () => {
     }
   }, [profile, getParentAgentBasePrice]);
 
+  const handleToggleApproval = async (subAgentId: string, currentStatus: boolean) => {
+    if (!user) return;
+    const newStatus = !currentStatus;
+    
+    // Optimistic UI update
+    setSubAgents(prev => prev.map(sa => sa.user_id === subAgentId ? { ...sa, sub_agent_approved: newStatus } : sa));
+    
+    const { error } = await supabase.from("profiles").update({
+      sub_agent_approved: newStatus,
+      agent_approved: newStatus,
+      is_agent: newStatus,
+      onboarding_complete: newStatus,
+      // If approving, also make sure they have the parent's prices
+      ...(newStatus ? { agent_prices: subAgentPrices } : {})
+    } as any).eq("user_id", subAgentId);
+    
+    if (error) {
+      toast({ title: "Update failed", description: error.message, variant: "destructive" });
+      fetchAll(); // revert on error
+    } else {
+      toast({ title: newStatus ? "Sub-Agent Approved" : "Access Revoked" });
+    }
+  };
+
   const handleSaveMarkup = async () => {
     if (!user) return;
     setSavingMarkup(true);
@@ -340,9 +364,21 @@ const DashboardSubAgents = () => {
                       <p className="text-xs text-muted-foreground truncate">{sa.email}</p>
                       {sa.store_name && <p className="text-xs text-muted-foreground">{sa.store_name}</p>}
                     </div>
-                    <p className="text-xs text-muted-foreground shrink-0">
-                      {new Date(sa.created_at).toLocaleDateString()}
-                    </p>
+                    <div className="flex flex-col items-end gap-2 shrink-0">
+                      <p className="text-xs text-muted-foreground">
+                        {new Date(sa.created_at).toLocaleDateString()}
+                      </p>
+                      <button
+                        onClick={() => handleToggleApproval(sa.user_id, sa.sub_agent_approved)}
+                        className={`text-[10px] font-bold px-3 py-1.5 rounded-lg transition-colors border ${
+                          sa.sub_agent_approved 
+                            ? "bg-red-500/10 text-red-500 border-red-500/20 hover:bg-red-500/20" 
+                            : "bg-emerald-500/10 text-emerald-500 border-emerald-500/20 hover:bg-emerald-500/20"
+                        }`}
+                      >
+                        {sa.sub_agent_approved ? "Revoke Access" : "Approve Agent"}
+                      </button>
+                    </div>
                   </CardContent>
                 </Card>
               ))}

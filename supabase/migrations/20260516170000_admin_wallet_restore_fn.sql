@@ -20,11 +20,13 @@ BEGIN
     RAISE EXCEPTION 'Unauthorized: Admin access required';
   END IF;
 
-  -- Guard: Only apply once
+  -- Guard: Only apply once (and NEVER if deductions have started)
   IF EXISTS (
-    SELECT 1 FROM public.audit_logs WHERE action = 'wallet_restoration_applied' LIMIT 1
+    SELECT 1 FROM public.audit_logs 
+    WHERE action IN ('wallet_restoration_applied', 'wallet_deduction_applied', 'wallet_deduction_applied_v2') 
+    LIMIT 1
   ) THEN
-    RETURN jsonb_build_object('success', false, 'message', 'Restoration already applied. Contact admin to re-run.');
+    RETURN jsonb_build_object('success', false, 'message', 'Restoration already applied or reconciliation in progress. System is locked for safety.');
   END IF;
 
   -- Step 1: Drop the broken FK constraint (if still present) then create missing wallets

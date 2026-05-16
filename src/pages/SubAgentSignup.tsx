@@ -155,8 +155,25 @@ const SubAgentSignup = () => {
         window.location.href = paymentData.authorization_url;
       }
     } else {
-      // If fee is 0, just go to pending/dashboard
-      navigate("/sub-agent/pending");
+      // Free activation: auto-approve immediately
+      toast({ title: "Activation Free!", description: "Activating your portal instantly..." });
+      
+      // Fetch parent's configured sub-agent prices to copy over
+      const { data: parentProfile } = await supabase
+        .from("profiles")
+        .select("sub_agent_prices")
+        .eq("user_id", agent!.user_id)
+        .maybeSingle();
+        
+      await supabase.from("profiles").update({
+        is_agent: true,
+        agent_approved: true,
+        sub_agent_approved: true,
+        onboarding_complete: true,
+        agent_prices: parentProfile?.sub_agent_prices || {}
+      } as any).eq("user_id", userId);
+      
+      navigate("/dashboard");
     }
     setSubmitting(false);
   };
