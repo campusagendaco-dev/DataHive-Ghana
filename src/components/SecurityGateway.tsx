@@ -72,22 +72,49 @@ export function SecurityGateway({ children }: SecurityGatewayProps) {
     
     try {
       setLoading(true);
-      // In a real app, this would call navigator.credentials.get
-      // For this implementation, we simulate the native prompt
-      // WebAuthn requires a challenge from the server, but we'll use it as a device-lock proxy
       
-      // Simulating successful biometric check
+      // Use WebAuthn as a proxy for device biometric check
+      // This will trigger the native Fingerprint/FaceID/PIN prompt from the browser/OS
+      const challenge = crypto.getRandomValues(new Uint8Array(32));
+      
       if (mode === "setup") {
-        localStorage.setItem("swift_vendor_bio_enabled", "true");
-        toast.success("Biometrics linked successfully");
-        setIsLocked(false);
+        const credential = await navigator.credentials.create({
+          publicKey: {
+            challenge,
+            rp: { name: "SwiftData" },
+            user: {
+              id: crypto.getRandomValues(new Uint8Array(16)),
+              name: "agent@swiftdata.gh",
+              displayName: "Swift Agent",
+            },
+            pubKeyCredParams: [{ alg: -7, type: "public-key" }],
+            authenticatorSelection: { authenticatorAttachment: "platform" },
+          }
+        });
+
+        if (credential) {
+          localStorage.setItem("swift_vendor_bio_enabled", "true");
+          toast.success("Biometrics linked successfully");
+          setIsLocked(false);
+        }
       } else {
-        // Here you would normally trigger the native biometric prompt
-        // For the demo/prototype, we'll assume the user approves the prompt
-        setIsLocked(false);
+        const credential = await navigator.credentials.get({
+          publicKey: {
+            challenge,
+            allowCredentials: [], // Allow any platform credential
+          }
+        });
+
+        if (credential) {
+          setIsLocked(false);
+          toast.success("Dashboard Unlocked via Biometrics");
+        }
       }
-    } catch (err) {
-      toast.error("Biometric authentication failed");
+    } catch (err: any) {
+      console.error("Biometric error:", err);
+      if (err.name !== "NotAllowedError") {
+        toast.error("Biometric authentication failed");
+      }
     } finally {
       setLoading(false);
     }
@@ -135,11 +162,12 @@ export function SecurityGateway({ children }: SecurityGatewayProps) {
                   <Button
                     key={val}
                     variant="ghost"
-                    className="h-14 rounded-2xl flex items-center justify-center"
+                    className="h-14 rounded-2xl flex items-center justify-center relative group"
                     disabled={!isBiometricAvailable || loading}
                     onClick={handleBiometricAuth}
                   >
-                    <Fingerprint className="w-6 h-6 text-primary" />
+                    <div className="absolute inset-0 rounded-2xl bg-primary/10 animate-pulse group-hover:bg-primary/20 transition-colors" />
+                    <Fingerprint className="w-6 h-6 text-primary relative z-10" />
                   </Button>
                 );
               }
