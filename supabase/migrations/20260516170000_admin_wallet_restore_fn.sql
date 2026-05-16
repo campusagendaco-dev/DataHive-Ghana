@@ -335,7 +335,12 @@ BEGIN
   INSERT INTO public.audit_logs (action, details)
   VALUES (
     'wallet_restoration_applied',
-    format('Wallet restoration complete. Created %s new wallet records. Restored balances for %s agents.', _inserted, _restored)
+    jsonb_build_object(
+      'message', format('Wallet restoration complete. Created %s new wallet records. Restored balances for %s agents.', _inserted, _restored),
+      'created_wallets', _inserted,
+      'restored_agents', _restored,
+      'timestamp', now()
+    )
   );
 
   RETURN jsonb_build_object(
