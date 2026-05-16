@@ -15,30 +15,41 @@ const json = (data: unknown, status = 200) =>
   });
 
 serve(async (req: Request) => {
-  if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
-
-  const authHeader = req.headers.get("Authorization");
-  const token = authHeader?.replace(/^Bearer\s+/i, "").trim();
-  if (!token) return json({ error: "Unauthorized" }, 401);
-
-  const { data: { user }, error: userErr } = await supabaseAdmin.auth.getUser(token);
-  if (userErr || !user) return json({ error: "Unauthorized" }, 401);
-
-  const { data: roles } = await supabaseAdmin
-    .from("user_roles")
-    .select("role")
-    .eq("user_id", user.id)
-    .eq("role", "admin")
-    .limit(1);
-
-  if (!roles || roles.length === 0) return json({ error: "Forbidden: admin only" }, 403);
-
-  const { data, error } = await supabaseAdmin.rpc("admin_apply_wallet_restoration");
-
-  if (error) {
-    console.error("Wallet restoration error:", error);
-    return json({ error: error.message }, 500);
+  // 1. Handle CORS preflight
+  if (req.method === "OPTIONS") {
+    return new Response("ok", { 
+      status: 200, 
+      headers: corsHeaders 
+    });
   }
 
-  return json(data);
+  try {
+    const authHeader = req.headers.get("Authorization");
+    const token = authHeader?.replace(/^Bearer\s+/i, "").trim();
+    if (!token) return json({ error: "Unauthorized" }, 401);
+
+    const { data: { user }, error: userErr } = await supabaseAdmin.auth.getUser(token);
+    if (userErr || !user) return json({ error: "Unauthorized" }, 401);
+
+    const { data: roles } = await supabaseAdmin
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", user.id)
+      .eq("role", "admin")
+      .limit(1);
+
+    if (!roles || roles.length === 0) return json({ error: "Forbidden: admin only" }, 403);
+
+    const { data, error } = await supabaseAdmin.rpc("admin_apply_wallet_restoration");
+
+    if (error) {
+      console.error("Wallet restoration error:", error);
+      return json({ error: error.message }, 500);
+    }
+
+    return json(data);
+  } catch (err: any) {
+    console.error("Critical error:", err);
+    return json({ error: err.message }, 500);
+  }
 });
