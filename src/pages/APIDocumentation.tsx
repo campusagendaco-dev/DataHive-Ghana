@@ -1,10 +1,10 @@
 import { useState, useEffect, useRef } from "react";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import {
-  ArrowLeft, Copy, Check, Terminal, Shield, Zap, Code2, BookOpen,
+  ArrowLeft, Copy, Check, Shield, Zap, Code2, BookOpen,
   AlertCircle, ChevronRight, Globe, Key, List, ShoppingCart, AlertTriangle,
-  Activity, Lock, RotateCcw, ExternalLink, Menu, X, CreditCard, Search
+  Activity, Lock, RotateCcw, Menu, X, CreditCard, Search,
+  ArrowLeftRight, Gauge, RefreshCw, Database
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
@@ -22,9 +22,21 @@ const makeSnippets = (key: string): Record<string, Record<Lang, string>> => {
   return {
     balance: {
       curl: `curl -X GET "${BASE_URL}/balance" \\\n  -H "Authorization: Bearer ${K}"`,
-      node: `const res = await fetch("${BASE_URL}/balance", {\n  headers: { "Authorization": "Bearer ${K}" },\n});\nconst { balance } = await res.json();\nconsole.log("Balance:", balance); // 50.00`,
+      node: `const res = await fetch("${BASE_URL}/balance", {\n  headers: { "Authorization": "Bearer ${K}" },\n});\nconst { balance, api_balance } = await res.json();\nconsole.log("Main:", balance, "API:", api_balance);`,
       python: `import requests\n\nres = requests.get(\n    "${BASE_URL}/balance",\n    headers={"Authorization": "Bearer ${K}"},\n)\nprint(res.json())`,
       php: `<?php\n$ch = curl_init("${BASE_URL}/balance");\ncurl_setopt_array($ch, [\n    CURLOPT_HTTPHEADER    => ["Authorization: Bearer ${K}"],\n    CURLOPT_RETURNTRANSFER => true,\n]);\n$res = json_decode(curl_exec($ch));\necho $res->balance;`,
+    },
+    wallets: {
+      curl: `curl -X GET "${BASE_URL}/wallets" \\\n  -H "Authorization: Bearer ${K}"`,
+      node: `const res = await fetch("${BASE_URL}/wallets", {\n  headers: { "Authorization": "Bearer ${K}" },\n});\nconst { wallets } = await res.json();\nconsole.log("Main:", wallets.main.balance);\nconsole.log("API:", wallets.api.balance);`,
+      python: `import requests\n\nres = requests.get(\n    "${BASE_URL}/wallets",\n    headers={"Authorization": "Bearer ${K}"},\n)\nw = res.json()["wallets"]\nprint("Main:", w["main"]["balance"])\nprint("API:", w["api"]["balance"])`,
+      php: `<?php\n$ch = curl_init("${BASE_URL}/wallets");\ncurl_setopt_array($ch, [\n    CURLOPT_HTTPHEADER    => ["Authorization: Bearer ${K}"],\n    CURLOPT_RETURNTRANSFER => true,\n]);\n$data = json_decode(curl_exec($ch));\necho $data->wallets->main->balance;`,
+    },
+    transfer: {
+      curl: `curl -X POST "${BASE_URL}/wallet/transfer" \\\n  -H "Authorization: Bearer ${K}" \\\n  -H "Content-Type: application/json" \\\n  -d '{\n    "from": "main",\n    "to": "api",\n    "amount": 100.00\n  }'`,
+      node: `const res = await fetch("${BASE_URL}/wallet/transfer", {\n  method: "POST",\n  headers: {\n    "Authorization": "Bearer ${K}",\n    "Content-Type": "application/json",\n  },\n  body: JSON.stringify({\n    from: "main",    // "main" | "api"\n    to:   "api",     // "main" | "api"\n    amount: 100.00,\n  }),\n});\nconst data = await res.json();\nconsole.log(data.success); // true`,
+      python: `import requests\n\nres = requests.post(\n    "${BASE_URL}/wallet/transfer",\n    headers={\n        "Authorization": "Bearer ${K}",\n        "Content-Type": "application/json",\n    },\n    json={"from": "main", "to": "api", "amount": 100.00},\n)\nprint(res.json())`,
+      php: `<?php\n$payload = json_encode(["from" => "main", "to" => "api", "amount" => 100.00]);\n$ch = curl_init("${BASE_URL}/wallet/transfer");\ncurl_setopt_array($ch, [\n    CURLOPT_POST           => true,\n    CURLOPT_POSTFIELDS     => $payload,\n    CURLOPT_HTTPHEADER     => [\n        "Authorization: Bearer ${K}",\n        "Content-Type: application/json",\n    ],\n    CURLOPT_RETURNTRANSFER => true,\n]);\necho curl_exec($ch);`,
     },
     account: {
       curl: `curl -X GET "${BASE_URL}/account" \\\n  -H "Authorization: Bearer ${K}"`,
@@ -39,63 +51,87 @@ const makeSnippets = (key: string): Record<string, Record<Lang, string>> => {
       php: `<?php\n$ch = curl_init("${BASE_URL}/plans");\ncurl_setopt_array($ch, [\n    CURLOPT_HTTPHEADER    => ["Authorization: Bearer ${K}"],\n    CURLOPT_RETURNTRANSFER => true,\n]);\n$data = json_decode(curl_exec($ch));\nforeach ($data->plans as $plan) {\n    echo $plan->network . " " . $plan->package_size . " → GH₵" . $plan->api_price . "\\n";\n}`,
     },
     airtime: {
-      curl: `curl -X POST "${BASE_URL}/airtime" \\\n  -H "Authorization: Bearer ${K}" \\\n  -H "Content-Type: application/json" \\\n  -d '{\n    "networkCode": "MTN",\n    "amount": 5.00,\n    "customerNumber": "0241234567",\n    "request_id": "unique_id_123"\n  }'`,
-      node: `const res = await fetch("${BASE_URL}/airtime", {\n  method: "POST",\n  headers: {\n    "Authorization": "Bearer ${K}",\n    "Content-Type": "application/json",\n  },\n  body: JSON.stringify({\n    networkCode: "MTN",        // MTN | TELECEL | AT | GLO\n    amount: 5.00,             // GHS amount\n    customerNumber: "0241234567",\n    request_id: "unique_id_123",\n  }),\n});\n\nconst data = await res.json();\nconsole.log(data.status); // "fulfilled"`,
-      python: `import requests\n\nres = requests.post(\n    "${BASE_URL}/airtime",\n    headers={\n        "Authorization": "Bearer ${K}",\n        "Content-Type": "application/json",\n    },\n    json={\n        "networkCode": "MTN",     # MTN | TELECEL | AT | GLO\n        "amount": 5.00,\n        "customerNumber": "0241234567",\n        "request_id": "unique_id_123",\n    },\n)\nprint(res.json())`,
-      php: `<?php\n$payload = json_encode([\n    "networkCode"    => "MTN",\n    "amount"         => 5.00,\n    "customerNumber" => "0241234567",\n    "request_id"     => "unique_id_123",\n]);\n$ch = curl_init("${BASE_URL}/airtime");\ncurl_setopt_array($ch, [\n    CURLOPT_POST           => true,\n    CURLOPT_POSTFIELDS     => $payload,\n    CURLOPT_HTTPHEADER     => [\n        "Authorization: Bearer ${K}",\n        "Content-Type: application/json",\n    ],\n    CURLOPT_RETURNTRANSFER => true,\n]);\necho curl_exec($ch);`,
+      curl: `curl -X POST "${BASE_URL}/buy" \\\n  -H "Authorization: Bearer ${K}" \\\n  -H "Content-Type: application/json" \\\n  -H "X-Idempotency-Key: unique_key_abc123" \\\n  -d '{\n    "network": "MTN",\n    "phone": "0241234567",\n    "amount": 5.00,\n    "request_id": "my_ref_001"\n  }'`,
+      node: `const res = await fetch("${BASE_URL}/buy", {\n  method: "POST",\n  headers: {\n    "Authorization": "Bearer ${K}",\n    "Content-Type": "application/json",\n    "X-Idempotency-Key": "unique_key_abc123",\n  },\n  body: JSON.stringify({\n    network: "MTN",          // MTN | TELECEL | AT | GLO\n    phone: "0241234567",\n    amount: 5.00,            // GHS — airtime mode\n    request_id: "my_ref_001",\n  }),\n});\nconst data = await res.json();\nconsole.log(data.status); // "fulfilled"`,
+      python: `import requests\n\nres = requests.post(\n    "${BASE_URL}/buy",\n    headers={\n        "Authorization": "Bearer ${K}",\n        "Content-Type": "application/json",\n        "X-Idempotency-Key": "unique_key_abc123",\n    },\n    json={\n        "network": "MTN",\n        "phone": "0241234567",\n        "amount": 5.00,\n        "request_id": "my_ref_001",\n    },\n)\nprint(res.json())`,
+      php: `<?php\n$payload = json_encode([\n    "network" => "MTN",\n    "phone"   => "0241234567",\n    "amount"  => 5.00,\n    "request_id" => "my_ref_001",\n]);\n$ch = curl_init("${BASE_URL}/buy");\ncurl_setopt_array($ch, [\n    CURLOPT_POST           => true,\n    CURLOPT_POSTFIELDS     => $payload,\n    CURLOPT_HTTPHEADER     => [\n        "Authorization: Bearer ${K}",\n        "Content-Type: application/json",\n        "X-Idempotency-Key: unique_key_abc123",\n    ],\n    CURLOPT_RETURNTRANSFER => true,\n]);\necho curl_exec($ch);`,
     },
     data: {
-      curl: `curl -X POST "${BASE_URL}/airtime" \\\n  -H "Authorization: Bearer ${K}" \\\n  -H "Content-Type: application/json" \\\n  -d '{\n    "networkCode": "MTN",\n    "package_size": "5GB",\n    "customerNumber": "0241234567",\n    "request_id": "unique_id_123"\n  }'`,
-      node: `const res = await fetch("${BASE_URL}/airtime", {\n  method: "POST",\n  headers: {\n    "Authorization": "Bearer ${K}",\n    "Content-Type": "application/json",\n  },\n  body: JSON.stringify({\n    networkCode: "MTN",        // MTN | TELECEL | AT | GLO\n    package_size: "5GB",      // size from /plans\n    customerNumber: "0241234567",\n    request_id: "unique_id_123",\n  }),\n});\n\nconst data = await res.json();\nconsole.log(data.status); // "fulfilled"`,
-      python: `import requests\n\nres = requests.post(\n    "${BASE_URL}/airtime",\n    headers={\n        "Authorization": "Bearer ${K}",\n        "Content-Type": "application/json",\n    },\n    json={\n        "networkCode": "MTN",     # MTN | TELECEL | AT | GLO\n        "package_size": "5GB",    # size from /plans\n        "customerNumber": "0241234567",\n        "request_id": "unique_id_123",\n    },\n)\nprint(res.json())`,
-      php: `<?php\n$payload = json_encode([\n    "networkCode"    => "MTN",\n    "package_size"   => "5GB",\n    "customerNumber" => "0241234567",\n    "request_id"     => "unique_id_123",\n]);\n$ch = curl_init("${BASE_URL}/airtime");\ncurl_setopt_array($ch, [\n    CURLOPT_POST           => true,\n    CURLOPT_POSTFIELDS     => $payload,\n    CURLOPT_HTTPHEADER     => [\n        "Authorization: Bearer ${K}",\n        "Content-Type: application/json",\n    ],\n    CURLOPT_RETURNTRANSFER => true,\n]);\necho curl_exec($ch);`,
+      curl: `curl -X POST "${BASE_URL}/buy" \\\n  -H "Authorization: Bearer ${K}" \\\n  -H "Content-Type: application/json" \\\n  -H "X-Idempotency-Key: unique_key_def456" \\\n  -d '{\n    "network": "MTN",\n    "phone": "0241234567",\n    "package_size": "5GB",\n    "request_id": "my_ref_002"\n  }'`,
+      node: `const res = await fetch("${BASE_URL}/buy", {\n  method: "POST",\n  headers: {\n    "Authorization": "Bearer ${K}",\n    "Content-Type": "application/json",\n    "X-Idempotency-Key": "unique_key_def456",\n  },\n  body: JSON.stringify({\n    network: "MTN",          // MTN | TELECEL | AT | GLO\n    phone: "0241234567",\n    package_size: "5GB",     // from /plans — data mode\n    request_id: "my_ref_002",\n  }),\n});\nconst data = await res.json();\nconsole.log(data.status); // "fulfilled"`,
+      python: `import requests\n\nres = requests.post(\n    "${BASE_URL}/buy",\n    headers={\n        "Authorization": "Bearer ${K}",\n        "Content-Type": "application/json",\n        "X-Idempotency-Key": "unique_key_def456",\n    },\n    json={\n        "network": "MTN",\n        "phone": "0241234567",\n        "package_size": "5GB",\n        "request_id": "my_ref_002",\n    },\n)\nprint(res.json())`,
+      php: `<?php\n$payload = json_encode([\n    "network"      => "MTN",\n    "phone"        => "0241234567",\n    "package_size" => "5GB",\n    "request_id"   => "my_ref_002",\n]);\n$ch = curl_init("${BASE_URL}/buy");\ncurl_setopt_array($ch, [\n    CURLOPT_POST           => true,\n    CURLOPT_POSTFIELDS     => $payload,\n    CURLOPT_HTTPHEADER     => [\n        "Authorization: Bearer ${K}",\n        "Content-Type: application/json",\n        "X-Idempotency-Key: unique_key_def456",\n    ],\n    CURLOPT_RETURNTRANSFER => true,\n]);\necho curl_exec($ch);`,
     },
     validate: {
       curl: `curl -X POST "${BASE_URL}/payment/bills/validate" \\\n  -H "Authorization: Bearer ${K}" \\\n  -H "Content-Type: application/json" \\\n  -d '{\n    "customerNumber": "8226349986",\n    "billType": "DSTV"\n  }'`,
-      node: `const res = await fetch("${BASE_URL}/payment/bills/validate", {\n  method: "POST",\n  headers: {\n    "Authorization": "Bearer ${K}",\n    "Content-Type": "application/json",\n  },\n  body: JSON.stringify({\n    customerNumber: "8226349986",\n    billType: "DSTV"\n  }),\n});\n\nconst data = await res.json();\nconsole.log(data.customerName); // "JOHN DOE"`,
+      node: `const res = await fetch("${BASE_URL}/payment/bills/validate", {\n  method: "POST",\n  headers: {\n    "Authorization": "Bearer ${K}",\n    "Content-Type": "application/json",\n  },\n  body: JSON.stringify({\n    customerNumber: "8226349986",\n    billType: "DSTV"\n  }),\n});\nconst data = await res.json();\nconsole.log(data.customerName); // "JOHN DOE"`,
       python: `import requests\n\nres = requests.post(\n    "${BASE_URL}/payment/bills/validate",\n    headers={\n        "Authorization": "Bearer ${K}",\n        "Content-Type": "application/json",\n    },\n    json={\n        "customerNumber": "8226349986",\n        "billType": "DSTV"\n    },\n)\nprint(res.json())`,
       php: `<?php\n$payload = json_encode([\n    "customerNumber" => "8226349986",\n    "billType"       => "DSTV",\n]);\n$ch = curl_init("${BASE_URL}/payment/bills/validate");\ncurl_setopt_array($ch, [\n    CURLOPT_POST           => true,\n    CURLOPT_POSTFIELDS     => $payload,\n    CURLOPT_HTTPHEADER     => [\n        "Authorization: Bearer ${K}",\n        "Content-Type: application/json",\n    ],\n    CURLOPT_RETURNTRANSFER => true,\n]);\necho curl_exec($ch);`,
     },
     ecg: {
       curl: `curl -X POST "${BASE_URL}/ecg" \\\n  -H "Authorization: Bearer ${K}" \\\n  -H "Content-Type: application/json" \\\n  -d '{\n    "customerNumber": "0123456789",\n    "billType": "ECG",\n    "amount": 50.00,\n    "senderName": "JOHN DOE",\n    "phoneNumber": "0241234567"\n  }'`,
-      node: `const res = await fetch("${BASE_URL}/ecg", {\n  method: "POST",\n  headers: {\n    "Authorization": "Bearer ${K}",\n    "Content-Type": "application/json",\n  },\n  body: JSON.stringify({\n    customerNumber: "0123456789",\n    billType: "ECG",\n    amount: 50.00,\n    senderName: "JOHN DOE",\n    phoneNumber: "0241234567"\n  }),\n});\n\nconst data = await res.json();\nconsole.log(data.transaction_id); // "SWFT_BILL_..."`,
+      node: `const res = await fetch("${BASE_URL}/ecg", {\n  method: "POST",\n  headers: {\n    "Authorization": "Bearer ${K}",\n    "Content-Type": "application/json",\n  },\n  body: JSON.stringify({\n    customerNumber: "0123456789",\n    billType: "ECG",\n    amount: 50.00,\n    senderName: "JOHN DOE",\n    phoneNumber: "0241234567"\n  }),\n});\nconst data = await res.json();\nconsole.log(data.transaction_id);`,
       python: `import requests\n\nres = requests.post(\n    "${BASE_URL}/ecg",\n    headers={\n        "Authorization": "Bearer ${K}",\n        "Content-Type": "application/json",\n    },\n    json={\n        "customerNumber": "0123456789",\n        "billType": "ECG",\n        "amount": 50.00,\n        "senderName": "JOHN DOE",\n        "phoneNumber": "0241234567"\n    },\n)\nprint(res.json())`,
       php: `<?php\n$payload = json_encode([\n    "customerNumber" => "0123456789",\n    "billType"       => "ECG",\n    "amount"         => 50.00,\n    "senderName"     => "JOHN DOE",\n    "phoneNumber"    => "0241234567",\n]);\n$ch = curl_init("${BASE_URL}/ecg");\ncurl_setopt_array($ch, [\n    CURLOPT_POST           => true,\n    CURLOPT_POSTFIELDS     => $payload,\n    CURLOPT_HTTPHEADER     => [\n        "Authorization: Bearer ${K}",\n        "Content-Type: application/json",\n    ],\n    CURLOPT_RETURNTRANSFER => true,\n]);\necho curl_exec($ch);`,
     },
     sms: {
-      curl: `curl -X POST "${BASE_URL}/sms" \\\n  -H "Authorization: Bearer ${K}" \\\n  -H "Content-Type: application/json" \\\n  -d '{\n    "to": "0241234567",\n    "message": "Hello from SwiftData API",\n    "senderId": "SwiftData"\n  }'`,
-      node: `const res = await fetch("${BASE_URL}/sms", {\n  method: "POST",\n  headers: {\n    "Authorization": "Bearer ${K}",\n    "Content-Type": "application/json",\n  },\n  body: JSON.stringify({\n    to: "0241234567",\n    message: "Hello from SwiftData API",\n    senderId: "SwiftData"\n  }),\n});\nconst data = await res.json();`,
-      python: `import requests\n\nres = requests.post(\n    "${BASE_URL}/sms",\n    headers={"Authorization": "Bearer ${K}"},\n    json={"to": "0241234567", "message": "Hello"},\n)\nprint(res.json())`,
-      php: `<?php\n$payload = json_encode(["to" => "0241234567", "message" => "Hello"]);\n$ch = curl_init("${BASE_URL}/sms");\ncurl_setopt_array($ch, [\n    CURLOPT_POST => true,\n    CURLOPT_POSTFIELDS => $payload,\n    CURLOPT_HTTPHEADER => ["Authorization: Bearer ${K}", "Content-Type: application/json"],\n    CURLOPT_RETURNTRANSFER => true,\n]);\necho curl_exec($ch);`,
+      curl: `curl -X POST "${BASE_URL}/sms" \\\n  -H "Authorization: Bearer ${K}" \\\n  -H "Content-Type: application/json" \\\n  -d '{\n    "to": "0241234567",\n    "message": "Your data bundle is ready!",\n    "senderId": "SwiftData"\n  }'`,
+      node: `const res = await fetch("${BASE_URL}/sms", {\n  method: "POST",\n  headers: {\n    "Authorization": "Bearer ${K}",\n    "Content-Type": "application/json",\n  },\n  body: JSON.stringify({\n    to: "0241234567",\n    message: "Your data bundle is ready!",\n    senderId: "SwiftData"\n  }),\n});\nconst data = await res.json();`,
+      python: `import requests\n\nres = requests.post(\n    "${BASE_URL}/sms",\n    headers={"Authorization": "Bearer ${K}"},\n    json={"to": "0241234567", "message": "Your data bundle is ready!"},\n)\nprint(res.json())`,
+      php: `<?php\n$payload = json_encode(["to" => "0241234567", "message" => "Your data bundle is ready!"]);\n$ch = curl_init("${BASE_URL}/sms");\ncurl_setopt_array($ch, [\n    CURLOPT_POST => true,\n    CURLOPT_POSTFIELDS => $payload,\n    CURLOPT_HTTPHEADER => ["Authorization: Bearer ${K}", "Content-Type: application/json"],\n    CURLOPT_RETURNTRANSFER => true,\n]);\necho curl_exec($ch);`,
     },
     orders: {
-      curl: `curl -X GET "${BASE_URL}/orders?limit=10" \\\n  -H "Authorization: Bearer ${K}"`,
-      node: `const res = await fetch("${BASE_URL}/orders?limit=10", {\n  headers: { "Authorization": "Bearer ${K}" },\n});\nconst { orders } = await res.json();`,
-      python: `import requests\n\nres = requests.get(\n    "${BASE_URL}/orders",\n    params={"limit": 10},\n    headers={"Authorization": "Bearer ${K}"},\n)\nprint(res.json()["orders"])`,
-      php: `<?php\n$ch = curl_init("${BASE_URL}/orders?limit=10");\ncurl_setopt_array($ch, [\n    CURLOPT_HTTPHEADER    => ["Authorization: Bearer ${K}"],\n    CURLOPT_RETURNTRANSFER => true,\n]);\necho curl_exec($ch);`,
+      curl: `curl -X GET "${BASE_URL}/orders?limit=20&offset=0" \\\n  -H "Authorization: Bearer ${K}"`,
+      node: `const res = await fetch("${BASE_URL}/orders?limit=20&offset=0", {\n  headers: { "Authorization": "Bearer ${K}" },\n});\nconst { orders } = await res.json();`,
+      python: `import requests\n\nres = requests.get(\n    "${BASE_URL}/orders",\n    params={"limit": 20, "offset": 0},\n    headers={"Authorization": "Bearer ${K}"},\n)\nprint(res.json()["orders"])`,
+      php: `<?php\n$ch = curl_init("${BASE_URL}/orders?limit=20&offset=0");\ncurl_setopt_array($ch, [\n    CURLOPT_HTTPHEADER    => ["Authorization: Bearer ${K}"],\n    CURLOPT_RETURNTRANSFER => true,\n]);\necho curl_exec($ch);`,
+    },
+    orders_filtered: {
+      curl: `curl -X GET "${BASE_URL}/orders?limit=20&offset=40&status=fulfilled&network=MTN" \\\n  -H "Authorization: Bearer ${K}"`,
+      node: `const params = new URLSearchParams({\n  limit:   "20",\n  offset:  "40",        // skip first 40 (page 3)\n  status:  "fulfilled", // pending|fulfilled|fulfillment_failed\n  network: "MTN",\n});\nconst res = await fetch(\`${BASE_URL}/orders?\${params}\`, {\n  headers: { "Authorization": "Bearer ${K}" },\n});\nconst { orders, total } = await res.json();`,
+      python: `import requests\n\nres = requests.get(\n    "${BASE_URL}/orders",\n    params={\n        "limit":   20,\n        "offset":  40,\n        "status":  "fulfilled",\n        "network": "MTN",\n    },\n    headers={"Authorization": "Bearer ${K}"},\n)\ndata = res.json()\nprint(f"Total: {data['total']}, Returned: {len(data['orders'])}")`,
+      php: `<?php\n$q = http_build_query(["limit"=>20,"offset"=>40,"status"=>"fulfilled","network"=>"MTN"]);\n$ch = curl_init("${BASE_URL}/orders?$q");\ncurl_setopt_array($ch, [\n    CURLOPT_HTTPHEADER    => ["Authorization: Bearer ${K}"],\n    CURLOPT_RETURNTRANSFER => true,\n]);\necho curl_exec($ch);`,
     },
     status: {
       curl: `curl -X GET "${BASE_URL}/status?order_id=a3f2b1c0-..." \\\n  -H "Authorization: Bearer ${K}"`,
       node: `const res = await fetch("${BASE_URL}/status?order_id=a3f2b1c0-...", {\n  headers: { "Authorization": "Bearer ${K}" },\n});\nconst { order } = await res.json();\nconsole.log("Status:", order.status);`,
       python: `import requests\n\nres = requests.get(\n    "${BASE_URL}/status",\n    params={"order_id": "a3f2b1c0-..."},\n    headers={"Authorization": "Bearer ${K}"},\n)\nprint(res.json()["order"]["status"])`,
       php: `<?php\n$ch = curl_init("${BASE_URL}/status?order_id=a3f2b1c0-...");\ncurl_setopt_array($ch, [\n    CURLOPT_HTTPHEADER    => ["Authorization: Bearer ${K}"],\n    CURLOPT_RETURNTRANSFER => true,\n]);\n$data = json_decode(curl_exec($ch));\necho $data->order->status;`,
-    }
+    },
+    hmac: {
+      curl: `# 1. Compute HMAC-SHA256 of the raw JSON body using your secret key\nBODY='{"network":"MTN","phone":"0241234567","package_size":"5GB"}'\nSIG=$(echo -n "$BODY" | openssl dgst -sha256 -hmac "$YOUR_SECRET_KEY" -hex | awk '{print $2}')\n\n# 2. Send with both API key + signature headers\ncurl -X POST "${BASE_URL}/buy" \\\n  -H "Authorization: Bearer ${K}" \\\n  -H "X-Swift-Signature: $SIG" \\\n  -H "Content-Type: application/json" \\\n  -d "$BODY"`,
+      node: `import crypto from "crypto";\n\nconst body = JSON.stringify({\n  network: "MTN",\n  phone: "0241234567",\n  package_size: "5GB",\n});\n\n// Sign the raw body string with your secret key\nconst sig = crypto\n  .createHmac("sha256", YOUR_SECRET_KEY)\n  .update(body)\n  .digest("hex");\n\nconst res = await fetch("${BASE_URL}/buy", {\n  method: "POST",\n  headers: {\n    "Authorization": "Bearer ${K}",\n    "X-Swift-Signature": sig,\n    "Content-Type": "application/json",\n  },\n  body,\n});`,
+      python: `import hmac, hashlib, json, requests\n\nbody = json.dumps({\n    "network": "MTN",\n    "phone": "0241234567",\n    "package_size": "5GB",\n}, separators=(",", ":"))\n\nsig = hmac.new(\n    YOUR_SECRET_KEY.encode(),\n    body.encode(),\n    hashlib.sha256\n).hexdigest()\n\nres = requests.post(\n    "${BASE_URL}/buy",\n    headers={\n        "Authorization": "Bearer ${K}",\n        "X-Swift-Signature": sig,\n        "Content-Type": "application/json",\n    },\n    data=body,\n)\nprint(res.json())`,
+      php: `<?php\n$body = json_encode([\n    "network"      => "MTN",\n    "phone"        => "0241234567",\n    "package_size" => "5GB",\n]);\n\n$sig = hash_hmac("sha256", $body, $YOUR_SECRET_KEY);\n\n$ch = curl_init("${BASE_URL}/buy");\ncurl_setopt_array($ch, [\n    CURLOPT_POST       => true,\n    CURLOPT_POSTFIELDS => $body,\n    CURLOPT_HTTPHEADER => [\n        "Authorization: Bearer ${K}",\n        "X-Swift-Signature: $sig",\n        "Content-Type: application/json",\n    ],\n    CURLOPT_RETURNTRANSFER => true,\n]);\necho curl_exec($ch);`,
+    },
+    webhook_verify: {
+      curl: `# Webhooks are verified server-side automatically.\n# Your endpoint will receive POST requests like:\n#\n# POST https://yourserver.com/webhooks/swiftdata\n# X-Swift-Signature: <hmac_sha256_of_body>\n# Content-Type: application/json\n#\n# {\n#   "event": "order.fulfilled",\n#   "order_id": "a3f2...",\n#   "status": "fulfilled",\n#   "network": "MTN",\n#   "amount": 22.00,\n#   "timestamp": "2026-05-16T10:00:00Z"\n# }`,
+      node: `// Express.js webhook handler\napp.post("/webhooks/swiftdata", express.raw({ type: "application/json" }), (req, res) => {\n  const sig  = req.headers["x-swift-signature"];\n  const body = req.body.toString();\n\n  // Verify HMAC signature\n  const expected = crypto\n    .createHmac("sha256", process.env.SWIFT_WEBHOOK_SECRET)\n    .update(body)\n    .digest("hex");\n\n  if (sig !== expected) return res.status(401).send("Invalid signature");\n\n  const event = JSON.parse(body);\n  if (event.event === "order.fulfilled") {\n    console.log("Fulfilled:", event.order_id);\n  }\n  res.sendStatus(200);\n});`,
+      python: `import hmac, hashlib\nfrom flask import Flask, request, abort\n\napp = Flask(__name__)\n\n@app.route("/webhooks/swiftdata", methods=["POST"])\ndef webhook():\n    sig      = request.headers.get("X-Swift-Signature", "")\n    body     = request.get_data()\n    expected = hmac.new(\n        SWIFT_WEBHOOK_SECRET.encode(),\n        body,\n        hashlib.sha256\n    ).hexdigest()\n\n    if not hmac.compare_digest(sig, expected):\n        abort(401)\n\n    event = request.json\n    print(event["event"], event["order_id"])\n    return "", 200`,
+      php: `<?php\n$body     = file_get_contents("php://input");\n$sig      = $_SERVER["HTTP_X_SWIFT_SIGNATURE"] ?? "";\n$expected = hash_hmac("sha256", $body, SWIFT_WEBHOOK_SECRET);\n\nif (!hash_equals($expected, $sig)) {\n    http_response_code(401);\n    exit("Invalid signature");\n}\n\n$event = json_decode($body, true);\necho $event["event"]; // "order.fulfilled"`,
+    },
   };
 };
 
 // ─── Responses ────────────────────────────────────────────────────────────────
 const RESPONSES: Record<string, string> = {
-  balance: `{\n  "success": true,\n  "balance": 50.00,\n  "currency": "GHS"\n}`,
-  account: `{\n  "success": true,\n  "name": "John Doe",\n  "balance": 50.00,\n  "active": true\n}`,
+  balance: `{\n  "success": true,\n  "balance": 250.00,\n  "api_balance": 100.00,\n  "currency": "GHS"\n}`,
+  wallets_ok: `{\n  "success": true,\n  "wallets": {\n    "main": { "balance": 250.00, "currency": "GHS" },\n    "api":  { "balance": 100.00, "currency": "GHS" }\n  }\n}`,
+  transfer_ok: `{\n  "success": true,\n  "message": "Transfer successful",\n  "from_balance": 150.00,\n  "to_balance":   200.00\n}`,
+  account: `{\n  "success": true,\n  "name": "John Doe",\n  "balance": 250.00,\n  "active": true\n}`,
   plans: `{\n  "success": true,\n  "plans": [\n    {\n      "network": "MTN",\n      "package_size": "5GB",\n      "api_price": 22.00,\n      "is_unavailable": false\n    },\n    {\n      "network": "TELECEL",\n      "package_size": "6GB",\n      "api_price": 20.00,\n      "is_unavailable": false\n    }\n  ]\n}`,
-  buy_ok: `{\n  "success": true,\n  "order_id": "a3f2b1c0-...",\n  "status": "fulfilled",\n  "balance": 45.00\n}`,
+  buy_ok: `{\n  "success": true,\n  "order_id": "a3f2b1c0-d4e5-6789-ab01-cd2345ef6789",\n  "status": "fulfilled",\n  "balance": 228.00\n}`,
   validate_ok: `{\n  "success": true,\n  "customerName": "JOHN DOE",\n  "validatedAmount": 41.00\n}`,
-  bill_ok: `{\n  "success": true,\n  "transaction_id": "SWFT_BILL_1234567890",\n  "cost": 41.00,\n  "balance": 9.00\n}`,
+  bill_ok: `{\n  "success": true,\n  "transaction_id": "SWFT_BILL_1234567890",\n  "cost": 41.00,\n  "balance": 209.00\n}`,
   sms_ok: `{\n  "success": true,\n  "message": "SMS sent successfully"\n}`,
-  orders_ok: `{\n  "success": true,\n  "orders": [\n    {\n      "id": "...",\n      "created_at": "...",\n      "network": "MTN",\n      "package_size": "5GB",\n      "customer_phone": "...",\n      "amount": 22.00,\n      "status": "fulfilled"\n    }\n  ]\n}`,
-  status_ok: `{\n  "success": true,\n  "order": {\n    "id": "a3f2b1c0-...",\n    "status": "fulfilled",\n    "network": "MTN",\n    "amount": 22.00,\n    "created_at": "..."\n  }\n}`,
+  orders_ok: `{\n  "success": true,\n  "total": 48,\n  "orders": [\n    {\n      "id": "a3f2b1c0-...",\n      "created_at": "2026-05-10T09:12:00Z",\n      "network": "MTN",\n      "package_size": "5GB",\n      "customer_phone": "0241234567",\n      "amount": 22.00,\n      "status": "fulfilled",\n      "profit": 2.00\n    }\n  ]\n}`,
+  status_ok: `{\n  "success": true,\n  "order": {\n    "id": "a3f2b1c0-...",\n    "status": "fulfilled",\n    "network": "MTN",\n    "package_size": "5GB",\n    "customer_phone": "0241234567",\n    "amount": 22.00,\n    "profit": 2.00,\n    "created_at": "2026-05-10T09:12:00Z"\n  }\n}`,
+  webhook_event: `{\n  "event": "order.fulfilled",\n  "order_id": "a3f2b1c0-...",\n  "status": "fulfilled",\n  "network": "MTN",\n  "package_size": "5GB",\n  "customer_phone": "0241234567",\n  "amount": 22.00,\n  "timestamp": "2026-05-16T10:00:00Z"\n}`,
   error_401: `{\n  "success": false,\n  "error": "Invalid API key"\n}`,
   error_402: `{\n  "success": false,\n  "error": "Insufficient balance"\n}`,
+  error_409: `{\n  "success": false,\n  "error": "Duplicate order detected. Please wait 60 minutes before placing the same order again."\n}`,
+  error_429: `{\n  "success": false,\n  "error": "Rate limit exceeded."\n}`,
+  error_500: `{\n  "success": false,\n  "error": "Internal Server Error",\n  "reference": "ERR-7f3a2b1c"\n}`,
 };
 
 
@@ -104,6 +140,7 @@ function CopyButton({ text, className = "" }: { text: string; className?: string
   const [copied, setCopied] = useState(false);
   return (
     <button
+      type="button"
       onClick={() => { navigator.clipboard.writeText(text); setCopied(true); setTimeout(() => setCopied(false), 2000); }}
       className={`p-1.5 rounded-lg bg-white/5 hover:bg-white/15 transition-colors ${className}`}
       title="Copy"
@@ -181,12 +218,25 @@ function SectionAnchor({ id }: { id: string }) {
   return <span id={id} className="block -mt-20 pt-20 invisible absolute" />;
 }
 
+function SectionHeader({ icon: Icon, title }: { icon: React.FC<any>; title: string }) {
+  return (
+    <div className="flex items-center gap-3 mb-2">
+      <div className="w-8 h-8 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center shrink-0">
+        <Icon className="w-4 h-4 text-white/40" />
+      </div>
+      <h2 className="text-2xl font-black">{title}</h2>
+    </div>
+  );
+}
+
 // ─── Sidebar nav ──────────────────────────────────────────────────────────────
 const NAV_ITEMS = [
   { id: "overview",        label: "Overview",           icon: BookOpen },
   { id: "authentication",  label: "Authentication",      icon: Key },
   { id: "account",         label: "Account Details",     icon: Activity },
   { id: "balance",         label: "Check Balance",       icon: Activity },
+  { id: "wallets",         label: "All Wallets",         icon: Database },
+  { id: "transfer",        label: "Wallet Transfer",     icon: ArrowLeftRight },
   { id: "plans",           label: "List Plans",          icon: List },
   { id: "buy",             label: "Airtime & Data",      icon: ShoppingCart },
   { id: "bills-validate",  label: "Validate Bills",      icon: Search },
@@ -194,6 +244,8 @@ const NAV_ITEMS = [
   { id: "sms",             label: "Send SMS",            icon: Zap },
   { id: "orders",          label: "Order History",       icon: List },
   { id: "status",          label: "Order Status",        icon: Activity },
+  { id: "webhooks",        label: "Webhooks",            icon: Globe },
+  { id: "rate-limits",     label: "Rate Limits",         icon: Gauge },
   { id: "errors",          label: "Error Reference",     icon: AlertTriangle },
   { id: "best-practices",  label: "Best Practices",      icon: Shield },
 ];
@@ -201,14 +253,13 @@ const NAV_ITEMS = [
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
 const APIDocumentation = () => {
-  const { toast } = useToast();
+  useToast();
   const { profile } = useAuth();
   const [activeLang, setActiveLang] = useState<Lang>("curl");
   const [activeSection, setActiveSection] = useState("overview");
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  // Use the key provided by the user if available, otherwise use profile key
   const userApiKey = profile?.api_key || null;
   const snippets = makeSnippets(userApiKey);
 
@@ -244,6 +295,7 @@ const APIDocumentation = () => {
       <p className="px-3 pb-1 text-[9px] font-bold uppercase tracking-widest text-white/20">Reference</p>
       {NAV_ITEMS.map(({ id, label, icon: Icon }) => (
         <button
+          type="button"
           key={id}
           onClick={() => scrollTo(id)}
           className={`w-full text-left flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-all ${
@@ -267,7 +319,7 @@ const APIDocumentation = () => {
       <div className="fixed top-0 left-0 right-0 z-50 border-b border-white/5 bg-[#030305]/95 backdrop-blur-xl">
         <div className="max-w-[1400px] mx-auto px-4 sm:px-6 h-14 flex items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-            <button onClick={() => setMobileNavOpen(!mobileNavOpen)} className="lg:hidden p-1.5 rounded-lg hover:bg-white/10 transition-colors">
+            <button type="button" onClick={() => setMobileNavOpen(!mobileNavOpen)} className="lg:hidden p-1.5 rounded-lg hover:bg-white/10 transition-colors">
               {mobileNavOpen ? <X className="w-4 h-4" /> : <Menu className="w-4 h-4" />}
             </button>
             <Link to="/dashboard/api" className="flex items-center gap-2 text-white/40 hover:text-white/80 transition-colors text-sm">
@@ -278,6 +330,7 @@ const APIDocumentation = () => {
           <div className="flex items-center gap-1 p-1 bg-white/5 rounded-xl border border-white/8">
             {LANGS.map((l) => (
               <button
+                type="button"
                 key={l}
                 onClick={() => setActiveLang(l)}
                 className={`px-3 py-1 text-xs rounded-lg font-mono font-bold transition-all ${
@@ -312,8 +365,9 @@ const APIDocumentation = () => {
                   </div>
                   <span className="font-black tracking-tight">API Docs</span>
                 </div>
-                <button 
-                  onClick={() => setMobileNavOpen(false)} 
+                <button
+                  type="button"
+                  onClick={() => setMobileNavOpen(false)}
                   title="Close menu"
                   className="p-2 rounded-xl bg-white/5 border border-white/10"
                 >
@@ -342,13 +396,14 @@ const APIDocumentation = () => {
                   </span>
                 </h1>
                 <p className="text-white/50 text-lg max-w-2xl leading-relaxed">
-                  Integrate airtime, data, and bill payments into your applications.
-                  Our API is RESTful, secure, and built for scale.
+                  Integrate airtime, data bundles, bill payments, SMS, and wallet management into your applications.
+                  RESTful, secure, and built for scale.
                 </p>
               </div>
             </div>
 
-            <div className="rounded-xl border border-white/8 overflow-hidden bg-white/[0.02]">
+            {/* Base URL */}
+            <div className="rounded-xl border border-white/8 overflow-hidden bg-white/[0.02] mb-8">
               <div className="px-4 py-2.5 bg-white/[0.03] border-b border-white/5 flex items-center justify-between">
                 <span className="text-[10px] font-bold uppercase tracking-widest text-white/25">Base URL</span>
                 <CopyButton text={BASE_URL} />
@@ -358,47 +413,97 @@ const APIDocumentation = () => {
                 <code className="text-sm font-mono text-emerald-300 break-all">{BASE_URL}</code>
               </div>
             </div>
+
+            {/* Quick reference table */}
+            <div className="rounded-xl border border-white/8 overflow-hidden">
+              <div className="px-4 py-2.5 bg-white/[0.03] border-b border-white/5">
+                <span className="text-[10px] font-bold uppercase tracking-widest text-white/25">Endpoint Summary</span>
+              </div>
+              {[
+                { method: "GET",  path: "/account",               desc: "Get account profile" },
+                { method: "GET",  path: "/balance",               desc: "Main + API wallet balance" },
+                { method: "GET",  path: "/wallets",               desc: "Full wallet breakdown" },
+                { method: "POST", path: "/wallet/transfer",       desc: "Move funds between wallets" },
+                { method: "GET",  path: "/plans",                 desc: "Available data packages & prices" },
+                { method: "POST", path: "/buy",                   desc: "Purchase airtime or data bundle" },
+                { method: "POST", path: "/payment/bills/validate",desc: "Look up utility account" },
+                { method: "POST", path: "/ecg",                   desc: "Pay electricity / TV bill" },
+                { method: "POST", path: "/sms",                   desc: "Send transactional SMS" },
+                { method: "GET",  path: "/orders",                desc: "Paginated order history with filters" },
+                { method: "GET",  path: "/status",                desc: "Single order status" },
+              ].map(({ method, path, desc }) => (
+                <div key={path} className="flex flex-col sm:grid sm:grid-cols-12 sm:gap-2 px-4 py-3 text-xs border-b border-white/5 last:border-0 hover:bg-white/[0.02] gap-1">
+                  <div className="sm:col-span-1">
+                    <MethodBadge method={method as "GET" | "POST"} />
+                  </div>
+                  <div className="sm:col-span-5 font-mono text-amber-300 font-semibold sm:pl-2">{path}</div>
+                  <div className="sm:col-span-6 text-white/40">{desc}</div>
+                </div>
+              ))}
+            </div>
           </section>
 
           {/* ── Authentication ───────────────────────────────────────── */}
           <section>
             <SectionAnchor id="authentication" />
-            <div className="flex items-center gap-3 mb-2">
-              <div className="w-8 h-8 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center shrink-0">
-                <Key className="w-4 h-4 text-white/40" />
-              </div>
-              <h2 className="text-2xl font-black">Authentication</h2>
-            </div>
+            <SectionHeader icon={Key} title="Authentication" />
             <p className="text-white/45 text-sm mb-6 md:ml-11 max-w-xl">
-              Authenticating with the SwiftData API is done via API Keys. You can provide your key using any of the following headers:
+              All requests require a Bearer token in the <code className="text-amber-300 bg-white/5 px-1.5 py-0.5 rounded-md">Authorization</code> header.
+              Optionally sign POST bodies with HMAC-SHA256 for tamper-proof requests.
             </p>
 
-            <div className="grid lg:grid-cols-2 gap-6 md:ml-11">
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <p className="text-[10px] font-bold uppercase tracking-widest text-white/20">Supported Headers</p>
-                  <div className="space-y-1.5">
-                    <div className="flex items-center justify-between p-3 rounded-lg bg-white/5 border border-white/8">
-                      <code className="text-sky-400 text-xs">Authorization: Bearer {userApiKey || "swft_live_..."}</code>
-                      <span className="text-[9px] text-white/20 font-bold uppercase">Standard</span>
-                    </div>
+            <div className="ml-11 space-y-6">
+              {/* Auth header */}
+              <div className="space-y-2">
+                <p className="text-[10px] font-bold uppercase tracking-widest text-white/20">Required Header</p>
+                <div className="flex items-center justify-between p-3 rounded-lg bg-white/5 border border-white/8">
+                  <code className="text-sky-400 text-xs">Authorization: Bearer {userApiKey || "swft_live_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"}</code>
+                </div>
+              </div>
+
+              {/* Idempotency key */}
+              <div className="rounded-xl border border-sky-500/15 bg-sky-500/5 p-4 flex gap-3">
+                <RefreshCw className="w-4 h-4 text-sky-400 shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-xs font-bold text-sky-300 mb-1">Idempotency Key <span className="font-normal text-white/30">(recommended for POST)</span></p>
+                  <p className="text-[11px] text-white/40 leading-relaxed mb-2">Pass <code className="text-amber-300 bg-white/5 px-1 rounded">X-Idempotency-Key: &lt;unique_id&gt;</code> on every POST request. If your network drops and you retry, the server returns the original result without double-charging.</p>
+                  <code className="text-[10px] font-mono text-white/30">X-Idempotency-Key: order_20260516_abc123</code>
+                </div>
+              </div>
+
+              {/* HMAC signing */}
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-widest text-white/20 mb-3">Optional — HMAC Request Signing</p>
+                <div className="rounded-xl border border-amber-500/15 bg-amber-500/5 p-4 flex gap-3 mb-4">
+                  <Shield className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+                  <div>
+                    <p className="text-xs font-bold text-amber-300 mb-1">How it works</p>
+                    <ol className="text-[11px] text-white/40 leading-relaxed space-y-1 list-decimal list-inside">
+                      <li>Retrieve your <strong className="text-white/60">Secret Key</strong> from the Developer dashboard.</li>
+                      <li>Compute <code className="text-amber-300 bg-white/5 px-1 rounded">HMAC-SHA256(secret, raw_body_string)</code>.</li>
+                      <li>Send the hex digest in the <code className="text-amber-300 bg-white/5 px-1 rounded">X-Swift-Signature</code> header.</li>
+                    </ol>
+                    <p className="text-[11px] text-white/30 mt-2 italic">Skipped automatically when Test Mode is enabled.</p>
                   </div>
                 </div>
+                <CodeBlock code={snippets.hmac[activeLang]} label="HMAC Signing Example" />
+              </div>
 
-                <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 p-4 flex gap-3">
-                  <Zap className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
-                  <div>
-                    <p className="text-xs font-bold text-amber-300 mb-1">Testing Mode</p>
-                    <p className="text-[11px] text-white/40 leading-relaxed">Enable **Testing Mode** in your dashboard to bypass security signatures and test fulfillment without real charges.</p>
-                  </div>
+              {/* Test mode */}
+              <div className="rounded-xl border border-emerald-500/15 bg-emerald-500/5 p-4 flex gap-3">
+                <Zap className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-xs font-bold text-emerald-300 mb-1">Test Mode</p>
+                  <p className="text-[11px] text-white/40 leading-relaxed">Enable <strong className="text-white/60">Test Mode</strong> in your dashboard to bypass signature checks and fulfillment. Orders are created in the database but no real data is sent. Responses are identical to production.</p>
                 </div>
+              </div>
 
-                <div className="rounded-xl border border-sky-500/20 bg-sky-500/5 p-4 flex gap-3">
-                  <Shield className="w-4 h-4 text-sky-400 shrink-0 mt-0.5" />
-                  <div>
-                    <p className="text-xs font-bold text-sky-300 mb-1">Production Security</p>
-                    <p className="text-[11px] text-white/40 leading-relaxed">Never expose your API key in client-side code. Always proxy requests through your backend server.</p>
-                  </div>
+              {/* Production security */}
+              <div className="rounded-xl border border-white/8 bg-white/[0.02] p-4 flex gap-3">
+                <Lock className="w-4 h-4 text-white/30 shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-xs font-bold text-white/60 mb-1">Production Security</p>
+                  <p className="text-[11px] text-white/40 leading-relaxed">Never expose API keys in client-side code. Always proxy calls through your own backend server.</p>
                 </div>
               </div>
             </div>
@@ -407,12 +512,7 @@ const APIDocumentation = () => {
           {/* ── Account Details ────────────────────────────────────────── */}
           <section>
             <SectionAnchor id="account" />
-            <div className="flex items-center gap-3 mb-2">
-              <div className="w-8 h-8 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center shrink-0">
-                <Activity className="w-4 h-4 text-white/40" />
-              </div>
-              <h2 className="text-2xl font-black">Account Details</h2>
-            </div>
+            <SectionHeader icon={Activity} title="Account Details" />
             <div className="ml-11 flex flex-wrap items-center gap-3 mb-6">
               <MethodBadge method="GET" />
               <code className="text-white/55 text-sm font-mono bg-white/5 px-3 py-1 rounded-lg border border-white/8">/account</code>
@@ -423,26 +523,63 @@ const APIDocumentation = () => {
             </div>
           </section>
 
-
           {/* ── Check Balance ────────────────────────────────────────── */}
           <section>
             <SectionAnchor id="balance" />
-            <div className="flex items-center gap-3 mb-2">
-              <div className="w-8 h-8 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center shrink-0">
-                <Activity className="w-4 h-4 text-white/40" />
-              </div>
-              <h2 className="text-2xl font-black">Check Wallet Balance</h2>
-            </div>
-            <div className="ml-11 flex flex-wrap items-center gap-3 mb-6">
+            <SectionHeader icon={Activity} title="Check Wallet Balance" />
+            <div className="ml-11 flex flex-wrap items-center gap-3 mb-4">
               <MethodBadge method="GET" />
               <code className="text-white/55 text-sm font-mono bg-white/5 px-3 py-1 rounded-lg border border-white/8">/balance</code>
             </div>
+            <p className="text-white/40 text-sm mb-6 ml-11 max-w-xl">Returns both your main wallet balance and your API wallet balance in one call.</p>
             <div className="grid lg:grid-cols-2 gap-6 ml-11">
-              <div>
-                <CodeBlock code={snippets.balance[activeLang]} label="Request" />
+              <CodeBlock code={snippets.balance[activeLang]} label="Request" />
+              <ResponseBlock code={RESPONSES.balance} label="Response · 200 OK" />
+            </div>
+          </section>
+
+          {/* ── All Wallets ────────────────────────────────────────── */}
+          <section>
+            <SectionAnchor id="wallets" />
+            <SectionHeader icon={Database} title="All Wallets" />
+            <div className="ml-11 flex flex-wrap items-center gap-3 mb-4">
+              <MethodBadge method="GET" />
+              <code className="text-white/55 text-sm font-mono bg-white/5 px-3 py-1 rounded-lg border border-white/8">/wallets</code>
+            </div>
+            <p className="text-white/40 text-sm mb-6 ml-11 max-w-xl">
+              Returns a structured breakdown of all wallet types. Useful for building balance displays in your app.
+              Your account has two wallets: <code className="text-amber-300 bg-white/5 px-1.5 py-0.5 rounded-md">main</code> (funded via Paystack) and <code className="text-amber-300 bg-white/5 px-1.5 py-0.5 rounded-md">api</code> (funded via transfer from main).
+            </p>
+            <div className="grid lg:grid-cols-2 gap-6 ml-11">
+              <CodeBlock code={snippets.wallets[activeLang]} label="Request" />
+              <ResponseBlock code={RESPONSES.wallets_ok} label="Response · 200 OK" />
+            </div>
+          </section>
+
+          {/* ── Wallet Transfer ────────────────────────────────────────── */}
+          <section>
+            <SectionAnchor id="transfer" />
+            <SectionHeader icon={ArrowLeftRight} title="Wallet Transfer" />
+            <div className="ml-11 flex flex-wrap items-center gap-3 mb-4">
+              <MethodBadge method="POST" />
+              <code className="text-white/55 text-sm font-mono bg-white/5 px-3 py-1 rounded-lg border border-white/8">/wallet/transfer</code>
+            </div>
+            <p className="text-white/40 text-sm mb-6 ml-11 max-w-xl">
+              Move funds between your <code className="text-amber-300 bg-white/5 px-1.5 py-0.5 rounded-md">main</code> and <code className="text-amber-300 bg-white/5 px-1.5 py-0.5 rounded-md">api</code> wallets.
+              API purchases are charged from the <strong className="text-white/60">api</strong> wallet only — ensure it has sufficient funds before fulfillment.
+            </p>
+            <div className="ml-11 space-y-6">
+              <div className="rounded-xl border border-white/8 overflow-hidden">
+                <div className="px-4 py-2.5 bg-white/[0.03] border-b border-white/5">
+                  <span className="text-[10px] font-bold uppercase tracking-widest text-white/25">Body Parameters</span>
+                </div>
+                <ParamRow name="from"   type="string" required desc='"main" or "api" — source wallet' />
+                <ParamRow name="to"     type="string" required desc='"main" or "api" — destination wallet' />
+                <ParamRow name="amount" type="number" required desc="GHS amount to transfer (must be > 0)" />
               </div>
-              <div>
-                <ResponseBlock code={RESPONSES.balance} label="Response · 200 OK" />
+              <div className="grid lg:grid-cols-2 gap-6">
+                <CodeBlock code={snippets.transfer[activeLang]} label="Request" />
+                <ResponseBlock code={RESPONSES.transfer_ok} label="Response · 200 OK" />
               </div>
             </div>
           </section>
@@ -450,17 +587,15 @@ const APIDocumentation = () => {
           {/* ── List Plans ─────────────────────────────────────────────── */}
           <section>
             <SectionAnchor id="plans" />
-            <div className="flex items-center gap-3 mb-2">
-              <div className="w-8 h-8 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center shrink-0">
-                <List className="w-4 h-4 text-white/40" />
-              </div>
-              <h2 className="text-2xl font-black">List Data Plans</h2>
-            </div>
+            <SectionHeader icon={List} title="List Data Plans" />
             <div className="ml-11 flex flex-wrap items-center gap-3 mb-4">
               <MethodBadge method="GET" />
               <code className="text-white/55 text-sm font-mono bg-white/5 px-3 py-1 rounded-lg border border-white/8">/plans</code>
             </div>
-            <p className="text-white/40 text-sm mb-6 ml-11 max-w-xl">Returns all available data packages with prices. Use the <code className="text-amber-400 bg-white/5 px-1.5 py-0.5 rounded-md">package_size</code> from this response when placing a data order.</p>
+            <p className="text-white/40 text-sm mb-6 ml-11 max-w-xl">
+              Returns all available data packages with your API pricing. Packages marked <code className="text-amber-300 bg-white/5 px-1.5 py-0.5 rounded-md">is_unavailable: true</code> cannot be purchased.
+              Always call this before building a package selection UI.
+            </p>
             <div className="grid lg:grid-cols-2 gap-6 ml-11">
               <CodeBlock code={snippets.plans[activeLang]} label="Request" />
               <ResponseBlock code={RESPONSES.plans} label="Response · 200 OK" />
@@ -470,15 +605,10 @@ const APIDocumentation = () => {
           {/* ── Airtime & Data ────────────────────────────────────────── */}
           <section>
             <SectionAnchor id="buy" />
-            <div className="flex items-center gap-3 mb-2">
-              <div className="w-8 h-8 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center shrink-0">
-                <ShoppingCart className="w-4 h-4 text-white/40" />
-              </div>
-              <h2 className="text-2xl font-black">Purchase Airtime & Data</h2>
-            </div>
+            <SectionHeader icon={ShoppingCart} title="Purchase Airtime & Data" />
             <div className="ml-11 flex flex-wrap items-center gap-3 mb-4">
               <MethodBadge method="POST" />
-              <code className="text-white/55 text-sm font-mono bg-white/5 px-3 py-1 rounded-lg border border-white/8">/airtime</code>
+              <code className="text-white/55 text-sm font-mono bg-white/5 px-3 py-1 rounded-lg border border-white/8">/buy</code>
             </div>
 
             {/* Key distinction callout */}
@@ -487,9 +617,9 @@ const APIDocumentation = () => {
               <div>
                 <p className="text-xs font-bold text-amber-300 mb-1.5">Same endpoint — two modes</p>
                 <ul className="text-[11px] text-white/50 space-y-1 leading-relaxed">
-                  <li><span className="text-amber-400 font-mono font-bold">Airtime</span> — send <code className="text-sky-400 bg-white/5 px-1 rounded">amount</code> (GHS). Do <em>not</em> include <code className="bg-white/5 px-1 rounded">package_size</code>.</li>
-                  <li><span className="text-emerald-400 font-mono font-bold">Data bundle</span> — send <code className="text-sky-400 bg-white/5 px-1 rounded">package_size</code> (e.g. "5GB" from <code className="bg-white/5 px-1 rounded">/plans</code>). Do <em>not</em> include <code className="bg-white/5 px-1 rounded">amount</code>.</li>
-                  <li><span className="text-sky-400 font-mono font-bold">AirtelTigo</span> — We support all **AT iShare** and **BigData** bundles via the standard data endpoint.</li>
+                  <li><span className="text-amber-400 font-mono font-bold">Airtime</span> — send <code className="text-sky-400 bg-white/5 px-1 rounded">amount</code> (GHS). Omit <code className="bg-white/5 px-1 rounded">package_size</code>.</li>
+                  <li><span className="text-emerald-400 font-mono font-bold">Data bundle</span> — send <code className="text-sky-400 bg-white/5 px-1 rounded">package_size</code> from <code className="bg-white/5 px-1 rounded">/plans</code>. Omit <code className="bg-white/5 px-1 rounded">amount</code>.</li>
+                  <li><span className="text-sky-400 font-mono font-bold">Duplicate protection</span> — the same phone + network + package within 60 minutes returns <code className="bg-white/5 px-1 rounded">409</code>. Use a unique <code className="bg-white/5 px-1 rounded">request_id</code> to track retries.</li>
                 </ul>
               </div>
             </div>
@@ -500,11 +630,11 @@ const APIDocumentation = () => {
                 <div className="px-4 py-2.5 bg-white/[0.03] border-b border-white/5">
                   <span className="text-[10px] font-bold uppercase tracking-widest text-white/25">Body Parameters</span>
                 </div>
-                <ParamRow name="networkCode" type="string" required desc="MTN · TELECEL · AT · GLO" />
-                <ParamRow name="customerNumber" type="string" required desc="Recipient phone number (e.g. 0241234567)" />
-                <ParamRow name="amount" type="number" required={false} desc="GHS amount — required for airtime. Omit for data." />
+                <ParamRow name="network"      type="string" required      desc="MTN · TELECEL · AT · GLO" />
+                <ParamRow name="phone"        type="string" required      desc="Recipient phone number (e.g. 0241234567)" />
+                <ParamRow name="amount"       type="number" required={false} desc="GHS amount — required for airtime. Omit for data." />
                 <ParamRow name="package_size" type="string" required={false} desc="Bundle size from /plans (e.g. 5GB) — required for data. Omit for airtime." />
-                <ParamRow name="request_id" type="string" required={false} desc="Idempotency key. Resend the same ID to avoid duplicate charges." />
+                <ParamRow name="request_id"   type="string" required={false} desc="Your idempotency key. Re-send the same ID to avoid double charges on retry." />
               </div>
 
               {/* Airtime example */}
@@ -528,18 +658,37 @@ const APIDocumentation = () => {
               {/* Network codes quick ref */}
               <div className="rounded-xl border border-white/8 overflow-hidden">
                 <div className="px-4 py-2.5 bg-white/[0.03] border-b border-white/5">
-                  <span className="text-[10px] font-bold uppercase tracking-widest text-white/25">networkCode Reference</span>
+                  <span className="text-[10px] font-bold uppercase tracking-widest text-white/25">network Reference</span>
                 </div>
                 {[
-                  { code: "MTN", name: "MTN Ghana", note: "YELLOW, YELLO" },
-                  { code: "TELECEL", name: "Telecel", note: "VODAFONE, VOD" },
-                  { code: "AT", name: "AirtelTigo", note: "iShare, BigData" },
-                  { code: "GLO", name: "Glo Ghana", note: "" },
+                  { code: "MTN",    name: "MTN Ghana",   note: "Also accepted: YELLO, MTN_XPRESS" },
+                  { code: "TELECEL",name: "Telecel",     note: "Also accepted: VODAFONE, VOD" },
+                  { code: "AT",     name: "AirtelTigo",  note: "iShare & BigData bundles" },
+                  { code: "GLO",    name: "Glo Ghana",   note: "" },
                 ].map(({ code, name, note }) => (
                   <div key={code} className="flex flex-col md:grid md:grid-cols-12 md:gap-2 px-4 py-3 text-xs border-b border-white/5 last:border-0 hover:bg-white/[0.02] gap-1">
                     <div className="md:col-span-3 font-mono font-black text-amber-300">{code}</div>
                     <div className="md:col-span-5 font-semibold text-white/70">{name}</div>
                     <div className="md:col-span-4 text-white/30 text-[10px] md:text-xs italic">{note}</div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Order status lifecycle */}
+              <div className="rounded-xl border border-white/8 overflow-hidden">
+                <div className="px-4 py-2.5 bg-white/[0.03] border-b border-white/5">
+                  <span className="text-[10px] font-bold uppercase tracking-widest text-white/25">Order Status Lifecycle</span>
+                </div>
+                {[
+                  { status: "pending",            color: "text-yellow-400",  desc: "Created — awaiting payment confirmation" },
+                  { status: "paid",               color: "text-sky-400",     desc: "Payment confirmed — queued for fulfillment" },
+                  { status: "processing",         color: "text-blue-400",    desc: "Sent to network provider" },
+                  { status: "fulfilled",          color: "text-emerald-400", desc: "Delivered to recipient successfully" },
+                  { status: "fulfillment_failed", color: "text-red-400",     desc: "Provider returned an error — wallet refunded" },
+                ].map(({ status, color, desc }) => (
+                  <div key={status} className="flex items-center gap-4 px-4 py-3 text-xs border-b border-white/5 last:border-0 hover:bg-white/[0.02]">
+                    <code className={`font-mono font-bold w-36 shrink-0 ${color}`}>{status}</code>
+                    <span className="text-white/40">{desc}</span>
                   </div>
                 ))}
               </div>
@@ -549,23 +698,19 @@ const APIDocumentation = () => {
           {/* ── Bill Validation ────────────────────────────────────────── */}
           <section>
             <SectionAnchor id="bills-validate" />
-            <div className="flex items-center gap-3 mb-2">
-              <div className="w-8 h-8 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center shrink-0">
-                <Search className="w-4 h-4 text-white/40" />
-              </div>
-              <h2 className="text-2xl font-black">Validate Utility Bill</h2>
-            </div>
+            <SectionHeader icon={Search} title="Validate Utility Bill" />
             <div className="ml-11 flex flex-wrap items-center gap-3 mb-6">
               <MethodBadge method="POST" />
               <code className="text-white/55 text-sm font-mono bg-white/5 px-3 py-1 rounded-lg border border-white/8">/payment/bills/validate</code>
             </div>
+            <p className="text-white/40 text-sm mb-6 ml-11 max-w-xl">Look up the customer name and due amount before paying. Always validate before calling the pay endpoint to avoid rejected transactions.</p>
             <div className="ml-11 space-y-6">
               <div className="rounded-xl border border-white/8 overflow-hidden">
                 <div className="px-4 py-2.5 bg-white/[0.03] border-b border-white/5">
                   <span className="text-[10px] font-bold uppercase tracking-widest text-white/25">Body Parameters</span>
                 </div>
-                <ParamRow name="customerNumber" type="string" required desc="Smartcard, Account or Meter number" />
-                <ParamRow name="billType" type="string" required desc="DSTV | GOTV | STARTIMES | ECG" />
+                <ParamRow name="customerNumber" type="string" required desc="Smartcard, account or meter number" />
+                <ParamRow name="billType"       type="string" required desc="DSTV · GOTV · STARTIMES · ECG" />
               </div>
               <div className="grid lg:grid-cols-2 gap-6">
                 <CodeBlock code={snippets.validate[activeLang]} label="Request" />
@@ -577,27 +722,25 @@ const APIDocumentation = () => {
           {/* ── Pay Bill ────────────────────────────────────────── */}
           <section>
             <SectionAnchor id="bills-pay" />
-            <div className="flex items-center gap-3 mb-2">
-              <div className="w-8 h-8 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center shrink-0">
-                <CreditCard className="w-4 h-4 text-white/40" />
-              </div>
-              <h2 className="text-2xl font-black">Pay Utility Bill</h2>
-            </div>
-            <div className="ml-11 flex flex-wrap items-center gap-3 mb-6">
+            <SectionHeader icon={CreditCard} title="Pay Utility Bill" />
+            <div className="ml-11 flex flex-wrap items-center gap-3 mb-4">
               <MethodBadge method="POST" />
               <code className="text-white/55 text-sm font-mono bg-white/5 px-3 py-1 rounded-lg border border-white/8">/ecg</code>
             </div>
-            <p className="text-white/45 text-sm mb-6 ml-11 max-w-xl">Note: Use <code className="text-sky-400">/ecg</code> for electricity and <code className="text-sky-400">/dstv</code>, <code className="text-sky-400">/gotv</code>, <code className="text-sky-400">/startimes</code> for TV subscriptions.</p>
+            <p className="text-white/45 text-sm mb-6 ml-11 max-w-xl">
+              Use <code className="text-sky-400">/ecg</code> for electricity. Use <code className="text-sky-400">/dstv</code>, <code className="text-sky-400">/gotv</code>, or <code className="text-sky-400">/startimes</code> for TV subscriptions.
+              Pass the <code className="text-amber-300">customerName</code> returned by the validate call.
+            </p>
             <div className="ml-11 space-y-6">
               <div className="rounded-xl border border-white/8 overflow-hidden">
                 <div className="px-4 py-2.5 bg-white/[0.03] border-b border-white/5">
                   <span className="text-[10px] font-bold uppercase tracking-widest text-white/25">Body Parameters</span>
                 </div>
                 <ParamRow name="customerNumber" type="string" required desc="Account/Meter number" />
-                <ParamRow name="billType" type="string" required desc="e.g. ECG, DSTV, GOTV" />
-                <ParamRow name="amount" type="number" required desc="Amount to pay in GHS" />
-                <ParamRow name="senderName" type="string" required desc="Customer name from validation lookup" />
-                <ParamRow name="phoneNumber" type="string" required desc="Required for ECG to receive token via SMS" />
+                <ParamRow name="billType"       type="string" required desc="ECG · DSTV · GOTV · STARTIMES" />
+                <ParamRow name="amount"         type="number" required desc="Amount to pay in GHS" />
+                <ParamRow name="senderName"     type="string" required desc="Customer name from the validation response" />
+                <ParamRow name="phoneNumber"    type="string" required desc="Phone number to receive ECG token via SMS" />
               </div>
               <div className="grid lg:grid-cols-2 gap-6">
                 <CodeBlock code={snippets.ecg[activeLang]} label="Request" />
@@ -609,25 +752,20 @@ const APIDocumentation = () => {
           {/* ── Send SMS ────────────────────────────────────────── */}
           <section>
             <SectionAnchor id="sms" />
-            <div className="flex items-center gap-3 mb-2">
-              <div className="w-8 h-8 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center shrink-0">
-                <Zap className="w-4 h-4 text-white/40" />
-              </div>
-              <h2 className="text-2xl font-black">Send SMS</h2>
-            </div>
-            <div className="ml-11 flex flex-wrap items-center gap-3 mb-6">
+            <SectionHeader icon={Zap} title="Send SMS" />
+            <div className="ml-11 flex flex-wrap items-center gap-3 mb-4">
               <MethodBadge method="POST" />
               <code className="text-white/55 text-sm font-mono bg-white/5 px-3 py-1 rounded-lg border border-white/8">/sms</code>
             </div>
-            <p className="text-white/45 text-sm mb-6 ml-11 max-w-xl">Send transactional SMS to any number. Charge: <code className="text-amber-400">0.05 GHS</code> per message.</p>
+            <p className="text-white/45 text-sm mb-6 ml-11 max-w-xl">Send transactional SMS to any Ghana number. Common use: notify customers after data purchase. Charge: <code className="text-amber-400">0.05 GHS</code> per message, deducted from your API wallet.</p>
             <div className="ml-11 space-y-6">
               <div className="rounded-xl border border-white/8 overflow-hidden">
                 <div className="px-4 py-2.5 bg-white/[0.03] border-b border-white/5">
                   <span className="text-[10px] font-bold uppercase tracking-widest text-white/25">Body Parameters</span>
                 </div>
-                <ParamRow name="to" type="string" required desc="Recipient phone number" />
-                <ParamRow name="message" type="string" required desc="Message content" />
-                <ParamRow name="senderId" type="string" required={false} desc="Optional Sender ID (default: SwiftData)" />
+                <ParamRow name="to"       type="string" required      desc="Recipient phone number (e.g. 0241234567)" />
+                <ParamRow name="message"  type="string" required      desc="Message body (max 160 chars per SMS segment)" />
+                <ParamRow name="senderId" type="string" required={false} desc='Sender ID shown to recipient (default: "SwiftData")' />
               </div>
               <div className="grid lg:grid-cols-2 gap-6">
                 <CodeBlock code={snippets.sms[activeLang]} label="Request" />
@@ -639,40 +777,46 @@ const APIDocumentation = () => {
           {/* ── Order History ────────────────────────────────────────── */}
           <section>
             <SectionAnchor id="orders" />
-            <div className="flex items-center gap-3 mb-2">
-              <div className="w-8 h-8 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center shrink-0">
-                <List className="w-4 h-4 text-white/40" />
-              </div>
-              <h2 className="text-2xl font-black">Order History</h2>
-            </div>
-            <div className="ml-11 flex flex-wrap items-center gap-3 mb-6">
+            <SectionHeader icon={List} title="Order History" />
+            <div className="ml-11 flex flex-wrap items-center gap-3 mb-4">
               <MethodBadge method="GET" />
               <code className="text-white/55 text-sm font-mono bg-white/5 px-3 py-1 rounded-lg border border-white/8">/orders</code>
             </div>
+            <p className="text-white/40 text-sm mb-6 ml-11 max-w-xl">
+              Returns paginated orders in reverse-chronological order. Combine <code className="text-amber-300 bg-white/5 px-1.5 py-0.5 rounded-md">offset</code> with <code className="text-amber-300 bg-white/5 px-1.5 py-0.5 rounded-md">limit</code> to page through large histories. Filter by <code className="text-amber-300 bg-white/5 px-1.5 py-0.5 rounded-md">status</code> and <code className="text-amber-300 bg-white/5 px-1.5 py-0.5 rounded-md">network</code> to narrow results.
+            </p>
             <div className="ml-11 space-y-6">
               <div className="rounded-xl border border-white/8 overflow-hidden">
                 <div className="px-4 py-2.5 bg-white/[0.03] border-b border-white/5">
                   <span className="text-[10px] font-bold uppercase tracking-widest text-white/25">Query Parameters</span>
                 </div>
-                <ParamRow name="limit" type="number" required={false} desc="Max orders to return (default: 20, max: 100)" />
+                <ParamRow name="limit"   type="number"  required={false} desc="Max orders to return (default: 20, max: 100)" />
+                <ParamRow name="offset"  type="number"  required={false} desc="Number of orders to skip — use for pagination (default: 0)" />
+                <ParamRow name="status"  type="string"  required={false} desc="Filter: pending · paid · processing · fulfilled · fulfillment_failed" />
+                <ParamRow name="network" type="string"  required={false} desc="Filter: MTN · TELECEL · AT · GLO" />
               </div>
-              <div className="grid lg:grid-cols-2 gap-6">
-                <CodeBlock code={snippets.orders[activeLang]} label="Request" />
-                <ResponseBlock code={RESPONSES.orders_ok} label="Response · 200 OK" />
+
+              {/* Basic example */}
+              <div>
+                <p className="text-xs font-black uppercase tracking-widest text-sky-400 mb-3">Basic — Latest 20 Orders</p>
+                <div className="grid lg:grid-cols-2 gap-6">
+                  <CodeBlock code={snippets.orders[activeLang]} label="Request" />
+                  <ResponseBlock code={RESPONSES.orders_ok} label="Response · 200 OK" />
+                </div>
+              </div>
+
+              {/* Filtered example */}
+              <div>
+                <p className="text-xs font-black uppercase tracking-widest text-amber-400 mb-3">Filtered — Page 3 of MTN Fulfilled Orders</p>
+                <CodeBlock code={snippets.orders_filtered[activeLang]} label="Request" />
               </div>
             </div>
           </section>
 
-
           {/* ── Order Status ────────────────────────────────────────── */}
           <section>
             <SectionAnchor id="status" />
-            <div className="flex items-center gap-3 mb-2">
-              <div className="w-8 h-8 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center shrink-0">
-                <Activity className="w-4 h-4 text-white/40" />
-              </div>
-              <h2 className="text-2xl font-black">Check Order Status</h2>
-            </div>
+            <SectionHeader icon={Activity} title="Check Order Status" />
             <div className="ml-11 flex flex-wrap items-center gap-3 mb-6">
               <MethodBadge method="GET" />
               <code className="text-white/55 text-sm font-mono bg-white/5 px-3 py-1 rounded-lg border border-white/8">/status</code>
@@ -682,7 +826,7 @@ const APIDocumentation = () => {
                 <div className="px-4 py-2.5 bg-white/[0.03] border-b border-white/5">
                   <span className="text-[10px] font-bold uppercase tracking-widest text-white/25">Query Parameters</span>
                 </div>
-                <ParamRow name="order_id" type="string" required desc="The ID returned during purchase" />
+                <ParamRow name="order_id" type="string" required desc="The UUID returned in the purchase response" />
               </div>
               <div className="grid lg:grid-cols-2 gap-6">
                 <CodeBlock code={snippets.status[activeLang]} label="Request" />
@@ -690,87 +834,208 @@ const APIDocumentation = () => {
               </div>
             </div>
           </section>
+
+          {/* ── Webhooks ────────────────────────────────────────── */}
           <section>
-            <SectionAnchor id="errors" />
-            <div className="flex items-center gap-3 mb-2">
-              <div className="w-8 h-8 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center shrink-0">
-                <AlertTriangle className="w-4 h-4 text-white/40" />
-              </div>
-              <h2 className="text-2xl font-black">Error Reference</h2>
-            </div>
-            <div className="ml-11 grid lg:grid-cols-2 gap-6">
+            <SectionAnchor id="webhooks" />
+            <SectionHeader icon={Globe} title="Webhooks" />
+            <p className="text-white/45 text-sm mb-6 md:ml-11 max-w-xl">
+              SwiftData can POST real-time events to your server whenever an order status changes.
+              Set your webhook URL in the <strong className="text-white/70">Developer Dashboard → API Settings</strong>.
+            </p>
+
+            <div className="ml-11 space-y-6">
+              {/* Events table */}
               <div className="rounded-xl border border-white/8 overflow-hidden">
-                <div className="grid grid-cols-12 px-4 py-2.5 bg-white/[0.03] border-b border-white/5">
-                  <div className="col-span-2 text-[9px] font-bold uppercase tracking-widest text-white/20">Code</div>
-                  <div className="col-span-10 text-[9px] font-bold uppercase tracking-widest text-white/20">Description</div>
+                <div className="px-4 py-2.5 bg-white/[0.03] border-b border-white/5">
+                  <span className="text-[10px] font-bold uppercase tracking-widest text-white/25">Event Types</span>
                 </div>
                 {[
-                  { code: "400", title: "Bad Request", desc: "Missing parameters" },
-                  { code: "401", title: "Unauthorized", desc: "Invalid API key" },
-                  { code: "402", title: "Low Balance", desc: "Wallet balance too low" },
-                  { code: "403", title: "Forbidden", desc: "Key disabled" },
-                  { code: "404", title: "Not Found", desc: "Invalid endpoint" },
-                ].map(({ code, title, desc }) => (
-                  <div key={code} className="flex items-center gap-4 px-4 py-3 text-xs border-b border-white/5 last:border-0 hover:bg-white/[0.02]">
-                    <div className="font-mono font-black text-sky-400 w-8">{code}</div>
-                    <div className="font-bold text-white/80 w-24 shrink-0">{title}</div>
-                    <div className="text-white/35 truncate">{desc}</div>
+                  { event: "order.fulfilled",         desc: "Order delivered to recipient" },
+                  { event: "order.fulfillment_failed", desc: "Provider returned an error; wallet was refunded" },
+                  { event: "order.processing",        desc: "Order accepted by provider, awaiting delivery" },
+                  { event: "wallet.credited",         desc: "API wallet received a transfer" },
+                ].map(({ event, desc }) => (
+                  <div key={event} className="flex items-center gap-4 px-4 py-3 text-xs border-b border-white/5 last:border-0 hover:bg-white/[0.02]">
+                    <code className="font-mono font-bold text-emerald-300 w-44 shrink-0">{event}</code>
+                    <span className="text-white/40">{desc}</span>
                   </div>
                 ))}
               </div>
-              <ResponseBlock code={RESPONSES.error_402} variant="error" label="Example Error" />
+
+              {/* Security callout */}
+              <div className="rounded-xl border border-amber-500/15 bg-amber-500/5 p-4 flex gap-3">
+                <Shield className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-xs font-bold text-amber-300 mb-1">Verify Webhook Signatures</p>
+                  <p className="text-[11px] text-white/40 leading-relaxed">
+                    Every webhook includes an <code className="text-amber-300 bg-white/5 px-1 rounded">X-Swift-Signature</code> header — the HMAC-SHA256 of the raw body using your Secret Key.
+                    Always verify it before processing the event to prevent replay attacks.
+                  </p>
+                </div>
+              </div>
+
+              {/* Payload example + handler */}
+              <div>
+                <p className="text-xs font-black uppercase tracking-widest text-sky-400 mb-3">Webhook Payload</p>
+                <ResponseBlock code={RESPONSES.webhook_event} label="Incoming POST Body" />
+              </div>
+
+              <div>
+                <p className="text-xs font-black uppercase tracking-widest text-emerald-400 mb-3">Signature Verification Handler</p>
+                <CodeBlock code={snippets.webhook_verify[activeLang]} label="Your Server Code" />
+              </div>
+
+              {/* Retry policy */}
+              <div className="rounded-xl border border-white/8 bg-white/[0.02] p-4">
+                <p className="text-xs font-bold text-white/60 mb-2">Retry Policy</p>
+                <ul className="text-[11px] text-white/40 leading-relaxed space-y-1">
+                  <li>Your endpoint must respond with <code className="text-white/60">HTTP 200</code> within <strong className="text-white/60">10 seconds</strong>.</li>
+                  <li>Failed deliveries are retried up to <strong className="text-white/60">5 times</strong> with exponential back-off (1 min → 5 min → 30 min → 2 hr → 12 hr).</li>
+                  <li>Use the <code className="text-amber-300 bg-white/5 px-1 rounded">order_id</code> field to deduplicate events in case of retries.</li>
+                </ul>
+              </div>
+            </div>
+          </section>
+
+          {/* ── Rate Limits ────────────────────────────────────────── */}
+          <section>
+            <SectionAnchor id="rate-limits" />
+            <SectionHeader icon={Gauge} title="Rate Limits" />
+            <p className="text-white/45 text-sm mb-6 md:ml-11 max-w-xl">
+              Each API key has a configurable per-minute request limit. The default is <strong className="text-white/70">30 requests / minute</strong>.
+              Adjust your limit in the <strong className="text-white/70">Developer Dashboard → API Keys</strong>.
+            </p>
+
+            <div className="ml-11 space-y-6">
+              <div className="rounded-xl border border-white/8 overflow-hidden">
+                <div className="px-4 py-2.5 bg-white/[0.03] border-b border-white/5">
+                  <span className="text-[10px] font-bold uppercase tracking-widest text-white/25">Limits Overview</span>
+                </div>
+                {[
+                  { label: "Default rate limit",   value: "30 req / min per key" },
+                  { label: "Max rate limit",        value: "300 req / min (contact support)" },
+                  { label: "Daily spend cap",       value: "Set per key in dashboard (GHS)" },
+                  { label: "Duplicate protection",  value: "Same phone + network + package = 409 within 60 min" },
+                  { label: "Exceeded response",     value: "HTTP 429 — Rate limit exceeded" },
+                ].map(({ label, value }) => (
+                  <div key={label} className="flex flex-col sm:grid sm:grid-cols-12 sm:gap-2 px-4 py-3 text-xs border-b border-white/5 last:border-0 hover:bg-white/[0.02] gap-1">
+                    <div className="sm:col-span-5 font-semibold text-white/60">{label}</div>
+                    <div className="sm:col-span-7 font-mono text-amber-300">{value}</div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="rounded-xl border border-red-500/15 bg-red-500/5 p-4 flex gap-3">
+                <AlertCircle className="w-4 h-4 text-red-400 shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-xs font-bold text-red-300 mb-1">On 429 — Back Off Gracefully</p>
+                  <p className="text-[11px] text-white/40 leading-relaxed">
+                    When you receive a <code className="text-red-300 bg-white/5 px-1 rounded">429</code>, wait at least <strong className="text-white/60">60 seconds</strong> before retrying.
+                    Queue purchases and send them in batches rather than firing rapid sequential requests.
+                  </p>
+                </div>
+              </div>
+
+              <ResponseBlock code={RESPONSES.error_429} variant="error" label="429 Response" />
+            </div>
+          </section>
+
+          {/* ── Error Reference ───────────────────────────────────────── */}
+          <section>
+            <SectionAnchor id="errors" />
+            <SectionHeader icon={AlertTriangle} title="Error Reference" />
+            <div className="ml-11 space-y-6">
+              <div className="rounded-xl border border-white/8 overflow-hidden">
+                <div className="grid grid-cols-12 px-4 py-2.5 bg-white/[0.03] border-b border-white/5">
+                  <div className="col-span-2 text-[9px] font-bold uppercase tracking-widest text-white/20">Code</div>
+                  <div className="col-span-3 text-[9px] font-bold uppercase tracking-widest text-white/20">Title</div>
+                  <div className="col-span-7 text-[9px] font-bold uppercase tracking-widest text-white/20">Description</div>
+                </div>
+                {[
+                  { code: "400", title: "Bad Request",       desc: "Missing or malformed request parameters" },
+                  { code: "401", title: "Unauthorized",      desc: "API key missing, invalid, or signature mismatch" },
+                  { code: "402", title: "Low Balance",       desc: "API wallet balance insufficient for this purchase" },
+                  { code: "403", title: "Forbidden",         desc: "API access disabled or action not permitted for this key" },
+                  { code: "404", title: "Not Found",         desc: "Order ID not found or endpoint does not exist" },
+                  { code: "409", title: "Duplicate Order",   desc: "Same phone + network + package placed within the last 60 minutes" },
+                  { code: "429", title: "Rate Limited",      desc: "Exceeded your per-minute request limit or daily spend cap" },
+                  { code: "500", title: "Server Error",      desc: "Unexpected internal error — includes a reference ID for support" },
+                ].map(({ code, title, desc }) => (
+                  <div key={code} className={`flex items-center gap-4 px-4 py-3 text-xs border-b border-white/5 last:border-0 hover:bg-white/[0.02] ${["402","403","409","429","500"].includes(code) ? "hover:bg-red-500/[0.02]" : ""}`}>
+                    <div className={`font-mono font-black w-8 shrink-0 ${parseInt(code) >= 400 ? "text-red-400" : "text-sky-400"}`}>{code}</div>
+                    <div className="font-bold text-white/80 w-28 shrink-0">{title}</div>
+                    <div className="text-white/35">{desc}</div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="grid lg:grid-cols-3 gap-4">
+                <ResponseBlock code={RESPONSES.error_402} variant="error" label="402 Insufficient Balance" />
+                <ResponseBlock code={RESPONSES.error_409} variant="error" label="409 Duplicate Order" />
+                <ResponseBlock code={RESPONSES.error_500} variant="error" label="500 Server Error (with reference)" />
+              </div>
             </div>
           </section>
 
           {/* ── Best Practices ───────────────────────────────────────── */}
           <section>
             <SectionAnchor id="best-practices" />
-            <div className="flex items-center gap-3 mb-6">
-              <div className="w-8 h-8 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center shrink-0">
-                <Shield className="w-4 h-4 text-white/40" />
-              </div>
-              <h2 className="text-2xl font-black">Best Practices</h2>
-            </div>
-            
+            <SectionHeader icon={Shield} title="Best Practices" />
+
             <div className="ml-11 grid md:grid-cols-2 gap-6">
-              <div className="space-y-4">
-                <div className="p-4 rounded-xl border border-white/8 bg-white/[0.02]">
-                  <h3 className="text-sm font-bold text-white mb-2 flex items-center gap-2">
-                    <Lock className="w-4 h-4 text-sky-400" /> Security First
-                  </h3>
-                  <p className="text-xs text-white/45 leading-relaxed">
-                    Never store your API keys in client-side code (HTML/JS). Always keep them on your server and proxy requests through your own backend.
-                  </p>
-                </div>
-                
-                <div className="p-4 rounded-xl border border-white/8 bg-white/[0.02]">
-                  <h3 className="text-sm font-bold text-white mb-2 flex items-center gap-2">
-                    <RotateCcw className="w-4 h-4 text-amber-400" /> Use Idempotency
-                  </h3>
-                  <p className="text-xs text-white/45 leading-relaxed">
-                    Always send a unique <code className="text-amber-400">request_id</code> with POST requests. This prevents duplicate charges if your request is retried due to network issues.
-                  </p>
-                </div>
+              <div className="p-4 rounded-xl border border-white/8 bg-white/[0.02]">
+                <h3 className="text-sm font-bold text-white mb-2 flex items-center gap-2">
+                  <Lock className="w-4 h-4 text-sky-400" /> Never Expose Your Key
+                </h3>
+                <p className="text-xs text-white/45 leading-relaxed">
+                  Never store API keys in client-side code, mobile apps, or public repositories. Always proxy requests through your own backend server where the key lives in environment variables.
+                </p>
               </div>
 
-              <div className="space-y-4">
-                <div className="p-4 rounded-xl border border-white/8 bg-white/[0.02]">
-                  <h3 className="text-sm font-bold text-white mb-2 flex items-center gap-2">
-                    <Activity className="w-4 h-4 text-emerald-400" /> Handle Errors
-                  </h3>
-                  <p className="text-xs text-white/45 leading-relaxed">
-                    Monitor for 402 (Low Balance) and 401 (Unauthorized) errors. Implement proper logging on your end to catch failed fulfillment attempts.
-                  </p>
-                </div>
-                
-                <div className="p-4 rounded-xl border border-white/8 bg-white/[0.02]">
-                  <h3 className="text-sm font-bold text-white mb-2 flex items-center gap-2">
-                    <Globe className="w-4 h-4 text-blue-400" /> IP Whitelisting
-                  </h3>
-                  <p className="text-xs text-white/45 leading-relaxed">
-                    For maximum security, whitelist your server's IP address in the Developer Dashboard to restrict API access only to your infrastructure.
-                  </p>
-                </div>
+              <div className="p-4 rounded-xl border border-white/8 bg-white/[0.02]">
+                <h3 className="text-sm font-bold text-white mb-2 flex items-center gap-2">
+                  <RotateCcw className="w-4 h-4 text-amber-400" /> Always Use Idempotency Keys
+                </h3>
+                <p className="text-xs text-white/45 leading-relaxed">
+                  Send a unique <code className="text-amber-400">request_id</code> on every purchase. If your request times out and you retry, the server returns the original result instead of creating a duplicate order.
+                </p>
+              </div>
+
+              <div className="p-4 rounded-xl border border-white/8 bg-white/[0.02]">
+                <h3 className="text-sm font-bold text-white mb-2 flex items-center gap-2">
+                  <Database className="w-4 h-4 text-emerald-400" /> Keep the API Wallet Funded
+                </h3>
+                <p className="text-xs text-white/45 leading-relaxed">
+                  Purchases are charged from your <strong className="text-white/70">API wallet</strong>, not your main wallet. Use <code className="text-sky-400">/wallet/transfer</code> to move funds programmatically, and monitor the <code className="text-sky-400">wallet.credited</code> webhook.
+                </p>
+              </div>
+
+              <div className="p-4 rounded-xl border border-white/8 bg-white/[0.02]">
+                <h3 className="text-sm font-bold text-white mb-2 flex items-center gap-2">
+                  <Activity className="w-4 h-4 text-blue-400" /> Monitor for 402 Errors
+                </h3>
+                <p className="text-xs text-white/45 leading-relaxed">
+                  Implement proper logging on your end. A spike in <code className="text-red-400">402</code> (low balance) or <code className="text-red-400">fulfillment_failed</code> orders is your signal to top up or investigate provider issues.
+                </p>
+              </div>
+
+              <div className="p-4 rounded-xl border border-white/8 bg-white/[0.02]">
+                <h3 className="text-sm font-bold text-white mb-2 flex items-center gap-2">
+                  <Globe className="w-4 h-4 text-purple-400" /> Validate Bills Before Paying
+                </h3>
+                <p className="text-xs text-white/45 leading-relaxed">
+                  Always call <code className="text-sky-400">/payment/bills/validate</code> before <code className="text-sky-400">/ecg</code>. This confirms the account exists and prevents payment failures from invalid meter/smartcard numbers.
+                </p>
+              </div>
+
+              <div className="p-4 rounded-xl border border-white/8 bg-white/[0.02]">
+                <h3 className="text-sm font-bold text-white mb-2 flex items-center gap-2">
+                  <Zap className="w-4 h-4 text-yellow-400" /> Use Test Mode First
+                </h3>
+                <p className="text-xs text-white/45 leading-relaxed">
+                  Enable <strong className="text-white/70">Test Mode</strong> in the dashboard before going live. Orders behave identically (same responses, same order records) but no real fulfillment occurs and no wallet is charged.
+                </p>
               </div>
             </div>
           </section>
