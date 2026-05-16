@@ -15,15 +15,9 @@ const forceAssetRecovery = async (sourceMsg?: string) => {
     localStorage.setItem("asset-failure-reload", now.toString());
     
     try {
-      // 1. Unregister service workers to wipe out stale registrations
-      if ("serviceWorker" in navigator) {
-        const registrations = await navigator.serviceWorker.getRegistrations();
-        for (const registration of registrations) {
-          await registration.unregister();
-          console.log("Successfully unregistered stale ServiceWorker:", registration.scope);
-        }
-      }
-      // 2. Force clear all browser caches to purge any old versions of index.html/assets
+      // 1. Clear only Workbox/asset caches — do NOT unregister service workers.
+      //    Unregistering would destroy push subscriptions on devices that have
+      //    already granted notification permission, causing silent notification loss.
       if ("caches" in window) {
         const cacheKeys = await caches.keys();
         await Promise.all(cacheKeys.map(key => caches.delete(key)));
