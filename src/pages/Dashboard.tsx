@@ -116,13 +116,15 @@ const Dashboard = () => {
         .filter((o: any) => o.parent_agent_id === user.id && isSale(o))
         .reduce((s: number, o: any) => s + Number(o.amount || 0), 0);
 
+      const subAgentEarnings = subAgentActivationOrders.reduce((s: number, o: any) => s + Number(o.profit || 0), 0);
+      
       setStats({
         walletBalance: balance,
         totalOrders: fulfilledOrders.length,
         totalDeposited: depositedOrders.reduce((s: number, o: any) => s + Number(o.amount || 0), 0),
         totalSalesAmount: directSales + subAgentSales,
-        subAgentEarnings: subAgentActivationOrders.reduce((s: number, o: any) => s + Number(o.profit || 0), 0),
-        totalProfit: directProfit + parentProfit,
+        subAgentEarnings,
+        totalProfit: directProfit + parentProfit + subAgentEarnings,
         loyaltyBalance: Number(walletRes.data?.loyalty_balance || 0),
       });
 

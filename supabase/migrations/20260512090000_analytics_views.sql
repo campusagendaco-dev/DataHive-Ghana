@@ -95,7 +95,7 @@ SELECT
 
 FROM public.orders o
 LEFT JOIN public.providers prov ON prov.id = o.provider_id
-WHERE o.order_type IN ('data', 'airtime')
+WHERE o.order_type IN ('data', 'airtime', 'utility', 'api', 'afa')
 GROUP BY date_trunc('day', o.created_at)::date, o.network, o.order_type, prov.name, prov.handler_type
 ORDER BY report_date DESC, gross_revenue DESC;
 
@@ -110,8 +110,8 @@ WITH cohorts AS (
     date_trunc('week', p.created_at)::date AS cohort_week,
     p.user_id,
     p.created_at                           AS signed_up_at,
-    MIN(o.created_at) FILTER (WHERE o.order_type IN ('data','airtime'))  AS first_order_at,
-    COUNT(o.id) FILTER (WHERE o.order_type IN ('data','airtime'))        AS total_orders,
+    MIN(o.created_at) FILTER (WHERE o.order_type IN ('data','airtime','utility','api','afa'))  AS first_order_at,
+    COUNT(o.id) FILTER (WHERE o.order_type IN ('data','airtime','utility','api','afa'))        AS total_orders,
     (p.is_agent OR p.sub_agent_approved)                                 AS is_activated
   FROM public.profiles p
   LEFT JOIN public.orders o ON o.agent_id = p.user_id
@@ -166,7 +166,7 @@ SELECT
   MAX(o.created_at)                                                     AS last_sold_at
 
 FROM public.orders o
-WHERE o.order_type IN ('data', 'airtime')
+WHERE o.order_type IN ('data', 'airtime', 'utility', 'api', 'afa')
   AND o.created_at > now() - interval '90 days'
 GROUP BY o.network, o.package_size, o.order_type
 ORDER BY total_revenue DESC;
