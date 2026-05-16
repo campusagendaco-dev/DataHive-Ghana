@@ -48,6 +48,7 @@ interface AgentProfile {
   full_name: string;
   email: string;
   is_sub_agent: boolean;
+  wallet_balance?: number;
 }
 
 const STATUS_COLORS: Record<string, string> = {
@@ -139,13 +140,24 @@ const AdminOrders = () => {
     const profileMap: Record<string, AgentProfile> = { ...profiles };
     
     if (agentIds.length > 0) {
-      const { data: profData } = await supabase
-        .from("profiles")
-        .select("user_id, full_name, email, is_sub_agent")
-        .in("user_id", agentIds);
+      const [profRes, walletRes] = await Promise.all([
+        supabase
+          .from("profiles")
+          .select("user_id, full_name, email, is_sub_agent")
+          .in("user_id", agentIds),
+        supabase
+          .from("wallets")
+          .select("agent_id, balance")
+          .in("agent_id", agentIds)
+      ]);
+
+      const walletMap = new Map((walletRes.data || []).map((w: any) => [w.agent_id, w.balance]));
       
-      (profData || []).forEach(p => {
-        profileMap[p.user_id] = p as AgentProfile;
+      (profRes.data || []).forEach(p => {
+        profileMap[p.user_id] = {
+          ...(p as any),
+          wallet_balance: walletMap.get(p.user_id) ?? 0
+        };
       });
       setProfiles(profileMap);
     }
@@ -159,6 +171,7 @@ const AdminOrders = () => {
         agent_name: profile?.full_name || (isPlaceholder ? (o.customer_name || "Guest (Direct Purchase)") : "Unknown Agent"),
         agent_email: profile?.email || "",
         is_sub_agent: profile?.is_sub_agent ?? false,
+        metadata: { ...o.metadata, wallet_balance: profile?.wallet_balance }
       };
     });
 
@@ -447,12 +460,14 @@ const AdminOrders = () => {
   const safePage = page;
 
   // Stats from ALL loaded orders (not just current page)
-  const totalRevenue = allOrders.reduce((s, o) => s + Number(o.paystack_verified_amount ?? o.amount ?? 0), 0);
-  const totalPaystackFees = allOrders.reduce((s, o) => s + Number(o.paystack_fee || 0), 0);
+  // Stats from ONLY fulfilled orders in the current view
+  const fulfilledForStats = allOrders.filter(o => o.status === "fulfilled");
+  const totalRevenue = fulfilledForStats.reduce((s, o) => s + Number(o.paystack_verified_amount ?? o.amount ?? 0), 0);
+  const totalPaystackFees = fulfilledForStats.reduce((s, o) => s + Number(o.paystack_fee || 0), 0);
   const totalNetRevenue = totalRevenue - totalPaystackFees;
-  const totalAgentProfits = allOrders.reduce((s, o) => s + Number(o.profit || 0), 0);
-  const totalParentProfits = allOrders.reduce((s, o) => s + Number(o.parent_profit || 0), 0);
-  const totalCosts = allOrders.reduce((s, o) => s + Number(o.cost_price || 0), 0);
+  const totalAgentProfits = fulfilledForStats.reduce((s, o) => s + Number(o.profit || 0), 0);
+  const totalParentProfits = fulfilledForStats.reduce((s, o) => s + Number(o.parent_profit || 0), 0);
+  const totalCosts = fulfilledForStats.reduce((s, o) => s + Number(o.cost_price || 0), 0);
   const totalAdminNetProfit = totalNetRevenue - totalAgentProfits - totalParentProfits - totalCosts;
   
   const failed = allOrders.filter((o) => o.status === "fulfillment_failed").length;
@@ -535,7 +550,7 @@ const AdminOrders = () => {
       <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3">
         {[
           { label: "Total Orders", value: allOrders.length.toLocaleString(), icon: ShoppingCart, color: "text-blue-500" },
-          { label: "Gross Revenue", value: `GH₵${totalRevenue.toFixed(2)}`, icon: TrendingUp, color: "text-emerald-500" },
+          { label: "Fulfilled Volume", value: `GH₵${totalRevenue.toFixed(2)}`, icon: TrendingUp, color: "text-emerald-500" },
           { label: "Paystack Fees", value: `GH₵${totalPaystackFees.toFixed(2)}`, icon: TrendingUp, color: "text-red-500" },
           { label: "Agent Profits", value: `GH₵${(totalAgentProfits + totalParentProfits).toFixed(2)}`, icon: TrendingUp, color: "text-purple-500" },
           { label: "Platform Costs", value: `GH₵${totalCosts.toFixed(2)}`, icon: TrendingUp, color: "text-orange-500" },
@@ -704,7 +719,14 @@ const AdminOrders = () => {
                   </td>
                   <td className="px-4 py-3">
                     <p className="text-xs font-semibold text-foreground truncate max-w-[120px]">{order.agent_name}</p>
-                    <p className="text-[10px] text-muted-foreground truncate max-w-[120px]">{order.agent_email}</p>
+                    <div className="flex items-center gap-1.5 mt-0.5">
+                      <p className="text-[10px] text-muted-foreground truncate max-w-[80px]">{order.agent_email}</p>
+                      {order.metadata?.wallet_balance !== undefined && (
+                        <span className="text-[9px] font-black px-1.5 py-0.5 rounded bg-cyan-500/10 text-cyan-500 border border-cyan-500/20 whitespace-nowrap">
+                          ₵{Number(order.metadata.wallet_balance).toFixed(2)}
+                        </span>
+                      )}
+                    </div>
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex flex-col items-start gap-1">

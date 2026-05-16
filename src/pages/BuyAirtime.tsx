@@ -8,7 +8,6 @@ import { getAppBaseUrl } from "@/lib/app-base-url";
 import { invokePublicFunction } from "@/lib/public-function-client";
 import { useAppTheme } from "@/contexts/ThemeContext";
 import { MTNLogo, TelecelLogo, AirtelTigoLogo } from "@/components/BrandLogos";
-import ComingSoonOverlay from "@/components/ComingSoonOverlay";
 
 const NETWORK_GLASS_ACTIVE: Record<string, Record<string, string>> = {
   MTN: {
@@ -69,46 +68,10 @@ const BuyAirtime = () => {
   const total = canPay ? parseFloat((numAmount + fee).toFixed(2)) : 0;
 
   const handlePay = async () => {
-    if (!canPay) return;
-    if (orderingDisabled) {
-      toast({ title: "Ordering disabled", description: holidayMessage, variant: "destructive" });
-      return;
-    }
-    setBuying(true);
-    const orderId = crypto.randomUUID();
-    const callbackParams = new URLSearchParams({
-      reference: orderId,
-      network: selectedNetwork,
-      package: `${numAmount} Airtime`,
-      phone: phoneDigits,
+    toast({
+      title: "Coming Soon",
+      description: "Direct airtime purchases are currently undergoing maintenance. Please use the dashboard for active services.",
     });
-
-    const { data: paymentData, error: paymentError } = await invokePublicFunction("initialize-payment", {
-      body: {
-        email: email.trim() || `${phoneDigits}@swiftdata-anon.gh`,
-        amount: total,
-        reference: orderId,
-        callback_url: `${getAppBaseUrl()}/order-status?${callbackParams.toString()}`,
-        metadata: {
-          order_id: orderId,
-          order_type: "airtime",
-          network: selectedNetwork,
-          package_size: `${numAmount} Airtime`,
-          amount: numAmount,
-          customer_phone: phoneDigits,
-          fee,
-          payment_source: "direct",
-        },
-      },
-    });
-
-    if (paymentError || !paymentData?.authorization_url) {
-      const description = paymentData?.error || await getFunctionErrorMessage(paymentError, "Could not initialize payment.");
-      toast({ title: "Payment failed", description, variant: "destructive" });
-      setBuying(false);
-      return;
-    }
-    window.location.href = paymentData.authorization_url;
   };
 
   const getNetworkLogo = (net: NetworkName) => {
@@ -119,7 +82,6 @@ const BuyAirtime = () => {
 
   return (
     <div className="min-h-screen pt-20 transition-all duration-300 pb-24 relative overflow-hidden">
-      <ComingSoonOverlay />
       
       {/* Hero header */}
       <div className="text-white py-10 px-4 mb-6" style={{ background: theme.heroHex }}>

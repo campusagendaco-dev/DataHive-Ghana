@@ -29,6 +29,7 @@ interface SubAgentRow {
   parent_agent_id: string | null;
   parent_name?: string;
   wallet_balance?: number;
+  api_wallet_balance?: number;
   total_sales_volume?: number;
 }
 
@@ -84,17 +85,19 @@ const AdminSubAgents = () => {
 
     if (ids.length > 0) {
       const [walletsRes, salesRes, parentsRes] = await Promise.all([
-        supabase.from("wallets").select("agent_id, balance").in("agent_id", ids),
+        supabase.from("wallets").select("agent_id, balance, api_balance").in("agent_id", ids),
         supabase.from("user_sales_stats").select("user_id, total_sales_volume").in("user_id", ids),
         parentIds.length > 0 ? supabase.from("profiles").select("user_id, full_name").in("user_id", parentIds) : Promise.resolve({ data: [] }),
       ]);
 
-      const walletMap = new Map((walletsRes.data || []).map((w: any) => [w.agent_id, w.balance]));
+      const walletMap = new Map((walletsRes.data || []).map((w: any) => [w.agent_id, { balance: w.balance, api_balance: w.api_balance }]));
       const salesMap = new Map((salesRes.data || []).map((s: any) => [s.user_id, s.total_sales_volume]));
       const parentMap = new Map((parentsRes.data || []).map((p: any) => [p.user_id, p.full_name]));
 
       rows.forEach(r => {
-        r.wallet_balance = walletMap.get(r.user_id) ?? 0;
+        const wallet = walletMap.get(r.user_id) as any;
+        r.wallet_balance = wallet?.balance ?? 0;
+        r.api_wallet_balance = wallet?.api_balance ?? 0;
         r.total_sales_volume = salesMap.get(r.user_id) ?? 0;
         if (r.parent_agent_id) {
           r.parent_name = parentMap.get(r.parent_agent_id) || "Unknown Parent";
@@ -290,14 +293,18 @@ const AdminSubAgents = () => {
                 </div>
 
                 <div className="flex flex-wrap items-center justify-between gap-4 pt-4 border-t border-border">
-                   <div className="flex items-center gap-6">
+                   <div className="flex flex-wrap items-center gap-6">
                       <div>
                         <p className="text-[9px] text-muted-foreground font-black uppercase tracking-widest mb-0.5">Wallet Balance</p>
-                        <p className="text-base font-black text-foreground">GH₵{(agent.wallet_balance || 0).toFixed(2)}</p>
+                        <p className="text-sm font-black text-foreground">GH₵{(agent.wallet_balance || 0).toFixed(2)}</p>
+                      </div>
+                      <div>
+                        <p className="text-[9px] text-muted-foreground font-black uppercase tracking-widest mb-0.5">API Balance</p>
+                        <p className="text-sm font-black text-cyan-600 dark:text-cyan-400">GH₵{(agent.api_wallet_balance || 0).toFixed(2)}</p>
                       </div>
                       <div>
                         <p className="text-[9px] text-muted-foreground font-black uppercase tracking-widest mb-0.5">Sales Volume</p>
-                        <p className="text-base font-black text-emerald-600 dark:text-emerald-400">GH₵{(agent.total_sales_volume || 0).toFixed(2)}</p>
+                        <p className="text-sm font-black text-emerald-600 dark:text-emerald-400">GH₵{(agent.total_sales_volume || 0).toFixed(2)}</p>
                       </div>
                    </div>
 

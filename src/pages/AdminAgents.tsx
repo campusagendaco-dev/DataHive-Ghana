@@ -28,6 +28,7 @@ interface AgentRow {
   agent_approved: boolean;
   created_at: string;
   wallet_balance?: number;
+  api_wallet_balance?: number;
   credit_limit?: number;
   sub_agent_count?: number;
   total_sales_volume?: number;
@@ -103,12 +104,12 @@ const AdminAgents = () => {
     const ids = rows.map(r => r.user_id);
     if (ids.length > 0) {
       const [walletsRes, subCountRes, salesRes] = await Promise.all([
-        supabase.from("wallets").select("agent_id, balance, credit_limit").in("agent_id", ids),
+        supabase.from("wallets").select("agent_id, balance, api_balance, credit_limit").in("agent_id", ids),
         supabase.from("profiles").select("user_id, parent_agent_id").eq("is_sub_agent" as any, true).in("parent_agent_id" as any, ids),
         supabase.from("user_sales_stats").select("user_id, total_sales_volume").in("user_id", ids),
       ]);
 
-      const walletMap = new Map((walletsRes.data || []).map((w: any) => [w.agent_id, { balance: w.balance, limit: w.credit_limit }]));
+      const walletMap = new Map((walletsRes.data || []).map((w: any) => [w.agent_id, { balance: w.balance, api_balance: w.api_balance, limit: w.credit_limit }]));
       const salesMap = new Map((salesRes.data || []).map((s: any) => [s.user_id, s.total_sales_volume]));
       const subCountMap: Record<string, number> = {};
       (subCountRes.data || []).forEach((sa: any) => {
@@ -119,6 +120,7 @@ const AdminAgents = () => {
       rows.forEach(r => {
         const wallet = walletMap.get(r.user_id) as any;
         r.wallet_balance = wallet?.balance ?? 0;
+        r.api_wallet_balance = wallet?.api_balance ?? 0;
         r.credit_limit = wallet?.limit ?? 0;
         r.sub_agent_count = subCountMap[r.user_id] ?? 0;
         r.total_sales_volume = salesMap.get(r.user_id) ?? 0;
@@ -575,14 +577,18 @@ const AdminAgents = () => {
 
                 {/* Stats & Actions (Mobile) */}
                 <div className="flex flex-col gap-4 border-t border-border pt-4">
-                  <div className="grid grid-cols-3 gap-2">
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
                     <div className="p-2.5 rounded-xl bg-secondary/30 border border-border text-center">
                       <p className="text-[9px] text-muted-foreground uppercase tracking-widest mb-1">Sales</p>
-                      <p className="text-xs font-black text-emerald-600 dark:text-emerald-400 truncate">₵{(agent.total_sales_volume || 0).toFixed(0)}</p>
+                      <p className="text-xs font-black text-emerald-600 dark:text-emerald-400 truncate">₵{(agent.total_sales_volume || 0).toFixed(2)}</p>
                     </div>
                     <div className="p-2.5 rounded-xl bg-secondary/30 border border-border text-center">
                       <p className="text-[9px] text-muted-foreground uppercase tracking-widest mb-1">Wallet</p>
-                      <p className="text-xs font-black text-amber-600 dark:text-amber-400 truncate">₵{(agent.wallet_balance || 0).toFixed(0)}</p>
+                      <p className="text-xs font-black text-amber-600 dark:text-amber-400 truncate">₵{(agent.wallet_balance || 0).toFixed(2)}</p>
+                    </div>
+                    <div className="p-2.5 rounded-xl bg-secondary/30 border border-border text-center">
+                      <p className="text-[9px] text-muted-foreground uppercase tracking-widest mb-1">API Balance</p>
+                      <p className="text-xs font-black text-cyan-600 dark:text-cyan-400 truncate">₵{(agent.api_wallet_balance || 0).toFixed(2)}</p>
                     </div>
                     <div className="p-2.5 rounded-xl bg-secondary/30 border border-border text-center">
                       <p className="text-[9px] text-muted-foreground uppercase tracking-widest mb-1">Subs</p>

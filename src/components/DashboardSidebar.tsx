@@ -260,7 +260,7 @@ const DashboardSidebar = ({ open, onClose }: DashboardSidebarProps) => {
               <div className="space-y-1">
                 {agentNavItems
                   .filter(
-                    (item) => !((profile as any)?.is_sub_agent && ["/dashboard/subagents", "/dashboard/subagent-pricing"].includes(item.to)),
+                    (item) => !((profile as any)?.is_sub_agent && !(profile as any)?.is_agent && ["/dashboard/subagents", "/dashboard/subagent-pricing"].includes(item.to)),
                   )
                   .map((item) => {
                     const isActive = location.pathname === item.to;

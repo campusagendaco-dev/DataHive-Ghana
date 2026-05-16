@@ -11,7 +11,6 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
-import ComingSoonOverlay from "@/components/ComingSoonOverlay";
 import { 
   Sheet, 
   SheetContent, 
@@ -64,24 +63,7 @@ const AdminSwiftVendorPro = () => {
   };
 
   const saveSystemRules = async () => {
-    setSavingRules(true);
-    try {
-      const { error } = await supabase
-        .from("system_settings")
-        .update({
-          sub_agent_base_fee: config.momoSplit,
-          at_markup_percentage: config.africaMargin,
-          maintenance_mode: config.isFrozen
-        })
-        .eq("id", 1); // Assuming ID 1 is the main settings
-
-      if (error) throw error;
-      toast.success("Global System Rules Synchronized");
-    } catch (err: any) {
-      toast.error(err.message || "Failed to sync rules");
-    } finally {
-      setSavingRules(false);
-    }
+    toast.info("Coming Soon", { description: "Global rule synchronization is currently locked. Contact system administrator for changes." });
   };
 
   const fetchVendors = async () => {
@@ -141,30 +123,12 @@ const AdminSwiftVendorPro = () => {
   };
 
   const toggleVendorLock = async (agentId: string, currentlyLocked: boolean) => {
-    try {
-      const action = currentlyLocked ? 'unlock' : 'lock';
-      const { data, error } = await supabase.functions.invoke("admin-vendor-security", {
-        body: { agent_id: agentId, action }
-      });
-
-      if (error) throw error;
-      if (data?.error) throw new Error(data.error);
-
-      toast.success(data.message || `Terminal ${currentlyLocked ? 'unlocked' : 'locked'} successfully`);
-      fetchVendors(); // Refresh UI
-    } catch (err: any) {
-      toast.error(err.message || "Security override failed");
-    }
+    toast.info("Coming Soon", { description: "Security overrides and terminal locking features are currently in simulation mode." });
   };
 
   return (
     <div className="relative h-full w-full overflow-hidden min-h-[80vh] rounded-3xl">
-      <ComingSoonOverlay 
-        title="Swift Vendor Admin is Coming Soon!" 
-        description="We're currently fine-tuning our institutional control console. The ultimate vendor management system is almost here!" 
-        showHomeButton={false} 
-      />
-      <div className="p-6 md:p-10 space-y-10 bg-[#0a0a0b] min-h-[80vh] text-white opacity-20 pointer-events-none select-none blur-[2px]">
+      <div className="p-6 md:p-10 space-y-10 bg-[#0a0a0b] min-h-[80vh] text-white">
       {/* Super Pro Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
         <div>

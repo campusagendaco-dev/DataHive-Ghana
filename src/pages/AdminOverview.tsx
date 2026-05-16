@@ -516,7 +516,7 @@ const AdminOverview = () => {
   const statCards = [
     { title: "Total Inflow",     value: `GH₵ ${(stats.totalRevenue || 0).toFixed(2)}`,                                icon: DollarSign, color: "text-emerald-500",  bg: "bg-emerald-500/10",  border: "border-emerald-500/20"  },
     { title: "Data/Airtime Volume",   value: `GH₵ ${(stats.totalPurchases || 0).toFixed(2)}`,                                icon: ShoppingCart, color: "text-blue-500",  bg: "bg-blue-500/10",  border: "border-blue-500/20"  },
-    { title: "Agent Profits",   value: `GH₵ ${(stats.totalAgentProfit || 0).toFixed(2)}`, icon: DollarSign, color: "text-amber-500",  bg: "bg-amber-400/10",  border: "border-amber-400/20"  },
+    { title: "Agent Profits",   value: `GH₵ ${(Number(stats.totalAgentProfit || 0) + Number(stats.totalSubAgentProfit || 0)).toFixed(2)}`, icon: DollarSign, color: "text-amber-500",  bg: "bg-amber-400/10",  border: "border-amber-400/20"  },
     { title: "User Balances",   value: `GH₵ ${(stats.totalSystemBalance || 0).toFixed(2)}`,                        icon: Wallet,     color: "text-red-400",    bg: "bg-red-400/10",    border: "border-red-400/20"    },
     { 
       title: "Net Admin Profit", 

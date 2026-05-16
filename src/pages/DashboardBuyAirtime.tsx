@@ -9,7 +9,6 @@ import {
 } from "lucide-react";
 import { cn, detectNetwork } from "@/lib/utils";
 import { MTNLogo, TelecelLogo, AirtelTigoLogo } from "@/components/BrandLogos";
-import ComingSoonOverlay from "@/components/ComingSoonOverlay";
 import { getFunctionErrorMessage } from "@/lib/function-errors";
 import OrderStatusBanner from "@/components/OrderStatusBanner";
 import { useAppTheme } from "@/contexts/ThemeContext";
@@ -94,100 +93,14 @@ const DashboardBuyAirtime = () => {
   const ActiveLogo = activeNet.Logo;
 
   const handlePay = async () => {
-    if (!canPay || !user) return;
-    setLoading(true);
-
-    if (payMethod === "wallet") {
-      const orderId = crypto.randomUUID();
-      const { data, error } = await supabase.functions.invoke("wallet-pay-airtime", {
-        body: { network, phone: phone.trim(), amount: numAmount, reference: orderId },
-      });
-
-      if (error || data?.error) {
-        const description = await getFunctionErrorMessage(
-          error || data?.error,
-          "Purchase failed. Please check your balance."
-        );
-        
-        // Log diagnostics for admins and show in toast if possible
-        if (data?.diagnostics) {
-          console.error("Provider Diagnostics:", data.diagnostics);
-          const diag = data.diagnostics;
-          const diagMsg = `API Key: ${diag.api_key_used}\nURL: ${diag.attempted_urls?.[0] || 'N/A'}\nError: ${diag.provider_error}\nResponse: ${diag.provider_response || 'No response body'}`;
-          
-          toast({ 
-            title: "Purchase Failed (Admin Info)", 
-            description: (
-              <div className="mt-2 space-y-2">
-                <p className="text-sm font-semibold text-destructive">{description}</p>
-                <div className="p-2 rounded bg-black/50 border border-white/10 text-[10px] font-mono whitespace-pre-wrap">
-                  {diagMsg}
-                </div>
-              </div>
-            ), 
-            variant: "destructive" 
-          });
-        } else {
-          toast({ title: "Purchase Failed", description, variant: "destructive" });
-        }
-      } else {
-        setLastOrder({
-          id: data.order_id,
-          network,
-          packageSize: `GHS ${numAmount} Airtime`,
-          phone,
-          status: "fulfilled",
-        });
-        setShowSuccessOverlay(true);
-        setTimeout(() => setShowSuccessOverlay(false), 5000);
-        setAmount("");
-        setPhone("");
-        setLoading(false);
-        supabase.from("wallets").select("balance").eq("agent_id", user.id).maybeSingle().then(({data:w}) => {
-          if (w) setWalletBalance(w.balance);
-        });
-      }
-      setLoading(false);
-      return;
-    }
-
-    // Paystack flow
-    const reference = crypto.randomUUID();
-    const { data, error } = await supabase.functions.invoke("initialize-payment", {
-      body: {
-        email: user.email || `${user.id}@swiftdatagh.shop`,
-
-        amount: numAmount,
-        reference,
-        callback_url: `${window.location.origin}/dashboard/buy-airtime?ref=${reference}`,
-        metadata: {
-          order_id: reference,
-          order_type: "airtime",
-          network,
-          customer_phone: phone.trim(),
-          package_size: `GHS ${numAmount} Airtime`,
-          amount: numAmount,
-          agent_id: user.id,
-        },
-      },
+    toast({
+      title: "Coming Soon",
+      description: "Airtime services for agents are being optimized. Expect activation within 24 hours.",
     });
-
-    if (error || !data?.authorization_url) {
-      toast({
-        title: "Payment init failed",
-        description: error?.message || "Please try again.",
-        variant: "destructive",
-      });
-      setLoading(false);
-      return;
-    }
-
-    window.location.href = data.authorization_url;
   };
 
   return (
     <div className="relative p-4 md:p-8 max-w-4xl mx-auto space-y-8 animate-in fade-in duration-700 pb-20 overflow-hidden">
-      <ComingSoonOverlay />
       
       {/* Dynamic ambient glow that shifts with network */}
       <div

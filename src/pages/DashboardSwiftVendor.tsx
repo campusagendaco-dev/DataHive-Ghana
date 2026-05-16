@@ -17,7 +17,6 @@ import { toast } from "sonner";
 import { useAuth } from "@/hooks/useAuth";
 import { cn } from "@/lib/utils";
 import { SecurityGateway } from "@/components/SecurityGateway";
-import ComingSoonOverlay from "@/components/ComingSoonOverlay";
 
 const GHANA_BANKS = [
   { code: "GCB", name: "GCB Bank" },
@@ -216,176 +215,34 @@ const DashboardSwiftVendor = () => {
   };
 
   const handleMomoAction = async () => {
-    if (!momoPhone || !momoAmount) {
-      toast.error("Please fill in all fields");
-      return;
-    }
-
-    const amount = parseFloat(momoAmount);
-    if (momoAction === "cash-in" && amount > walletBalance) {
-      toast.error("Insufficient wallet balance for Cash-In");
-      return;
-    }
-
-    setLoading(true);
-    try {
-      const { data, error } = await supabase.functions.invoke("theteller-vendor", {
-        body: {
-          action: momoAction === "cash-in" ? "momo-disbursement" : "momo-collection",
-          amount,
-          phone: momoPhone,
-          network: momoNetwork,
-          description: `Swift Vendor ${momoAction === "cash-in" ? "Cash-In" : "Cash-Out"}`
-        }
-      });
-
-      if (error) throw error;
-
-      if (data.status === "successful" || data.code === "000") {
-        toast.success("Transaction Successful!");
-        setMomoAmount("");
-        setMomoPhone("");
-        setMomoAccountName(null);
-        fetchBalance();
-      } else if (data.status === "pending" || data.code === "100") {
-        toast.info("Transaction Pending", { description: "Wait for customer authorization on their phone." });
-        setMomoAmount("");
-        setMomoPhone("");
-        setMomoAccountName(null);
-      } else {
-        toast.error("Transaction Failed", { description: data.reason || data.message });
-      }
-    } catch (err: any) {
-      toast.error("Request Failed", { description: err.message });
-    } finally {
-      setLoading(false);
-    }
+    toast.info("Coming Soon", { 
+      description: "Mobile Money Agency features are currently undergoing final calibration. Stay tuned!",
+      icon: <Zap className="w-4 h-4 text-amber-400" />
+    });
   };
 
   const handleMomoEnquiry = async () => {
-    if (!momoPhone || momoPhone.length < 10) {
-      toast.error("Please enter a valid phone number");
-      return;
-    }
-
-    setVerifying(true);
-    try {
-      const { data, error } = await supabase.functions.invoke("theteller-vendor", {
-        body: {
-          action: "momo-enquiry",
-          phone: momoPhone,
-          network: momoNetwork
-        }
-      });
-
-      if (error) throw error;
-
-      if (data.status === "successful" || data.code === "000") {
-        setMomoAccountName(data.account_name || "Name Verified");
-        toast.success("Account Verified!");
-      } else {
-        toast.error("Verification Failed", { description: data.reason || data.message });
-      }
-    } catch (err: any) {
-      toast.error("Verification Failed", { description: err.message });
-    } finally {
-      setVerifying(false);
-    }
+    toast.info("Verification Feature Coming Soon", {
+      description: "Identity resolution for MoMo agents will be active in the next update."
+    });
   };
 
   const handleBankEnquiry = async () => {
-    if (!bankCode || !accountNumber || !bankAmount) {
-      toast.error("Please fill in all fields");
-      return;
-    }
-
-    const amount = parseFloat(bankAmount);
-    if (amount > walletBalance) {
-      toast.error("Insufficient wallet balance");
-      return;
-    }
-
-    setVerifying(true);
-    setAccountName(null);
-    setReferenceId(null);
-
-    try {
-      const { data, error } = await supabase.functions.invoke("theteller-vendor", {
-        body: {
-          action: selectedCountry === "GH" ? "bank-transfer-init" : "momo-enquiry", // reuse momo-enquiry for general paystack resolution
-          amount,
-          bank_code: bankCode,
-          account_number: accountNumber,
-          network: bankCode, // for paystack resolution
-          phone: accountNumber, // for paystack resolution
-          description: `Swift Vendor Africa Payout (${selectedCountry})`
-        }
-      });
-
-      if (error) throw error;
-
-      if (data.status === "successful" || data.code === "000") {
-        setAccountName(data.account_name);
-        setReferenceId(data.reference_id || "paystack_verified");
-        toast.success("Account Verified!");
-      } else {
-        toast.error("Verification Failed", { description: data.reason || data.message });
-      }
-    } catch (err: any) {
-      toast.error("Enquiry Failed", { description: err.message });
-    } finally {
-      setVerifying(false);
-    }
+    toast.info("Coming Soon", {
+      description: "Bank account verification is temporarily disabled for maintenance."
+    });
   };
 
   const handleBankTransferComplete = async () => {
-    if (!referenceId) return;
-
-    setLoading(true);
-    try {
-      const isAfrica = selectedCountry !== "GH";
-      const { data, error } = await supabase.functions.invoke("theteller-vendor", {
-        body: {
-          action: isAfrica ? "africa-transfer" : "bank-transfer-complete",
-          reference_id: referenceId,
-          amount: parseFloat(bankAmount),
-          account_number: accountNumber,
-          bank_code: bankCode,
-          account_name: accountName,
-          country: selectedCountry,
-          currency: AFRICA_COUNTRIES.find(c => c.code === selectedCountry)?.currency,
-          description: `Swift Vendor Payout to ${selectedCountry}`
-        }
-      });
-
-      if (error) throw error;
-
-      if (data.status === "successful" || data.code === "000" || data.status === true) {
-        toast.success(isAfrica ? "International Transfer Initiated!" : "Bank Transfer Completed!");
-        setBankAmount("");
-        setAccountNumber("");
-        setAccountName(null);
-        setReferenceId(null);
-        fetchBalance();
-      } else {
-        toast.error("Transfer Failed", { description: data.reason || data.message || data.error });
-      }
-    } catch (err: any) {
-      toast.error("Transfer Failed", { description: err.message });
-    } finally {
-      setLoading(false);
-    }
+    toast.info("Coming Soon", {
+      description: "Bank transfer capabilities will be re-enabled shortly."
+    });
   };
 
   return (
     <SecurityGateway>
       <div className="relative h-full w-full overflow-hidden min-h-[80vh] rounded-3xl">
-        <ComingSoonOverlay 
-          title="Swift Vendor is Coming Soon!" 
-          description="We're currently fine-tuning our agency banking and MoMo features to bring you the fastest and most reliable POS experience in Ghana. Stay tuned!" 
-          showHomeButton={false} 
-        />
-        <div className="p-6 md:p-8 space-y-8 animate-in fade-in duration-700 opacity-20 pointer-events-none select-none blur-[2px]">
+        <div className="p-6 md:p-8 space-y-8 animate-in fade-in duration-700">
       {walletBalance < balanceThreshold && !isPrivateMode && (
         <div className="bg-amber-500/10 border border-amber-500/20 rounded-2xl p-4 flex items-center justify-between animate-in slide-in-from-top-4 duration-500">
           <div className="flex items-center gap-3">
