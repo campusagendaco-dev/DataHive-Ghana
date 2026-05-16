@@ -215,6 +215,7 @@ const FreeDataButton = () => {
               }
             }}
             className="flex items-center gap-2 rounded-full pr-4 pl-1.5 py-1.5 shadow-2xl transition-transform hover:scale-105 active:scale-95 group"
+            title="Claim Free Data"
             style={{
               background: `linear-gradient(135deg, ${accentColor} 0%, ${accentColor}dd 100%)`,
               boxShadow: `0 8px 32px ${accentColor}60, 0 4px 12px rgba(0,0,0,0.3)`,
@@ -241,7 +242,7 @@ const FreeDataButton = () => {
       {isOpen && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
           <div className="w-full max-w-sm rounded-3xl overflow-hidden border border-white/10 relative shadow-2xl animate-in zoom-in-95 duration-200" style={{ background: "#11111a" }}>
-            <button onClick={() => setIsOpen(false)} className="absolute top-4 right-4 z-10 p-2 rounded-full bg-white/5 hover:bg-white/10 text-white/50 hover:text-white transition-colors">
+            <button onClick={() => setIsOpen(false)} title="Close" className="absolute top-4 right-4 z-10 p-2 rounded-full bg-white/5 hover:bg-white/10 text-white/50 hover:text-white transition-colors">
               <X className="w-4 h-4" />
             </button>
             

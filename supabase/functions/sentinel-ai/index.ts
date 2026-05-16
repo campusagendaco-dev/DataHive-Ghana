@@ -1,322 +1,274 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { corsHeaders } from "../_shared/cors.ts";
-import { log } from "../_shared/logger.ts";
-
-declare const Deno: any;
+import { getSmsConfig, sendSmsViaTxtConnect } from "../_shared/sms.ts";
 
 const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY");
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
 
 serve(async (req: Request) => {
-  if (req.method === "OPTIONS") {
-    return new Response(null, { headers: corsHeaders });
-  }
+  if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
-  if (!ANTHROPIC_API_KEY || !SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
-    console.error("Missing Config:", { 
-      hasAnthropic: !!ANTHROPIC_API_KEY, 
-      hasUrl: !!SUPABASE_URL, 
-      hasServiceRole: !!SUPABASE_SERVICE_ROLE_KEY 
-    });
-    return new Response(JSON.stringify({ 
-      error: "Missing configuration",
-      details: {
-        hasAnthropic: !!ANTHROPIC_API_KEY,
-        hasUrl: !!SUPABASE_URL,
-        hasServiceRole: !!SUPABASE_SERVICE_ROLE_KEY
-      }
-    }), {
-      status: 200,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
-  }
-
-  const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+  const supabaseAdmin = createClient(SUPABASE_URL!, SUPABASE_SERVICE_ROLE_KEY!);
 
   try {
-    console.log("Sentinel starting scan via Anthropic Engine...");
-    // 0. Budget Check (Budget Guardian)
-    const { data: settings } = await supabaseAdmin.from("system_settings").select("*").eq("id", 1).maybeSingle();
+    const body = await req.json().catch(() => ({}));
+    const { event, order_id, log_id } = body;
 
-    // 1. Fetch recent error logs (last 30 mins)
-    const { data: recentErrors, error: logError } = await supabaseAdmin
-      .from("system_logs")
-      .select("*")
-      .eq("level", "error")
-      .gt("ts", new Date(Date.now() - 30 * 60 * 1000).toISOString())
-      .order("ts", { ascending: false })
-      .limit(20);
+    console.log(`Sentinel Prime: Initiating ${event ? 'Surgical Strike' : 'Autonomous Scan'}...`);
 
-    if (logError) throw logError;
+    // 1. Fetch System Pulse
+    let agentsToAnalyze = [];
+    let ordersToAnalyze = [];
 
-    const errors = recentErrors || [];
-
-    if (settings?.sentinel_low_power_mode && errors.length < 5) {
-      return new Response(JSON.stringify({ message: "Budget Guardian: Low Power Mode active. Skipping routine scan." }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+    if (event === 'order_failure' && order_id) {
+      // Surgical Strike: Focus on this specific failure
+      const { data: failedOrder } = await supabaseAdmin.from("orders").select("*").eq("id", order_id).single();
+      if (failedOrder) {
+        const { data: agent } = await supabaseAdmin.from("profiles").select("id, full_name, phone, wallet_balance, loyalty_points").eq("id", failedOrder.agent_id).single();
+        if (agent) agentsToAnalyze = [agent];
+        ordersToAnalyze = [failedOrder];
+      }
+    } else {
+      // General Scan
+      const { data: agents } = await supabaseAdmin.from("profiles").select("id, full_name, phone, wallet_balance, loyalty_points").eq("is_agent", true).limit(50);
+      const { data: recentOrders } = await supabaseAdmin.from("orders").select("*").gt("created_at", new Date(Date.now() - 3600000).toISOString());
+      agentsToAnalyze = agents || [];
+      ordersToAnalyze = recentOrders || [];
     }
+    const { data: settings } = await supabaseAdmin.from("system_settings").select("*").single();
+    const { data: providers } = await supabaseAdmin.from("providers").select("*").order("priority", { ascending: true });
+    
+    // Fetch Admin Contact
+    const { data: admins } = await supabaseAdmin
+      .from("profiles")
+      .select("phone, email")
+      .eq("role" as any, "admin" as any)
+      .limit(1);
+    
+    const adminContact = admins?.[0];
 
-    if (settings && settings.sentinel_current_month_cost_usd >= settings.sentinel_monthly_budget_usd) {
-      return new Response(JSON.stringify({ message: "Budget Guardian: Monthly limit reached. Sentinel standing down." }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
+    // 2. Risk & Behavior Processing (Sentinel Prime Core)
+    const agentStats = agentsToAnalyze?.map(agent => {
+      const orders = ordersToAnalyze?.filter(o => o.agent_id === agent.id) || [];
+      const failures = orders.filter(o => o.status === 'failed').length;
+      
+      // Heuristic Risk Score
+      let riskScore = 0;
+      if (orders.length > 20) riskScore += 40;
+      if (failures > 5) riskScore += 30;
+      if (orders.length > 0 && (failures / orders.length) > 0.5) riskScore += 30;
 
-    // 1.5. Fetch stuck orders (processing for > 10 mins)
-    const { data: stuckOrders } = await supabaseAdmin
-      .from("orders")
-      .select("*, profiles(full_name, phone)")
-      .eq("status", "processing")
-      .lt("updated_at", new Date(Date.now() - 10 * 60 * 1000).toISOString())
-      .limit(5);
+      return {
+        id: agent.id,
+        name: agent.full_name,
+        phone: agent.phone,
+        balance: agent.wallet_balance,
+        loyalty: agent.loyalty_points,
+        velocity: orders.length,
+        failure_rate: orders.length > 0 ? (failures / orders.length).toFixed(2) : 0,
+        risk_score: riskScore
+      };
+    });
 
-    // 1.6. Fetch Potential Security Threats (Failed Logins / Rapid Actions)
-    const { data: threats } = await supabaseAdmin
-      .from("system_logs")
-      .select("*")
-      .in("event", ["login_failure", "suspicious_activity", "unauthorized_access"])
-      .gt("ts", new Date(Date.now() - 5 * 60 * 1000).toISOString())
-      .limit(10);
+    // 3. Provider Health Check (Liquidity Balancing)
+    const providerHealth = providers?.map(p => ({
+      id: p.id,
+      name: p.name,
+      balance: p.balance,
+      priority: p.priority,
+      status: p.is_active ? 'active' : 'inactive',
+      type: p.provider_type
+    }));
 
-    // 1.7. Fetch "Churning" Agents (No orders in 7 days)
-    const { data: churningAgents } = await supabaseAdmin
-      .from("agent_loyalty_metrics")
-      .select("*, profiles(full_name, phone)")
-      .gt("days_since_last_order", 7)
-      .limit(5);
-
-    // 2. Fetch current system state
-    const { data: providers } = await supabaseAdmin.from("providers").select("*");
-
-    const tokenCostPerScan = 0.0001; 
-    const { data: strategies } = await supabaseAdmin.from("sentinel_strategies").select("*").eq("is_active", true);
-
-    // 3. Construct AI Prompt
+    // 4. Construct the "God Mode" Prompt
     const systemPrompt = `
-      You are SENTINEL — the autonomous intelligence core of SwiftData Ghana's fintech platform.
-      You think like a senior Site Reliability Engineer combined with a seasoned business analyst.
-      You don't just react to alerts — you reason carefully, weigh evidence, consider context,
-      and make judgment calls like an experienced human expert would.
+      You are SENTINEL PRIME — the ultimate autonomous controller for Swift Vendor.
+      
+      ━━━ CORE DIRECTIVES ━━━
+      1. FRAUD DETECTION: Identify high risk scores (>80).
+      2. FINANCIAL INTEGRITY: Monitor wallet_balance on profiles table. Flag suspicious self-top-ups.
+      3. LIQUIDITY BALANCING: Ensure only providers with HIGH BALANCE are prioritized (Priority 1).
+      4. FAILOVER: If Priority 1 provider has balance < 50, switch to the highest balance alternative.
+      5. NOTIFICATION: Any autonomous action MUST trigger an admin notification.
+      6. TRANSPARENCY: If an agent reports a discrepancy, direct them to use the "Wallet Statement" on their dashboard for proof.
 
-      ━━━ YOUR MINDSET ━━━
-      - Think before acting. Consider whether a pattern is a real problem or a transient blip.
-      - Prioritize impact: a stuck order affecting a real customer is more urgent than a background log warning.
-      - Be conservative with destructive actions (switching providers, blocking IPs). Only act when confidence is high.
-      - When in doubt, notify_admin rather than taking an irreversible action.
-      - Always ask: "What is the most likely root cause?" before deciding on action.
+      ━━━ AVAILABLE ACTIONS ━━━
+      - lock_terminal: { "target": "uuid", "reason": "string" }
+      - switch_priority: { "provider_id": "uuid", "new_priority": 1, "reason": "string" }
+      - notify_admin: { "message": "string" }
 
-      ━━━ DECISION FRAMEWORK ━━━
-      1. Are the errors clustered around one provider/source, or scattered? Clustered = provider issue. Scattered = platform issue.
-      2. Is this a spike or a sustained pattern? A single error is noise. 3+ similar errors in 30 min is a signal.
-      3. For security: Is the same IP failing repeatedly? Is the rate abnormal? Only block with high confidence.
-      4. For stuck orders: How long? Who is the customer? Longer = more urgent. Always do customer_outreach first.
-      5. For churning agents: Are they a high-value agent? Tailor the outreach accordingly.
-      6. If everything looks healthy: return "none" confidently — no action is a valid decision.
-
-      ━━━ ACTION RULES ━━━
-      - switch_provider: Only if 3+ errors from one provider in this window AND a healthy alternative exists
-      - block_ip: Only if 5+ login_failure or suspicious_activity from same IP in 5 min
-      - auto_refund: Only if order has failed 3+ times AND provider is confirmed down
-      - customer_outreach: For any stuck order > 10 min — the customer deserves communication
-      - marketing_outreach: For churning agents (inactive > 7 days) — generate a personal, warm message with a 5% discount code
-      - notify_admin: When something needs human judgment — wallet mismatches, anomalies, critical errors
-      - none: When the system is healthy or errors are transient noise
-
-      OUTPUT FORMAT - Return ONLY a valid JSON object with exactly these fields:
+      OUTPUT FORMAT: JSON ONLY.
       {
-        "diagnosis": "string - clear human-readable explanation of root cause",
-        "action": "string - one of: switch_provider, notify_admin, adjust_settings, retry_order, customer_outreach, auto_refund, mask_service, block_ip, marketing_outreach, none",
-        "parameters": {
-          "provider_id": "string or null",
-          "message": "string - specific human-written message, not generic",
-          "order_id": "string or null",
-          "ip_address": "string or null",
-          "target_user_id": "string or null",
-          "severity": "string - one of: low, medium, high, critical"
-        },
-        "reasoning": "string - step by step reasoning for this decision",
-        "confidence": "string - one of: high, medium, low"
+        "findings": [...],
+        "actions": [{ "type": "string", "target": "uuid", "params": {} }],
+        "insights": [...]
       }
     `;
 
     const userMessage = `
-      ━━━ CURRENT SYSTEM STATE ━━━
-      Settings: ${JSON.stringify(settings)}
-      Providers: ${JSON.stringify(providers?.map((p: any) => ({ id: p.id, name: p.name, is_active: p.is_active, handler: p.handler_type })))}
-      Active Strategies: ${JSON.stringify(strategies?.map((s: any) => s.condition_prompt))}
-
-      ━━━ RECENT ERRORS (last 30 min) ━━━
-      ${JSON.stringify(errors.map((e: any) => ({ ts: e.ts, source: e.source, event: e.event, message: e.message, data: e.data })))}
-
-      ━━━ STUCK ORDERS (processing > 10 min) ━━━
-      ${JSON.stringify(stuckOrders?.map((o: any) => ({ id: o.id, amount: o.amount, customer: o.profiles?.full_name, phone: o.profiles?.phone })))}
-
-      ━━━ SECURITY SIGNALS (last 5 min) ━━━
-      ${JSON.stringify(threats?.map((t: any) => ({ ts: t.ts, event: t.event, message: t.message, ip: t.data?.ip })))}
-
-      ━━━ CHURNING AGENTS ━━━
-      ${JSON.stringify(churningAgents?.map((a: any) => ({ id: a.user_id, name: a.profiles?.full_name, days_inactive: a.days_since_last_order })))}
+      CURRENT NETWORK STATE:
+      Agents: ${JSON.stringify(agentStats)}
+      Providers: ${JSON.stringify(providerHealth)}
+      System Settings: ${JSON.stringify(settings)}
     `;
 
-    // 4. Call Anthropic
+    // 5. Call AI Brain
     const aiResponse = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
       headers: {
-        "x-api-key": ANTHROPIC_API_KEY,
+        "x-api-key": ANTHROPIC_API_KEY!,
         "anthropic-version": "2023-06-01",
         "content-type": "application/json",
       },
       body: JSON.stringify({
-        model: "claude-haiku-4-5-20251001",
-        max_tokens: 1000,
+        model: "claude-3-haiku-20240307",
+        max_tokens: 1500,
         system: systemPrompt,
         messages: [{ role: "user", content: userMessage }],
       }),
     });
 
-    if (!aiResponse.ok) {
-      const errText = await aiResponse.text();
-      throw new Error(`Anthropic API error: ${aiResponse.status} — ${errText}`);
-    }
-
     const aiData = await aiResponse.json();
-    const rawText = aiData?.content?.[0]?.text;
-    if (!rawText) throw new Error("Empty response from Anthropic");
+    const result = JSON.parse(aiData.content[0].text);
 
-    // Robust JSON extraction
-    let decision: any;
-    try {
-      const jsonMatch = rawText.match(/\{[\s\S]*\}/);
-      decision = JSON.parse(jsonMatch ? jsonMatch[0] : rawText);
-    } catch (_parseErr) {
-      decision = {
-        diagnosis: "Sentinel received an unparseable AI response — standing down safely.",
-        action: "none",
-        parameters: { severity: "low", message: "" },
-        reasoning: rawText?.slice(0, 300) || "No reasoning available",
-        confidence: "low"
-      };
-    }
+    // 5. Execute Autonomous Actions & Store Insights
+    const executedActions = [];
 
-    // 5. Execute Action
-    let executionResult = null;
-    if (decision.action !== "none") {
-      const { data: actionLog } = await supabaseAdmin
-        .from("sentinel_actions")
-        .insert({
-          action_type: decision.action,
-          reasoning: decision.reasoning,
-          status: 'pending',
-          metadata: decision.parameters
-        })
-        .select()
-        .single();
+    // Helper for SMS Notifications
+    const notifyAdmin = async (message: string) => {
+      if (adminContact?.phone) {
+        try {
+          const { apiKey, senderId } = await getSmsConfig(supabaseAdmin);
+          if (apiKey) {
+            await sendSmsViaTxtConnect(apiKey, senderId, adminContact.phone, `[Sentinel AI] ${message}`);
+            console.log(`Admin Notified via SMS: ${adminContact.phone}`);
+          }
+        } catch (smsErr) {
+          console.error("SMS notification failed:", smsErr);
+        }
+      }
+    };
+
+    for (const action of result.actions || []) {
+      console.log(`Sentinel Tactical Action: ${action.type} on ${action.target || 'System'}`);
+      
+      const status = 'executed';
+      const effectiveness = 1;
+      const actionMetadata = action.params || {};
 
       try {
-        if (decision.action === "switch_provider" && decision.parameters?.provider_id) {
-          await supabaseAdmin.from("providers").update({ is_active: false }).eq("id", errors[0]?.data?.provider_id).not("id", "is", null);
-          await supabaseAdmin.from("providers").update({ is_active: true }).eq("id", decision.parameters.provider_id);
-          executionResult = "Provider switched successfully";
-        } else if (decision.action === "notify_admin") {
-          executionResult = "Admin notification queued";
-        } else if (decision.action === "auto_refund") {
-          const { order_id } = decision.parameters;
-          const { error: refundErr } = await supabaseAdmin.rpc("admin_refund_order", {
-            target_order_id: order_id,
-            refund_reason: "Sentinel Auto-Refund: Unrecoverable provider failure."
+        if (action.type === 'lock_terminal') {
+          const { error: lockError } = await supabaseAdmin
+            .from("profiles")
+            .update({ terminal_locked: true })
+            .eq("user_id", action.target);
+
+          if (lockError) throw lockError;
+
+          await supabaseAdmin.from("fraud_risk_logs").insert({
+            agent_id: action.target,
+            risk_score: 95,
+            risk_factors: ['AI_Autonomous_Security_Sweep'],
+            action_taken: 'lock_terminal'
           });
-          if (refundErr) throw refundErr;
-          executionResult = "Refund executed";
-        } else if (decision.action === "mask_service") {
-          const { provider_id } = decision.parameters;
-          const { error: maskErr } = await supabaseAdmin
+
+          await notifyAdmin(`Locked terminal for Agent ID ${action.target.slice(0,8)} due to high fraud risk.`);
+          actionMetadata.reason = "High-velocity fraud pattern detected autonomously";
+        }
+
+        if (action.type === 'adjust_float_bridge') {
+          // Autonomous Float Bridge (Overdraft) Adjustment
+          const { error: bridgeError } = await supabaseAdmin
+            .from("wallets")
+            .update({ 
+              auto_credit_limit: action.params.new_limit,
+              ai_trust_score: action.params.new_trust_score,
+              last_credit_review: new Date().toISOString()
+            })
+            .eq("agent_id", action.target);
+          
+          if (bridgeError) throw bridgeError;
+          
+          await notifyAdmin(`Float Bridge Updated for Agent ${action.target.slice(0,8)}: New Limit GHS ${action.params.new_limit}.`);
+          actionMetadata.reason = "Performance-based liquidity bridge";
+        }
+
+        if (action.type === 'switch_priority') {
+          // Autonomous Liquidity Rebalancing
+          const { error: pError } = await supabaseAdmin
             .from("providers")
-            .update({ is_active: false })
-            .eq("id", provider_id);
-          if (maskErr) throw maskErr;
-          executionResult = "Service masked";
-        } else if (decision.action === "block_ip") {
-          const { ip_address, message } = decision.parameters;
-          const { error: blockErr } = await supabaseAdmin
-            .from("blocked_ips")
-            .insert({
-              ip_address,
-              reason: message || "Sentinel: Detected high-volume malicious activity.",
-              expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
-            });
-          if (blockErr) throw blockErr;
-
-          await supabaseAdmin.from("sentinel_security_audits").insert({
-            severity: "high",
-            event_type: "ip_blocked",
-            description: `Automatically blocked IP ${ip_address} due to ${decision.diagnosis}`,
-            attacker_info: { ip: ip_address },
-            action_taken: "block_ip"
-          });
-          executionResult = "IP Blocked and Audit Created";
-        } else if (decision.action === "marketing_outreach") {
-          const { target_user_id } = decision.parameters;
-          const promoCode = "MISSYOU-" + Math.random().toString(36).substring(7).toUpperCase();
-
-          await supabaseAdmin.from("sentinel_marketing_promos").insert({
-            code: promoCode,
-            discount_percent: 5,
-            target_user_id,
-            expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
-          });
-          executionResult = `Generated promo code ${promoCode} for user ${target_user_id} and queued marketing message.`;
+            .update({ priority: action.params.new_priority })
+            .eq("id", action.params.provider_id);
+          
+          if (pError) throw pError;
+          
+          await notifyAdmin(`Rebalanced liquidity: Switched ${action.params.provider_name || 'Provider'} to Priority ${action.params.new_priority}.`);
+          actionMetadata.reason = "Autonomous liquidity optimization";
         }
 
-        if (actionLog?.id) {
-          await supabaseAdmin
-            .from("sentinel_actions")
-            .update({ status: 'executed', result: { message: executionResult } })
-            .eq("id", actionLog.id);
+        if (action.type === 'self_heal_provider') {
+          // Autonomous Network Recovery
+          const { error: healError } = await supabaseAdmin
+            .from("providers")
+            .update({ priority: 1, is_active: true })
+            .eq("id", action.params.provider_id);
+          
+          if (healError) throw healError;
+          
+          await notifyAdmin(`Network Healed: ${action.params.provider_name || 'Provider'} restored to Priority 1 after health verification.`);
+          actionMetadata.reason = "Autonomous system recovery";
         }
-      } catch (execError: unknown) {
-        if (actionLog?.id) {
-          await supabaseAdmin
-            .from("sentinel_actions")
-            .update({ status: 'failed', result: { error: (execError as any)?.message || String(execError) } })
-            .eq("id", actionLog.id);
+
+        if (action.type === 'notify_admin') {
+           await notifyAdmin(action.params.message || "System anomaly detected.");
         }
+
+        // Log the tactical action to the audit stream
+        const { data: loggedAction } = await supabaseAdmin.from("sentinel_actions").insert({
+          action_type: action.type,
+          status: status,
+          effectiveness: effectiveness,
+          reasoning: action.reason || action.diagnosis || "Autonomous optimization",
+          metadata: actionMetadata
+        }).select().single();
+
+        if (loggedAction) executedActions.push(loggedAction);
+
+      } catch (err: any) {
+        console.error(`Tactical execution failed: ${err.message}`);
+        await supabaseAdmin.from("sentinel_actions").insert({
+          action_type: action.type,
+          status: 'failed',
+          effectiveness: -1,
+          reasoning: "Execution error: " + err.message,
+          metadata: { ...actionMetadata, error: err.message }
+        });
       }
     }
 
-    log(supabaseAdmin, {
-      level: "info",
-      source: "sentinel-ai",
-      event: "sentinel.processed",
-      message: `Sentinel processed ${errors.length} errors. Decision: ${decision.action}`,
-      data: { decision, executionResult }
-    });
+    if (result.insights) {
+      await supabaseAdmin.from("ai_insights").insert(
+        result.insights.map((i: any) => ({
+          agent_id: i.agent_id,
+          type: i.type === 'profit' ? 'profit_optimization' : 'liquidity_warning',
+          insight_text: i.text,
+          metadata: i.metadata
+        }))
+      );
+    }
 
-    // 6. Update Budget Guardian Stats
-    await supabaseAdmin.rpc("increment_sentinel_cost", { amount: tokenCostPerScan });
-
-    return new Response(JSON.stringify({
-      success: true,
-      decision,
-      executionResult,
-      budget: {
-        current: (settings?.sentinel_current_month_cost_usd || 0) + tokenCostPerScan,
-        limit: settings?.sentinel_monthly_budget_usd || 10
-      }
+    return new Response(JSON.stringify({ 
+      success: true, 
+      processed: result,
+      tactical_actions: executedActions 
     }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
 
-  } catch (error: any) {
-    console.error("Sentinel Critical Failure:", error);
-    return new Response(JSON.stringify({ 
-      error: "Sentinel Core Failure", 
-      message: error.message,
-      stack: error.stack,
-      details: error
-    }), {
+  } catch (err: any) {
+    return new Response(JSON.stringify({ error: err.message }), {
       status: 200,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });

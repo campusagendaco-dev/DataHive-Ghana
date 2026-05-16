@@ -71,7 +71,7 @@ const Dashboard = () => {
 
     try {
       const [walletRes, ordersRes] = await Promise.all([
-        supabase.from("wallets").select("balance, loyalty_balance").eq("agent_id", user.id).single(),
+        supabase.from("wallets").select("balance, loyalty_balance").eq("agent_id", user.id).maybeSingle(),
         supabase
           .from("orders")
           .select("amount, order_type, status, profit")
@@ -79,7 +79,7 @@ const Dashboard = () => {
           .in("status", ["paid", "processing", "fulfilled", "fulfillment_failed"]),
       ]);
 
-      if (walletRes.error && walletRes.error.code !== "PGRST116") throw new Error("Fetch failed");
+      if (walletRes.error) throw new Error("Fetch failed");
       if (ordersRes.error) throw new Error("Fetch failed");
 
       const balance = walletRes.data ? Number(walletRes.data.balance) : 0;
@@ -114,7 +114,7 @@ const Dashboard = () => {
 
     const walletChannel = supabase
       .channel("dashboard-wallet")
-      .on("postgres_changes", { event: "*", schema: "public", table: "wallets", filter: `agent_id=eq.${user?.id}` }, (p: any) => {
+      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "wallets", filter: `agent_id=eq.${user?.id}` }, (p: any) => {
         if (p.new?.balance !== undefined) setStats(prev => ({ ...prev, walletBalance: Number(p.new.balance) }));
       })
       .subscribe();

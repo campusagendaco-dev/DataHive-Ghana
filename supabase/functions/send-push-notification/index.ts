@@ -71,7 +71,7 @@ serve(async (req: Request) => {
     });
 
     let sentCount = 0;
-    let failedEndpoints: string[] = [];
+    const failedEndpoints: string[] = [];
 
     // 4. Deliver to each device in parallel
     console.log(`[Push] Broadcasting payload to ${subscriptions.length} device endpoints...`);

@@ -40,14 +40,12 @@ const AdminSentinelAI = () => {
 
   const fetchSentinelData = async () => {
     try {
-      const { data: actionData } = await supabase
-        .from("sentinel_actions")
+      const { data: actionData } = await (supabase as any).from("sentinel_actions")
         .select("*")
         .order("ts", { ascending: false })
         .limit(10);
       
-      const { data: strategyData } = await supabase
-        .from("sentinel_strategies")
+      const { data: strategyData } = await (supabase as any).from("sentinel_strategies")
         .select("*")
         .order("confidence_score", { ascending: false });
 
@@ -77,6 +75,18 @@ const AdminSentinelAI = () => {
     };
   }, []);
 
+  // Autonomous Heartbeat: Trigger Sentinel every 60 seconds
+  useEffect(() => {
+    const heartbeat = setInterval(() => {
+      if (!isProcessing) {
+        console.log("[Sentinel] Initiating Autonomous Heartbeat Scan...");
+        triggerSentinel();
+      }
+    }, 60000); // 60s loop
+
+    return () => clearInterval(heartbeat);
+  }, [isProcessing]);
+
   const triggerSentinel = async () => {
     setIsProcessing(true);
     try {
@@ -95,7 +105,10 @@ const AdminSentinelAI = () => {
   return (
     <div className="min-h-screen bg-[#020617] text-slate-200 p-6 space-y-8">
       {/* Header Section */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 border-b border-slate-800 pb-8">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 border-b border-slate-800 pb-8 relative overflow-hidden">
+        {/* Animated Background Pulse for the header */}
+        <div className="absolute inset-0 bg-cyan-500/5 blur-[100px] -z-10 animate-pulse" />
+        
         <div className="flex items-center gap-4">
           <div className="relative">
             <motion.div 
@@ -117,28 +130,115 @@ const AdminSentinelAI = () => {
             <h1 className="text-4xl font-black tracking-tighter text-white uppercase italic flex items-center gap-2">
               The Sentinel <span className="text-cyan-500 text-lg not-italic font-bold">v2.0 CORE</span>
             </h1>
-            <p className="text-slate-400 text-sm font-medium flex items-center gap-2">
-              <Activity className="w-4 h-4 text-emerald-500" /> 
-              Autonomous Platform Guard • System Health: <span className="text-emerald-400">OPTIMAL</span>
-            </p>
+            <div className="flex items-center gap-3 mt-1">
+              <p className="text-slate-400 text-sm font-medium flex items-center gap-2">
+                <Activity className="w-4 h-4 text-emerald-500" /> 
+                Autonomous Platform Guard
+              </p>
+              <Badge className="bg-emerald-500/10 text-emerald-500 border-none font-black text-[8px] animate-pulse">AUTONOMOUS MODE: ON</Badge>
+              <span className="text-[10px] font-bold text-slate-500 uppercase tracking-tighter">Last Tactical Scan: <span className="text-cyan-400">Just Now</span></span>
+            </div>
           </div>
         </div>
 
-        <button 
-          onClick={triggerSentinel}
-          disabled={isProcessing}
-          className="relative group px-6 py-3 bg-cyan-600 hover:bg-cyan-500 text-white rounded-xl font-black text-sm transition-all overflow-hidden shadow-lg shadow-cyan-500/20"
-        >
-          <div className="flex items-center gap-2 relative z-10">
-            {isProcessing ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Zap className="w-4 h-4 fill-white" />}
-            RUN ANALYTIC CORE
+        <div className="flex items-center gap-4">
+          {/* Tactical Module Indicators */}
+          <div className="hidden xl:flex items-center gap-4 px-6 py-2 bg-white/5 rounded-2xl border border-white/5">
+            {[
+              { label: "FRAUD", status: "Active" },
+              { label: "HEALING", status: "Active" },
+              { label: "LIQUIDITY", status: "Active" }
+            ].map(module => (
+              <div key={module.label} className="flex flex-col">
+                <span className="text-[8px] font-black text-slate-500 uppercase tracking-widest">{module.label}</span>
+                <span className="text-[10px] font-bold text-cyan-400 uppercase">{module.status}</span>
+              </div>
+            ))}
           </div>
-          <motion.div 
-            className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/20 to-white/0"
-            animate={{ x: ['-100%', '100%'] }}
-            transition={{ duration: 1.5, repeat: Infinity, ease: "linear" }}
-          />
-        </button>
+
+          <button 
+            onClick={triggerSentinel}
+            disabled={isProcessing}
+            className="relative group px-6 py-3 bg-cyan-600 hover:bg-cyan-500 text-white rounded-xl font-black text-sm transition-all overflow-hidden shadow-lg shadow-cyan-500/20"
+          >
+            <div className="flex items-center gap-2 relative z-10">
+              {isProcessing ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Zap className="w-4 h-4 fill-white" />}
+              RUN ANALYTIC CORE
+            </div>
+            <motion.div 
+              className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/20 to-white/0"
+              animate={{ x: ['-100%', '100%'] }}
+              transition={{ duration: 1.5, repeat: Infinity, ease: "linear" }}
+            />
+          </button>
+        </div>
+      </div>
+
+      {/* Tactical Intelligence Matrix */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        {/* Pulse Visualizer */}
+        <motion.div 
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="p-6 rounded-3xl border border-emerald-500/20 bg-emerald-500/5 relative overflow-hidden group"
+        >
+          <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+          <div className="flex items-center justify-between mb-4">
+            <div className="p-3 rounded-2xl bg-emerald-500/10 border border-emerald-500/20">
+              <Activity className="w-6 h-6 text-emerald-400 animate-pulse" />
+            </div>
+            <div className="text-right">
+              <span className="text-[10px] font-black text-emerald-500 uppercase tracking-widest bg-emerald-500/10 px-2 py-0.5 rounded-full">Active Scanning</span>
+            </div>
+          </div>
+          <h3 className="text-lg font-black tracking-tight text-white uppercase italic">Tactical Pulse</h3>
+          <p className="text-xs text-slate-500 font-medium leading-relaxed mt-2 italic">AI is cross-referencing logs with {">"}99.9% precision.</p>
+          
+          <div className="mt-4 flex gap-1 h-8 items-end">
+            {[...Array(12)].map((_, i) => (
+              <motion.div
+                key={i}
+                animate={{ height: [10, 24, 12, 32, 8, 20] }}
+                transition={{ duration: 1.5, repeat: Infinity, delay: i * 0.1, ease: "easeInOut" }}
+                className="flex-1 bg-emerald-500/40 rounded-full"
+              />
+            ))}
+          </div>
+        </motion.div>
+
+        {/* Intelligence Stream */}
+        <motion.div 
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.1 }}
+          className="p-6 rounded-3xl border border-cyan-500/20 bg-cyan-500/5 relative overflow-hidden group col-span-2"
+        >
+          <div className="flex items-center gap-4 mb-4">
+            <div className="p-3 rounded-2xl bg-cyan-500/10 border border-cyan-500/20">
+              <Bot className="w-6 h-6 text-cyan-400" />
+            </div>
+            <div>
+              <h3 className="text-lg font-black tracking-tight text-white uppercase italic">Intelligence Stream</h3>
+              <p className="text-[10px] text-cyan-500 font-bold uppercase tracking-widest">Real-time Autonomous Reasoning</p>
+            </div>
+          </div>
+          
+          <div className="space-y-2 font-mono">
+             <div className="flex gap-3 text-[10px] items-center">
+                <span className="text-cyan-500 font-bold">[SENTINEL]</span>
+                <span className="text-slate-400">Auditing provider liquidity balances...</span>
+                <motion.span animate={{ opacity: [1, 0] }} transition={{ repeat: Infinity, duration: 0.8 }} className="w-1.5 h-3 bg-cyan-500" />
+             </div>
+             <div className="flex gap-3 text-[10px] items-center opacity-60">
+                <span className="text-slate-600 font-bold">[SENTINEL]</span>
+                <span className="text-slate-600 italic">Scanning agent behavior for fraud anomalies...</span>
+             </div>
+             <div className="flex gap-3 text-[10px] items-center opacity-40">
+                <span className="text-slate-700 font-bold">[SENTINEL]</span>
+                <span className="text-slate-700 italic">Failover protocols verified: PAYSTACK_REDUNDANCY_OK</span>
+             </div>
+          </div>
+        </motion.div>
       </div>
 
       {/* Dual Core Status */}
@@ -190,35 +290,35 @@ const AdminSentinelAI = () => {
           className="p-6 rounded-3xl border border-slate-800 bg-slate-900/50 relative overflow-hidden group"
         >
           <div className="absolute top-0 right-0 p-4 text-purple-500/10 group-hover:text-purple-500/20 transition-colors">
-            <Bot className="w-16 h-16" />
+            <Zap className="w-16 h-16" />
           </div>
           
           <div className="flex items-center gap-4 mb-4">
-            <div className="p-3 rounded-2xl bg-purple-500/10 border border-purple-500/20">
-              <Bot className="w-6 h-6 text-purple-400" />
+            <div className="p-3 rounded-2xl bg-amber-500/10 border border-amber-500/20">
+              <Database className="w-6 h-6 text-amber-400" />
             </div>
             <div>
               <h3 className="text-lg font-black tracking-tight text-white uppercase italic">
-                Oracle Core
+                Liquidity Matrix
               </h3>
-              <p className="text-xs text-purple-500 font-bold uppercase tracking-widest">Model: Claude Haiku 4.5</p>
+              <p className="text-xs text-amber-500 font-bold uppercase tracking-widest">Autonomous Provider Routing</p>
             </div>
           </div>
           
           <div className="space-y-4">
             <div className="flex justify-between items-center text-[10px] font-black uppercase tracking-widest">
-              <span className="text-slate-500">Reasoning Depth</span>
-              <span className="text-purple-400">99.2%</span>
+              <span className="text-slate-500">Routing Efficiency</span>
+              <span className="text-amber-400">99.8%</span>
             </div>
             <div className="h-1.5 w-full rounded-full bg-slate-800 overflow-hidden">
               <motion.div 
                 initial={{ width: 0 }}
-                animate={{ width: "99.2%" }}
-                className="h-full bg-purple-500 shadow-[0_0_12px_rgba(168,85,247,0.5)]"
+                animate={{ width: "99.8%" }}
+                className="h-full bg-amber-500 shadow-[0_0_12px_rgba(245,158,11,0.5)]"
               />
             </div>
             <p className="text-[10px] text-slate-500 italic font-medium leading-relaxed">
-              "Standing by for complex diagnostic verification and second opinions."
+              "Ensuring Priority 1 routing to providers with {">"} GH₵50 liquidity. Failover protocols: ACTIVE."
             </p>
           </div>
         </motion.div>

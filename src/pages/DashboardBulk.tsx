@@ -140,13 +140,13 @@ const DashboardBulk = () => {
   const failedCount  = results?.filter(r => r.status === "failed").length ?? 0;
 
   return (
-    <div className="min-h-screen pb-24" style={{ background: PAGE_BG }}>
+    <div className="min-h-screen pb-24 bg-[#0a0a0f]">
       <div className="max-w-5xl mx-auto px-4 py-6 space-y-6">
 
         {/* ── Header ── */}
         <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl flex items-center justify-center shrink-0" style={{ background: "rgba(251,191,36,0.15)", border: "1px solid rgba(251,191,36,0.25)" }}>
+            <div className="w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 bg-amber-400/15 border border-amber-400/25">
               <Users className="w-5 h-5 text-amber-400" />
             </div>
             <div>
@@ -162,8 +162,7 @@ const DashboardBulk = () => {
               a.download = "swiftdata_bulk_template.csv";
               a.click();
             }}
-            className="flex items-center gap-1.5 px-3 h-8 rounded-xl text-[11px] font-bold border transition-all"
-            style={{ background: "rgba(255,255,255,0.05)", borderColor: "rgba(255,255,255,0.10)", color: "rgba(255,255,255,0.50)" }}
+            className="flex items-center gap-1.5 px-3 h-8 rounded-xl text-[11px] font-bold border transition-all bg-white/5 border-white/10 text-white/50"
           >
             <Download className="w-3.5 h-3.5" /> Sample CSV
           </button>
@@ -175,9 +174,9 @@ const DashboardBulk = () => {
           <div className="lg:col-span-7 space-y-4">
 
             {/* Step 1 – Network */}
-            <div className="rounded-3xl overflow-hidden border border-white/8" style={{ background: CARD_BG }}>
+            <div className="rounded-3xl overflow-hidden border border-white/8 bg-[#111116]">
               <div className="flex items-center gap-2 px-5 py-4 border-b border-white/6">
-                <span className="w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-black text-black shrink-0" style={{ background: cfg.color }}>1</span>
+                <span className="w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-black text-black shrink-0" style={{ backgroundColor: cfg.color }}>1</span>
                 <p className="text-xs font-black uppercase tracking-widest text-white/40">Select Network</p>
               </div>
               <div className="p-4 grid grid-cols-3 gap-2.5">
@@ -202,14 +201,14 @@ const DashboardBulk = () => {
             </div>
 
             {/* Step 2 – Recipients */}
-            <div className="rounded-3xl overflow-hidden border border-white/8" style={{ background: CARD_BG }}>
+            <div className="rounded-3xl overflow-hidden border border-white/8 bg-[#111116]">
               <div className="flex items-center justify-between px-5 py-4 border-b border-white/6">
                 <div className="flex items-center gap-2">
-                  <span className="w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-black text-black shrink-0" style={{ background: cfg.color }}>2</span>
+                  <span className="w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-black text-black shrink-0" style={{ backgroundColor: cfg.color }}>2</span>
                   <p className="text-xs font-black uppercase tracking-widest text-white/40">Recipients</p>
                 </div>
                 {parsedEntries.length > 0 && (
-                  <span className="text-[10px] font-black px-2.5 py-1 rounded-full" style={{ background: cfg.bg, color: cfg.color }}>
+                  <span className="text-[10px] font-black px-2.5 py-1 rounded-full" style={{ backgroundColor: cfg.bg, color: cfg.color }}>
                     {validEntries.length}/{parsedEntries.length} valid
                   </span>
                 )}
@@ -234,8 +233,7 @@ const DashboardBulk = () => {
                   onClick={() => fileRef.current?.click()}
                   onDragOver={(e) => e.preventDefault()}
                   onDrop={(e) => { e.preventDefault(); const f = e.dataTransfer.files?.[0]; if (f) handleFileUpload(f); }}
-                  className="w-full h-16 rounded-2xl border-2 border-dashed flex items-center justify-center gap-3 transition-all"
-                  style={{ borderColor: "rgba(255,255,255,0.12)", background: INPUT_BG }}
+                  className="w-full h-16 rounded-2xl border-2 border-dashed flex items-center justify-center gap-3 transition-all border-white/12 bg-[#1a1a24]"
                 >
                   <FileSpreadsheet className="w-5 h-5 text-amber-400" />
                   <div className="text-left">
@@ -246,9 +244,9 @@ const DashboardBulk = () => {
                 </button>
 
                 <div className="flex items-center gap-2">
-                  <div className="flex-1 h-px" style={{ background: "rgba(255,255,255,0.07)" }} />
+                  <div className="flex-1 h-px bg-white/10" />
                   <span className="text-[10px] text-white/25 font-bold">or type manually</span>
-                  <div className="flex-1 h-px" style={{ background: "rgba(255,255,255,0.07)" }} />
+                  <div className="flex-1 h-px bg-white/10" />
                 </div>
 
                 <div className="relative">
@@ -257,21 +255,19 @@ const DashboardBulk = () => {
                     onChange={(e) => setInputNumbers(e.target.value)}
                     placeholder={"0241234567 2\n0551234567 5\n0591234567 10"}
                     rows={6}
-                    className="w-full rounded-2xl px-4 py-3 text-sm font-mono text-white resize-none outline-none transition-all"
-                    style={{ background: INPUT_BG, border: "1.5px solid rgba(255,255,255,0.08)", lineHeight: 1.7 }}
+                    className="w-full rounded-2xl px-4 py-3 text-sm font-mono text-white resize-none outline-none transition-all bg-[#1a1a24] border-white/10 border-[1.5px] leading-[1.7]"
                   />
                   {inputNumbers && (
                     <button
                       type="button"
                       onClick={() => setInputNumbers("")}
-                      className="absolute top-2.5 right-2.5 w-6 h-6 rounded-lg flex items-center justify-center text-white/30 hover:text-white/60 transition-all"
-                      style={{ background: "rgba(255,255,255,0.06)" }}
+                      className="absolute top-2.5 right-2.5 w-6 h-6 rounded-lg flex items-center justify-center text-white/30 hover:text-white/60 transition-all bg-white/5"
                     >
                       <X className="w-3.5 h-3.5" />
                     </button>
                   )}
                 </div>
-                <div className="rounded-xl px-3 py-2.5 space-y-0.5" style={{ background: "rgba(251,191,36,0.06)", border: "1px solid rgba(251,191,36,0.12)" }}>
+                <div className="rounded-xl px-3 py-2.5 space-y-0.5 bg-amber-400/5 border border-amber-400/10">
                   <p className="text-[10px] font-black text-amber-400/70">Format: <span className="font-mono">0241234567 2</span> (phone then GB size per line)</p>
                   <p className="text-[10px] text-white/30">Or use the global package below if all numbers get the same bundle. Valid prefixes: 024, 025, 053, 054, 055, 059.</p>
                 </div>
@@ -279,9 +275,9 @@ const DashboardBulk = () => {
             </div>
 
             {/* Step 3 – Package */}
-            <div className="rounded-3xl overflow-hidden border border-white/8" style={{ background: CARD_BG }}>
+            <div className="rounded-3xl overflow-hidden border border-white/8 bg-[#111116]">
               <div className="flex items-center gap-2 px-5 py-4 border-b border-white/6">
-                <span className="w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-black text-black shrink-0" style={{ background: cfg.color }}>3</span>
+                <span className="w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-black text-black shrink-0" style={{ backgroundColor: cfg.color }}>3</span>
                 <p className="text-xs font-black uppercase tracking-widest text-white/40">Choose Package</p>
               </div>
               <div className="p-4 grid grid-cols-3 sm:grid-cols-4 gap-2.5">
@@ -310,7 +306,7 @@ const DashboardBulk = () => {
           {/* ── RIGHT – Summary ── */}
           <div className="lg:col-span-5 space-y-4">
             <div className="sticky top-24 space-y-4">
-              <div className="rounded-3xl overflow-hidden border border-white/8" style={{ background: CARD_BG }}>
+              <div className="rounded-3xl overflow-hidden border border-white/8 bg-[#111116]">
                 <div className="px-5 py-4 border-b border-white/6">
                   <p className="text-xs font-black uppercase tracking-widest text-white/40">Order Summary</p>
                 </div>
@@ -356,7 +352,7 @@ const DashboardBulk = () => {
 
               {/* Live results */}
               {results && results.length > 0 && (
-                <div className="rounded-3xl overflow-hidden border border-white/8" style={{ background: CARD_BG }}>
+                <div className="rounded-3xl overflow-hidden border border-white/8 bg-[#111116]">
                   <div className="flex items-center justify-between px-5 py-3 border-b border-white/6">
                     <p className="text-[10px] font-black uppercase tracking-widest text-white/40">Live Results</p>
                     <div className="flex gap-3">
@@ -395,14 +391,14 @@ const DashboardBulk = () => {
         </div>
 
         {/* ── B2B Section ── */}
-        <div className="rounded-3xl overflow-hidden border border-amber-400/15" style={{ background: "rgba(251,191,36,0.04)" }}>
+        <div className="rounded-3xl overflow-hidden border border-amber-400/15 bg-amber-400/[0.04]">
           <button
             type="button"
             onClick={() => setShowB2B(v => !v)}
             className="w-full flex items-center justify-between gap-4 px-6 py-5 text-left"
           >
             <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-2xl flex items-center justify-center shrink-0" style={{ background: "rgba(251,191,36,0.12)", border: "1px solid rgba(251,191,36,0.2)" }}>
+              <div className="w-9 h-9 rounded-2xl flex items-center justify-center shrink-0 bg-amber-400/10 border border-amber-400/20">
                 <Building2 className="w-4 h-4 text-amber-400" />
               </div>
               <div>
@@ -437,7 +433,7 @@ const DashboardBulk = () => {
                 ))}
               </div>
 
-              <div className="rounded-2xl border border-white/8 p-4 space-y-2.5" style={{ background: INPUT_BG }}>
+              <div className="rounded-2xl border border-white/8 p-4 space-y-2.5 bg-[#1a1a24]">
                 <p className="text-[10px] font-black uppercase tracking-widest text-white/30">What corporate clients get</p>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                   {["Volume discount on every bundle","Dedicated WhatsApp support line","Monthly usage report (CSV)","Priority fulfillment queue","Recurring bulk schedule option","Custom invoice on request"].map(f => (
@@ -454,8 +450,7 @@ const DashboardBulk = () => {
                   href={`https://wa.me/233${(profile?.support_number || "").replace(/^0/, "")}?text=${encodeURIComponent("Hi, I'm interested in a corporate bulk data plan. Please share pricing details.")}`}
                   target="_blank"
                   rel="noreferrer"
-                  className="flex items-center gap-2 px-5 py-3 rounded-2xl text-sm font-black text-black transition-all"
-                  style={{ background: "#fbbf24" }}
+                  className="flex items-center gap-2 px-5 py-3 rounded-2xl text-sm font-black text-black transition-all bg-[#fbbf24]"
                 >
                   <MessageCircle className="w-4 h-4" /> Request Corporate Quote
                 </a>
@@ -469,7 +464,7 @@ const DashboardBulk = () => {
       {confirmOpen && (
         <div className="fixed inset-0 z-[200] flex items-end sm:items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={() => setConfirmOpen(false)} />
-          <div className="relative w-full max-w-sm rounded-3xl border border-white/10 p-6 space-y-5" style={{ background: "#111116" }}>
+          <div className="relative w-full max-w-sm rounded-3xl border border-white/10 p-6 space-y-5 bg-[#111116]">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-2xl flex items-center justify-center shrink-0" style={{ background: `${cfg.color}20`, border: `1px solid ${cfg.color}40` }}>
                 <Zap className="w-5 h-5" style={{ color: cfg.color }} />
@@ -480,7 +475,7 @@ const DashboardBulk = () => {
               </div>
             </div>
 
-            <div className="rounded-2xl p-4 space-y-2 border border-white/6" style={{ background: INPUT_BG }}>
+            <div className="rounded-2xl p-4 space-y-2 border border-white/6 bg-[#1a1a24]">
               {[
                 ["Network",    selectedNetwork],
                 ["Package",    selectedSize],
@@ -498,8 +493,7 @@ const DashboardBulk = () => {
               <button
                 type="button"
                 onClick={() => setConfirmOpen(false)}
-                className="flex-1 h-12 rounded-2xl font-bold text-sm transition-all"
-                style={{ background: "rgba(255,255,255,0.07)", color: "rgba(255,255,255,0.50)" }}
+                className="flex-1 h-12 rounded-2xl font-bold text-sm transition-all bg-white/10 text-white/50"
               >
                 Cancel
               </button>
@@ -520,7 +514,7 @@ const DashboardBulk = () => {
       {showSuccessOverlay && (
         <div className="fixed inset-0 z-[210] flex items-center justify-center p-6">
           <div className="absolute inset-0 bg-black/90 backdrop-blur-3xl" />
-          <div className="relative max-w-sm w-full border border-white/10 rounded-[2.5rem] p-10 text-center space-y-6" style={{ background: "#0f0f17" }}>
+          <div className="relative max-w-sm w-full border border-white/10 rounded-[2.5rem] p-10 text-center space-y-6 bg-[#0f0f17]">
             <div className="relative mx-auto w-20 h-20">
               <div className="absolute inset-0 bg-emerald-500 rounded-full blur-2xl opacity-30 animate-pulse" />
               <div className="relative w-full h-full rounded-full bg-emerald-500 flex items-center justify-center">

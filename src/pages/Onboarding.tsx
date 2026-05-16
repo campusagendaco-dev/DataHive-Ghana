@@ -70,7 +70,7 @@ const Onboarding = () => {
         if (settings?.agent_activation_fee) {
           activationFee = Number(settings.agent_activation_fee);
         }
-      } catch (e) {}
+      } catch (e) { /* ignore error */ }
 
       toast({ title: "Details saved!", description: `Now pay GHS ${activationFee} and contact admin on WhatsApp for reseller approval.` });
       navigate("/agent/pending");

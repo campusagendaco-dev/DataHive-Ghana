@@ -1,4 +1,5 @@
 import { Toaster } from "@/components/ui/toaster";
+// App Entry Configuration
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -6,6 +7,7 @@ import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-route
 import { lazy, Suspense, useEffect, useState } from "react";
 import { AuthProvider, useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
+import { invokePublicFunction } from "@/lib/public-function-client";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import DashboardLayout from "@/components/DashboardLayout";
@@ -90,6 +92,9 @@ const AdminFeatureFlags = lazy(() => import("./pages/AdminFeatureFlags"));
 const AdminSmsTemplates = lazy(() => import("./pages/AdminSmsTemplates"));
 const AdminCreditManagement = lazy(() => import("./pages/AdminCreditManagement"));
 const AdminSentinelAI = lazy(() => import("./pages/AdminSentinelAI"));
+const AdminSwiftVendorPro = lazy(() => import("./pages/AdminSwiftVendorPro"));
+const AdminAIStrategy = lazy(() => import("./pages/AdminAIStrategy"));
+const AdminAPINetwork = lazy(() => import("./pages/AdminAPINetwork"));
 const SubAgentSignup = lazy(() => import("./pages/SubAgentSignup"));
 const SubAgentPending = lazy(() => import("./pages/SubAgentPending"));
 const DashboardDeveloperAPI = lazy(() => import("./pages/DashboardDeveloperAPI"));
@@ -105,6 +110,9 @@ const DashboardBulk = lazy(() => import("./pages/DashboardBulk"));
 const DashboardSchedule = lazy(() => import("./pages/DashboardSchedule"));
 const DashboardWhatsAppBot = lazy(() => import("./pages/DashboardWhatsAppBot"));
 const MyOrders = lazy(() => import("./pages/MyOrders"));
+const DashboardSwiftVendor = lazy(() => import("./pages/DashboardSwiftVendor"));
+const DashboardAgentDevHub = lazy(() => import("./pages/DashboardAgentDevHub"));
+const AgentDevAPIDocs = lazy(() => import("./pages/AgentDevAPIDocs"));
 
 
 const queryClient = new QueryClient();
@@ -255,21 +263,20 @@ const AppContent = () => {
 
       try {
         const maintenanceResult = await Promise.race([
-          supabase.functions.invoke("maintenance-mode", {
+          invokePublicFunction("maintenance-mode", {
             body: { action: "get" },
           }),
           new Promise<never>((_, reject) => {
-            window.setTimeout(() => reject(new Error("maintenance-timeout")), 8000);
+            window.setTimeout(() => reject(new Error("maintenance-timeout")), 12000); // Increased timeout to allow retries
           }),
         ]);
         const { data, error } = maintenanceResult as { data: any; error: any };
 
         if (!mounted) return;
 
-        if (error) {
-          setMaintenance({ is_enabled: false, message: "" });
-          setIpBlocked(false);
-        } else if (data && !(data as any).error) {
+        if (error) throw error;
+        
+        if (data && !(data as any).error) {
           setMaintenance({
             is_enabled: Boolean((data as any).is_enabled),
             message: String((data as any).message || ""),
@@ -281,7 +288,7 @@ const AppContent = () => {
         }
       } catch (e) {
         if (!mounted) return;
-        // Silent fail for network/connection errors
+        console.warn("[Maintenance] Fallback: Connection closed or timeout.", e);
         setMaintenance({ is_enabled: false, message: "" });
         setIpBlocked(false);
       } finally {
@@ -342,6 +349,7 @@ const AppContent = () => {
         <Route path="/delivery-tracker" element={<Navigate to="/order-status" replace />} />
         <Route path="/purchase-success" element={<PurchaseSuccess />} />
         <Route path="/api-docs" element={<APIDocumentation />} />
+        <Route path="/docs/agent-api" element={<AgentDevAPIDocs />} />
         <Route path="/developers" element={<DeveloperPortal />} />
 
         {/* Auth pages */}
@@ -396,9 +404,11 @@ const AppContent = () => {
           <Route path="flyer" element={<AgentFeatureGuard><DashboardFlyer /></AgentFeatureGuard>} />
           <Route path="/dashboard/api" element={<AgentFeatureGuard><DashboardDeveloperAPI /></AgentFeatureGuard>} />
           <Route path="result-checker" element={<AgentFeatureGuard><DashboardResultCheckers /></AgentFeatureGuard>} />
+          <Route path="agent-dev-hub" element={<AgentFeatureGuard><DashboardAgentDevHub /></AgentFeatureGuard>} />
           <Route path="leaderboard" element={<AgentFeatureGuard><DashboardLeaderboard /></AgentFeatureGuard>} />
           <Route path="marketing" element={<AgentFeatureGuard><DashboardMarketing /></AgentFeatureGuard>} />
           <Route path="whatsapp-bot" element={<AgentFeatureGuard><DashboardWhatsAppBot /></AgentFeatureGuard>} />
+          <Route path="swift-vendor" element={<AgentFeatureGuard><DashboardSwiftVendor /></AgentFeatureGuard>} />
 
           {/* Legacy aliases */}
           <Route path="orders" element={<Navigate to="/dashboard/transactions" replace />} />
@@ -441,6 +451,9 @@ const AppContent = () => {
           <Route path="sms-templates" element={<AdminSmsTemplates />} />
           <Route path="credit-management" element={<AdminCreditManagement />} />
           <Route path="sentinel" element={<AdminSentinelAI />} />
+          <Route path="swift-vendor" element={<AdminSwiftVendorPro />} />
+          <Route path="ai-strategy" element={<AdminAIStrategy />} />
+          <Route path="api-network" element={<AdminAPINetwork />} />
           <Route path="account-settings" element={<DashboardAccountSettings />} />
         </Route>
 

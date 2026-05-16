@@ -70,6 +70,7 @@ export const WelcomePromoModal = () => {
         <button 
           onClick={close}
           className="absolute top-4 right-4 p-2 rounded-full bg-white/5 hover:bg-white/10 transition-colors text-white/50 hover:text-white"
+          title="Close"
         >
           <X className="w-4 h-4" />
         </button>

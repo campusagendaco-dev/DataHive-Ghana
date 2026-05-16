@@ -18,19 +18,31 @@ const publicFunctionClient = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLI
 
 export async function invokePublicFunction(functionName: string, options?: { body?: unknown; headers?: Record<string, string> }) {
   let retries = 0;
-  const maxRetries = 2;
+  const maxRetries = 3;
+  const baseDelay = 800; // start with 800ms
   
   while (retries <= maxRetries) {
     try {
       const result = await publicFunctionClient.functions.invoke(functionName, options);
       // If we got a result (even an error), return it
       return result;
-    } catch (error) {
-      if (retries === maxRetries) throw error;
-      console.warn(`Function ${functionName} failed (retry ${retries + 1}):`, error);
+    } catch (error: any) {
+      const isConnectionError = 
+        error?.message?.includes("failed to fetch") || 
+        error?.message?.includes("Network error") ||
+        error?.message?.includes("ERR_CONNECTION_CLOSED");
+
+      if (retries === maxRetries || !isConnectionError) {
+        if (isConnectionError) {
+          console.error(`[Resilience] Final retry for ${functionName} failed:`, error);
+        }
+        throw error;
+      }
+
       retries++;
-      // Wait a bit before retrying
-      await new Promise(resolve => setTimeout(resolve, 500 * retries));
+      const delay = baseDelay * Math.pow(2, retries - 1); // 800, 1600, 3200ms
+      console.warn(`[Resilience] ${functionName} failed (retry ${retries}/${maxRetries} after ${delay}ms):`, error.message);
+      await new Promise(resolve => setTimeout(resolve, delay));
     }
   }
   return await publicFunctionClient.functions.invoke(functionName, options);

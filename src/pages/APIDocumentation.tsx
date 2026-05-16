@@ -312,7 +312,11 @@ const APIDocumentation = () => {
                   </div>
                   <span className="font-black tracking-tight">API Docs</span>
                 </div>
-                <button onClick={() => setMobileNavOpen(false)} className="p-2 rounded-xl bg-white/5 border border-white/10">
+                <button 
+                  onClick={() => setMobileNavOpen(false)} 
+                  title="Close menu"
+                  className="p-2 rounded-xl bg-white/5 border border-white/10"
+                >
                   <X className="w-4 h-4" />
                 </button>
               </div>

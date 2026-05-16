@@ -51,19 +51,25 @@ export default function AIConcierge() {
       if (!user) return;
 
       // Load History
-      const { data: history } = await supabase
-        .from("chat_messages")
-        .select("*")
-        .order("created_at", { ascending: true })
-        .limit(20);
+      try {
+        const { data: history, error: historyError } = await supabase
+          .from("chat_messages")
+          .select("*")
+          .order("created_at", { ascending: true })
+          .limit(20);
 
-      if (history && history.length > 0) {
-        setMessages(history.map(m => ({
-          id: m.id,
-          role: m.role as any,
-          text: m.content,
-          ts: new Date(m.created_at)
-        })));
+        if (historyError) throw historyError;
+
+        if (history && history.length > 0) {
+          setMessages(history.map(m => ({
+            id: m.id,
+            role: m.role as any,
+            text: m.content,
+            ts: new Date(m.created_at)
+          })));
+        }
+      } catch (err) {
+        console.warn("[AIConcierge] Could not load chat history:", err);
       }
     };
     initChat();
@@ -91,11 +97,15 @@ export default function AIConcierge() {
     try {
       // Save user message to DB
       if (user) {
-        await supabase.from("chat_messages").insert({
-          user_id: user.id,
-          role: "user",
-          content: msg
-        });
+        try {
+          await supabase.from("chat_messages").insert({
+            user_id: user.id,
+            role: "user",
+            content: msg
+          });
+        } catch (dbErr) {
+          console.warn("[AIConcierge] Failed to save user message:", dbErr);
+        }
       }
 
       // Gather Super Context
@@ -136,11 +146,15 @@ export default function AIConcierge() {
 
       // Save bot reply to DB
       if (user) {
-        await supabase.from("chat_messages").insert({
-          user_id: user.id,
-          role: "bot",
-          content: reply
-        });
+        try {
+          await supabase.from("chat_messages").insert({
+            user_id: user.id,
+            role: "bot",
+            content: reply
+          });
+        } catch (dbErr) {
+          console.warn("[AIConcierge] Failed to save bot reply:", dbErr);
+        }
       }
 
       if (!open) setUnread(n => n + 1);
@@ -275,6 +289,7 @@ export default function AIConcierge() {
                 type="button"
                 onClick={() => setOpen(false)}
                 className="w-8 h-8 rounded-xl flex items-center justify-center text-white/30 hover:text-white hover:bg-white/5 transition-all"
+                title="Minimize Ama"
               >
                 <ChevronDown className="w-4 h-4" />
               </button>

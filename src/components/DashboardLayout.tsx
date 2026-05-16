@@ -46,18 +46,28 @@ const DashboardLayout = () => {
   useEffect(() => {
     if (!user) return;
     const fetchBalance = async () => {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from("wallets")
         .select("balance")
         .eq("agent_id", user.id)
-        .single();
-      if (data) setWalletBalance(Number(data.balance));
+        .maybeSingle();
+      
+      if (error) {
+        console.error("[Wallet-Debug] Error fetching balance from wallets:", error);
+        return;
+      }
+
+      if (data) {
+        setWalletBalance(Number(data.wallet_balance || 0));
+      } else {
+        setWalletBalance(0);
+      }
     };
     fetchBalance();
 
     const channel = supabase
       .channel("wallet-balance-header")
-      .on("postgres_changes", { event: "*", schema: "public", table: "wallets", filter: `agent_id=eq.${user.id}` }, (payload: any) => {
+      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "wallets", filter: `agent_id=eq.${user.id}` }, (payload: any) => {
         if (payload.new?.balance !== undefined) {
           const newBal = Number(payload.new.balance);
           const oldBal = Number(payload.old?.balance || 0);

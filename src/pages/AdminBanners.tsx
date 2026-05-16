@@ -249,6 +249,7 @@ const AdminBanners = () => {
                         )}
                         <input 
                           type="file" accept="image/*" className="absolute inset-0 opacity-0 cursor-pointer"
+                          title="Upload dashboard banner image"
                           onChange={(e) => setNewBanner({ ...newBanner, image: e.target.files?.[0] || null })}
                         />
                       </div>
@@ -371,6 +372,7 @@ const AdminBanners = () => {
                     )}
                     <input 
                       type="file" accept="image/*" className="absolute inset-0 opacity-0 cursor-pointer"
+                      title="Upload menu banner image"
                       onChange={(e) => setNewMenuBanner({ ...newMenuBanner, image: e.target.files?.[0] || null })}
                     />
                   </div>

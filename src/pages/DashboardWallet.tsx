@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useRealtimeRefresh } from "@/hooks/useRealtimeRefresh";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -19,6 +19,7 @@ import {
   ChevronRight, ArrowUpRight, Zap, ShieldCheck, CheckCircle2, X 
 } from "lucide-react";
 import { basePackages, networks, getPublicPrice } from "@/lib/data";
+import { WalletStatement } from "@/components/WalletStatement";
 
 interface WalletTopupRow {
   id: string;
@@ -157,8 +158,10 @@ const DashboardWallet = () => {
       supabase.from("withdrawals").select("amount, status").eq("agent_id", user.id).in("status", ["completed", "pending", "processing"]),
     ]);
 
-    const walletBalance = walletRes.data?.balance || 0;
-    const apiBal = walletRes.data?.api_balance || 0;
+    const walletData = walletRes.data;
+    const walletBalance = walletData?.balance || 0;
+    const apiBal = walletData?.api_balance || 0;
+    const loyaltyPoints = walletData?.loyalty_balance || 0;
     const totalProfit = (ordersRes.data || []).reduce((sum, row: any) => sum + Number(row.profit || 0), 0);
     const parentProfitRows = (parentProfitRes.data || []) as Array<{ parent_profit?: number }>;
     const totalParentProfit = parentProfitRows.reduce((sum, row) => sum + Number(row.parent_profit || 0), 0);
@@ -167,7 +170,7 @@ const DashboardWallet = () => {
 
     setBalance(walletBalance);
     setApiBalance(apiBal);
-    setLoyaltyBalance(Number(walletRes.data?.loyalty_balance || 0));
+    setLoyaltyBalance(Number(loyaltyPoints));
     setAvailableProfit(Math.max(0, profitBalance));
     setLoading(false);
   }, [user]);
@@ -187,17 +190,18 @@ const DashboardWallet = () => {
   useEffect(() => { fetchBalance(); }, [fetchBalance]);
   useEffect(() => { fetchRecentTopups(); }, [fetchRecentTopups]);
 
-  // Live updates — refresh balance and topups whenever wallet or orders change
   useRealtimeRefresh({
     tables: ["wallets", "orders"],
     onRefresh: () => { fetchBalance(); fetchRecentTopups(); },
     filters: user ? { wallets: `agent_id=eq.${user.id}`, orders: `agent_id=eq.${user.id}` } : {},
   });
 
+  const verifiedRef = useRef(false);
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const reference = params.get("reference") || params.get("trxref");
-    if (reference) {
+    if (reference && !verifiedRef.current) {
+      verifiedRef.current = true;
       invokePublicFunctionAsUser("verify-payment", { body: { reference } }).then(async (res) => {
         const status = res.data?.status;
         if (status === "fulfilled") {
@@ -293,12 +297,9 @@ const DashboardWallet = () => {
       const description = data?.error || await getFunctionErrorMessage(error, "Could not complete wallet purchase.");
       toast({ title: "Purchase failed", description, variant: "destructive" });
     } else if (data?.success || data?.status === "paid" || data?.status === "fulfilled") {
-      // Fast-track fulfillment if the order is 'paid'
       if (data?.order_id) {
-        console.log("[FastTrack] Triggering fulfillment for:", data.order_id);
         invokePublicFunction("verify-payment", { body: { reference: data.order_id } }).catch(e => console.error("[FastTrack-Error]", e));
       }
-      
       setShowSuccessOverlay(true);
       setCustomerPhone("");
       setSelectedPackage("");
@@ -323,10 +324,7 @@ const DashboardWallet = () => {
     if (error || !data?.success) {
       toast({ title: "Conversion failed", description: data?.error || error?.message, variant: "destructive" });
     } else {
-      toast({ 
-        title: "Points Converted!", 
-        description: `GHS ${data.cash_added} has been added to your wallet.` 
-      });
+      toast({ title: "Points Converted!", description: `GHS ${data.cash_added} has been added to your wallet.` });
       await fetchBalance();
     }
     setConvertingPoints(false);
@@ -344,11 +342,16 @@ const DashboardWallet = () => {
       if (error) { toast({ title: "Sync failed", description: error.message, variant: "destructive" }); return; }
       if (!pendingRows || pendingRows.length === 0) { toast({ title: "No pending deposits found" }); return; }
 
-      const checks = await Promise.allSettled(
-        pendingRows.map((row) => invokePublicFunctionAsUser("verify-payment", { body: { reference: row.id } })),
-      );
-
-      const fulfilledCount = checks.filter((result) => result.status === "fulfilled" && result.value?.data?.status === "fulfilled").length;
+      let fulfilledCount = 0;
+      for (const row of pendingRows) {
+        try {
+          const res = await invokePublicFunctionAsUser("verify-payment", { body: { reference: row.id } });
+          if (res.data?.status === "fulfilled") fulfilledCount++;
+          await new Promise(r => setTimeout(r, 300));
+        } catch (e) {
+          console.error(`[Sync-Error] Reference ${row.id}:`, e);
+        }
+      }
 
       await fetchBalance();
       await fetchRecentTopups();
@@ -372,7 +375,6 @@ const DashboardWallet = () => {
 
   return (
     <div className="space-y-8 p-4 md:p-8 max-w-5xl mx-auto">
-      {/* ── Header ── */}
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
         <div>
           <h1 className="font-display text-3xl font-black tracking-tight text-foreground flex items-center gap-3">
@@ -384,11 +386,8 @@ const DashboardWallet = () => {
         </div>
         <div className="flex items-center gap-2">
           <Button 
-            variant="outline" 
-            size="sm" 
-            className="bg-muted/50 border-border hover:bg-muted text-foreground/70 h-10 px-4 rounded-xl gap-2"
-            onClick={handleSyncPendingDeposits}
-            disabled={syncingDeposits}
+            variant="outline" size="sm" className="bg-muted/50 border-border hover:bg-muted text-foreground/70 h-10 px-4 rounded-xl gap-2"
+            onClick={handleSyncPendingDeposits} disabled={syncingDeposits}
           >
             <RefreshCw className={`w-4 h-4 ${syncingDeposits ? "animate-spin" : ""}`} />
             <span className="hidden sm:inline text-xs font-bold uppercase tracking-widest">Verify Deposits</span>
@@ -396,10 +395,7 @@ const DashboardWallet = () => {
         </div>
       </div>
 
-      {/* ── Main Stats Grid ── */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        
-        {/* Balance Card (Pro Design) */}
         <Card className="relative overflow-hidden border-none bg-gradient-to-br from-amber-500 to-amber-600 shadow-2xl shadow-amber-500/20 group">
           <div className="absolute top-0 right-0 p-6 opacity-10 group-hover:scale-110 transition-transform duration-500">
             <Wallet className="w-24 h-24 text-white" />
@@ -421,18 +417,10 @@ const DashboardWallet = () => {
                <p className="text-[10px] font-bold text-white/60 uppercase">Available Profit</p>
                <p className="text-sm font-black text-white">GHS {availableProfit.toFixed(2)}</p>
             </div>
-            {(profile?.is_agent || profile?.sub_agent_approved || apiBalance > 0) && (
-              <div className="pt-2 flex justify-between items-center">
-                 <p className="text-[10px] font-bold text-white/60 uppercase">API Wallet Balance</p>
-                 <p className="text-sm font-black text-white">GHS {apiBalance.toFixed(2)}</p>
-              </div>
-            )}
           </CardContent>
         </Card>
 
-        {/* Loyalty Card (Pro Design) */}
         <Card className="relative overflow-hidden border-border bg-card backdrop-blur-xl group shadow-sm">
-          <div className="absolute -top-4 -right-4 w-24 h-24 bg-amber-400/10 rounded-full blur-2xl group-hover:bg-amber-400/20 transition-colors" />
           <CardHeader className="pb-2 flex flex-row items-center justify-between">
             <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/60">SwiftPoints</p>
             <Gift className="w-4 h-4 text-amber-500 dark:text-amber-400" />
@@ -443,10 +431,8 @@ const DashboardWallet = () => {
               <p className="text-[10px] text-muted-foreground mt-1 font-medium uppercase tracking-widest">Est. Value: GHS {(loyaltyBalance / 100).toFixed(2)}</p>
             </div>
             <Button 
-              variant="outline" 
-              className="w-full h-11 bg-amber-400 text-black border-none font-black text-xs uppercase tracking-widest hover:bg-amber-300 shadow-lg shadow-amber-400/10 disabled:opacity-30 rounded-xl"
-              onClick={handleConvertPoints} 
-              disabled={convertingPoints || loyaltyBalance < 100}
+              variant="outline" className="w-full h-11 bg-amber-400 text-black border-none font-black text-xs uppercase tracking-widest hover:bg-amber-300 shadow-lg shadow-amber-400/10 disabled:opacity-30 rounded-xl"
+              onClick={handleConvertPoints} disabled={convertingPoints || loyaltyBalance < 100}
             >
               {convertingPoints ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <ArrowRightLeft className="w-4 h-4 mr-2" />}
               Convert to Cash
@@ -454,7 +440,6 @@ const DashboardWallet = () => {
           </CardContent>
         </Card>
 
-        {/* Quick Topup (Pro Design) */}
         <Card className="border-border bg-card backdrop-blur-xl shadow-sm">
           <CardHeader className="pb-2 flex flex-row items-center justify-between">
             <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/60">Quick Top Up</p>
@@ -466,39 +451,27 @@ const DashboardWallet = () => {
                 <span className="text-xs font-bold">GHS</span>
               </div>
               <Input
-                type="number"
-                placeholder="0.00"
-                value={topupAmount}
+                type="number" placeholder="0.00" value={topupAmount}
                 onChange={(e) => setTopupAmount(e.target.value)}
                 className="h-12 pl-12 bg-muted/30 border-border focus:border-blue-500/50 rounded-xl text-lg font-black text-foreground"
               />
             </div>
             <Button 
-              onClick={handlePaystackTopup} 
-              disabled={toppingUp} 
+              onClick={handlePaystackTopup} disabled={toppingUp} 
               className="w-full h-11 bg-blue-500 hover:bg-blue-600 text-white font-black text-xs uppercase tracking-widest rounded-xl shadow-lg shadow-blue-500/10"
             >
               {toppingUp ? <Loader2 className="w-4 h-4 animate-spin" /> : <><CreditCard className="w-4 h-4 mr-2" /> Top Up Now</>}
             </Button>
-            {topupChargeTotal > 0 && (
-              <div className="flex justify-between items-center px-1">
-                <span className="text-[9px] text-muted-foreground/40 font-bold uppercase tracking-wider">Fee Included</span>
-                <span className="text-[10px] text-blue-500 dark:text-blue-400 font-black">Total: GHS {topupChargeTotal.toFixed(2)}</span>
-              </div>
-            )}
           </CardContent>
         </Card>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-8">
-        
-        {/* ── Buy Data Section (Left) ── */}
         <div className="lg:col-span-3 space-y-6">
           <div className="flex items-center gap-2 mb-2">
             <div className="w-1 h-6 bg-amber-500 rounded-full" />
             <h2 className="text-lg font-black text-foreground uppercase tracking-wider">Purchase Service</h2>
           </div>
-          
           <Card className="border-border bg-card shadow-sm overflow-hidden rounded-[2rem]">
             <CardContent className="p-8 space-y-6">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
@@ -529,145 +502,52 @@ const DashboardWallet = () => {
                   </Select>
                 </div>
               </div>
-
               <div className="space-y-2">
                 <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground px-1">Recipient Number</Label>
                 <div className="relative">
-                  <Input 
-                    placeholder="e.g. 024XXXXXXX" 
-                    value={customerPhone} 
-                    onChange={(e) => setCustomerPhone(e.target.value)} 
-                    className="h-12 bg-muted/30 border-border rounded-xl pl-11 text-foreground font-mono" 
-                  />
-                  <div className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground/40">
-                    <CreditCard className="w-4 h-4" />
-                  </div>
+                  <Input placeholder="e.g. 024XXXXXXX" value={customerPhone} onChange={(e) => setCustomerPhone(e.target.value)} className="h-12 bg-muted/30 border-border rounded-xl pl-11 text-foreground font-mono" />
+                  <div className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground/40"><CreditCard className="w-4 h-4" /></div>
                 </div>
               </div>
-
-              {selectedPkg && (
-                <div className="bg-muted/50 border border-border rounded-2xl p-5 space-y-2 animate-in fade-in slide-in-from-top-2 duration-300">
-                  <div className="flex justify-between items-center text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                    <span>Selected Plan</span>
-                    <span className="text-foreground">{selectedNetwork} {selectedPkg.size}</span>
-                  </div>
-                  <div className="flex justify-between items-center text-sm font-black">
-                    <span className="text-muted-foreground uppercase text-[10px] tracking-widest">Amount to Pay</span>
-                    <span className="text-amber-500 dark:text-amber-400 text-lg">GHS {selectedPkg.price.toFixed(2)}</span>
-                  </div>
-                  <div className="pt-2 mt-2 border-t border-border flex justify-between items-center text-[10px] font-medium text-muted-foreground italic">
-                    <span>Balance after purchase</span>
-                    <span>GHS {(balance - selectedPkg.price).toFixed(2)}</span>
-                  </div>
-                </div>
-              )}
-
-              <Button 
-                onClick={handleBuyData} 
-                disabled={buying || !selectedPkg || !customerPhone} 
-                className="w-full h-14 rounded-2xl bg-amber-500 hover:bg-amber-400 text-black font-black text-base shadow-xl shadow-amber-500/10 group overflow-hidden relative"
-              >
-                {buying ? (
-                  <Loader2 className="w-5 h-5 animate-spin" />
-                ) : (
-                  <>
-                    <Send className="w-5 h-5 mr-2 group-hover:translate-x-1 group-hover:-translate-y-1 transition-transform" />
-                    Buy with Wallet
-                  </>
-                )}
+              <Button onClick={handleBuyData} disabled={buying || !selectedPkg || !customerPhone} className="w-full h-14 rounded-2xl bg-amber-500 hover:bg-amber-400 text-black font-black text-base shadow-xl shadow-amber-500/10 group">
+                {buying ? <Loader2 className="w-5 h-5 animate-spin" /> : <><Send className="w-5 h-5 mr-2 group-hover:translate-x-1 group-hover:-translate-y-1 transition-transform" /> Buy with Wallet</>}
               </Button>
             </CardContent>
           </Card>
         </div>
 
-        {/* ── Recent Activity (Right) ── */}
         <div className="lg:col-span-2 space-y-6">
           <div className="flex items-center gap-2 mb-2">
             <div className="w-1 h-6 bg-blue-500 rounded-full" />
-            <h2 className="text-lg font-black text-foreground uppercase tracking-wider">Recent Activity</h2>
+            <h2 className="text-lg font-black text-foreground uppercase tracking-wider">Statement</h2>
           </div>
-
-          <Card className="border-border bg-card shadow-sm overflow-hidden rounded-[2rem]">
-            <CardContent className="p-6">
-              {recentTopups.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-12 text-center">
-                  <History className="w-10 h-10 text-muted-foreground/30 mb-4" />
-                  <p className="text-xs font-bold text-muted-foreground/50 uppercase tracking-widest">No activity yet</p>
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  {recentTopups.map((row) => (
-                    <div 
-                      key={row.id} 
-                      className="group flex items-center justify-between p-4 rounded-2xl border border-border bg-muted/10 hover:bg-muted/30 transition-all hover:scale-[1.02]"
-                    >
-                      <div className="flex items-center gap-4">
-                        <div className={`w-10 h-10 rounded-full flex items-center justify-center ${row.status === "fulfilled" ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400" : "bg-amber-500/10 text-amber-600 dark:text-amber-400"}`}>
-                          <PlusCircle className="w-5 h-5" />
-                        </div>
-                        <div>
-                          <p className="text-sm font-black text-foreground">GHS {Number(row.amount || 0).toFixed(2)}</p>
-                          <p className="text-[10px] text-muted-foreground font-medium uppercase tracking-tight">
-                            {new Date(row.created_at).toLocaleDateString("en-GH", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}
-                          </p>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2">
-                         <div className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-tighter ${row.status === "fulfilled" ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400" : "bg-muted text-muted-foreground"}`}>
-                            {row.status === "fulfilled" ? "Verified" : row.status}
-                         </div>
-                         <ChevronRight className="w-4 h-4 text-muted-foreground/30 group-hover:text-muted-foreground transition-colors" />
-                      </div>
-                    </div>
-                  ))}
-                  <Button variant="ghost" className="w-full h-10 text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground hover:bg-muted">
-                     View All History
-                  </Button>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* Quick Help Tip */}
+          {user && <WalletStatement userId={user.id} />}
           <div className="bg-blue-500/10 border border-blue-500/20 rounded-2xl p-6 flex gap-4">
-            <div className="w-10 h-10 rounded-full bg-blue-500/20 flex items-center justify-center shrink-0">
-               <ArrowUpRight className="w-5 h-5 text-blue-600 dark:text-blue-400" />
-            </div>
+            <div className="w-10 h-10 rounded-full bg-blue-500/20 flex items-center justify-center shrink-0"><ArrowUpRight className="w-5 h-5 text-blue-600 dark:text-blue-400" /></div>
             <div className="space-y-1">
-               <p className="text-xs font-black text-foreground uppercase tracking-wider">Pro Tip</p>
-               <p className="text-[10px] text-muted-foreground leading-relaxed font-medium">
-                 Use the wallet to bypass Paystack fees on every single purchase. Top up a large amount once and save on processing costs!
-               </p>
+               <p className="text-xs font-black text-foreground uppercase tracking-wider">Statement Proof</p>
+               <p className="text-[10px] text-muted-foreground leading-relaxed font-medium">Your account statement above shows every deposit and purchase. Use this to track your spending and verify your balance.</p>
             </div>
           </div>
         </div>
       </div>
-      {/* ── Success Overlay ── */}
+
       {showSuccessOverlay && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center p-6 animate-in fade-in duration-500">
           <div className="absolute inset-0 bg-black/90 backdrop-blur-3xl" />
-          <div className="relative max-w-sm w-full bg-[#0A0A0C] border border-white/10 rounded-[3rem] p-10 text-center space-y-8 animate-in zoom-in-95 duration-300 shadow-3xl">
+          <div className="relative max-w-sm w-full bg-[#0A0A0C] border border-white/10 rounded-[3rem] p-10 text-center space-y-8 animate-in zoom-in-95 duration-300">
             <div className="relative mx-auto w-24 h-24">
-              <div className="absolute inset-0 bg-emerald-500 rounded-full blur-2xl opacity-20 animate-pulse" />
+              <div className="absolute inset-0 bg-emerald-500 rounded-full blur-2xl opacity-20" />
               <div className="relative w-full h-full rounded-full bg-emerald-500 flex items-center justify-center shadow-[0_0_50px_rgba(16,185,129,0.3)]">
                 <CheckCircle2 className="w-12 h-12 text-white" />
               </div>
             </div>
-            
             <div className="space-y-3">
               <h2 className="text-4xl font-black tracking-tighter text-white uppercase">Delivered!</h2>
-              <p className="text-white/40 text-sm font-medium leading-relaxed">
-                Your bundle has been processed successfully. Your balance has been updated.
-              </p>
+              <p className="text-white/40 text-sm font-medium leading-relaxed">Your bundle has been processed successfully. Your balance has been updated.</p>
             </div>
-
             <div className="pt-4">
-              <button 
-                onClick={() => setShowSuccessOverlay(false)}
-                className="w-full bg-white/5 border border-white/10 hover:bg-white/10 text-white font-black py-4 rounded-2xl transition-all uppercase tracking-widest text-xs"
-              >
-                Continue
-              </button>
+              <button onClick={() => setShowSuccessOverlay(false)} className="w-full bg-white/5 border border-white/10 hover:bg-white/10 text-white font-black py-4 rounded-2xl transition-all uppercase tracking-widest text-xs">Continue</button>
             </div>
           </div>
         </div>

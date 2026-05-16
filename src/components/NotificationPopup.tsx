@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useAuth } from "@/hooks/useAuth";
+import { useAuth, Profile } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { Bell, X, Info, Zap, AlertCircle } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
@@ -38,7 +38,8 @@ const NotificationPopup = () => {
 
       if (!notifs) return;
 
-      const isAgent = Boolean(profile?.agent_approved || profile?.sub_agent_approved || profile?.is_agent || profile?.is_sub_agent);
+      const p = profile as Profile | null;
+      const isAgent = Boolean(p?.agent_approved || p?.sub_agent_approved || p?.is_agent || p?.is_sub_agent);
       
       const filtered = notifs.filter((n: any) => {
         if (dismissedIds.includes(n.id)) return false;
@@ -126,6 +127,7 @@ const NotificationPopup = () => {
                     <h3 className="text-sm font-black text-white tracking-tight uppercase">{current.title}</h3>
                     <button 
                       onClick={handleDismiss}
+                      title="Dismiss notification"
                       className="p-1 rounded-lg hover:bg-white/5 text-white/20 hover:text-white/60 transition-all"
                     >
                       <X className="w-4 h-4" />

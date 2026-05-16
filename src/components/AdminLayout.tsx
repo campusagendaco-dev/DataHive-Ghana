@@ -8,7 +8,8 @@ import {
   Wallet, Bell, Package, CreditCard, Activity, Settings, ChevronRight,
   BarChart3, Ticket, LifeBuoy, FileSearch, Key, TrendingUp, Sun, Moon,
   Sparkles, Image as ImageIcon, Users2, ScrollText,
-  Megaphone, Flag, MessageSquare, Banknote, UserCheck, LineChart, Brain
+  Megaphone, Flag, MessageSquare, Banknote, UserCheck, LineChart, Brain,
+  ShieldAlert
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetDescription, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
@@ -24,6 +25,7 @@ const NAV_SECTIONS = [
   {
     title: "Operations",
     items: [
+      { label: "Swift Vendor Master", icon: ShieldAlert, path: "/admin/swift-vendor" },
       { label: "Agents",       icon: ShieldCheck,  path: "/admin/agents" },
       { label: "Sub-Agents",   icon: Users2,       path: "/admin/sub-agents" },
       { label: "Orders",       icon: ShoppingCart, path: "/admin/orders" },
@@ -55,6 +57,8 @@ const NAV_SECTIONS = [
       { label: "Security",      icon: ShieldCheck, path: "/admin/security" },
       { label: "System Health", icon: Activity,    path: "/admin/system-health" },
       { label: "Sentinel AI",   icon: Brain,       path: "/admin/sentinel" },
+      { label: "AI Intelligence Hub", icon: Brain, path: "/admin/ai-strategy" },
+      { label: "API Network Intelligence", icon: Activity, path: "/admin/api-network" },
       { label: "System Logs",    icon: ScrollText,    path: "/admin/system-logs" },
       { label: "Feature Flags",  icon: Flag,          path: "/admin/feature-flags" },
       { label: "SMS Templates",  icon: MessageSquare, path: "/admin/sms-templates" },

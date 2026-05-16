@@ -70,9 +70,11 @@ const agentNavItems = [
   { to: "/dashboard/flyer", label: "Flyer Generator", icon: FileText },
   { to: "/dashboard/marketing", label: "Marketing Tools", icon: Zap },
   { to: "/dashboard/result-checker", label: "Result Checker", icon: GraduationCap },
-  { to: "/dashboard/api", label: "Developer API", icon: Key },
+  { to: "/dashboard/api", label: "My API Access", icon: Key },
+  { to: "/dashboard/agent-dev-hub", label: "Agent Developer Hub", icon: Users2 },
   { to: "/dashboard/bulk", label: "Bulk Disbursement", icon: Send },
   { to: "/dashboard/whatsapp-bot", label: "WhatsApp Bot", icon: Bot },
+  { to: "/dashboard/swift-vendor", label: "Swift Vendor", icon: Zap },
   { to: "/dashboard/leaderboard", label: "Agent Leaderboard", icon: Trophy },
 ];
 

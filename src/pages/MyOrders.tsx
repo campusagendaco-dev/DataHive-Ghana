@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { 
   Search, Package, Clock, CheckCircle2, 
   XCircle, Loader2, ArrowLeft, RefreshCw,
-  Activity, ExternalLink, ShieldCheck, Zap, ArrowRight, ReceiptText
+  Activity, ExternalLink, ShieldCheck, Zap, ArrowRight, ReceiptText, AlertTriangle
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
@@ -12,6 +12,7 @@ import { toast } from "sonner";
 
 interface Order {
   id: string;
+  agent_id: string;
   customer_phone: string;
   customer_name?: string;
   network: string;
@@ -32,6 +33,28 @@ const MyOrders = () => {
   const [loading, setLoading] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [showReceipt, setShowReceipt] = useState<Order | null>(null);
+
+  const handleDispute = async (order: Order) => {
+    const reason = prompt("Please describe the issue (e.g., Data not received):");
+    if (!reason) return;
+
+    try {
+      toast.loading("Awakening AI Judge...");
+      const { error } = await supabase
+        .from("order_disputes")
+        .insert({
+          order_id: order.id,
+          user_id: order.agent_id,
+          reason: reason,
+          status: 'pending'
+        });
+
+      if (error) throw error;
+      toast.success("AI Judge activated. Investigation underway.");
+    } catch (err: any) {
+      toast.error("Failed to trigger AI Judge: " + err.message);
+    }
+  };
 
   const fetchOrders = async (targetPhone: string) => {
     if (!targetPhone) return;
@@ -192,6 +215,13 @@ const MyOrders = () => {
                    >
                      <ReceiptText className="w-3 h-3" />
                      Receipt
+                   </button>
+                   <button 
+                    onClick={(e) => { e.stopPropagation(); handleDispute(order); }}
+                    className="flex-1 h-9 rounded-xl bg-red-500/10 border border-red-500/20 hover:bg-red-500/20 text-[9px] font-black uppercase tracking-widest text-red-400 flex items-center justify-center gap-2 transition-all"
+                   >
+                     <AlertTriangle className="w-3 h-3" />
+                     Dispute
                    </button>
                    <button 
                     onClick={(e) => { e.stopPropagation(); navigate(`/order-status?reference=${order.id}`); }}

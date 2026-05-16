@@ -411,10 +411,12 @@ const AdminSettings = () => {
   const handleSaveProviders = async () => {
     setSaving(true);
     try {
+      // Process all providers to handle new vs existing correctly
       const toUpsert = providers.map(p => {
-        // Strip out calculated fields and IDs for new items
+        // Strip out calculated fields
         const { created_at, updated_at, balance, last_synced_at, ...item } = p;
         
+        // Handle new items that have temporary IDs
         if (typeof item.id === 'string' && item.id.startsWith("new-")) {
           const { id, ...newItem } = item;
           return newItem;
@@ -422,23 +424,31 @@ const AdminSettings = () => {
         return item;
       });
 
+      // Divide into batches for safer processing
       const existing = toUpsert.filter(p => !!p.id);
       const newItems = toUpsert.filter(p => !p.id);
 
+      // 1. Update existing providers by ID (safer than name)
       if (existing.length > 0) {
-        const { error } = await supabase.from("providers").upsert(existing, { onConflict: 'name' });
+        const { error } = await supabase.from("providers").upsert(existing, { onConflict: 'id' });
         if (error) throw error;
       }
       
+      // 2. Insert new providers (use name for conflict resolution if they already exist)
       if (newItems.length > 0) {
         const { error } = await supabase.from("providers").upsert(newItems, { onConflict: 'name' });
         if (error) throw error;
       }
 
-      toast({ title: "Providers Updated" });
+      toast({ title: "Providers Updated", description: "Network routing logic synchronized successfully." });
       fetchProviders();
     } catch (err: any) {
-      toast({ title: "Failed to save providers", description: err.message, variant: "destructive" });
+      console.error("Save error:", err);
+      toast({ 
+        title: "Conflict Detected", 
+        description: err.message || "A provider with this name may already exist.", 
+        variant: "destructive" 
+      });
     } finally {
       setSaving(false);
     }

@@ -320,7 +320,7 @@ const AdminUsers = () => {
           </h1>
           <p className={`text-sm mt-1 ${isDark ? "text-white/50" : "text-gray-500"}`}>Manage all platform users — customers, agents, and sub-agents.</p>
         </div>
-        <Button onClick={fetchUsers} variant={isDark ? "outline" : "default"} className={isDark ? "gap-2 bg-white/5 hover:bg-white/10 text-white border border-white/10 rounded-xl" : "gap-2 rounded-xl shadow-sm"}>
+        <Button onClick={() => fetchUsers()} variant={isDark ? "outline" : "default"} title="Refresh user list" className={isDark ? "gap-2 bg-white/5 hover:bg-white/10 text-white border border-white/10 rounded-xl" : "gap-2 rounded-xl shadow-sm"}>
           <RefreshCw className="w-4 h-4" /> Refresh
         </Button>
       </div>
@@ -336,6 +336,7 @@ const AdminUsers = () => {
           <button
             key={key}
             onClick={() => setTab(key)}
+            title={`View ${label}`}
             className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all border shadow-sm ${
               tab === key
                 ? "bg-amber-400/20 text-amber-700 dark:text-amber-400 border-amber-400/30"
@@ -358,6 +359,7 @@ const AdminUsers = () => {
           placeholder="Search by name, email, phone..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
+          title="Search users"
           className="pl-9 rounded-xl border-input bg-card shadow-sm"
         />
       </div>
@@ -373,6 +375,7 @@ const AdminUsers = () => {
                      type="checkbox" 
                      checked={selectedUsers.length === users.length && users.length > 0} 
                      onChange={toggleSelectAll}
+                     title="Select all users"
                      className="rounded border-input text-amber-500 focus:ring-amber-500/30"
                    />
                 </th>
@@ -394,6 +397,7 @@ const AdminUsers = () => {
                        type="checkbox" 
                        checked={selectedUsers.includes(user.user_id)} 
                        onChange={() => {}}
+                       title="Select user"
                        className="rounded border-input text-amber-500 focus:ring-amber-500/30"
                      />
                   </td>
@@ -401,7 +405,9 @@ const AdminUsers = () => {
                     <div className="flex items-center gap-1.5">
                       <p className="font-semibold text-foreground">{user.full_name || "—"}</p>
                       {user.has_mfa && (
-                        <ShieldCheck className="w-3.5 h-3.5 text-emerald-500 fill-emerald-500/10 shrink-0 animate-pulse-subtle" title="2FA Secured" />
+                        <span title="2FA Secured">
+                          <ShieldCheck className="w-3.5 h-3.5 text-emerald-500 fill-emerald-500/10 shrink-0 animate-pulse-subtle" />
+                        </span>
                       )}
                     </div>
                     <p className="text-xs text-muted-foreground mt-0.5">{user.email}</p>
@@ -453,6 +459,7 @@ const AdminUsers = () => {
                         size="sm" variant="outline"
                         onClick={() => handleResetPassword(user)}
                         disabled={!!actionLoading[user.user_id]}
+                        title="Reset user password"
                         className="text-xs border-input hover:bg-secondary rounded-xl h-8 shadow-sm"
                       >
                         {actionLoading[user.user_id] === "reset" ? <Loader2 className="w-3 h-3 animate-spin" /> : "Reset"}
@@ -461,6 +468,7 @@ const AdminUsers = () => {
                         size="sm" variant="outline"
                         onClick={() => handleImpersonateUser(user)}
                         disabled={!!actionLoading[user.user_id]}
+                        title="Impersonate user"
                         className="w-8 h-8 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400 hover:bg-amber-500/20 transition-colors"
                       >
                         {actionLoading[user.user_id] === "impersonate" ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Eye className="w-3.5 h-3.5" />}
@@ -468,12 +476,14 @@ const AdminUsers = () => {
                       <Button
                         size="sm" variant="outline"
                         onClick={() => setSelectedUser(user)}
+                        title="View user wallets"
                         className="w-8 h-8 rounded-xl bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center text-cyan-400 hover:bg-cyan-500/20 transition-colors"
                       >
                         <Wallet className="w-3.5 h-3.5" />
                       </Button>
                       <Link
                         to={`/admin/orders?agent=${encodeURIComponent(user.full_name || user.email)}`}
+                        title="View user orders"
                         className="w-8 h-8 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-400 hover:bg-blue-500/20 transition-colors"
                       >
                         <ShoppingCart className="w-3.5 h-3.5" />
@@ -505,6 +515,7 @@ const AdminUsers = () => {
                     type="checkbox" 
                     checked={selectedUsers.includes(user.user_id)} 
                     onChange={(e) => toggleSelectUser(user.user_id, e)}
+                    title="Select user"
                     className="rounded border-input text-amber-500 focus:ring-amber-500/30 w-5 h-5"
                   />
                 </div>
@@ -564,12 +575,14 @@ const AdminUsers = () => {
                   <Button
                     size="sm" variant="outline"
                     onClick={() => setSelectedUser(user)}
+                    title="View user wallets"
                     className="h-8 w-8 rounded-xl bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 flex items-center justify-center p-0"
                   >
                     <Wallet className="w-3.5 h-3.5" />
                   </Button>
                   <Link
                     to={`/admin/orders?agent=${encodeURIComponent(user.full_name || user.email)}`}
+                    title="View user orders"
                     className="h-8 w-8 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-400 p-0"
                   >
                     <ShoppingCart className="w-3.5 h-3.5" />

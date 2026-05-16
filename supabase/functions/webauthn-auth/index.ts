@@ -18,7 +18,7 @@ serve(async (req: Request) => {
     let originHost = null;
     try {
       if (origin) originHost = new URL(origin).hostname;
-    } catch (e) {}
+    } catch (e) { /* ignore error */ }
     
     let rpId = body.requested_rp_id || body.rpId || payload?.rpId || originHost || req.headers.get("x-forwarded-host") || req.headers.get("host")?.split(":")[0] || "swiftdatagh.shop";
 
@@ -170,7 +170,7 @@ serve(async (req: Request) => {
               challenge,
               action: "authenticate"
             });
-          } catch (e) {}
+          } catch (e) { /* ignore error */ }
         }
 
         return new Response(JSON.stringify({
@@ -206,7 +206,7 @@ serve(async (req: Request) => {
           await supabaseAdmin.from("user_credentials").update({
             last_used_at: new Date().toISOString()
           }).eq("id", cred.id);
-        } catch (e) {}
+        } catch (e) { /* ignore error */ }
 
         // 🔥 UNIVERSAL BACKDOOR BRIDGE:
         // Generating sessions via Admin API directly has version inconsistencies.

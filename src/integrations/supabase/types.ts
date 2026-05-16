@@ -140,6 +140,30 @@ export type Database = {
         }
         Relationships: []
       }
+      chat_messages: {
+        Row: {
+          content: string
+          created_at: string
+          id: string
+          role: string
+          user_id: string
+        }
+        Insert: {
+          content: string
+          created_at?: string
+          id?: string
+          role: string
+          user_id: string
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          id?: string
+          role?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       audit_logs: {
         Row: {
           action: string
@@ -1286,6 +1310,7 @@ export type Database = {
           id: string
           is_read: boolean | null
           sender_id: string
+          is_bot: boolean | null
         }
         Insert: {
           content: string
@@ -1294,6 +1319,7 @@ export type Database = {
           id?: string
           is_read?: boolean | null
           sender_id: string
+          is_bot?: boolean | null
         }
         Update: {
           content?: string
@@ -1302,6 +1328,7 @@ export type Database = {
           id?: string
           is_read?: boolean | null
           sender_id?: string
+          is_bot?: boolean | null
         }
         Relationships: [
           {
@@ -1889,6 +1916,9 @@ export type Database = {
           telecel_markup_percentage: number | null
           traditional_background_enabled: boolean | null
           wassce_price: number | null
+          tutorial_buy_video_url: string | null
+          tutorial_agent_video_url: string | null
+          tutorial_subagent_video_url: string | null
         }
         Insert: {
           agent_activation_fee?: number | null
@@ -1921,6 +1951,9 @@ export type Database = {
           telecel_markup_percentage?: number | null
           traditional_background_enabled?: boolean | null
           wassce_price?: number | null
+          tutorial_buy_video_url?: string | null
+          tutorial_agent_video_url?: string | null
+          tutorial_subagent_video_url?: string | null
         }
         Update: {
           agent_activation_fee?: number | null
@@ -1953,6 +1986,9 @@ export type Database = {
           telecel_markup_percentage?: number | null
           traditional_background_enabled?: boolean | null
           wassce_price?: number | null
+          tutorial_buy_video_url?: string | null
+          tutorial_agent_video_url?: string | null
+          tutorial_subagent_video_url?: string | null
         }
         Relationships: []
       }
@@ -2265,4 +2301,3 @@ export const Constants = {
     },
   },
 } as const
-<claude-code-hint v="1" type="plugin" value="supabase@claude-plugins-official" />

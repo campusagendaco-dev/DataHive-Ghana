@@ -17,7 +17,7 @@ const getEmbedUrl = (url?: string) => {
   }
 
   // Handle standard YouTube and shortened y2u links
-  const ytRegex = /(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/(?:[^\/\n\s]+\/\S+\/|(?:v|e(?:mbed)?)\/|\S*?[?&]v=)|youtu\.be\/)([a-zA-Z0-9_-]{11})/;
+  const ytRegex = /(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/(?:[^/\n\s]+\/\S+\/|(?:v|e(?:mbed)?)\/|\S*?[?&]v=)|youtu\.be\/)([a-zA-Z0-9_-]{11})/;
   const match = url.match(ytRegex);
   if (match && match[1]) {
     return `https://www.youtube.com/embed/${match[1]}?autoplay=1&rel=0`;
@@ -33,8 +33,7 @@ const TutorialVideoPlayer = ({ url, accent }: { url?: string; accent: string }) 
   if (!url) {
     return (
       <div 
-        className="w-full min-h-[220px] rounded-2xl border border-white/10 flex flex-col items-center justify-center p-6 text-center" 
-        style={{ background: "rgba(255,255,255,0.02)" }}
+        className="w-full min-h-[220px] rounded-2xl border border-white/10 flex flex-col items-center justify-center p-6 text-center bg-white/[0.02]" 
       >
         <div className="w-12 h-12 rounded-full flex items-center justify-center mb-3 animate-pulse" style={{ background: `${accent}15`, border: `1px solid ${accent}25` }}>
           <Play className="w-5 h-5" style={{ color: accent }} />
@@ -94,8 +93,7 @@ const PathCard = ({
 }) => (
   <button
     onClick={onClick}
-    className="group w-full rounded-2xl border border-white/8 p-4 text-left transition-all duration-200 hover:border-white/20 hover:scale-[1.02] active:scale-[0.99]"
-    style={{ background: "rgba(255,255,255,0.03)" }}
+    className="group w-full rounded-2xl border border-white/8 p-4 text-left transition-all duration-200 hover:border-white/20 hover:scale-[1.02] active:scale-[0.99] bg-white/[0.03]"
   >
     <div className="flex items-center gap-3">
       <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 transition-all group-hover:scale-110"
@@ -164,7 +162,7 @@ const BuyStep1 = () => (
 const BuyStep2 = () => (
   <div className="flex flex-col items-center gap-4 py-4">
     <div className="relative w-full max-w-[280px]">
-      <div className="rounded-xl border border-white/15 flex items-center px-3 py-2.5 gap-2" style={{ background: "rgba(255,255,255,0.07)" }}>
+      <div className="rounded-xl border border-white/15 flex items-center px-3 py-2.5 gap-2 bg-white/[0.07]">
         <Phone className="w-4 h-4 text-white/40 shrink-0" />
         <div className="flex-1">
           <p className="text-white text-sm font-mono" style={{ animation: "tutorial-type 3s steps(11) infinite" }}>
@@ -184,7 +182,7 @@ const BuyStep2 = () => (
 
 const BuyStep3 = () => (
   <div className="flex flex-col items-center gap-4 py-4">
-    <div className="relative w-full max-w-[280px] rounded-2xl overflow-hidden border border-white/10" style={{ background: "#0d0d18" }}>
+    <div className="relative w-full max-w-[280px] rounded-2xl overflow-hidden border border-white/10 bg-[#0d0d18]">
       <div className="px-4 py-3 border-b border-white/8">
         <div className="flex items-center justify-between text-xs">
           <span className="text-white/40">MTN 5GB</span>
@@ -255,7 +253,7 @@ const AgentStep1 = () => (
         { icon: CircleDollarSign, label: "Set your prices", color: "#22c55e" },
         { icon: TrendingUp, label: "Earn profit", color: "#3b82f6" },
       ].map((b) => (
-        <div key={b.label} className="rounded-xl p-2.5 text-center border border-white/8" style={{ background: "rgba(255,255,255,0.03)" }}>
+        <div key={b.label} className="rounded-xl p-2.5 text-center border border-white/8 bg-white/[0.03]">
           <b.icon className="w-5 h-5 mx-auto mb-1" style={{ color: b.color }} />
           <p className="text-white/60 text-[10px] leading-tight">{b.label}</p>
         </div>
@@ -269,7 +267,7 @@ const AgentStep1 = () => (
 
 const AgentStep2 = () => (
   <div className="flex flex-col items-center gap-4 py-4">
-    <div className="w-full max-w-[280px] rounded-2xl border border-white/10 overflow-hidden" style={{ background: "#111124" }}>
+    <div className="w-full max-w-[280px] rounded-2xl border border-white/10 overflow-hidden bg-[#111124]">
       <div className="px-4 py-3 border-b border-white/8 flex items-center gap-2">
         <div className="w-2 h-2 rounded-full bg-red-500" />
         <div className="w-2 h-2 rounded-full bg-amber-400" />
@@ -299,7 +297,7 @@ const AgentStep2 = () => (
 const AgentStep3 = () => (
   <div className="flex flex-col items-center gap-4 py-4">
     <div className="relative w-full max-w-[280px]">
-      <div className="rounded-2xl border border-amber-400/30 p-4" style={{ background: "rgba(245,158,11,0.06)" }}>
+      <div className="rounded-2xl border border-amber-400/30 p-4 bg-amber-400/[0.06]">
         <div className="flex items-center gap-2 mb-3">
           <BadgeCheck className="w-5 h-5 text-amber-400" />
           <span className="text-amber-300 font-bold text-sm">Agent Program</span>
@@ -323,22 +321,22 @@ const AgentStep3 = () => (
 const AgentStep4 = () => (
   <div className="flex flex-col items-center gap-4 py-4">
     <div className="relative w-full max-w-[280px]">
-      <div className="rounded-2xl border border-white/10 p-4" style={{ background: "#111124" }}>
+      <div className="rounded-2xl border border-white/10 p-4 bg-[#111124]">
         <div className="flex items-center gap-2 mb-3">
           <Store className="w-4 h-4 text-amber-400" />
           <span className="text-white font-bold text-sm">Your Store is Live 🎉</span>
         </div>
-        <div className="rounded-lg border border-amber-400/20 px-3 py-2 flex items-center gap-2" style={{ background: "rgba(245,158,11,0.08)" }}>
+        <div className="rounded-lg border border-amber-400/20 px-3 py-2 flex items-center gap-2 bg-amber-400/[0.08]">
           <span className="text-amber-400 text-xs font-mono truncate">swiftdatagh.shop/store/</span>
 
           <span className="text-amber-300 font-bold text-xs">yourname</span>
         </div>
         <div className="mt-3 grid grid-cols-2 gap-2">
-          <div className="rounded-lg p-2 text-center border border-green-500/20" style={{ background: "rgba(34,197,94,0.08)" }}>
+          <div className="rounded-lg p-2 text-center border border-green-500/20 bg-emerald-500/[0.08]">
             <p className="text-green-400 font-black text-lg">GH₵0</p>
             <p className="text-white/40 text-[10px]">Today's profit</p>
           </div>
-          <div className="rounded-lg p-2 text-center border border-blue-500/20" style={{ background: "rgba(59,130,246,0.08)" }}>
+          <div className="rounded-lg p-2 text-center border border-blue-500/20 bg-blue-500/[0.08]">
             <p className="text-blue-400 font-black text-lg">0</p>
             <p className="text-white/40 text-[10px]">Customers</p>
           </div>
@@ -351,14 +349,14 @@ const AgentStep4 = () => (
 
 const SubStep1 = () => (
   <div className="flex flex-col items-center gap-4 py-4">
-    <div className="relative w-full max-w-[280px] rounded-2xl border border-white/10 overflow-hidden" style={{ background: "#0d0d18" }}>
+    <div className="relative w-full max-w-[280px] rounded-2xl border border-white/10 overflow-hidden bg-[#0d0d18]">
       <div className="p-4 text-center border-b border-white/8">
         <p className="text-white font-bold text-sm">Agent's Store</p>
         <p className="text-white/40 text-xs">swiftdatagh.shop/store/<span className="text-amber-400">agentname</span></p>
 
       </div>
       <div className="p-4">
-        <div className="rounded-xl border border-amber-400/30 p-3" style={{ background: "rgba(245,158,11,0.06)" }}>
+        <div className="rounded-xl border border-amber-400/30 p-3 bg-amber-400/[0.06]">
           <div className="flex items-center gap-2 mb-2">
             <TrendingUp className="w-4 h-4 text-amber-400" />
             <span className="text-amber-300 font-bold text-xs">Become a Sub Agent</span>
@@ -376,9 +374,9 @@ const SubStep1 = () => (
 
 const SubStep2 = () => (
   <div className="flex flex-col items-center gap-4 py-4">
-    <div className="w-full max-w-[280px] rounded-2xl border border-white/10 p-4 space-y-2" style={{ background: "#111124" }}>
+    <div className="w-full max-w-[280px] rounded-2xl border border-white/10 p-4 space-y-2 bg-[#111124]">
       {["Full name", "Phone number", "Email address"].map((label, i) => (
-        <div key={label} className="h-8 rounded-lg border border-white/10 flex items-center px-3" style={{ background: "rgba(255,255,255,0.05)", animation: `tutorial-fade-in 0.4s ease-out ${i * 150}ms both` }}>
+        <div key={label} className="h-8 rounded-lg border border-white/10 flex items-center px-3 bg-white/[0.05]" style={{ animation: `tutorial-fade-in 0.4s ease-out ${i * 150}ms both` }}>
           <span className="text-white/30 text-xs">{label}</span>
         </div>
       ))}
@@ -392,12 +390,12 @@ const SubStep2 = () => (
 
 const SubStep3 = () => (
   <div className="flex flex-col items-center gap-4 py-4">
-    <div className="relative w-full max-w-[280px] rounded-2xl border border-white/10 p-4" style={{ background: "#111124" }}>
+    <div className="relative w-full max-w-[280px] rounded-2xl border border-white/10 p-4 bg-[#111124]">
       <div className="flex items-center gap-2 mb-3">
         <CreditCard className="w-4 h-4 text-amber-400" />
         <span className="text-white font-bold text-sm">Pay Activation Fee</span>
       </div>
-      <div className="rounded-xl p-3 border border-white/8 mb-3" style={{ background: "rgba(255,255,255,0.03)" }}>
+      <div className="rounded-xl p-3 border border-white/8 mb-3 bg-white/[0.03]">
         <div className="flex justify-between text-xs mb-1.5">
           <span className="text-white/50">Sub-agent activation</span>
           <span className="text-white font-bold">GH₵ 50.00</span>
@@ -434,7 +432,7 @@ const SubStep4 = () => (
         { label: "Dashboard access", value: "Full control", color: "#3b82f6" },
         { label: "Set your prices", value: "Any margin", color: "#a855f7" },
       ].map((b) => (
-        <div key={b.label} className="rounded-xl p-2.5 border border-white/8 text-center" style={{ background: "rgba(255,255,255,0.03)" }}>
+        <div key={b.label} className="rounded-xl p-2.5 border border-white/8 text-center bg-white/[0.03]">
           <p className="text-[10px] text-white/40">{b.label}</p>
           <p className="text-xs font-bold mt-0.5" style={{ color: b.color }}>{b.value}</p>
         </div>
@@ -545,8 +543,7 @@ export default function TutorialModal() {
     return (
       <button
         onClick={() => { setFlow(null); setStep(0); setViewMode("steps"); setVisible(true); }}
-        className="fixed bottom-24 right-4 z-40 w-10 h-10 rounded-full border border-white/15 flex items-center justify-center text-white/50 hover:text-white hover:border-white/30 transition-all hover:scale-110 shadow-lg"
-        style={{ background: "rgba(13,13,24,0.9)", backdropFilter: "blur(12px)" }}
+        className="fixed bottom-24 right-4 z-40 w-10 h-10 rounded-full border border-white/15 flex items-center justify-center text-white/50 hover:text-white hover:border-white/30 transition-all hover:scale-110 shadow-lg bg-[#0d0d18]/90 backdrop-blur-xl"
         title="How it works"
       >
         <span className="text-base font-black">?</span>
@@ -612,19 +609,17 @@ export default function TutorialModal() {
 
       {/* Backdrop */}
       <div
-        className="fixed inset-0 z-50 flex items-start sm:items-center justify-center p-0 sm:p-4 pt-16 sm:pt-0"
-        style={{ background: "rgba(0,0,0,0.7)", backdropFilter: "blur(8px)" }}
+        className="fixed inset-0 z-50 flex items-start sm:items-center justify-center p-0 sm:p-4 pt-16 sm:pt-0 bg-black/70 backdrop-blur-md"
         onClick={(e) => { if (e.target === e.currentTarget) dismiss(); }}
       >
         <div
-          className="relative w-full sm:max-w-sm rounded-b-3xl sm:rounded-2xl overflow-hidden tutorial-enter-up"
-          style={{ background: "linear-gradient(180deg, #111124 0%, #0d0d18 100%)", border: "1px solid rgba(255,255,255,0.08)" }}
+          className="relative w-full sm:max-w-sm rounded-b-3xl sm:rounded-2xl overflow-hidden tutorial-enter-up bg-gradient-to-b from-[#111124] to-[#0d0d18] border border-white/10"
         >
           {/* Header */}
           <div className="flex items-center justify-between px-5 pt-5 pb-3">
             <div className="flex items-center gap-2.5">
               {flow && (
-                <button onClick={() => { setFlow(null); setStep(0); setViewMode("steps"); }} className="text-white/40 hover:text-white/70 transition-colors p-1 -ml-1">
+                <button onClick={() => { setFlow(null); setStep(0); setViewMode("steps"); }} title="Go back" className="text-white/40 hover:text-white/70 transition-colors p-1 -ml-1">
                   <ChevronLeft className="w-4 h-4" />
                 </button>
               )}
@@ -635,7 +630,7 @@ export default function TutorialModal() {
                 {!flow && <p className="text-white/40 text-xs mt-0.5">What would you like to do?</p>}
               </div>
             </div>
-            <button onClick={dismiss} className="text-white/30 hover:text-white/60 transition-colors p-1.5 rounded-lg hover:bg-white/8">
+            <button onClick={dismiss} title="Close" className="text-white/30 hover:text-white/60 transition-colors p-1.5 rounded-lg hover:bg-white/8">
               <X className="w-4 h-4" />
             </button>
           </div>
@@ -735,6 +730,7 @@ export default function TutorialModal() {
                 {step > 0 && (
                   <button
                     onClick={() => goStep("back")}
+                    title="Previous step"
                     className="px-3 py-2.5 rounded-xl border border-white/12 text-white/50 hover:text-white/80 hover:border-white/25 transition-all text-sm font-medium"
                   >
                     <ChevronLeft className="w-4 h-4" />
@@ -753,6 +749,7 @@ export default function TutorialModal() {
                 ) : (
                   <button
                     onClick={() => goStep("forward")}
+                    title="Next step"
                     className="flex-1 py-2.5 rounded-xl font-black text-sm flex items-center justify-center gap-2 transition-all hover:scale-[1.02] active:scale-[0.98]"
                     style={{ background: currentFlow!.accent, color: flow === "buy" ? "#000" : "#fff" }}
                   >

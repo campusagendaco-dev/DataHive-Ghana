@@ -233,10 +233,18 @@ const SupportChat = () => {
               </div>
             </div>
             <div className="flex items-center gap-1">
-              <button onClick={() => setIsMinimized(!isMinimized)} className="p-2 text-white/20 hover:text-white transition-colors">
+              <button 
+                onClick={() => setIsMinimized(!isMinimized)} 
+                title={isMinimized ? "Expand chat" : "Minimize chat"}
+                className="p-2 text-white/20 hover:text-white transition-colors"
+              >
                 <Minus className="w-4 h-4" />
               </button>
-              <button onClick={() => setIsOpen(false)} className="p-2 text-white/20 hover:text-white transition-colors">
+              <button 
+                onClick={() => setIsOpen(false)} 
+                title="Close chat"
+                className="p-2 text-white/20 hover:text-white transition-colors"
+              >
                 <X className="w-4 h-4" />
               </button>
             </div>
@@ -288,9 +296,19 @@ const SupportChat = () => {
                           <span className="text-[9px] font-black text-primary/60 uppercase tracking-widest">SwiftBot</span>
                         </div>
                         <div className="bg-primary/10 border border-primary/20 rounded-2xl rounded-tl-none px-4 py-3 flex items-center gap-1.5">
-                          <span className="w-1.5 h-1.5 bg-primary/60 rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
-                          <span className="w-1.5 h-1.5 bg-primary/60 rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
-                          <span className="w-1.5 h-1.5 bg-primary/60 rounded-full animate-bounce" style={{ animationDelay: "300ms" }} />
+                          {[0, 1, 2].map((i) => (
+                            <motion.span
+                              key={i}
+                              animate={{ y: [0, -4, 0] }}
+                              transition={{
+                                repeat: Infinity,
+                                duration: 0.6,
+                                delay: i * 0.15,
+                                ease: "easeInOut"
+                              }}
+                              className="w-1.5 h-1.5 bg-primary/60 rounded-full"
+                            />
+                          ))}
                         </div>
                       </div>
                     )}
@@ -318,7 +336,7 @@ const SupportChat = () => {
                   placeholder="Type your message..."
                   className="bg-white/5 border-white/10 h-12 rounded-xl text-sm flex-1"
                 />
-                <Button type="submit" disabled={!newMessage.trim() || sending} className="h-12 w-12 rounded-xl p-0 shrink-0">
+                <Button type="submit" disabled={!newMessage.trim() || sending} title="Send message" className="h-12 w-12 rounded-xl p-0 shrink-0">
                   {sending ? <Loader2 className="w-5 h-5 animate-spin" /> : <Send className="w-5 h-5" />}
                 </Button>
               </form>
@@ -334,6 +352,7 @@ const SupportChat = () => {
           dragConstraints={{ left: -window.innerWidth + 80, right: 0, top: -window.innerHeight + 80, bottom: 0 }}
           whileDrag={{ scale: 1.1, cursor: "grabbing" }}
           onClick={() => setIsOpen(true)}
+          title="Open support chat"
           className="group relative w-16 h-16 rounded-[2rem] bg-primary text-black flex items-center justify-center shadow-[0_15px_35px_rgba(251,191,36,0.4)] transition-all duration-500 hover:scale-110 active:scale-95 pointer-events-auto"
         >
           <div className="absolute -inset-2 bg-primary/20 rounded-[2.5rem] blur-xl opacity-0 group-hover:opacity-100 transition duration-500" />

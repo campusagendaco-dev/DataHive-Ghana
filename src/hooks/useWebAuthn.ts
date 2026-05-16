@@ -66,7 +66,7 @@ export function useWebAuthn() {
       const current = getCachedKeyIds();
       const merged = Array.from(new Set([...current, ...keys]));
       localStorage.setItem(LOCAL_KEY_CACHE, JSON.stringify(merged));
-    } catch (e) {}
+    } catch (e) { /* ignore error */ }
   };
 
   const invoke = async (action: string, extra: Record<string, unknown> = {}) => {
@@ -169,7 +169,7 @@ export function useWebAuthn() {
       const current = getCachedKeyIds();
       const filtered = current.filter(id => id !== credentialId);
       localStorage.setItem(LOCAL_KEY_CACHE, JSON.stringify(filtered));
-    } catch (e) {}
+    } catch (e) { /* ignore error */ }
     
     await fetchCredentials();
   };

@@ -63,7 +63,10 @@ function getDisplayStatus(status: string, orderType?: string): DisplayStatus {
     case "paid":
     case "processing":
       return {
-        label: orderType === "utility" ? "Processing Bill" : orderType === "airtime" ? "Sending Airtime" : "Delivering Data",
+        label: orderType === "utility" ? "Processing Bill" : 
+               orderType === "airtime" ? "Sending Airtime" : 
+               orderType?.includes("vendor") ? "Processing Vendor Transfer" :
+               "Delivering Data",
         shortLabel: "Processing",
         icon: Loader2,
         dot: "bg-blue-500",
@@ -270,6 +273,12 @@ const DashboardOrders = () => {
         ? `Type      : Utility Bill`
         : order.order_type === "airtime"
         ? `Type      : Airtime`
+        : order.order_type === "vendor_cash_in"
+        ? `Type      : Vendor Cash-In`
+        : order.order_type === "vendor_cash_out"
+        ? `Type      : Vendor Cash-Out`
+        : order.order_type === "vendor_bank_transfer"
+        ? `Type      : Bank Transfer`
         : `Network   : ${order.network || "—"}`,
       isWalletTopup
         ? `Amount    : GH₵ ${Number(order.amount).toFixed(2)}`
@@ -301,7 +310,13 @@ const DashboardOrders = () => {
     const statusColor =
       order.status === "fulfilled" ? "#16a34a" :
       order.status === "fulfillment_failed" ? "#dc2626" : "#d97706";
-    const serviceLabel = isWalletTopup ? "Wallet Top-up" : isAirtime ? `${order.network} Airtime` : isUtility ? order.package_size : `${order.network} ${order.package_size}`;
+    const serviceLabel = isWalletTopup ? "Wallet Top-up" : 
+                        isAirtime ? `${order.network} Airtime` : 
+                        isUtility ? order.package_size : 
+                        order.order_type === "vendor_cash_in" ? "Vendor Cash-In" :
+                        order.order_type === "vendor_cash_out" ? "Vendor Cash-Out" :
+                        order.order_type === "vendor_bank_transfer" ? "Bank Transfer" :
+                        `${order.network} ${order.package_size}`;
 
     const html = `<!DOCTYPE html><html><head><meta charset="utf-8"/><title>SwiftData Receipt</title>
 <style>

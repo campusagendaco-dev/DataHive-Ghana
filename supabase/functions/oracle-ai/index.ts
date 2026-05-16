@@ -106,13 +106,68 @@ serve(async (req: Request) => {
       }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    const body = await req.json();
+    const body = await req.json().catch(() => ({}));
+    const event = body?.event;
     const userMessage: string = body?.context?.userMessage || body?.message || "";
     const history: { role: string; content: string }[] = body?.history || [];
     const context = body?.context || {};
     
-    if (!userMessage) {
-      return new Response(JSON.stringify({ error: "userMessage required" }), {
+    // ━━━ NEW: Event-Driven Triggers (AI Judge) ━━━
+    if (event === 'new_dispute') {
+      const { order_id, reason } = body;
+      console.log(`[Oracle AI] New Dispute Triggered: Order ${order_id}`);
+      
+      // Construct the internal reasoning prompt for the AI Judge
+      const messages = [
+        { role: "user", content: `ACT AS AI JUDGE. A new dispute has been filed for Order ID: ${order_id}. Reason: "${reason}". Investigate the logs and provide a final judgment: REFUND, REJECT, or MANUAL_REVIEW.` }
+      ];
+
+      const response = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: {
+          "x-api-key": ANTHROPIC_API_KEY,
+          "anthropic-version": "2023-06-01",
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          model: "claude-3-5-haiku-20241022",
+          max_tokens: 1000,
+          system: `${SYSTEM_PROMPT}\n\n━━━ JUDGE DIRECTIVE ━━━\nYou are now in JUDGE MODE. Use the investigate_dispute tool to see the provider logs. If the provider says "Success" but the user says "Failed", check the timestamps. If the provider response is missing, issue a REFUND.`,
+          messages,
+          tools: [
+            ...TOOLS,
+            {
+              name: "investigate_dispute",
+              description: "Fetch deep logs and provider responses for a disputed order.",
+              input_schema: {
+                type: "object",
+                properties: { order_id: { type: "string" } },
+                required: ["order_id"]
+              }
+            },
+            {
+              name: "execute_resolution",
+              description: "Finalize the dispute judgment. If REFUND, it credits the wallet.",
+              input_schema: {
+                type: "object",
+                properties: {
+                  order_id: { type: "string" },
+                  judgment: { type: "string", enum: ["REFUND", "REJECT", "MANUAL_REVIEW"] },
+                  reasoning: { type: "string" }
+                },
+                required: ["order_id", "judgment", "reasoning"]
+              }
+            }
+          ],
+        }),
+      });
+
+      const data = await response.json();
+      // Handle tool usage in the background loop...
+    }
+
+    if (!userMessage && !event) {
+      return new Response(JSON.stringify({ error: "userMessage or event required" }), {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }

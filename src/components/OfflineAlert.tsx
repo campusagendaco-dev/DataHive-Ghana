@@ -71,6 +71,7 @@ export const OfflineAlert = () => {
             </div>
             <button 
               onClick={() => setDismissed(true)}
+              title="Dismiss warning"
               className="hover:bg-black/10 p-0.5 rounded-full transition-colors flex items-center justify-center"
             >
               <X className="w-3 h-3 text-black/60" />
