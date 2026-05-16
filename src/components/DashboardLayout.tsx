@@ -58,8 +58,9 @@ const DashboardLayout = () => {
       }
 
       if (data) {
-        setWalletBalance(Number(data.wallet_balance || 0));
+        setWalletBalance(Number(data.balance || 0));
       } else {
+
         setWalletBalance(0);
       }
     };

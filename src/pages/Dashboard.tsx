@@ -74,32 +74,59 @@ const Dashboard = () => {
         supabase.from("wallets").select("balance, loyalty_balance").eq("agent_id", user.id).maybeSingle(),
         supabase
           .from("orders")
-          .select("amount, order_type, status, profit")
-          .eq("agent_id", user.id)
+          .select("amount, order_type, status, profit, parent_profit, agent_id, parent_agent_id")
+          .or(`agent_id.eq.${user.id},parent_agent_id.eq.${user.id}`)
           .in("status", ["paid", "processing", "fulfilled", "fulfillment_failed"]),
       ]);
 
-      if (walletRes.error) throw new Error("Fetch failed");
-      if (ordersRes.error) throw new Error("Fetch failed");
+      if (ordersRes.error) {
+        console.error("Orders fetch error:", ordersRes.error);
+        throw new Error("Fetch failed");
+      }
+
+      if (walletRes.error) {
+        console.warn("Wallet fetch error (possibly missing column):", walletRes.error);
+      }
 
       const balance = walletRes.data ? Number(walletRes.data.balance) : 0;
       const allOrders = ordersRes.data ?? [];
+      
       const fulfilledOrders = allOrders.filter((o: any) => o.status === "fulfilled");
       const depositedOrders = allOrders.filter((o: any) => o.order_type === "wallet_topup" && o.status === "fulfilled");
-      const salesOrders = allOrders.filter((o: any) =>
-        ["data", "api", "airtime", "utility"].includes(o.order_type) && o.status === "fulfilled"
-      );
       const subAgentActivationOrders = allOrders.filter((o: any) => o.order_type === "sub_agent_activation" && o.status === "fulfilled");
+
+      // Direct profit + Parent profit (commissions from sub-agents)
+      const directProfit = fulfilledOrders
+        .filter((o: any) => o.agent_id === user.id)
+        .reduce((s: number, o: any) => s + Number(o.profit || 0), 0);
+      
+      const parentProfit = fulfilledOrders
+        .filter((o: any) => o.parent_agent_id === user.id)
+        .reduce((s: number, o: any) => s + Number(o.parent_profit || 0), 0);
+
+      // Define what counts as a "sale" (excludes topups and activations)
+      const isSale = (o: any) => ["data", "api", "airtime", "utility"].includes(o.order_type);
+
+      // Direct sales volume + Sub-agent sales volume
+      const directSales = fulfilledOrders
+        .filter((o: any) => o.agent_id === user.id && isSale(o))
+        .reduce((s: number, o: any) => s + Number(o.amount || 0), 0);
+      
+      const subAgentSales = fulfilledOrders
+        .filter((o: any) => o.parent_agent_id === user.id && isSale(o))
+        .reduce((s: number, o: any) => s + Number(o.amount || 0), 0);
 
       setStats({
         walletBalance: balance,
         totalOrders: fulfilledOrders.length,
         totalDeposited: depositedOrders.reduce((s: number, o: any) => s + Number(o.amount || 0), 0),
-        totalSalesAmount: salesOrders.reduce((s: number, o: any) => s + Number(o.amount || 0), 0),
+        totalSalesAmount: directSales + subAgentSales,
         subAgentEarnings: subAgentActivationOrders.reduce((s: number, o: any) => s + Number(o.profit || 0), 0),
-        totalProfit: fulfilledOrders.reduce((s: number, o: any) => s + Number(o.profit || 0), 0),
+        totalProfit: directProfit + parentProfit,
         loyaltyBalance: Number(walletRes.data?.loyalty_balance || 0),
       });
+
+
     } catch (err) {
       console.error("Dashboard fetch error:", err);
       setError(true);
@@ -112,10 +139,12 @@ const Dashboard = () => {
   useEffect(() => {
     fetchData();
 
+    // Realtime listeners for live updates
     const walletChannel = supabase
       .channel("dashboard-wallet")
       .on("postgres_changes", { event: "UPDATE", schema: "public", table: "wallets", filter: `agent_id=eq.${user?.id}` }, (p: any) => {
         if (p.new?.balance !== undefined) setStats(prev => ({ ...prev, walletBalance: Number(p.new.balance) }));
+        if (p.new?.loyalty_balance !== undefined) setStats(prev => ({ ...prev, loyaltyBalance: Number(p.new.loyalty_balance) }));
       })
       .subscribe();
 
@@ -125,11 +154,21 @@ const Dashboard = () => {
         fetchData(true);
       })
       .subscribe();
+    
+    // Also listen for sub-agent orders
+    const parentOrdersChannel = supabase
+      .channel("dashboard-parent-orders")
+      .on("postgres_changes", { event: "*", schema: "public", table: "orders", filter: `parent_agent_id=eq.${user?.id}` }, () => {
+        fetchData(true);
+      })
+      .subscribe();
 
     return () => {
       supabase.removeChannel(walletChannel);
       supabase.removeChannel(ordersChannel);
+      supabase.removeChannel(parentOrdersChannel);
     };
+
   }, [user, fetchData]);
 
   const primary = `hsl(${theme.primary})`;

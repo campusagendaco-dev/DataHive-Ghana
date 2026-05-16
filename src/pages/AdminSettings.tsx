@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Save, AlertCircle, Phone, MessageSquare, Percent, MessageCircle, Gift, Sparkles, Video, Upload, Trash2, Trash, Loader2, Loader, Globe, Database, Plus, ExternalLink, Activity, Shield, GraduationCap, RefreshCw, Wifi, Users, TrendingUp } from "lucide-react";
+import { Save, AlertCircle, Phone, MessageSquare, Percent, MessageCircle, Gift, Sparkles, Video, Upload, Trash2, Trash, Loader2, Loader, Globe, Database, Plus, ExternalLink, Activity, Shield, GraduationCap, RefreshCw, Wifi, Users, TrendingUp, Wallet } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Textarea } from "@/components/ui/textarea";
 import { logAudit } from "@/utils/auditLogger";
@@ -86,6 +86,7 @@ const AdminSettings = () => {
   const { session } = useAuth();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [restoringWallets, setRestoringWallets] = useState(false);
   const [settings, setSettings] = useState<SystemSettings>({
     auto_api_switch: false,
     preferred_provider: "paystack",
@@ -1680,7 +1681,7 @@ const AdminSettings = () => {
                 </p>
               </div>
 
-              <Button 
+              <Button
                 onClick={async () => {
                   setSaving(true);
                   try {
@@ -1689,7 +1690,7 @@ const AdminSettings = () => {
                       .update({ allowed_ips: allowedIps })
                       .eq("user_id", session?.user.id)
                       .eq("role", "admin");
-                    
+
                     if (error) throw error;
                     toast({ title: "IP Restrictions Updated", description: "Your access rules have been saved." });
                   } catch (e: any) {
@@ -1703,6 +1704,53 @@ const AdminSettings = () => {
                 className="w-full font-bold"
               >
                 Apply IP Restrictions
+              </Button>
+            </CardContent>
+          </Card>
+
+          <Card className="border-amber-500/30 bg-amber-500/5">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-amber-400">
+                <Wallet className="w-5 h-5" />
+                Wallet Balance Restoration
+              </CardTitle>
+              <CardDescription>
+                Creates missing wallet records for all agents and restores uncredited top-up balances.
+                This operation is safe to run once — it will not apply if already executed.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Button
+                onClick={async () => {
+                  if (!window.confirm("Restore wallet balances for all affected agents? This runs once and cannot be reversed.")) return;
+                  setRestoringWallets(true);
+                  try {
+                    const { data, error } = await supabase.functions.invoke("admin-wallet-restore", {
+                      headers: { Authorization: `Bearer ${session?.access_token}` },
+                    });
+                    if (error || data?.error) throw new Error(data?.error || error?.message);
+                    if (data?.success === false) {
+                      toast({ title: "Already Applied", description: data.message || "Restoration was already completed.", variant: "default" });
+                    } else {
+                      toast({
+                        title: "Wallet Restoration Complete",
+                        description: data?.message || `${data?.restored_agents} agent balances restored.`,
+                      });
+                    }
+                  } catch (e: any) {
+                    toast({ title: "Restoration Failed", description: e.message, variant: "destructive" });
+                  } finally {
+                    setRestoringWallets(false);
+                  }
+                }}
+                disabled={restoringWallets}
+                className="w-full bg-amber-600 hover:bg-amber-700 text-white font-bold"
+              >
+                {restoringWallets ? (
+                  <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Restoring Wallets...</>
+                ) : (
+                  <><Wallet className="w-4 h-4 mr-2" /> Restore Agent Wallet Balances</>
+                )}
               </Button>
             </CardContent>
           </Card>

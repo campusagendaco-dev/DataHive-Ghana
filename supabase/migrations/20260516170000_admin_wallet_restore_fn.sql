@@ -1,0 +1,343 @@
+-- Admin Wallet Restoration Function
+-- Creates missing wallet records for all profiles and restores uncredited top-up amounts.
+-- Safe to deploy: idempotent via audit_logs guard.
+
+CREATE OR REPLACE FUNCTION public.admin_apply_wallet_restoration()
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  _inserted integer;
+  _restored integer := 0;
+BEGIN
+  -- Guard: Only apply once
+  IF EXISTS (
+    SELECT 1 FROM public.audit_logs WHERE action = 'wallet_restoration_applied' LIMIT 1
+  ) THEN
+    RETURN jsonb_build_object('success', false, 'message', 'Restoration already applied. Contact admin to re-run.');
+  END IF;
+
+  -- Step 1: Drop the broken FK constraint (if still present) then create missing wallets
+  BEGIN
+    ALTER TABLE public.wallets DROP CONSTRAINT IF EXISTS wallets_agent_id_fkey;
+  EXCEPTION WHEN OTHERS THEN NULL;
+  END;
+
+  INSERT INTO public.wallets (agent_id, balance, loyalty_balance, api_balance)
+  SELECT user_id, 0, 0, 0
+  FROM public.profiles
+  ON CONFLICT (agent_id) DO NOTHING;
+
+  GET DIAGNOSTICS _inserted = ROW_COUNT;
+
+  -- Step 2: Apply uncredited top-up restorations
+  UPDATE public.wallets SET balance = balance + 80.00    WHERE agent_id = 'aec03811-5e97-4187-ba31-a6538f55a0b0'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 385.00   WHERE agent_id = '324bb585-f6cd-47ce-83eb-b382fb9f5019'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 50.00    WHERE agent_id = '2cd48e5b-f023-47cf-b128-e28a7ff83d58'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 530.00   WHERE agent_id = 'e1bddf5b-a26a-4057-bc46-dc41b334d142'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 80.00    WHERE agent_id = '843943ee-29eb-4e64-93c0-17ad53443eb2'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 20.00    WHERE agent_id = '8a0c1533-7e85-4626-9479-eb770a6739e2'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 35.50    WHERE agent_id = '4de307ed-eac9-40aa-918c-702e7809da22'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 20.00    WHERE agent_id = '8e096892-7fe9-4c7d-8d29-1339bcf7c2dc'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 118.00   WHERE agent_id = '89434f65-1f44-438f-be3a-26eae7122b3f'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 19.98    WHERE agent_id = '1c982854-345f-42cc-b524-8da603ab85a7'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 22.00    WHERE agent_id = 'b0a83a3b-5c9d-44f0-9d61-c7b875746c97'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 43.00    WHERE agent_id = 'abdd7e90-d0bc-48da-801a-7aaab75ab547'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 5.00     WHERE agent_id = 'cad1382e-89e5-4a7a-9ea7-3bea0cb2af2d'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 40.00    WHERE agent_id = '582c3db0-8d5a-43f0-bda1-8a27bbdfab57'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 8.20     WHERE agent_id = 'c5b4d5ae-15c8-4cb8-8f05-af2360c75d25'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 9.50     WHERE agent_id = '5169b557-6632-42ab-ba49-368bd4fbc327'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 124.98   WHERE agent_id = '928f823a-5697-40b0-b0b0-5bcb26958da5'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 38.00    WHERE agent_id = 'da4d8517-e72b-439e-9b55-300c4f00e0fb'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 10.00    WHERE agent_id = 'ee4d92cb-3a8f-433e-aa53-23f1fad8de3a'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 31.00    WHERE agent_id = 'b9e706e4-a371-4c17-ae07-91d3afd142c8'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 26.00    WHERE agent_id = '47e02ac2-b082-4a4e-966e-67b822aebec2'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 14.00    WHERE agent_id = '75c81da6-79af-431a-94cb-35e657af64d8'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 16.50    WHERE agent_id = 'f763d509-9ca7-4d4b-8324-0740d5e663ea'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 50.00    WHERE agent_id = 'b7e08ab3-c570-46eb-b4ed-e6698201b427'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 25.00    WHERE agent_id = '9a51d8ab-ea45-402f-a57b-eba2becb8e4a'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 25.00    WHERE agent_id = '6105d3ea-30f7-417b-ad2f-bab82984129c'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 98.00    WHERE agent_id = '3705ac5f-cbd4-49c5-88b1-3d5d66588386'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 130.00   WHERE agent_id = '49e364b3-2aaf-483b-a1ca-a8a2d68978ed'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 27.90    WHERE agent_id = '1244e125-8c64-440f-9179-a78cdc9f3101'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 10.00    WHERE agent_id = '5c963edf-f48b-47d3-99b8-827495264505'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 140.00   WHERE agent_id = 'dac42fe3-4152-4fd3-b440-5e957eb8bd88'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 25.00    WHERE agent_id = '7fd23ff5-7b97-40fb-ae5c-242b86930f45'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 28.00    WHERE agent_id = 'aeb76876-8f62-464a-ac81-99ce86b573dc'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 60.00    WHERE agent_id = '5c7994eb-8711-4a02-9520-331b59e4fe03'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 85.00    WHERE agent_id = '3a32615c-0394-4f70-9ba9-8fa75b467af5'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 69.00    WHERE agent_id = 'd65a44e6-00dd-4720-9aeb-18d4e93025cd'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 5.00     WHERE agent_id = '75a475d2-0eb1-4071-bad0-054c7ef97596'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 24.41    WHERE agent_id = '43d48412-7d73-4502-acd1-e97b5b4fdc84'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 16.00    WHERE agent_id = 'be28a2d1-2149-4207-a292-fe6cbecc61ca'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 85.00    WHERE agent_id = 'a3a7533d-a86f-4eaa-a22c-cc9e998b991d'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 49.00    WHERE agent_id = 'aa9d0ef8-0308-4ebe-ae1e-9581210b78b1'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 21.00    WHERE agent_id = '9a1836cc-cf94-4f7a-8b8f-e0fd94533ffd'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 41.00    WHERE agent_id = '47d76bac-d29a-4b64-9aab-3cd1f4b3c813'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 9.00     WHERE agent_id = '5b37e6a7-affb-4ca7-adca-1443873ead06'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 81.00    WHERE agent_id = 'b95c2cdd-5739-41c8-9bdc-de7212f3b00d'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 509.00   WHERE agent_id = 'e04ac52a-dee5-4b2d-a8a5-cb180c5cda76'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 5.00     WHERE agent_id = '1bef3eca-4b1c-47a4-bc09-0f0056d027e1'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 5.00     WHERE agent_id = 'a8bc2a17-9b84-4c5c-8b2e-33885ff9dae3'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 9.00     WHERE agent_id = 'c379b4de-4298-42e1-bf8f-05378a4fc7f0'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 845.00   WHERE agent_id = '282765fc-3501-4e08-9bb4-52737d54409f'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 16.00    WHERE agent_id = '1e27e9f6-b95d-43c3-9fdd-12a5f4500e93'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 200.00   WHERE agent_id = 'b6d11b65-606e-44d9-ac35-d5eeb86e4aff'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 10.00    WHERE agent_id = 'f91e1fb6-fda6-449c-a4c0-629f2c6b8e1e'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 9.20     WHERE agent_id = 'a452d747-ad28-42f2-8e7a-f137048a9851'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 89.00    WHERE agent_id = '05a4d2f0-cacb-41d5-a458-15b5e1326090'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 10.00    WHERE agent_id = 'cecdd49e-5871-4098-9acf-6b5d720f6625'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 44.00    WHERE agent_id = '2e9ae519-9c1c-45e7-a8ce-ba06a5f56158'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 36.50    WHERE agent_id = '693c4900-4efa-4153-815b-0709e1bdb998'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 61.00    WHERE agent_id = 'c3d84ac0-f739-4122-9f1a-394421ce90cb'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 210.00   WHERE agent_id = '3f07fd96-b8d3-4248-8c9f-f9aeeaa03818'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 5.00     WHERE agent_id = '51dea3e7-98eb-4998-af98-cc0d1d80ed7f'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 35.00    WHERE agent_id = 'c732b328-fa40-450d-ab65-14eb7e9f22e6'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 20.00    WHERE agent_id = '741ead47-e8da-4179-a30d-342669aaf428'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 3.90     WHERE agent_id = 'fb314d9e-0b9e-4394-b6b5-abd8df3dca89'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 8.50     WHERE agent_id = '7702e5ba-3d8f-41ab-b1aa-3cefe2807acb'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 9.00     WHERE agent_id = '132ed222-a1b4-4f40-b53f-80632d5f69bd'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 89.00    WHERE agent_id = 'da9b7431-6c56-43bd-b98d-61c94d6bea9d'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 62.00    WHERE agent_id = '28949716-5198-46fd-b02e-a58c86dcb659'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 250.00   WHERE agent_id = 'ea4aa3f6-8839-4972-9986-2065aa72805d'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 15.00    WHERE agent_id = 'ac88444d-ab2b-4df5-a9d8-c188a4ea40ba'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 15.00    WHERE agent_id = '254d4dea-81a7-4d0e-bfed-7c0ef81f4fa8'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 260.00   WHERE agent_id = '1f2fe994-2e74-4427-8ba3-c55e77535a2c'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 4.30     WHERE agent_id = 'fb30c763-3b4c-4a4c-9a37-4e6aa0cc3bea'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 135.00   WHERE agent_id = '6efcb855-1c80-4443-a341-081020b429f1'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 8.50     WHERE agent_id = '6eb40595-b6a8-4087-a81a-e8a18568fe97'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 17.00    WHERE agent_id = '244bffb4-220e-4059-8c8c-ff198d060d48'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 80.00    WHERE agent_id = '7a8f70dd-24e5-46d7-a1f8-6f8703819d82'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 40.00    WHERE agent_id = 'af9e457f-5026-40ea-86d9-fc563daee7d7'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 419.00   WHERE agent_id = '48137685-7be9-424f-92a3-32c1532abdf7'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 53.00    WHERE agent_id = '69e6bd97-942f-435f-80e0-eec95ff05482'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 8.20     WHERE agent_id = '3c31b559-be55-42a7-b740-352afd0902d0'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 50.00    WHERE agent_id = '5de2ad01-064a-4f67-b8f9-d3efcd48930c'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 100.00   WHERE agent_id = '1fba70c2-9b16-4beb-85eb-73fc8631e808'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 501.00   WHERE agent_id = '9bf201dd-ee21-4a70-8cfc-9186d7566f9d'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 35.00    WHERE agent_id = '7af73fdd-a2c6-4a33-b76a-8fcc86a9121e'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 5.00     WHERE agent_id = 'd80f7d77-0851-4103-9ea6-c2a1ea196d65'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 25.00    WHERE agent_id = '0d97e6ae-81c5-4a0e-8474-de002a51a6cb'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 119.00   WHERE agent_id = '00e44334-1efd-4064-9eb8-67ecc7286086'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 120.00   WHERE agent_id = 'dffaf45e-8cbe-4278-9540-aa10593efd83'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 5100.00  WHERE agent_id = '45667b99-fe09-41cf-8a9b-7b7bde6a21e3'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 165.00   WHERE agent_id = 'd080c079-f767-4563-ab48-676f01de9dfa'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 92.00    WHERE agent_id = '62016086-5ddb-4cd7-ac80-7398f3000e80'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 15.00    WHERE agent_id = '88c164ed-c0ac-4220-a1f4-07cc3794dc16'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 640.00   WHERE agent_id = 'ce76960d-9892-4cee-926f-7c8dbbb15cdb'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 47.00    WHERE agent_id = 'a496e383-48db-4083-9def-3e5d747747d5'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 46.00    WHERE agent_id = '45ed83a8-a938-4047-8b97-36cca33486f4'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 72.00    WHERE agent_id = 'aea31680-fcf5-466b-8651-cea64bd0e761'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 238.00   WHERE agent_id = 'ee9cb88c-2f8a-4a8b-ace9-c64099f24392'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 130.00   WHERE agent_id = '5c1dae74-d761-4c0c-9712-9ea576697b91'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 10.00    WHERE agent_id = '3ff4ad4a-3fd1-46bf-a952-0f6a935d496e'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 15.00    WHERE agent_id = '87f86a4a-be34-452b-9710-80a888f1d84c'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 68.00    WHERE agent_id = '8ae573d9-362c-481a-bb52-8a129e0bec58'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 100.00   WHERE agent_id = '435bc0b2-d202-40ba-9425-cb3e922279a3'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 20.00    WHERE agent_id = 'e39c49cb-57e4-44a6-bbcb-16930f501eef'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 15.00    WHERE agent_id = 'b27fd265-7b03-4bf2-aaa7-023bfd712f66'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 20.00    WHERE agent_id = 'ce3d10c5-c788-47c3-b4ae-879b87efec4f'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 20.00    WHERE agent_id = 'ad69631f-592a-4d63-9860-5957bee58731'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 155.00   WHERE agent_id = 'fbdb12a3-d19b-4197-aa7b-a46fad6af8ee'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 218.00   WHERE agent_id = 'e5d9da29-e10b-44dd-a13c-8c12a5e65c1c'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 1050.00  WHERE agent_id = 'daff4e33-1ef9-4c4e-8043-0331dac03916'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 10.00    WHERE agent_id = '56473c77-fa97-45b9-82c3-c410ff58e108'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 156.00   WHERE agent_id = 'bc30dd36-f763-4e6b-8360-a29e0d2339f8'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 16.00    WHERE agent_id = '1f19e0e8-2625-4d0e-a1b8-bc4a51f64893'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 99.00    WHERE agent_id = '637dae5f-d92d-4707-a5d5-da1b022e498d'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 25.00    WHERE agent_id = 'd2e2409d-42df-4811-baea-23b7f7695e1e'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 14.68    WHERE agent_id = 'aa85ac09-6f4e-497b-97fd-c723ebd5e74f'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 70.00    WHERE agent_id = '24ee86c1-3129-4576-9bee-9fbdb294e749'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 30.00    WHERE agent_id = 'dd6d4032-faac-41e1-a2db-9ccf416763ff'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 30.00    WHERE agent_id = 'e8180840-a7c5-4521-a14c-a9e40f44c360'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 50.00    WHERE agent_id = '6ec1161b-d96a-459c-b8f9-66e5642c320d'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 20.00    WHERE agent_id = 'e8344413-7fdd-4d6b-91d8-c42f55cfd648'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 136.00   WHERE agent_id = 'a721223f-7253-4bbf-90bf-7bb5e7cb7b20'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 17.19    WHERE agent_id = 'a258fec5-e375-4d8a-be9e-c46ef3d121ad'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 10.00    WHERE agent_id = 'd1b2e0a6-b441-49b0-bf88-9699a5f13fad'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 20.00    WHERE agent_id = 'e860e35a-003a-4cf1-ae64-0f6451b0b1b1'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 55.00    WHERE agent_id = '672eb0e5-caa6-4569-83a6-825b2da867f6'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 10.00    WHERE agent_id = '148de7e8-b797-42ca-b6f0-3c10b5f1933d'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 126.00   WHERE agent_id = '82e7b016-72bd-4d08-a546-91df7b45a038'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 10.00    WHERE agent_id = 'd62368ed-f3b6-4200-9438-2111f8bdd8dc'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 20.00    WHERE agent_id = '6924a8fb-781f-40c2-80b6-cbbc5bb25fc8'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 25.00    WHERE agent_id = '5fc1fc5e-ca9f-4182-8b94-b8985dcb19e6'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 10.00    WHERE agent_id = 'd48b5f92-aacf-4314-ae5e-3d6b0e41d76a'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 10.00    WHERE agent_id = '73095e13-975a-41b2-89e4-8dcd6917b778'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 103.50   WHERE agent_id = '2a12ad23-737b-4ba7-a9c0-ca59d759597e'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 130.98   WHERE agent_id = '021aafbe-9edb-4ce9-aa02-50d491a89835'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 33.00    WHERE agent_id = '96486fba-8753-4373-bca2-ebd1e1961533'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 35.00    WHERE agent_id = '7cb8a8cf-1c32-46b0-a75b-3641daaebb3f'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 40.00    WHERE agent_id = 'ae048c90-bd8c-479a-baf3-e9392aef1f56'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 34.00    WHERE agent_id = '84c68402-b341-4f1b-9a82-a9077c82b621'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 10.00    WHERE agent_id = '076487cb-a577-410f-bd33-dfb623049e5d'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 40.00    WHERE agent_id = '0f7e7ed2-e2e7-4dac-ba1a-91e45ffc79a3'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 20.00    WHERE agent_id = '13b45f86-3724-45ca-a724-304ddaf5363b'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 50.00    WHERE agent_id = '29fbf850-6517-45d9-962b-2de5c12c4c8e'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 19.00    WHERE agent_id = 'd9bce390-9c80-49bf-9fdd-183ae0fab1f1'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 10.00    WHERE agent_id = 'a3c732b2-1fb3-4642-a9e6-a6b6d3a281ea'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 158.00   WHERE agent_id = 'd0d3b100-0120-44f6-be52-5f2c272484dd'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 127.00   WHERE agent_id = '9439e4fc-20c9-480b-9ac9-2e1e6d72f16b'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 50.00    WHERE agent_id = 'a8c91a11-34a7-45c8-9541-996897141e0f'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 10.00    WHERE agent_id = '47da553d-4bea-4542-a331-b5e91eeceab6'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 10.00    WHERE agent_id = '81ae2ede-7221-45c9-978b-78243a6e326f'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 30.00    WHERE agent_id = 'ee5d14b1-0ebf-429a-98e6-8e8ee8976daa'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 10.00    WHERE agent_id = '615de130-5024-4667-98f8-cb23a5c53cf2'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 40.00    WHERE agent_id = '2bb9f8dc-7290-4b7e-a8bd-454ec34352d6'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 32.00    WHERE agent_id = 'a2622792-32cc-46b7-8ece-dc962c74f74e'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 50.00    WHERE agent_id = 'df289d62-399a-421c-9852-a2e37c9bde58'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 78.00    WHERE agent_id = '13de6520-ab80-4c99-8504-1da209ee3420'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 200.00   WHERE agent_id = '72de4d60-23be-4a2f-8adb-ca769b482cbd'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 10.00    WHERE agent_id = '8dd60d0d-f1c2-42c1-9509-220e1f38dae9'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 60.00    WHERE agent_id = 'cb6acbaa-b63d-4e54-a9ec-7a77f354bd2f'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 12.90    WHERE agent_id = '4652a755-79dc-4dfd-9cce-be38d18fbb0f'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 13.00    WHERE agent_id = '42dcaf7d-072a-4da5-b931-a5199d75b464'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 10.00    WHERE agent_id = '88b9b1cb-45ad-48e2-a7b7-c28b22377e5c'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 50.00    WHERE agent_id = '6d7741d0-7155-421e-8c72-c0ebbf40ae10'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 10.00    WHERE agent_id = '267dfb95-c51a-45a7-9937-cedc55a3171f'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 10.00    WHERE agent_id = 'a87a1ed4-781c-41c0-8a7f-bb09c4a1984c'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 40.00    WHERE agent_id = 'b1f3050a-756d-4ec7-b9bc-8fb46356ec08'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 52.10    WHERE agent_id = 'ef0a94a4-d3c3-42ae-8f4a-2ef471d6ee88'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 48.00    WHERE agent_id = 'c42f0bd9-b5e8-45ce-8e80-fadc1ae481d8'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 10.00    WHERE agent_id = '58594d91-1745-4891-9fc1-c4d2fab87485'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 10.00    WHERE agent_id = '64346ae6-b073-44eb-9b28-b7ec851439f9'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 104.10   WHERE agent_id = '469cceee-72b4-4986-a4db-38bf71389b67'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 135.00   WHERE agent_id = '2cc31b98-b677-471e-8264-e9f1bdc5d00c'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 2240.00  WHERE agent_id = '46ac926e-6541-4a76-bda4-d0bc42427616'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 70.00    WHERE agent_id = '7c544508-002b-47c4-9c5c-b14d147bd6e5'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 68.00    WHERE agent_id = '1444426f-0275-4974-a9d6-4f499422d979'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 35.50    WHERE agent_id = '0f39fe8e-b44b-4ef7-96db-e1ed8161bd93'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 10.00    WHERE agent_id = '6f5d4551-e644-4d7b-87c9-07dcf9aebc98'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 39.00    WHERE agent_id = 'cade6ebe-681b-4be7-8d89-a1d1f9af3bf7'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 20.00    WHERE agent_id = '4e03451e-0330-4d05-8190-4e8ebfc68cbc'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 10.00    WHERE agent_id = 'c02df967-b398-48e1-9456-c89e729f9c7f'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 10.00    WHERE agent_id = '5cf521f3-3226-4a32-8008-62c1aa50ec57'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 25.50    WHERE agent_id = '9e84c5ad-4f3d-45ba-b429-c319d64d35ee'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 120.28   WHERE agent_id = '411df1ec-38b4-4626-acbe-304f9b1a71a4'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 20.00    WHERE agent_id = 'f34c8e63-f76f-44fa-8c76-f6c52945211b'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 186.00   WHERE agent_id = 'c0825d18-3ac9-4a72-849b-f1a3a53d684d'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 30.00    WHERE agent_id = '54375f84-cc8a-4f47-8576-ed74c4512f2f'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 21.00    WHERE agent_id = '3709f27a-29e7-4a46-acae-7c539e94ae24'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 10.00    WHERE agent_id = '72a3a436-93bd-44d3-b4ef-b3f14f7f0f7e'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 22.00    WHERE agent_id = '32f2c22d-d656-43fe-9605-2fbb1926a20d'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 12.55    WHERE agent_id = 'd2650690-fe6d-440c-9da5-9c8870ec1408'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 10.00    WHERE agent_id = '03d334f1-c0b7-47ba-9bfa-c642a65ae80b'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 10.00    WHERE agent_id = '96211f35-e202-4c76-9077-5bcefce6ac3c'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 90.00    WHERE agent_id = 'e85ce5e1-117b-4830-b475-fb9dc2bd9ea9'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 51.20    WHERE agent_id = '1a14df90-668c-41d5-afff-e4bce3d1f305'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 10.00    WHERE agent_id = 'cd44da4e-5f84-4e06-bfe7-b172df99da51'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 10.00    WHERE agent_id = '95a4a5d3-dfd1-4749-8cb2-3d2723b048c8'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 38.00    WHERE agent_id = '698f41a6-92ce-4929-9eb6-a461e89056fb'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 31.00    WHERE agent_id = '4fd5030f-1977-462a-a6c6-e721914b8523'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 37.00    WHERE agent_id = 'd18d8081-431d-4998-a33b-920eed7f6966'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 10.00    WHERE agent_id = '0fdeb950-b1e8-40b3-8319-ec241c4aa9ee'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 40.00    WHERE agent_id = '2e44639e-5513-479a-940e-d62dea61f8b4'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 20.00    WHERE agent_id = '1eedc00f-b3d7-4e48-a7ec-dff0d16d0826'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 10.00    WHERE agent_id = '8bb62b75-e28c-4cb1-b201-3c87b051bf9a'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 30.00    WHERE agent_id = '3b34848e-a02d-4c8c-90f9-2aaefeaeb2d7'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 10.00    WHERE agent_id = '8b18c61d-075c-4471-a5b1-7fe6e57f6ea7'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 10.00    WHERE agent_id = 'b690b375-1366-400c-a192-7092ab1f1435'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 50.00    WHERE agent_id = '544addfe-509b-47fa-b312-39e6e2b155ca'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 10.00    WHERE agent_id = '5d669bc6-8dcf-4b1c-b7c0-e4cb3dda2be5'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 10.00    WHERE agent_id = 'bc7ee557-359b-413f-8a3f-5c02f4934fb3'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 25.00    WHERE agent_id = '2279dbe7-dda4-4ce2-9820-c7aa3992026f'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 10.00    WHERE agent_id = 'b882620f-4a9c-41db-97e2-68a4279fd6a1'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 10.00    WHERE agent_id = 'ccce80de-4bb0-4fe8-b222-3256f1f06dbb'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 10.00    WHERE agent_id = 'b0c511ca-2191-421d-a8a0-45cb3ac61dcd'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 85.00    WHERE agent_id = '7697518d-d3f2-4f4b-a311-d5293cec98b5'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 50.00    WHERE agent_id = '1d602872-7340-4a9d-9582-b44bba58c37d'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 52.00    WHERE agent_id = '32240c7f-82b8-4501-a5ee-105eed5bcc4a'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 20.00    WHERE agent_id = '318be208-907e-4d55-bcbc-2e73e90ebc84'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 10.00    WHERE agent_id = '9586578b-b184-4335-b478-c26eeb062115'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 120.00   WHERE agent_id = '1bdf5648-472b-4311-9ac2-426ed3d96747'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 100.00   WHERE agent_id = '95208053-5f9f-443e-8c35-69663cce29ac'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 150.00   WHERE agent_id = '68d3d23b-9fa8-4168-b42d-dfd612e04761'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 20.00    WHERE agent_id = '76b0069f-efc9-465c-8d52-82fa78257583'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 20.00    WHERE agent_id = '869a40ec-94b6-460f-ab4a-a9346c569026'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 39.00    WHERE agent_id = 'f08ee1d3-53e4-418e-bf90-3c72a10c1e00'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 48.00    WHERE agent_id = 'dc152ad7-1b5d-4315-ba1a-e3c79f18bceb'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 10.00    WHERE agent_id = '1a900fbc-6e18-4153-87d0-8d2603369a29'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 51.00    WHERE agent_id = '61012678-fa72-477e-9e3f-0f8b534af3ce'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 20.00    WHERE agent_id = '664f5941-e9d2-4977-a92f-da7455d2b7f9'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 10.00    WHERE agent_id = '1602dcf8-50fb-4967-8c38-94d0c217d32c'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 10.00    WHERE agent_id = '32b3b12c-9481-442d-b937-c76ddab214e4'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 170.00   WHERE agent_id = 'ed04aec1-cfa7-42b6-a2c6-3632b40be53a'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 10.00    WHERE agent_id = 'f99db6ea-30d7-478d-b2c8-080b682d08ff'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 10.00    WHERE agent_id = 'ccbfa13c-ae1f-42a3-90d6-512604fa88cc'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 10.00    WHERE agent_id = '2c0a601f-50e4-410f-b4b8-fc48fcd0f545'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 10.00    WHERE agent_id = 'f8ad87eb-c576-4c71-9369-8563a395d637'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 10.00    WHERE agent_id = '5f9f42e9-d5ce-41bc-827b-d67604ddcfcb'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 30.00    WHERE agent_id = '1ee2e986-751e-4a8e-a773-375fee6a98cf'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 10.00    WHERE agent_id = '49a28499-6c31-40e0-8e16-448e98ac0768'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 13.00    WHERE agent_id = '2477f009-db5f-4a16-be05-40537a478682'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 10.00    WHERE agent_id = '050c19d1-f931-494e-81c3-6ab42a12774e'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 20.00    WHERE agent_id = '8a7939cb-f1f8-4ce8-a0ba-58f30797dc02'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 13.00    WHERE agent_id = '71dfc70b-922d-4b55-a484-1151cc65f7c8'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 25.00    WHERE agent_id = 'a85479d5-1157-4da6-a49c-051eca555a08'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 10.00    WHERE agent_id = '22aba10e-aeea-4374-9dde-a4b115c5492d'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 10.00    WHERE agent_id = '656d0948-a0df-4e26-ba8d-94e7ca528d6a'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 10.00    WHERE agent_id = '0ab4e797-b6fb-4e03-844e-cc7d406b71e0'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 12.50    WHERE agent_id = '632c26a3-f6f9-4d6d-9f0a-f40fdd8aa364'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 10.00    WHERE agent_id = 'a7f0f561-8bf8-4d11-becd-57667acb35a0'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 10.00    WHERE agent_id = 'c4e0d74c-8c29-4122-ab50-8a2c64a9d1b7'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 20.00    WHERE agent_id = '63eb42f4-3564-4e9e-ba88-c97c51a70756'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 17.50    WHERE agent_id = '22f59b72-a1a0-4ed2-a1f4-2907b9e24a88'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 69.00    WHERE agent_id = 'f048ccf8-6a9c-4abb-86f4-e5b32949fec5'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 10.00    WHERE agent_id = 'b0997bc7-0f51-4f5a-b8e8-4fe02aa69b9c'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 10.00    WHERE agent_id = 'ac2ee4b1-6c43-4090-bd8e-e49fa7a546d9'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 20.00    WHERE agent_id = 'c6168480-419b-4b16-867b-0063bb8d20b9'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 10.00    WHERE agent_id = '59bbf735-7442-49c5-a6d4-cebaac6ea57e'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 13.00    WHERE agent_id = 'b7712f0d-3cc8-457e-b849-b0898b5fb8cd'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 70.00    WHERE agent_id = 'ce854b6c-079f-4d2f-996a-ab8579a45228'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 10.00    WHERE agent_id = 'd65285b3-d562-4a90-b4c5-9f44e1a9b94f'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 23.00    WHERE agent_id = '74f92489-baf4-49b1-b23b-c9de8638135d'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 10.00    WHERE agent_id = '78190229-9a34-454f-bc70-11da6f3756ae'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 10.00    WHERE agent_id = '8793c9b9-cbbf-4868-8309-82c46fa274fa'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 50.00    WHERE agent_id = '9d201ed7-dade-4704-bcbe-d7de1376f54b'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 35.00    WHERE agent_id = '4da15f73-6069-40dd-a099-302d4d289ab0'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 10.00    WHERE agent_id = '24d9ed01-bc78-4f78-9304-7fb0b1943db5'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 40.00    WHERE agent_id = '0aa73f86-8ec3-4ab2-9638-e091986dacb5'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 10.00    WHERE agent_id = '61d9a68f-12af-4592-8e7b-74bfd867d327'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 17.90    WHERE agent_id = '11825164-0c1a-49bb-ad6e-a8cfdc92c969'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 40.00    WHERE agent_id = '409ff92f-6345-41b2-bd65-82920dbf3cc6'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 40.00    WHERE agent_id = 'dc311f4c-9e2f-4b96-813e-df65e388d74a'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 10.00    WHERE agent_id = 'e6daa195-d70b-426c-9f86-2c97e786febe'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 20.00    WHERE agent_id = 'ccb8d12a-0a34-4a21-9c5d-5edcad426fb1'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 10.00    WHERE agent_id = 'd47d4ff3-3f2a-4f25-b65d-47397b511477'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 150.00   WHERE agent_id = 'fe4ac344-30ba-44c3-9d8b-2d3c2355ef93'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 13.00    WHERE agent_id = '2b58e9d9-c51a-43aa-80da-c045136dfe11'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 20.00    WHERE agent_id = '13961663-4f84-4e11-9799-d08e87c59298'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 20.00    WHERE agent_id = '2e7898f1-c2ee-4bbe-b067-7451ede783e5'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 15.00    WHERE agent_id = 'd2253774-5f4f-47d5-9fde-9a00939757f3'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 12.50    WHERE agent_id = '9e37436e-3a4e-498e-888d-caa8c531c1f6'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 10.00    WHERE agent_id = '8d59178a-ba62-475f-b86c-de277fd61893'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 20.00    WHERE agent_id = '114226bd-75c8-4617-853a-1e203c9d0a8f'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 200.00   WHERE agent_id = 'bc92987a-228e-4a2f-b0d1-0d4ba1c11de2'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 10.00    WHERE agent_id = '8a3e57b6-2849-4508-81a3-03f77fbc1adb'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 20.00    WHERE agent_id = '7e756e74-e8ee-4550-aa94-7ac6750ef9bc'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 20.00    WHERE agent_id = '1f4ae0d1-6857-448e-86fa-ba2f6ed13138'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 10.00    WHERE agent_id = '83e48e47-0c0d-43f3-bd4a-ca0145813e10'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 10.00    WHERE agent_id = '4060fdef-a4d0-440f-8dc4-e4cafe7daf4f'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 14.00    WHERE agent_id = '2dc9c147-7072-40cb-b5a8-6e35f7b1199e'; _restored := _restored + 1;
+  UPDATE public.wallets SET balance = balance + 13.00    WHERE agent_id = 'fa1db939-6a5d-49e6-9c21-04c351d4d3f9'; _restored := _restored + 1;
+
+  -- Step 3: Log the restoration
+  INSERT INTO public.audit_logs (action, details)
+  VALUES (
+    'wallet_restoration_applied',
+    format('Wallet restoration complete. Created %s new wallet records. Restored balances for %s agents.', _inserted, _restored)
+  );
+
+  RETURN jsonb_build_object(
+    'success', true,
+    'created_wallets', _inserted,
+    'restored_agents', _restored,
+    'message', format('Done. %s new wallets created, %s agent balances restored.', _inserted, _restored)
+  );
+END;
+$$;
+
+-- Grant execute to authenticated role (admin check is inside the function body)
+GRANT EXECUTE ON FUNCTION public.admin_apply_wallet_restoration() TO authenticated;

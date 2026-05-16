@@ -440,7 +440,7 @@ const Navbar = () => {
                   </Link>
                 )}
                 <motion.button
-                  onClick={() => setMenuOpen(true)}
+                  onClick={(e) => { setMenuOpen(true); (e.currentTarget as HTMLButtonElement).blur(); }}
                   whileTap={{ scale: 0.9 }}
                   className={`w-9 h-9 rounded-xl flex items-center justify-center transition-colors ${
                     isDark

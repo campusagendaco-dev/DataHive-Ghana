@@ -591,7 +591,7 @@ serve(async (req: Request) => {
           p_amount: amount,
         });
 
-        if (rpcError) throw rpcError;
+        if (rpcError) throw new Error("credit_wallet RPC Error: " + JSON.stringify(rpcError));
         const newBalance = result?.new_balance || 0;
 
         const { error: orderError } = await supabaseAdmin
@@ -604,7 +604,7 @@ serve(async (req: Request) => {
             status: "fulfilled",
           });
 
-        if (orderError) throw orderError;
+        if (orderError) throw new Error("order insert Error: " + JSON.stringify(orderError));
 
         await sendManualCreditSms(user_id, amount);
 
@@ -628,7 +628,7 @@ serve(async (req: Request) => {
           p_amount: amount,
         });
 
-        if (rpcError) throw rpcError;
+        if (rpcError) throw new Error("credit_api_wallet RPC Error: " + JSON.stringify(rpcError));
         const newBalance = result?.new_balance || 0;
 
         const { error: orderError } = await supabaseAdmin
@@ -641,7 +641,7 @@ serve(async (req: Request) => {
             status: "fulfilled",
           });
 
-        if (orderError) throw orderError;
+        if (orderError) throw new Error("order insert Error: " + JSON.stringify(orderError));
 
         await sendManualApiCreditSms(user_id, amount);
 
@@ -1620,7 +1620,7 @@ serve(async (req: Request) => {
     console.error("admin-user-actions error:", error);
     return new Response(
       JSON.stringify({
-        error: error instanceof Error ? error.message : "Internal error",
+        error: error instanceof Error ? error.message : typeof error === 'object' ? JSON.stringify(error) : String(error),
       }),
       {
         status: 500,
