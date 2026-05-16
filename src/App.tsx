@@ -92,6 +92,7 @@ const AdminFeatureFlags = lazy(() => import("./pages/AdminFeatureFlags"));
 const AdminSmsTemplates = lazy(() => import("./pages/AdminSmsTemplates"));
 const AdminCreditManagement = lazy(() => import("./pages/AdminCreditManagement"));
 const AdminSentinelAI = lazy(() => import("./pages/AdminSentinelAI"));
+const AdminSwiftVendorPro = lazy(() => import("./pages/AdminSwiftVendorPro"));
 const AdminAIStrategy = lazy(() => import("./pages/AdminAIStrategy"));
 const AdminAPINetwork = lazy(() => import("./pages/AdminAPINetwork"));
 const SubAgentSignup = lazy(() => import("./pages/SubAgentSignup"));
@@ -109,6 +110,7 @@ const DashboardBulk = lazy(() => import("./pages/DashboardBulk"));
 const DashboardSchedule = lazy(() => import("./pages/DashboardSchedule"));
 const DashboardWhatsAppBot = lazy(() => import("./pages/DashboardWhatsAppBot"));
 const MyOrders = lazy(() => import("./pages/MyOrders"));
+const DashboardSwiftVendor = lazy(() => import("./pages/DashboardSwiftVendor"));
 const DashboardAgentDevHub = lazy(() => import("./pages/DashboardAgentDevHub"));
 const AgentDevAPIDocs = lazy(() => import("./pages/AgentDevAPIDocs"));
 
@@ -406,6 +408,7 @@ const AppContent = () => {
           <Route path="leaderboard" element={<AgentFeatureGuard><DashboardLeaderboard /></AgentFeatureGuard>} />
           <Route path="marketing" element={<AgentFeatureGuard><DashboardMarketing /></AgentFeatureGuard>} />
           <Route path="whatsapp-bot" element={<AgentFeatureGuard><DashboardWhatsAppBot /></AgentFeatureGuard>} />
+          <Route path="swift-vendor" element={<AgentFeatureGuard><DashboardSwiftVendor /></AgentFeatureGuard>} />
 
           {/* Legacy aliases */}
           <Route path="orders" element={<Navigate to="/dashboard/transactions" replace />} />
@@ -448,6 +451,7 @@ const AppContent = () => {
           <Route path="sms-templates" element={<AdminSmsTemplates />} />
           <Route path="credit-management" element={<AdminCreditManagement />} />
           <Route path="sentinel" element={<AdminSentinelAI />} />
+          <Route path="swift-vendor" element={<AdminSwiftVendorPro />} />
           <Route path="ai-strategy" element={<AdminAIStrategy />} />
           <Route path="api-network" element={<AdminAPINetwork />} />
           <Route path="account-settings" element={<DashboardAccountSettings />} />

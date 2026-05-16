@@ -11,7 +11,7 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
-
+import ComingSoonOverlay from "@/components/ComingSoonOverlay";
 import { 
   Sheet, 
   SheetContent, 
@@ -158,7 +158,13 @@ const AdminSwiftVendorPro = () => {
   };
 
   return (
-    <div className="p-6 md:p-10 space-y-10 bg-[#0a0a0b] min-h-screen text-white">
+    <div className="relative h-full w-full overflow-hidden min-h-[80vh] rounded-3xl">
+      <ComingSoonOverlay 
+        title="Swift Vendor Admin is Coming Soon!" 
+        description="We're currently fine-tuning our institutional control console. The ultimate vendor management system is almost here!" 
+        showHomeButton={false} 
+      />
+      <div className="p-6 md:p-10 space-y-10 bg-[#0a0a0b] min-h-[80vh] text-white opacity-20 pointer-events-none select-none blur-[2px]">
       {/* Super Pro Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
         <div>
@@ -411,6 +417,7 @@ const AdminSwiftVendorPro = () => {
             Emergency Network Freeze
           </Button>
         </div>
+      </div>
       </div>
     </div>
   );

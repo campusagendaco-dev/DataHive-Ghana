@@ -17,6 +17,7 @@ import { toast } from "sonner";
 import { useAuth } from "@/hooks/useAuth";
 import { cn } from "@/lib/utils";
 import { SecurityGateway } from "@/components/SecurityGateway";
+import ComingSoonOverlay from "@/components/ComingSoonOverlay";
 
 const GHANA_BANKS = [
   { code: "GCB", name: "GCB Bank" },
@@ -378,7 +379,13 @@ const DashboardSwiftVendor = () => {
 
   return (
     <SecurityGateway>
-      <div className="p-6 md:p-8 space-y-8 animate-in fade-in duration-700">
+      <div className="relative h-full w-full overflow-hidden min-h-[80vh] rounded-3xl">
+        <ComingSoonOverlay 
+          title="Swift Vendor is Coming Soon!" 
+          description="We're currently fine-tuning our agency banking and MoMo features to bring you the fastest and most reliable POS experience in Ghana. Stay tuned!" 
+          showHomeButton={false} 
+        />
+        <div className="p-6 md:p-8 space-y-8 animate-in fade-in duration-700 opacity-20 pointer-events-none select-none blur-[2px]">
       {walletBalance < balanceThreshold && !isPrivateMode && (
         <div className="bg-amber-500/10 border border-amber-500/20 rounded-2xl p-4 flex items-center justify-between animate-in slide-in-from-top-4 duration-500">
           <div className="flex items-center gap-3">
@@ -1041,6 +1048,7 @@ const DashboardSwiftVendor = () => {
           </div>
         </TabsContent>
       </Tabs>
+      </div>
       </div>
     </SecurityGateway>
   );
