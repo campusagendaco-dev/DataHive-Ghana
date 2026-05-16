@@ -115,12 +115,12 @@ serve(async (req: Request) => {
       - broadcast_outage: { "network": "string", "reason": "string" }
       - notify_admin: { "message": "string" }
 
-      OUTPUT FORMAT: JSON ONLY.
-      {
-        "findings": [...],
-        "actions": [{ "type": "string", "target": "uuid", "params": {} }],
-        "insights": [...]
-      }
+      ━━━ CRITICAL OUTPUT RULES ━━━
+      - Respond with RAW JSON only. No markdown. No code blocks. No backticks. No explanations.
+      - Your entire response must be a single valid JSON object and nothing else.
+      - If there is nothing to action, return: {"findings":[],"actions":[],"insights":[]}
+      - Required schema:
+      {"findings":[],"actions":[{"type":"string","target":"uuid","params":{}}],"insights":[]}
     `;
 
     const userMessage = `
@@ -140,15 +140,34 @@ serve(async (req: Request) => {
         "content-type": "application/json",
       },
       body: JSON.stringify({
-        model: "claude-3-haiku-20240307",
+        model: "claude-haiku-4-5-20251001",
         max_tokens: 1500,
+        temperature: 0,
         system: systemPrompt,
         messages: [{ role: "user", content: userMessage }],
       }),
     });
 
     const aiData = await aiResponse.json();
-    const result = JSON.parse(aiData.content[0].text);
+    
+    if (aiData.error) {
+      throw new Error(`Anthropic API Error: ${aiData.error.message || JSON.stringify(aiData.error)}`);
+    }
+    
+    if (!aiData.content || !aiData.content[0] || !aiData.content[0].text) {
+      throw new Error(`Invalid AI Response Structure: ${JSON.stringify(aiData)}`);
+    }
+
+    const rawText = aiData.content[0].text;
+    const jsonStart = rawText.indexOf("{");
+    const jsonEnd = rawText.lastIndexOf("}");
+    if (jsonStart === -1 || jsonEnd === -1) throw new Error("No JSON object found in AI response");
+    const parsed = JSON.parse(rawText.slice(jsonStart, jsonEnd + 1));
+    const result = {
+      findings: Array.isArray(parsed.findings) ? parsed.findings : [],
+      actions: Array.isArray(parsed.actions) ? parsed.actions : [],
+      insights: Array.isArray(parsed.insights) ? parsed.insights : [],
+    };
 
     // 5. Execute Autonomous Actions & Store Insights
     const executedActions = [];

@@ -169,7 +169,7 @@ serve(async (req: Request) => {
           "content-type": "application/json",
         },
         body: JSON.stringify({
-          model: "claude-3-5-haiku-20241022",
+          model: "claude-haiku-4-5-20251001",
           max_tokens: 1000,
           system: `${SYSTEM_PROMPT}\n\n━━━ JUDGE DIRECTIVE ━━━\nYou are now in JUDGE MODE. Use the investigate_dispute tool to see the provider logs. If the provider says "Success" but the user says "Failed", check the timestamps. If the provider response is missing, issue a REFUND.`,
           messages,
@@ -241,7 +241,7 @@ serve(async (req: Request) => {
         "content-type": "application/json",
       },
       body: JSON.stringify({
-        model: "claude-3-5-haiku-20241022",
+        model: "claude-haiku-4-5-20251001",
         max_tokens: 800,
         system: SYSTEM_PROMPT,
         messages,
@@ -444,7 +444,7 @@ serve(async (req: Request) => {
             "content-type": "application/json",
           },
           body: JSON.stringify({
-            model: "claude-3-5-haiku-20241022",
+            model: "claude-haiku-4-5-20251001",
             max_tokens: 800,
             system: SYSTEM_PROMPT,
             messages: [
