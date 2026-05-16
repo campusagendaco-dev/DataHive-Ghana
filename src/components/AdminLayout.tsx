@@ -25,7 +25,6 @@ const NAV_SECTIONS = [
   {
     title: "Operations",
     items: [
-      { label: "Swift Vendor Master", icon: ShieldAlert, path: "/admin/swift-vendor" },
       { label: "Agents",       icon: ShieldCheck,  path: "/admin/agents" },
       { label: "Sub-Agents",   icon: Users2,       path: "/admin/sub-agents" },
       { label: "Orders",       icon: ShoppingCart, path: "/admin/orders" },
