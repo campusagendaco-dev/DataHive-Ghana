@@ -181,10 +181,10 @@ const Dashboard = () => {
   ];
 
   const quickActions = [
-    { label: "Buy MTN Data",   icon: Zap,          path: "/dashboard/buy-data/mtn",  color: "text-amber-400",   bg: "bg-amber-500/10",   border: "border-amber-500/20" },
+    { label: "Swift Vendor",   icon: Zap,          path: "/dashboard/swift-vendor",  color: "text-amber-400",   bg: "bg-amber-500/10",   border: "border-amber-500/20", isNew: true },
+    { label: "Sub Agents",     icon: Users2,       path: "/dashboard/subagents",     color: "text-cyan-400",    bg: "bg-cyan-500/10",    border: "border-cyan-500/20", isNew: true },
     { label: "Transactions",   icon: ClipboardList, path: "/dashboard/transactions",  color: "text-blue-400",    bg: "bg-blue-500/10",    border: "border-blue-500/20" },
     { label: "My Store",       icon: Store,         path: "/dashboard/my-store",      color: "text-emerald-400", bg: "bg-emerald-500/10", border: "border-emerald-500/20" },
-    { label: "Top Up Wallet",  icon: ArrowDownToLine, path: "/dashboard/wallet",      color: "text-violet-400",  bg: "bg-violet-500/10",  border: "border-violet-500/20" },
   ];
 
   return (
@@ -393,7 +393,14 @@ const Dashboard = () => {
                 <a.icon className={`w-4 h-4 ${a.color}`} />
               </div>
               <div className="flex items-center justify-between w-full">
-                <span className="text-xs font-black text-foreground/80">{a.label}</span>
+                <div className="flex flex-col items-start gap-1">
+                  <span className="text-xs font-black text-foreground/80">{a.label}</span>
+                  {(a as any).isNew && (
+                    <span className="text-[8px] px-1.5 py-0.5 rounded-full bg-emerald-500 text-white font-black uppercase leading-none shadow-[0_0_8px_rgba(16,185,129,0.3)]">
+                      NEW
+                    </span>
+                  )}
+                </div>
                 <ChevronRight className={`w-3.5 h-3.5 ${a.color} opacity-0 group-hover:opacity-100 transition-opacity`} />
               </div>
             </button>

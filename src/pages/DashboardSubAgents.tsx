@@ -249,7 +249,10 @@ const DashboardSubAgents = () => {
   return (
     <div className="p-4 md:p-6 max-w-5xl space-y-6">
       <div>
+      <div className="flex items-center gap-3">
         <h1 className="font-display text-2xl font-bold">Sub Agents</h1>
+        <Badge className="bg-emerald-500 text-white border-none uppercase font-black px-1.5 animate-pulse text-[10px]">NEW</Badge>
+      </div>
         <p className="text-muted-foreground text-sm mt-1">Manage your sub agent network, fees, and pricing.</p>
       </div>
 

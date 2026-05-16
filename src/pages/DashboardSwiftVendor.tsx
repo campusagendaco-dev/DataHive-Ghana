@@ -263,6 +263,7 @@ const DashboardSwiftVendor = () => {
           <h1 className="text-3xl font-black tracking-tight flex items-center gap-3">
             <Zap className="w-8 h-8 text-amber-400" />
             Swift Vendor
+            <Badge className="bg-emerald-500 text-white border-none uppercase font-black px-1.5 animate-pulse text-[10px]">NEW</Badge>
           </h1>
           <p className="text-muted-foreground mt-1 font-medium">Flagship Agency Banking POS by theTeller</p>
         </div>

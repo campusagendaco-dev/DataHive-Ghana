@@ -239,8 +239,8 @@ const DashboardSidebar = ({ open, onClose }: DashboardSidebarProps) => {
                       {item.label}
                     </div>
                     {item.to === "/dashboard/buy-airtime" && (
-                      <Badge variant="outline" className="text-[8px] h-4 bg-amber-400/10 text-amber-400 border-amber-400/20 uppercase font-black px-1">
-                        Soon
+                      <Badge className="text-[8px] h-4 bg-emerald-500 text-white border-none uppercase font-black px-1.5 shadow-[0_0_10px_rgba(16,185,129,0.4)] animate-pulse">
+                        NEW
                       </Badge>
                     )}
                     {isActive && <ChevronRight className="w-3 h-3 text-primary" />}
@@ -285,6 +285,11 @@ const DashboardSidebar = ({ open, onClose }: DashboardSidebarProps) => {
                           )} />
                           {item.label}
                         </div>
+                        {["/dashboard/swift-vendor", "/dashboard/subagents", "/dashboard/subagent-pricing"].includes(item.to) && (
+                          <Badge className="text-[8px] h-4 bg-emerald-500 text-white border-none uppercase font-black px-1.5 shadow-[0_0_10px_rgba(16,185,129,0.4)] animate-pulse">
+                            NEW
+                          </Badge>
+                        )}
                         {isActive && <Star className="w-3 h-3 text-amber-400 fill-amber-400" />}
                       </Link>
                     );
