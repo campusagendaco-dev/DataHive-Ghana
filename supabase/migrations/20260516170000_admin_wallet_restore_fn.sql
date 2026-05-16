@@ -12,6 +12,14 @@ DECLARE
   _inserted integer;
   _restored integer := 0;
 BEGIN
+  -- Guard: Only admins can run this
+  IF NOT EXISTS (
+    SELECT 1 FROM public.user_roles 
+    WHERE user_id = auth.uid() AND role = 'admin'
+  ) THEN
+    RAISE EXCEPTION 'Unauthorized: Admin access required';
+  END IF;
+
   -- Guard: Only apply once
   IF EXISTS (
     SELECT 1 FROM public.audit_logs WHERE action = 'wallet_restoration_applied' LIMIT 1

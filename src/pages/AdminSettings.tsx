@@ -1725,8 +1725,8 @@ const AdminSettings = () => {
                   if (!window.confirm("Restore wallet balances for all affected agents? This runs once and cannot be reversed.")) return;
                   setRestoringWallets(true);
                   try {
-                    const { data, error } = await supabase.functions.invoke("admin-wallet-restore");
-                    if (error || data?.error) throw new Error(data?.error || error?.message);
+                    const { data, error } = await supabase.rpc("admin_apply_wallet_restoration");
+                    if (error) throw error;
                     if (data?.success === false) {
                       toast({ title: "Already Applied", description: data.message || "Restoration was already completed.", variant: "default" });
                     } else {
