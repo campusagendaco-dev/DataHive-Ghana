@@ -32,6 +32,8 @@ interface AgentRow {
   credit_limit?: number;
   sub_agent_count?: number;
   total_sales_volume?: number;
+  total_own_profit?: number;
+  total_commissions_paid?: number;
 }
 
 interface StuckActivation {
@@ -106,11 +108,11 @@ const AdminAgents = () => {
       const [walletsRes, subCountRes, salesRes] = await Promise.all([
         supabase.from("wallets").select("agent_id, balance, api_balance, credit_limit").in("agent_id", ids),
         supabase.from("profiles").select("user_id, parent_agent_id").eq("is_sub_agent" as any, true).in("parent_agent_id" as any, ids),
-        supabase.from("user_sales_stats").select("user_id, total_sales_volume").in("user_id", ids),
+        supabase.from("user_sales_stats").select("user_id, total_sales_volume, total_own_profit, total_commissions_paid").in("user_id", ids),
       ]);
 
       const walletMap = new Map((walletsRes.data || []).map((w: any) => [w.agent_id, { balance: w.balance, api_balance: w.api_balance, limit: w.credit_limit }]));
-      const salesMap = new Map((salesRes.data || []).map((s: any) => [s.user_id, s.total_sales_volume]));
+      const salesMap = new Map((salesRes.data || []).map((s: any) => [s.user_id, s]));
       const subCountMap: Record<string, number> = {};
       (subCountRes.data || []).forEach((sa: any) => {
         const pid = sa.parent_agent_id;
@@ -123,7 +125,11 @@ const AdminAgents = () => {
         r.api_wallet_balance = wallet?.api_balance ?? 0;
         r.credit_limit = wallet?.limit ?? 0;
         r.sub_agent_count = subCountMap[r.user_id] ?? 0;
-        r.total_sales_volume = salesMap.get(r.user_id) ?? 0;
+        
+        const stats = salesMap.get(r.user_id) as any;
+        r.total_sales_volume = stats?.total_sales_volume ?? 0;
+        r.total_own_profit = stats?.total_own_profit ?? 0;
+        r.total_commissions_paid = stats?.total_commissions_paid ?? 0;
       });
     }
 
@@ -577,11 +583,19 @@ const AdminAgents = () => {
 
                 {/* Stats & Actions (Mobile) */}
                 <div className="flex flex-col gap-4 border-t border-border pt-4">
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-                    <div className="p-2.5 rounded-xl bg-secondary/30 border border-border text-center">
-                      <p className="text-[9px] text-muted-foreground uppercase tracking-widest mb-1">Sales</p>
-                      <p className="text-xs font-black text-emerald-600 dark:text-emerald-400 truncate">₵{(agent.total_sales_volume || 0).toFixed(2)}</p>
-                    </div>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2">
+                    <div className="p-2.5 rounded-xl bg-secondary/30 border border-border">
+                        <p className="text-[9px] text-muted-foreground font-black uppercase tracking-widest mb-0.5">Sales Volume</p>
+                        <p className="text-sm font-black text-foreground truncate">₵{(agent.total_sales_volume || 0).toFixed(2)}</p>
+                      </div>
+                      <div className="p-2.5 rounded-xl bg-secondary/30 border border-border">
+                        <p className="text-[9px] text-muted-foreground font-black uppercase tracking-widest mb-0.5">Profit Earned</p>
+                        <p className="text-sm font-black text-emerald-600 dark:text-emerald-400 truncate">₵{(agent.total_own_profit || 0).toFixed(2)}</p>
+                      </div>
+                      <div className="p-2.5 rounded-xl bg-secondary/30 border border-border">
+                        <p className="text-[9px] text-muted-foreground font-black uppercase tracking-widest mb-0.5">Comms Generated</p>
+                        <p className="text-sm font-black text-amber-600 dark:text-amber-400 truncate">₵{(agent.total_commissions_paid || 0).toFixed(2)}</p>
+                      </div>
                     <div className="p-2.5 rounded-xl bg-secondary/30 border border-border text-center">
                       <p className="text-[9px] text-muted-foreground uppercase tracking-widest mb-1">Wallet</p>
                       <p className="text-xs font-black text-amber-600 dark:text-amber-400 truncate">₵{(agent.wallet_balance || 0).toFixed(2)}</p>

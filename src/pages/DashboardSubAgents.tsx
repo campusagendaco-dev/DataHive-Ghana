@@ -254,15 +254,16 @@ const DashboardSubAgents = () => {
       </div>
 
       {/* Stats row */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {[
           { label: "Total Sub Agents", value: subAgents.length },
           { label: "Active", value: subAgents.filter((s) => s.sub_agent_approved).length },
+          { label: "Total Commission", value: `GH₵ ${subAgentOrders.filter(o => o.status === "fulfilled").reduce((s, o) => s + (Number(o.parent_profit) || 0), 0).toFixed(2)}` },
           { label: "Your Activation Fee", value: `GH₵ ${totalFee.toFixed(2)}` },
         ].map((s) => (
           <div key={s.label} className="rounded-xl bg-amber-400 p-3">
-            <p className="text-black/70 text-xs">{s.label}</p>
-            <p className="text-black font-black text-2xl">{s.value}</p>
+            <p className="text-black/70 text-[10px] uppercase font-bold tracking-tight">{s.label}</p>
+            <p className="text-black font-black text-xl">{s.value}</p>
           </div>
         ))}
       </div>
