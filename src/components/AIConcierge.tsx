@@ -449,9 +449,9 @@ export default function AIConcierge() {
         </motion.div>
       )}
 
-      {/* ── Mobile: floating trigger (always visible) ─────────────────────── */}
-      {isMobile && (
-        <div className="fixed bottom-6 right-4 z-[9999]">
+      {/* ── Mobile: floating trigger (hidden while sheet is open — header has close) */}
+      {isMobile && !open && (
+        <div className="fixed bottom-6 right-4 z-[9997]">
           <TriggerButton open={open} unread={unread} onToggle={() => setOpen(o => !o)} />
         </div>
       )}
