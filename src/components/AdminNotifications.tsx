@@ -32,16 +32,26 @@ const AdminNotifications = () => {
     fetchConfig();
 
     const playPing = () => {
-      const audio = new Audio(activeTone);
-      audio.volume = 0.5;
-      audio.play().catch(() => {
-        console.log("[AdminNotifications] Audio blocked by browser policy");
-      });
+      try {
+        if (activeTone) {
+          const audio = new Audio(activeTone);
+          audio.volume = 0.5;
+          audio.play().catch((err) => {
+            console.log("[AdminNotifications] Audio blocked by browser policy:", err);
+          });
+        }
+      } catch (err) {
+        console.warn("[AdminNotifications] Audio constructor exception:", err);
+      }
 
       if (isVibeEnabled && vibePatternStr) {
         if (typeof navigator !== "undefined" && navigator.vibrate) {
           try {
-            const pattern = vibePatternStr.split(",").map(Number).filter(Number.isFinite);
+            const pattern = String(vibePatternStr)
+              .split(",")
+              .map(Number)
+              .filter((num) => !isNaN(num) && num >= 0);
+
             if (pattern.length > 0) {
               navigator.vibrate(pattern);
             }

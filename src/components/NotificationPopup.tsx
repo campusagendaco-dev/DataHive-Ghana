@@ -132,21 +132,32 @@ const NotificationPopup = () => {
     customVibeEnabled = settingsRef.current.vibeEnabled,
     customVibePattern = settingsRef.current.vibePattern
   ) => {
-    const audio = new Audio(customTone);
-    audio.volume = 0.4;
-    audio.play().catch(() => {
-      console.log("[NotificationPopup] Audio blocked by browser");
-    });
+    try {
+      if (customTone) {
+        const audio = new Audio(customTone);
+        audio.volume = 0.4;
+        audio.play().catch((err) => {
+          console.log("[NotificationPopup] Audio blocked by browser policy:", err);
+        });
+      }
+    } catch (err) {
+      console.warn("[NotificationPopup] Audio constructor exception:", err);
+    }
 
     if (customVibeEnabled && customVibePattern) {
       if (typeof navigator !== "undefined" && navigator.vibrate) {
         try {
-          const pattern = customVibePattern.split(",").map(Number).filter(Number.isFinite);
+          const patternStr = String(customVibePattern);
+          const pattern = patternStr
+            .split(",")
+            .map(Number)
+            .filter((num) => !isNaN(num) && num >= 0);
+
           if (pattern.length > 0) {
             navigator.vibrate(pattern);
           }
         } catch (e) {
-          console.warn("[Vibration] Blocked or unsupported:", e);
+          console.warn("[Vibration] Direct navigator.vibrate crash prevented:", e);
         }
       }
     }

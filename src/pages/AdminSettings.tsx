@@ -1306,7 +1306,12 @@ const AdminSettings = () => {
                       onClick={() => {
                         if (typeof navigator !== "undefined" && navigator.vibrate) {
                           try {
-                            const pattern = settings.notification_vibration_pattern.split(",").map(Number).filter(Number.isFinite);
+                            const patternStr = String(settings.notification_vibration_pattern || "");
+                            const pattern = patternStr
+                              .split(",")
+                              .map(Number)
+                              .filter((num) => !isNaN(num) && num >= 0);
+
                             if (pattern.length > 0) {
                               navigator.vibrate(pattern);
                               toast({ title: "Tactile Haptics Dispatched", description: "Your physical device is now vibrating." });
