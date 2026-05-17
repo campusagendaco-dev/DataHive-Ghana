@@ -18,14 +18,14 @@ const VerifyMfa = () => {
   
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
 
-  // Fetch active MFA TOTP factor and create an initial challenge request
+  // Fetch active MFA TOTP factor on load
   useEffect(() => {
     if (!user) {
       navigate("/login");
       return;
     }
 
-    const initializeChallenge = async () => {
+    const initializeFactor = async () => {
       try {
         // 1. Retrieve list of enrolled factors
         const { data: factorsData, error: factorsError } = await supabase.auth.mfa.listFactors();
@@ -34,36 +34,23 @@ const VerifyMfa = () => {
         const verifiedFactors = factorsData.all.filter(f => f.status === "verified");
         if (verifiedFactors.length === 0) {
           // Intelligent Self-Healing Recovery Loop Breaker!
-          // An administrator wiped the factors, but the user's current browser JWT still holds the stale "aal2" challenge flag.
-          // Silently routing to dashboard causes an infinite redirect loop.
-          // We must force a local session purge and direct the user back to the login page to complete a clean password-only authorization.
           console.warn("[MFA Recovery] No active factors found on server. Clearing stale session.");
           await supabase.auth.signOut({ scope: "local" });
           
-          // Inform the user in simple terms
           toast.success("Security settings reset! Please enter your password one more time to log in.", { duration: 6000 });
-          
           navigate("/login");
           return;
         }
 
         const totpFactor = verifiedFactors[0];
         setFactorId(totpFactor.id);
-
-        // 2. Launch a challenge for this factor
-        const { data: challengeData, error: challengeError } = await supabase.auth.mfa.challenge({
-          factorId: totpFactor.id
-        });
-        if (challengeError) throw challengeError;
-
-        setChallengeId(challengeData.id);
       } catch (e: any) {
-        console.error("[MFA Challenge] Initialization error:", e);
+        console.error("[MFA Init] Factor initialization error:", e);
         setError("Could not initialize secure connection. Please try again.");
       }
     };
 
-    initializeChallenge();
+    initializeFactor();
   }, [user, navigate]);
 
   // Automatically refocus the first box on load
@@ -127,7 +114,7 @@ const VerifyMfa = () => {
       return;
     }
 
-    if (!factorId || !challengeId) {
+    if (!factorId) {
       setError("Authentication session not ready. Please refresh.");
       return;
     }
@@ -136,9 +123,20 @@ const VerifyMfa = () => {
     setError("");
 
     try {
+      // 1. Create the challenge immediately before verification
+      // This prevents "Challenge and verify IP addresses mismatch" by executing both in the exact same thread
+      const { data: challengeData, error: challengeError } = await supabase.auth.mfa.challenge({
+        factorId
+      });
+      
+      if (challengeError) {
+        throw challengeError;
+      }
+
+      // 2. Immediately verify the challenge
       const { data, error: verifyError } = await supabase.auth.mfa.verify({
         factorId,
-        challengeId,
+        challengeId: challengeData.id,
         code: fullCode,
       });
 
@@ -147,10 +145,7 @@ const VerifyMfa = () => {
       }
 
       toast.success("Secure login verified! Welcome back.");
-      // Elevate local app state assurance level immediately
       await refreshMfaStatus();
-      
-      // Redirect directly to dashboard home
       navigate("/dashboard");
     } catch (err: any) {
       console.error("[MFA] Verification failed:", err);
@@ -164,10 +159,10 @@ const VerifyMfa = () => {
 
   // Auto-submit when all 6 digits are typed
   useEffect(() => {
-    if (otp.join("").length === 6 && factorId && challengeId) {
+    if (otp.join("").length === 6 && factorId) {
       handleVerify();
     }
-  }, [otp]);
+  }, [otp, factorId]);
 
   return (
     <div className="min-h-screen flex items-center justify-center px-4 py-12 bg-[#09090b]">
