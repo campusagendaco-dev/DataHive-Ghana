@@ -294,16 +294,14 @@ export const NotificationCenter = ({ isDark }: { isDark: boolean }) => {
           )}
         </div>
 
-        {notifications.length > 0 && (
-          <div className={cn("p-3.5 text-center border-t", isDark ? "border-white/10 bg-white/[0.02]" : "border-black/5 bg-black/[0.02]")}>
-            <button
-              onClick={() => navigate("/dashboard/notifications")}
-              className="text-xs font-black uppercase tracking-wider text-sky-500 hover:text-sky-400 transition-colors w-full py-1.5 flex items-center justify-center gap-1.5"
-            >
-              View Full Inbox <ArrowRight className="w-3.5 h-3.5" />
-            </button>
-          </div>
-        )}
+        <div className={cn("p-3.5 text-center border-t", isDark ? "border-white/10 bg-white/[0.02]" : "border-black/5 bg-black/[0.02]")}>
+          <button
+            onClick={() => navigate("/dashboard/notifications")}
+            className="text-xs font-black uppercase tracking-wider text-sky-500 hover:text-sky-400 transition-colors w-full py-1.5 flex items-center justify-center gap-1.5"
+          >
+            View Full Inbox <ArrowRight className="w-3.5 h-3.5" />
+          </button>
+        </div>
       </DropdownMenuContent>
     </DropdownMenu>
   );
