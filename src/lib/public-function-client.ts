@@ -21,9 +21,27 @@ export async function invokePublicFunction(functionName: string, options?: { bod
   const maxRetries = 3;
   const baseDelay = 800; // start with 800ms
   
+  // Dynamic Cache-Buster to prevent Opera Mini, Phoenix, and Telecom caching proxies from serving stale API responses
+  const cacheBuster = `cb=${Date.now()}`;
+  const finalFunctionName = functionName.includes("?") 
+    ? `${functionName}&${cacheBuster}` 
+    : `${functionName}?${cacheBuster}`;
+
+  const headers = {
+    ...(options?.headers || {}),
+    "Cache-Control": "no-cache, no-store, must-revalidate",
+    "Pragma": "no-cache",
+    "Expires": "0",
+  };
+
+  const finalOptions = {
+    ...options,
+    headers,
+  };
+  
   while (retries <= maxRetries) {
     try {
-      const result = await publicFunctionClient.functions.invoke(functionName, options);
+      const result = await publicFunctionClient.functions.invoke(finalFunctionName, finalOptions);
       // If we got a result (even an error), return it
       return result;
     } catch (error: any) {
@@ -45,7 +63,7 @@ export async function invokePublicFunction(functionName: string, options?: { bod
       await new Promise(resolve => setTimeout(resolve, delay));
     }
   }
-  return await publicFunctionClient.functions.invoke(functionName, options);
+  return await publicFunctionClient.functions.invoke(finalFunctionName, finalOptions);
 }
 
 export async function invokePublicFunctionAsUser(functionName: string, options?: { body?: unknown; headers?: Record<string, string> }) {
