@@ -11,6 +11,17 @@ import { Button } from "@/components/ui/button";
 import { Gift, Zap, Sparkles, X } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 
+const getAnnouncementId = (title: string, message: string) => {
+  const str = (title || "") + (message || "");
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    const char = str.charCodeAt(i);
+    hash = (hash << 5) - hash + char;
+    hash |= 0; // Convert to 32bit integer
+  }
+  return `ann_hash_${Math.abs(hash)}`;
+};
+
 const WelcomeAnnouncement = () => {
   const [open, setOpen] = useState(false);
   const [settings, setSettings] = useState<{
@@ -29,14 +40,14 @@ const WelcomeAnnouncement = () => {
 
       if (!error && data?.show_announcement) {
         const storedDismissed = localStorage.getItem("swift_announcement_dismissed");
-        const announcementId = btoa(data.announcement_title + data.announcement_message);
+        const announcementId = getAnnouncementId(data.announcement_title || "", data.announcement_message || "");
         
         // Only show if not dismissed OR if the content has changed
         if (storedDismissed !== announcementId) {
           setSettings({
             show: data.show_announcement,
-            title: data.announcement_title,
-            message: data.announcement_message
+            title: data.announcement_title || "",
+            message: data.announcement_message || ""
           });
           // Delay popup for better UX
           setTimeout(() => setOpen(true), 1500);
@@ -49,7 +60,7 @@ const WelcomeAnnouncement = () => {
 
   const handleDismiss = () => {
     if (settings) {
-      const announcementId = btoa(settings.title + settings.message);
+      const announcementId = getAnnouncementId(settings.title, settings.message);
       localStorage.setItem("swift_announcement_dismissed", announcementId);
     }
     setOpen(false);
