@@ -23,6 +23,8 @@ const NotificationPopup = () => {
   useEffect(() => {
     if (!user) return;
 
+    let active = true;
+
     const fetchNotifications = async () => {
       const { data: dismissals } = await supabase
         .from("notification_dismissals")
@@ -36,7 +38,7 @@ const NotificationPopup = () => {
         .select("*")
         .order("created_at", { ascending: false });
 
-      if (!notifs) return;
+      if (!notifs || !active) return;
 
       const p = profile as Profile | null;
       const isAgent = Boolean(p?.agent_approved || p?.sub_agent_approved || p?.is_agent || p?.is_sub_agent);
@@ -54,6 +56,7 @@ const NotificationPopup = () => {
         setNotifications(filtered);
         // Delay visibility slightly for dramatic effect
         setTimeout(() => {
+          if (!active) return;
           setIsVisible(true);
           playPing();
         }, 1500);
@@ -61,6 +64,37 @@ const NotificationPopup = () => {
     };
 
     fetchNotifications();
+
+    // REAL-TIME NOTIFICATION SUBSCRIBER: Listen for instant webhook alerts (deposits/purchases)
+    const channel = supabase
+      .channel("public-notifications-live")
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "notifications" },
+        (payload) => {
+          const newNotif = payload.new as Notification;
+          const p = profile as Profile | null;
+          const isAgent = Boolean(p?.agent_approved || p?.sub_agent_approved || p?.is_agent || p?.is_sub_agent);
+          
+          let matches = false;
+          if (newNotif.target_type === "all") matches = true;
+          else if (newNotif.target_type === "agents" && isAgent) matches = true;
+          else if (newNotif.target_type === "users" && !isAgent) matches = true;
+          else if (newNotif.target_type === "specific" && newNotif.target_user_id === user.id) matches = true;
+
+          if (matches && active) {
+            setNotifications(prev => [newNotif, ...prev]);
+            setIsVisible(true);
+            playPing();
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      active = false;
+      supabase.removeChannel(channel);
+    };
   }, [user, profile]);
 
   const playPing = () => {
