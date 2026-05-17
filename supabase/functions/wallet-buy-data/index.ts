@@ -93,11 +93,33 @@ serve(async (req: Request) => {
     // Fetch agent profile and package info in parallel for profit calculation
     const [profileResult, pkgResult] = await Promise.all([
       supabaseAdmin.from("profiles").select("is_sub_agent, parent_agent_id, credit_enabled, credit_limit, credit_used").eq("user_id", user.id).maybeSingle(),
-      supabaseAdmin.from("global_package_settings").select("agent_price, cost_price").eq("network", normalizedNet).eq("package_size", package_size).maybeSingle(),
+      supabaseAdmin.from("global_package_settings").select("package_size, agent_price, cost_price, is_unavailable").eq("network", normalizedNet),
     ]);
 
     const agentProfile = profileResult.data;
-    const pkgRow = pkgResult.data;
+    
+    const normalizeSize = (s: string) => s.replace(/\s+/g, "").toUpperCase();
+    const pkgRow = (pkgResult.data || []).find(
+      (row: any) => normalizeSize(row.package_size) === normalizeSize(package_size)
+    );
+
+    // Check if the package is globally marked as unavailable/offline
+    if (pkgRow?.is_unavailable) {
+      log(supabaseAdmin, {
+        level: "warn",
+        source: "wallet-buy-data",
+        event: "order.offline_blocked",
+        message: `Blocked wallet order for offline package: ${normalizedNet} ${package_size}`,
+        agent_id: user.id,
+      });
+      return new Response(JSON.stringify({ 
+        error: "This package is currently offline and unavailable for purchase. Please try another bundle." 
+      }), { 
+        status: 400, 
+        headers: { ...corsHeaders, "Content-Type": "application/json" } 
+      });
+    }
+
     const adminBase = Number(pkgRow?.agent_price || 0);
     const resolvedCostPrice = Number(pkgRow?.cost_price || 0) > 0 ? Number(pkgRow!.cost_price) : adminBase;
 

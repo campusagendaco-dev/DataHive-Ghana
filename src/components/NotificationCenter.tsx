@@ -100,6 +100,14 @@ export const NotificationCenter = ({ isDark }: { isDark: boolean }) => {
 
     fetchNotifications();
 
+    const playPing = () => {
+      const audio = new Audio("/sounds/notification_system.mp3");
+      audio.volume = 0.45;
+      audio.play().catch(() => {
+        console.log("[NotificationCenter] Audio blocked by browser policy");
+      });
+    };
+
     // Generate unique ephemeral channel ID to prevent race conditions in strict mode
     const channelId = `user-notifs-${user.id}-${Math.random().toString(36).substring(7)}`;
     
@@ -131,6 +139,9 @@ export const NotificationCenter = ({ isDark }: { isDark: boolean }) => {
               onClick: () => navigate(newNotif.link!)
             } : undefined
           });
+
+          // Play real-time ping alert audio sound
+          playPing();
           
           // Apply pulse animation to the red badge element directly
           const pulseEl = document.getElementById("notification-ring");

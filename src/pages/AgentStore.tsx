@@ -120,7 +120,10 @@ const AgentStore = () => {
         if (agentRes.error) { setNotFound(true); setLoading(false); return; }
 
         const gsMap: Record<string, GlobalPkgSetting> = {};
-        (pkgRes.data || []).forEach((r: any) => { gsMap[`${r.network}-${r.package_size}`] = r; });
+        (pkgRes.data || []).forEach((r: any) => { 
+          const normSize = r.package_size.replace(/\s+/g, "").toUpperCase();
+          gsMap[`${r.network}-${normSize}`] = r; 
+        });
         setGlobalSettings(gsMap);
         setPriceMultipliers(pricingCtx.multipliers || { MTN: 1, Telecel: 1, AirtelTigo: 1 });
 
@@ -185,7 +188,8 @@ const AgentStore = () => {
 
   const packages = (basePackages[selectedNetwork] || [])
     .map((pkg) => {
-      const gs = globalSettings[`${selectedNetwork}-${pkg.size}`];
+      const normSize = pkg.size.replace(/\s+/g, "").toUpperCase();
+      const gs = globalSettings[`${selectedNetwork}-${normSize}`];
       if (gs?.is_unavailable) return null;
       if (agent?.disabled_packages?.[selectedNetwork]?.includes(pkg.size)) return null;
       return { ...pkg, price: resolveDisplayPrice(selectedNetwork, pkg.size, pkg.price) };

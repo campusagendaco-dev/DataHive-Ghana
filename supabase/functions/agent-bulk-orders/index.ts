@@ -50,7 +50,7 @@ serve(async (req) => {
     const [profileRes, walletRes, settingsRes] = await Promise.all([
       supabaseAdmin.from("profiles").select("is_sub_agent, parent_agent_id").eq("user_id", user.id).maybeSingle(),
       supabaseAdmin.from("wallets").select("balance").eq("agent_id", user.id).maybeSingle(),
-      supabaseAdmin.from("global_package_settings").select("network, package_size, cost_price, agent_price, sub_agent_price")
+      supabaseAdmin.from("global_package_settings").select("network, package_size, cost_price, agent_price, sub_agent_price, is_unavailable")
     ]);
 
     const profile = profileRes.data;
@@ -76,6 +76,11 @@ serve(async (req) => {
       
       if (!pkg) {
         errors.push({ row: i + 1, phone: o.customer_phone, error: `Unknown package: ${o.network} ${o.package_size}` });
+        continue;
+      }
+
+      if (pkg.is_unavailable) {
+        errors.push({ row: i + 1, phone: o.customer_phone, error: `Package ${o.network} ${o.package_size} is currently offline (unavailable).` });
         continue;
       }
 

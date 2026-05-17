@@ -57,6 +57,7 @@ const DashboardPricing = () => {
   const [prices, setPrices] = useState<AgentPrices>({});
   const [disabledPkgs, setDisabledPkgs] = useState<DisabledPackages>({});
   const [packageBasePrices, setPackageBasePrices] = useState<PackageBasePrices>({});
+  const [globallyUnavailable, setGloballyUnavailable] = useState<Record<string, string[]>>({});
   const [saving, setSaving] = useState(false);
   const [selectedNetwork, setSelectedNetwork] = useState("MTN");
 
@@ -74,9 +75,14 @@ const DashboardPricing = () => {
 
       const { data } = await supabase
         .from("global_package_settings")
-        .select("network, package_size, agent_price, sub_agent_price, cost_price");
+        .select("network, package_size, agent_price, sub_agent_price, cost_price, is_unavailable");
 
+      const nextUnavailable: Record<string, string[]> = {};
       (data || []).forEach((row: any) => {
+        if (row.is_unavailable) {
+          if (!nextUnavailable[row.network]) nextUnavailable[row.network] = [];
+          nextUnavailable[row.network].push(row.package_size);
+        }
         const numericAgentPrice = Number(row?.agent_price);
         const numericSubAgentPrice = Number(row?.sub_agent_price);
         const numericCostPrice = Number(row?.cost_price);
@@ -128,6 +134,7 @@ const DashboardPricing = () => {
         }
       }
 
+      setGloballyUnavailable(nextUnavailable);
       setPackageBasePrices(nextBasePrices);
     };
 
@@ -267,11 +274,19 @@ const DashboardPricing = () => {
               const basePrice = getBasePrice(selectedNetwork, pkg.size);
               const profit = getProfit(selectedNetwork, pkg.size);
               const disabled = isDisabled(selectedNetwork, pkg.size);
+              const isGloballyOffline = globallyUnavailable[selectedNetwork]?.includes(pkg.size) || false;
               return (
-                <tr key={pkg.size} className={`border-b border-border/50 ${disabled ? "opacity-50" : ""}`}>
+                <tr key={pkg.size} className={`border-b border-border/50 ${(disabled || isGloballyOffline) ? "opacity-50" : ""}`}>
                   <td className="py-3 px-4">
-                    <span className="font-medium text-foreground">{pkg.size}</span>
-                    <span className="text-xs text-muted-foreground ml-2">{pkg.validity}</span>
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium text-foreground">{pkg.size}</span>
+                      <span className="text-xs text-muted-foreground">{pkg.validity}</span>
+                      {isGloballyOffline && (
+                        <span className="text-[10px] px-2 py-0.5 rounded-full bg-red-500/10 text-red-500 border border-red-500/20 font-bold uppercase tracking-wider animate-pulse">
+                          Offline
+                        </span>
+                      )}
+                    </div>
                   </td>
                   <td className="py-3 px-4 text-muted-foreground">GHS {basePrice.toFixed(2)}</td>
                   <td className="py-3 px-4">
@@ -284,6 +299,7 @@ const DashboardPricing = () => {
                         type="number"
                         step="0.50"
                         min={isAdmin ? undefined : basePrice}
+                        disabled={isGloballyOffline}
                       />
                     </div>
                   </td>
@@ -294,8 +310,9 @@ const DashboardPricing = () => {
                   </td>
                   <td className="py-3 px-4 text-center">
                     <Switch
-                      checked={!disabled}
+                      checked={!disabled && !isGloballyOffline}
                       onCheckedChange={() => toggleDisabled(selectedNetwork, pkg.size)}
+                      disabled={isGloballyOffline}
                     />
                   </td>
                 </tr>

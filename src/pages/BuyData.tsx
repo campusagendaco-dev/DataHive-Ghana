@@ -100,7 +100,10 @@ const BuyData = () => {
         supabase.from("service_status").select("network, status"),
       ]);
       const map: Record<string, GlobalPkgSetting> = {};
-      (data || []).forEach((r: any) => { map[`${r.network}-${r.package_size}`] = r; });
+      (data || []).forEach((r: any) => { 
+        const normSize = r.package_size.replace(/\s+/g, "").toUpperCase();
+        map[`${r.network}-${normSize}`] = r; 
+      });
       setGlobalSettings(map);
 
       const svcMap: Record<string, string> = {};
@@ -166,7 +169,8 @@ const BuyData = () => {
   const packages = useMemo(() => {
     return (basePackages[selectedNetwork] || [])
       .map((pkg) => {
-        const gs = globalSettings[`${selectedNetwork}-${pkg.size}`];
+        const normSize = pkg.size.replace(/\s+/g, "").toUpperCase();
+        const gs = globalSettings[`${selectedNetwork}-${normSize}`];
         if (gs?.is_unavailable) return null;
         const base = gs?.public_price ?? getPublicPrice(pkg.price);
         const multiplier = priceMultipliers[selectedNetwork] || 1;

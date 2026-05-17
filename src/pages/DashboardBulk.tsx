@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef } from "react";
+import { useState, useMemo, useRef, useEffect } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
@@ -8,6 +8,28 @@ import {
   ChevronUp, Zap, Upload, FileSpreadsheet, X,
 } from "lucide-react";
 import { basePackages } from "@/lib/data";
+import { fetchApiPricingContext, applyPriceMultiplier } from "@/lib/api-source-pricing";
+
+const normalizePackageSize = (size: string) => size.replace(/\s+/g, "").toUpperCase();
+
+const getAssignedSubAgentPrice = (
+  prices: Record<string, Record<string, string | number>> | undefined,
+  network: string,
+  size: string,
+): number | null => {
+  if (!prices) return null;
+  const netKey = Object.keys(prices).find(
+    (k) => k.toLowerCase() === network.toLowerCase()
+  );
+  if (!netKey) return null;
+  const byNet = prices[netKey];
+  const matchedKey = Object.keys(byNet).find(
+    (k) => normalizePackageSize(k) === normalizePackageSize(size)
+  );
+  if (!matchedKey) return null;
+  const val = Number(byNet[matchedKey]);
+  return Number.isFinite(val) && val > 0 ? val : null;
+};
 
 // ─── Network config ────────────────────────────────────────────────────────────
 const NET_CFG = {
@@ -34,8 +56,91 @@ const DashboardBulk = () => {
   const [showB2B, setShowB2B]                 = useState(false);
   const [confirmOpen, setConfirmOpen]         = useState(false);
 
+  const [globalSettings, setGlobalSettings] = useState<any[]>([]);
+  const [parentAssignedPrices, setParentAssignedPrices] = useState<Record<string, Record<string, string | number>>>({});
+  const [priceMultiplier, setPriceMultiplier] = useState(1);
+  const [settingsLoading, setSettingsLoading] = useState(true);
+
+  useEffect(() => {
+    const loadPricing = async () => {
+      try {
+        const [settingsRes, pricingContext] = await Promise.all([
+          supabase.from("global_package_settings").select("network, package_size, public_price, agent_price, sub_agent_price, is_unavailable"),
+          fetchApiPricingContext(),
+        ]);
+        setGlobalSettings(settingsRes.data || []);
+        if (pricingContext?.multipliers) {
+          setPriceMultiplier(pricingContext.multipliers[selectedNetwork] || 1);
+        }
+        
+        if (profile?.is_sub_agent && profile?.parent_agent_id) {
+          const { data: parentProfile } = await supabase
+            .from("profiles")
+            .select("sub_agent_prices")
+            .eq("user_id", profile.parent_agent_id)
+            .maybeSingle();
+          setParentAssignedPrices((parentProfile?.sub_agent_prices || {}) as Record<string, Record<string, string | number>>);
+        }
+      } catch (err) {
+        console.error("Error loading pricing in bulk:", err);
+      } finally {
+        setSettingsLoading(false);
+      }
+    };
+    void loadPricing();
+  }, [profile, selectedNetwork]);
+
   const cfg      = NET_CFG[selectedNetwork];
-  const packages = useMemo(() => basePackages[selectedNetwork] || [], [selectedNetwork]);
+  
+  const packages = useMemo(() => {
+    const isPaidAgent = Boolean(profile?.agent_approved || profile?.sub_agent_approved);
+    
+    return (basePackages[selectedNetwork] || [])
+      .map((item) => {
+        const setting = globalSettings.find(
+          (s) => s.network === selectedNetwork && normalizePackageSize(s.package_size) === normalizePackageSize(item.size),
+        );
+        const assignedFromParent = getAssignedSubAgentPrice(parentAssignedPrices, selectedNetwork, item.size);
+        const assignedFromProfile = getAssignedSubAgentPrice(
+          profile?.agent_prices as Record<string, Record<string, string | number>> | undefined,
+          selectedNetwork,
+          item.size,
+        );
+        const assignedPrice = assignedFromParent || assignedFromProfile;
+        const basePublic = Number(setting?.public_price);
+        const baseAgent = Number(setting?.agent_price);
+
+        const resolvedBasePrice = (() => {
+          // If NOT approved, always use public price
+          if (!isPaidAgent) {
+            if (Number.isFinite(basePublic) && basePublic > 0) return basePublic;
+            return item.price * 1.12; // public markup fallback
+          }
+
+          // Approved agent/sub-agent pricing logic
+          if (assignedPrice && assignedPrice > 0) return assignedPrice;
+          
+          if (profile?.is_sub_agent) {
+            const baseSubAgent = Number(setting?.sub_agent_price);
+            if (Number.isFinite(baseSubAgent) && baseSubAgent > 0) return baseSubAgent;
+            // Fallback to agent price if subagent price not set
+            if (Number.isFinite(baseAgent) && baseAgent > 0) return baseAgent;
+            return item.price;
+          }
+
+          if (Number.isFinite(baseAgent) && baseAgent > 0) return baseAgent;
+          return item.price;
+        })();
+
+        return {
+          ...item,
+          isUnavailable: Boolean(setting?.is_unavailable),
+          price: applyPriceMultiplier(resolvedBasePrice, priceMultiplier),
+        };
+      })
+      .filter((item) => !item.isUnavailable);
+  }, [globalSettings, profile, selectedNetwork, parentAssignedPrices, priceMultiplier]);
+
   const selectedPackage = packages.find(p => p.size === selectedSize);
 
   // Parse each line as "phone [gb]"  e.g. "0241234567 2" or just "0241234567"

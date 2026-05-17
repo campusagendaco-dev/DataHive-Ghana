@@ -12,8 +12,20 @@ const AdminNotifications = () => {
       Notification.requestPermission();
     }
 
+    const playPing = () => {
+      const audio = new Audio("/sounds/notification_system.mp3");
+      audio.volume = 0.5;
+      audio.play().catch(() => {
+        console.log("[AdminNotifications] Audio blocked by browser policy");
+      });
+    };
+
     const notify = (title: string, body: string) => {
       toastRef.current({ title, description: body });
+      
+      // Play premium chime sound for incoming admin alerts
+      playPing();
+
       if ("Notification" in window && Notification.permission === "granted") {
         new Notification(title, { body, icon: "/favicon.png" });
       }
