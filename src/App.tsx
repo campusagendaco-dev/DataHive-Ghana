@@ -113,6 +113,7 @@ const MyOrders = lazy(() => import("./pages/MyOrders"));
 const DashboardSwiftVendor = lazy(() => import("./pages/DashboardSwiftVendor"));
 const DashboardAgentDevHub = lazy(() => import("./pages/DashboardAgentDevHub"));
 const AgentDevAPIDocs = lazy(() => import("./pages/AgentDevAPIDocs"));
+const DashboardNotifications = lazy(() => import("./pages/DashboardNotifications"));
 
 
 const queryClient = new QueryClient();
@@ -379,6 +380,7 @@ const AppContent = () => {
           <Route index element={<Dashboard />} />
           <Route path="wallet" element={<DashboardWallet />} />
           <Route path="transactions" element={<DashboardOrders />} />
+          <Route path="notifications" element={<DashboardNotifications />} />
           <Route path="buy-data" element={<Navigate to="/dashboard/buy-data/mtn" replace />} />
           <Route path="buy-data/mtn" element={<DashboardBuyDataNetwork network="MTN" />} />
           <Route path="buy-data/telecel" element={<DashboardBuyDataNetwork network="Telecel" />} />

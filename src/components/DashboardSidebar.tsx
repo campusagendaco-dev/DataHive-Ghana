@@ -3,6 +3,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useAppTheme } from "@/contexts/ThemeContext";
 import {
   LayoutDashboard,
+  Bell,
   Wallet,
   ClipboardList,
   ShoppingCart,
@@ -49,6 +50,7 @@ const userNavItems = [
   { to: "/dashboard/wallet", label: "Wallet", icon: Wallet },
   { to: "/dashboard/schedule", label: "Auto-Renewal", icon: CalendarClock },
   { to: "/dashboard/transactions", label: "Transactions", icon: ClipboardList },
+  { to: "/dashboard/notifications", label: "Inbox Notifications", icon: Bell },
   { to: "/dashboard/buy-data/mtn", label: "Buy Data - MTN", icon: ShoppingCart },
   { to: "/dashboard/buy-data/telecel", label: "Buy Data - Telecel", icon: ShoppingCart },
   { to: "/dashboard/buy-data/airteltigo", label: "Buy Data - AirtelTigo", icon: ShoppingCart },
