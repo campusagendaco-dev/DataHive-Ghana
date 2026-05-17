@@ -100,7 +100,9 @@ const DashboardNotifications = () => {
               const audio = new Audio("/sounds/notification_system.mp3");
               audio.volume = 0.4;
               audio.play().catch(() => {});
-            } catch (e) {}
+            } catch (e) {
+              // Ignore audio autoplay restrictions
+            }
           }
           if (vibeEnabled && typeof navigator !== "undefined" && navigator.vibrate) {
             navigator.vibrate(150);

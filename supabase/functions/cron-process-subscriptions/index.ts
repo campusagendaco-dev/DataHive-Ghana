@@ -34,7 +34,7 @@ serve(async () => {
         if (!pkg) throw new Error("Package not found");
 
         // Calculate next run date based on frequency
-        let nextRun = new Date(sub.next_run_at);
+        const nextRun = new Date(sub.next_run_at);
         if (sub.frequency === "daily") nextRun.setDate(nextRun.getDate() + 1);
         else if (sub.frequency === "weekly") nextRun.setDate(nextRun.getDate() + 7);
         else if (sub.frequency === "monthly") nextRun.setMonth(nextRun.getMonth() + 1);
