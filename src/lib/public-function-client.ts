@@ -27,16 +27,9 @@ export async function invokePublicFunction(functionName: string, options?: { bod
     ? `${functionName}&${cacheBuster}` 
     : `${functionName}?${cacheBuster}`;
 
-  const headers = {
-    ...(options?.headers || {}),
-    "Cache-Control": "no-cache, no-store, must-revalidate",
-    "Pragma": "no-cache",
-    "Expires": "0",
-  };
-
   const finalOptions = {
     ...options,
-    headers,
+    headers: options?.headers,
   };
   
   while (retries <= maxRetries) {
