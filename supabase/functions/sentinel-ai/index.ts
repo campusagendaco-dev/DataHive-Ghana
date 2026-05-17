@@ -26,15 +26,30 @@ serve(async (req: Request) => {
       // Surgical Strike: Focus on this specific failure
       const { data: failedOrder } = await supabaseAdmin.from("orders").select("*").eq("id", order_id).single();
       if (failedOrder) {
-        const { data: agent } = await supabaseAdmin.from("profiles").select("id, full_name, phone, wallet_balance, loyalty_points").eq("id", failedOrder.agent_id).single();
-        if (agent) agentsToAnalyze = [agent];
+        const [agentRes, walletRes] = await Promise.all([
+          supabaseAdmin.from("profiles").select("id, full_name, phone, wallet_balance, loyalty_points").eq("id", failedOrder.agent_id).single(),
+          supabaseAdmin.from("wallets").select("balance").eq("agent_id", failedOrder.agent_id).maybeSingle()
+        ]);
+        const agent = agentRes.data;
+        if (agent) {
+          agent.wallet_balance = walletRes.data?.balance ?? 0;
+          agentsToAnalyze = [agent];
+        }
         ordersToAnalyze = [failedOrder];
       }
     } else {
       // General Scan
       const { data: agents } = await supabaseAdmin.from("profiles").select("id, full_name, phone, wallet_balance, loyalty_points").eq("is_agent", true).limit(50);
+      if (agents && agents.length > 0) {
+        const agentIds = agents.map(a => a.id);
+        const { data: wallets } = await supabaseAdmin.from("wallets").select("agent_id, balance").in("agent_id", agentIds);
+        const walletMap = new Map((wallets || []).map(w => [w.agent_id, w.balance]));
+        agents.forEach(a => {
+          a.wallet_balance = walletMap.get(a.id) ?? 0;
+        });
+        agentsToAnalyze = agents;
+      }
       const { data: recentOrders } = await supabaseAdmin.from("orders").select("*").gt("created_at", new Date(Date.now() - 3600000).toISOString());
-      agentsToAnalyze = agents || [];
       ordersToAnalyze = recentOrders || [];
     }
     const { data: settings } = await supabaseAdmin.from("system_settings").select("*").single();

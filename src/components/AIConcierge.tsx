@@ -475,11 +475,16 @@ export default function AIConcierge() {
           .then(({ error }) => { if (error) console.warn("[AIConcierge] save user msg:", error); });
       }
 
-      const [profile, orders] = await Promise.all([
+      const [profile, wallet, orders] = await Promise.all([
         supabase.from("profiles").select("*").eq("id", user?.id).maybeSingle(),
+        supabase.from("wallets").select("balance").eq("agent_id", user?.id).maybeSingle(),
         supabase.from("orders").select("*").eq("agent_id", user?.id)
           .order("created_at", { ascending: false }).limit(3),
       ]);
+
+      if (profile.data && wallet.data) {
+        profile.data.wallet_balance = wallet.data.balance;
+      }
 
       const history = messages.slice(-10).map(m => ({ role: m.role, content: m.text }));
       const { data } = await supabase.functions.invoke("oracle-ai", {

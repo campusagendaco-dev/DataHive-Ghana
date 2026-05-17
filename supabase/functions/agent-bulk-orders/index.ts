@@ -47,12 +47,14 @@ serve(async (req) => {
     }
 
     // 1. Fetch Agent Profile and Settings
-    const [profileRes, settingsRes] = await Promise.all([
-      supabaseAdmin.from("profiles").select("wallet_balance, is_sub_agent, parent_agent_id").eq("user_id", user.id).maybeSingle(),
+    const [profileRes, walletRes, settingsRes] = await Promise.all([
+      supabaseAdmin.from("profiles").select("is_sub_agent, parent_agent_id").eq("user_id", user.id).maybeSingle(),
+      supabaseAdmin.from("wallets").select("balance").eq("agent_id", user.id).maybeSingle(),
       supabaseAdmin.from("global_package_settings").select("network, package_size, cost_price, agent_price, sub_agent_price")
     ]);
 
     const profile = profileRes.data;
+    const walletBalance = walletRes.data?.balance ?? 0;
     const allPkgs = settingsRes.data || [];
 
     if (!profile) {
@@ -139,7 +141,7 @@ serve(async (req) => {
        return new Response(JSON.stringify({ 
         error: "Insufficient wallet balance for bulk dispatch", 
         required_balance: totalCost,
-        current_balance: profile.wallet_balance
+        current_balance: walletBalance
       }), { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 

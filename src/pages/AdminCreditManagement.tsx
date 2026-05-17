@@ -113,10 +113,15 @@ export default function AdminCreditManagement() {
     const limit = parseFloat(editLimit);
     if (isNaN(limit) || limit < 0) { toast({ title: "Invalid limit", variant: "destructive" }); return; }
     setSaving(true);
-    const { error } = await (supabase as any)
-      .from("profiles").update({ credit_limit: limit }).eq("user_id", selectedAgent.agent_id);
-    if (error) {
-      toast({ title: "Failed", description: error.message, variant: "destructive" });
+    
+    const { data: { session } } = await supabase.auth.getSession();
+    const { data, error } = await supabase.functions.invoke("system-payout-v1", {
+      body: { action: "update_credit_limit", user_id: selectedAgent.agent_id, credit_limit: limit },
+      headers: { Authorization: `Bearer ${session?.access_token}` },
+    });
+
+    if (error || data?.error) {
+      toast({ title: "Failed", description: data?.error || error?.message, variant: "destructive" });
     } else {
       setSelectedAgent((p) => p ? { ...p, credit_limit: limit } : null);
       setAgents((prev) => prev.map((a) => a.agent_id === selectedAgent.agent_id ? { ...a, credit_limit: limit } : a));
