@@ -174,33 +174,22 @@ serve(async (req: Request) => {
     });
 
     if (debitError || !debitResult?.success) {
-      // Try credit/float if wallet insufficient
-      const agentP = agentProfile as any;
-      const creditAvailable = agentP?.credit_enabled
-        ? Math.max(0, (agentP.credit_limit || 0) - (agentP.credit_used || 0))
-        : 0;
-
-      if (creditAvailable >= Number(requestedAmount)) {
-        const { data: creditOk } = await supabaseAdmin.rpc("draw_agent_credit", {
-          p_agent_id: user.id, p_amount: requestedAmount,
-        });
-        if (!creditOk) {
-          const debitErrMsg = debitError?.message || debitResult?.error || "Insufficient balance or wallet error";
-          console.error(`[CREDIT_FAIL] ${user.id}: debit_wallet error was: ${debitErrMsg}`);
-          return new Response(JSON.stringify({ error: `Insufficient wallet balance and credit limit reached. (${debitErrMsg})` }), { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-        }
-        paymentMethod = "credit";
-        log(supabaseAdmin, { level: "info", source: "wallet-buy-data", event: "credit.drawn", message: `Credit drawn GHS ${requestedAmount} for ${user.id}`, agent_id: user.id, data: { amount: requestedAmount, credit_available: creditAvailable } });
-      } else {
-        const debitErrMsg = debitError?.message || debitResult?.error || "Insufficient balance or wallet error";
-        console.error(`[DEBIT_FAIL] ${user.id}: ${debitErrMsg}`, { debitError, debitResult });
-        log(supabaseAdmin, { level: "error", source: "wallet-buy-data", event: "debit.failed", message: `Wallet debit failed: ${debitErrMsg}`, agent_id: user.id, data: { amount: requestedAmount, debit_error: debitError?.message, debit_result: debitResult } });
-        return new Response(JSON.stringify({ error: debitErrMsg }), {
-          status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
+      const debitErrMsg = debitError?.message || debitResult?.message || debitResult?.error || "Insufficient funds and credit limit";
+      console.error(`[DEBIT_FAIL] ${user.id}: ${debitErrMsg}`, { debitError, debitResult });
+      
+      log(supabaseAdmin, { level: "error", source: "wallet-buy-data", event: "debit.failed", message: `Wallet debit failed: ${debitErrMsg}`, agent_id: user.id, data: { amount: requestedAmount, debit_error: debitError?.message, debit_result: debitResult } });
+      
+      return new Response(JSON.stringify({ error: debitErrMsg }), {
+        status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
-    if (paymentMethod === "wallet") console.log(`[DEBIT_SUCCESS] New balance: ${(debitResult as any).new_balance}`);
+
+    if (debitResult?.new_balance < 0) {
+      paymentMethod = "credit";
+      log(supabaseAdmin, { level: "info", source: "wallet-buy-data", event: "credit.drawn", message: `Credit drawn. Account is in overdraft (GHS ${debitResult.new_balance}) for ${user.id}`, agent_id: user.id, data: { amount: requestedAmount, new_balance: debitResult.new_balance } });
+    }
+    
+    console.log(`[DEBIT_SUCCESS] New balance: ${(debitResult as any).new_balance}`);
 
     const orderId = reference || crypto.randomUUID();
 
