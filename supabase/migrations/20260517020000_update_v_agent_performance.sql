@@ -2,7 +2,9 @@
 -- w.credit_limit is the actual credit/float limit assigned.
 -- credit_used is calculated dynamically as the negative balance (if overdrafted), or 0 otherwise.
 
-CREATE OR REPLACE VIEW public.v_agent_performance AS
+DROP VIEW IF EXISTS public.v_agent_performance CASCADE;
+
+CREATE VIEW public.v_agent_performance AS
 SELECT
   p.user_id                                                          AS agent_id,
   p.full_name,
@@ -12,8 +14,8 @@ SELECT
   p.parent_agent_id,
   p.created_at                                                       AS joined_at,
   p.credit_enabled,
-  COALESCE(w.credit_limit, 0)                                       AS credit_limit,
-  CASE WHEN w.balance < 0 THEN -w.balance ELSE 0 END                 AS credit_used,
+  COALESCE(w.credit_limit, 0)::numeric(12,2)                        AS credit_limit,
+  (CASE WHEN w.balance < 0 THEN -w.balance ELSE 0 END)::numeric(12,2) AS credit_used,
 
   -- 30-day stats
   COUNT(o.id) FILTER (WHERE o.created_at > now() - interval '30 days')                     AS orders_30d,
