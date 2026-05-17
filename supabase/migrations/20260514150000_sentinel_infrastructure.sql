@@ -56,5 +56,12 @@ CREATE POLICY "admins_manage_sentinel_strategies" ON public.sentinel_strategies 
 CREATE POLICY "admins_manage_sentinel_actions" ON public.sentinel_actions FOR ALL USING (EXISTS (SELECT 1 FROM public.user_roles WHERE user_id = auth.uid() AND role = 'admin'));
 
 -- Enable Realtime for the dashboard
-ALTER PUBLICATION supabase_realtime ADD TABLE public.sentinel_actions;
-ALTER PUBLICATION supabase_realtime ADD TABLE public.sentinel_strategies;
+DO $$ 
+BEGIN 
+  IF NOT EXISTS (SELECT 1 FROM pg_publication_tables WHERE pubname = 'supabase_realtime' AND tablename = 'sentinel_actions') THEN
+    ALTER PUBLICATION supabase_realtime ADD TABLE public.sentinel_actions;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_publication_tables WHERE pubname = 'supabase_realtime' AND tablename = 'sentinel_strategies') THEN
+    ALTER PUBLICATION supabase_realtime ADD TABLE public.sentinel_strategies;
+  END IF;
+END $$;

@@ -191,57 +191,75 @@ DROP POLICY IF EXISTS "service_role_knowledge"             ON public.ai_support_
 -- ── 11. Correct RLS policies (admin + service_role) ─────────────
 
 -- sentinel_knowledge
+DROP POLICY IF EXISTS "admins_sentinel_knowledge" ON public.sentinel_knowledge;
 CREATE POLICY "admins_sentinel_knowledge"
   ON public.sentinel_knowledge FOR ALL USING (public.is_admin());
+DROP POLICY IF EXISTS "service_role_sentinel_knowledge" ON public.sentinel_knowledge;
 CREATE POLICY "service_role_sentinel_knowledge"
   ON public.sentinel_knowledge TO service_role USING (true) WITH CHECK (true);
 
 -- sentinel_strategies
+DROP POLICY IF EXISTS "admins_sentinel_strategies" ON public.sentinel_strategies;
 CREATE POLICY "admins_sentinel_strategies"
   ON public.sentinel_strategies FOR ALL USING (public.is_admin());
+DROP POLICY IF EXISTS "service_role_sentinel_strategies" ON public.sentinel_strategies;
 CREATE POLICY "service_role_sentinel_strategies"
   ON public.sentinel_strategies TO service_role USING (true) WITH CHECK (true);
 
 -- sentinel_actions
+DROP POLICY IF EXISTS "admins_sentinel_actions" ON public.sentinel_actions;
 CREATE POLICY "admins_sentinel_actions"
   ON public.sentinel_actions FOR ALL USING (public.is_admin());
+DROP POLICY IF EXISTS "service_role_sentinel_actions" ON public.sentinel_actions;
 CREATE POLICY "service_role_sentinel_actions"
   ON public.sentinel_actions TO service_role USING (true) WITH CHECK (true);
 
 -- sentinel_security_audits
+DROP POLICY IF EXISTS "admins_sentinel_security_audits" ON public.sentinel_security_audits;
 CREATE POLICY "admins_sentinel_security_audits"
   ON public.sentinel_security_audits FOR ALL USING (public.is_admin());
+DROP POLICY IF EXISTS "service_role_sentinel_security_audits" ON public.sentinel_security_audits;
 CREATE POLICY "service_role_sentinel_security_audits"
   ON public.sentinel_security_audits TO service_role USING (true) WITH CHECK (true);
 
 -- blocked_ips
+DROP POLICY IF EXISTS "admins_blocked_ips" ON public.blocked_ips;
 CREATE POLICY "admins_blocked_ips"
   ON public.blocked_ips FOR ALL USING (public.is_admin());
+DROP POLICY IF EXISTS "service_role_blocked_ips" ON public.blocked_ips;
 CREATE POLICY "service_role_blocked_ips"
   ON public.blocked_ips TO service_role USING (true) WITH CHECK (true);
 
 -- sentinel_marketing_promos
+DROP POLICY IF EXISTS "admins_sentinel_marketing_promos" ON public.sentinel_marketing_promos;
 CREATE POLICY "admins_sentinel_marketing_promos"
   ON public.sentinel_marketing_promos FOR ALL USING (public.is_admin());
+DROP POLICY IF EXISTS "service_role_sentinel_marketing_promos" ON public.sentinel_marketing_promos;
 CREATE POLICY "service_role_sentinel_marketing_promos"
   ON public.sentinel_marketing_promos TO service_role USING (true) WITH CHECK (true);
 
 -- agent_loyalty_metrics
+DROP POLICY IF EXISTS "admins_agent_loyalty_metrics" ON public.agent_loyalty_metrics;
 CREATE POLICY "admins_agent_loyalty_metrics"
   ON public.agent_loyalty_metrics FOR ALL USING (public.is_admin());
+DROP POLICY IF EXISTS "service_role_agent_loyalty_metrics" ON public.agent_loyalty_metrics;
 CREATE POLICY "service_role_agent_loyalty_metrics"
   ON public.agent_loyalty_metrics TO service_role USING (true) WITH CHECK (true);
 
 -- sentinel_usage_logs
+DROP POLICY IF EXISTS "admins_sentinel_usage_logs" ON public.sentinel_usage_logs;
 CREATE POLICY "admins_sentinel_usage_logs"
   ON public.sentinel_usage_logs FOR ALL USING (public.is_admin());
+DROP POLICY IF EXISTS "service_role_sentinel_usage_logs" ON public.sentinel_usage_logs;
 CREATE POLICY "service_role_sentinel_usage_logs"
   ON public.sentinel_usage_logs TO service_role USING (true) WITH CHECK (true);
 
 -- ai_support_knowledge
+DROP POLICY IF EXISTS "admins_manage_knowledge" ON public.ai_support_knowledge;
 CREATE POLICY "admins_manage_knowledge"
   ON public.ai_support_knowledge FOR ALL
   USING (public.is_admin()) WITH CHECK (public.is_admin());
+DROP POLICY IF EXISTS "service_role_knowledge" ON public.ai_support_knowledge;
 CREATE POLICY "service_role_knowledge"
   ON public.ai_support_knowledge TO service_role USING (true) WITH CHECK (true);
 

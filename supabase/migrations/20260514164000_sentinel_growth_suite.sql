@@ -40,9 +40,18 @@ ALTER TABLE public.agent_loyalty_metrics ENABLE ROW LEVEL SECURITY;
 -- Admins only
 CREATE POLICY "Admins can manage growth suite" 
 ON public.sentinel_marketing_promos FOR ALL 
-USING (auth.jwt() ->> 'role' = 'service_role' OR (SELECT is_admin FROM profiles WHERE user_id = auth.uid()));
+USING (auth.jwt() ->> 'role' = 'service_role' OR EXISTS (SELECT 1 FROM user_roles WHERE user_id = auth.uid() AND role = 'admin'));
 
 -- Realtime for dashboard
-ALTER PUBLICATION supabase_realtime ADD TABLE sentinel_marketing_promos;
-ALTER PUBLICATION supabase_realtime ADD TABLE sentinel_price_intelligence;
-ALTER PUBLICATION supabase_realtime ADD TABLE agent_loyalty_metrics;
+DO $$ 
+BEGIN 
+  IF NOT EXISTS (SELECT 1 FROM pg_publication_tables WHERE pubname = 'supabase_realtime' AND tablename = 'sentinel_marketing_promos') THEN
+    ALTER PUBLICATION supabase_realtime ADD TABLE sentinel_marketing_promos;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_publication_tables WHERE pubname = 'supabase_realtime' AND tablename = 'sentinel_price_intelligence') THEN
+    ALTER PUBLICATION supabase_realtime ADD TABLE sentinel_price_intelligence;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_publication_tables WHERE pubname = 'supabase_realtime' AND tablename = 'agent_loyalty_metrics') THEN
+    ALTER PUBLICATION supabase_realtime ADD TABLE agent_loyalty_metrics;
+  END IF;
+END $$;

@@ -24,7 +24,12 @@ ALTER TABLE public.sentinel_usage_logs ENABLE ROW LEVEL SECURITY;
 -- Admins only
 CREATE POLICY "Admins can view usage logs" 
 ON public.sentinel_usage_logs FOR SELECT 
-USING (auth.jwt() ->> 'role' = 'service_role' OR (SELECT is_admin FROM profiles WHERE user_id = auth.uid()));
+USING (auth.jwt() ->> 'role' = 'service_role' OR EXISTS (SELECT 1 FROM user_roles WHERE user_id = auth.uid() AND role = 'admin'));
 
 -- Realtime for dashboard
-ALTER PUBLICATION supabase_realtime ADD TABLE sentinel_usage_logs;
+DO $$ 
+BEGIN 
+  IF NOT EXISTS (SELECT 1 FROM pg_publication_tables WHERE pubname = 'supabase_realtime' AND tablename = 'sentinel_usage_logs') THEN
+    ALTER PUBLICATION supabase_realtime ADD TABLE sentinel_usage_logs;
+  END IF;
+END $$;
