@@ -17,7 +17,13 @@ const DailyCheckIn = () => {
     if (profile?.last_check_in) {
       const lastCheckIn = new Date(profile.last_check_in);
       const today = new Date();
-      if (lastCheckIn.toDateString() === today.toDateString()) {
+      
+      // We MUST use UTC to evaluate the date, otherwise users in UTC+1 will see the button 
+      // unlock at 11:00 PM Ghana time, resulting in a database rejection!
+      const lastCheckInUTC = `${lastCheckIn.getUTCFullYear()}-${lastCheckIn.getUTCMonth()}-${lastCheckIn.getUTCDate()}`;
+      const todayUTC = `${today.getUTCFullYear()}-${today.getUTCMonth()}-${today.getUTCDate()}`;
+      
+      if (lastCheckInUTC === todayUTC) {
         setHasCheckedIn(true);
       }
     }
