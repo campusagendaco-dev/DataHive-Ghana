@@ -12,12 +12,44 @@ const AdminNotifications = () => {
       Notification.requestPermission();
     }
 
+    let activeTone = "/sounds/notification_system.mp3";
+    let isVibeEnabled = true;
+    let vibePatternStr = "200,100,200";
+
+    const fetchConfig = async () => {
+      const { data } = await supabase
+        .from("public_system_settings")
+        .select("notification_tone, notification_vibration_enabled, notification_vibration_pattern")
+        .eq("id", 1)
+        .maybeSingle();
+      if (data) {
+        if (data.notification_tone) activeTone = data.notification_tone;
+        isVibeEnabled = data.notification_vibration_enabled !== false;
+        if (data.notification_vibration_pattern) vibePatternStr = data.notification_vibration_pattern;
+      }
+    };
+
+    fetchConfig();
+
     const playPing = () => {
-      const audio = new Audio("/sounds/notification_system.mp3");
+      const audio = new Audio(activeTone);
       audio.volume = 0.5;
       audio.play().catch(() => {
         console.log("[AdminNotifications] Audio blocked by browser policy");
       });
+
+      if (isVibeEnabled && vibePatternStr) {
+        if (typeof navigator !== "undefined" && navigator.vibrate) {
+          try {
+            const pattern = vibePatternStr.split(",").map(Number).filter(Number.isFinite);
+            if (pattern.length > 0) {
+              navigator.vibrate(pattern);
+            }
+          } catch (e) {
+            console.warn("[Vibration] Blocked or unsupported in AdminNotifications:", e);
+          }
+        }
+      }
     };
 
     const notify = (title: string, body: string) => {

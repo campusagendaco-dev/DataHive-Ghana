@@ -79,6 +79,9 @@ interface SystemSettings {
   min_withdrawal_amount: string;
   max_withdrawal_amount: string;
   withdrawal_system_enabled: boolean;
+  notification_tone: string;
+  notification_vibration_enabled: boolean;
+  notification_vibration_pattern: string;
 }
 
 const AdminSettings = () => {
@@ -153,6 +156,9 @@ const AdminSettings = () => {
     tutorial_buy_video_url: "",
     tutorial_agent_video_url: "",
     tutorial_subagent_video_url: "",
+    notification_tone: "/sounds/notification_system.mp3",
+    notification_vibration_enabled: true,
+    notification_vibration_pattern: "200,100,200",
   });
 
   const [currentIp, setCurrentIp] = useState("");
@@ -253,6 +259,9 @@ const AdminSettings = () => {
           min_withdrawal_amount: String(d.min_withdrawal_amount || "25.00"),
           max_withdrawal_amount: String(d.max_withdrawal_amount || "5000.00"),
           withdrawal_system_enabled: d.withdrawal_system_enabled !== false,
+          notification_tone: d.notification_tone || "/sounds/notification_system.mp3",
+          notification_vibration_enabled: d.notification_vibration_enabled !== false,
+          notification_vibration_pattern: d.notification_vibration_pattern || "200,100,200",
         });
       }
       setLoading(false);
@@ -313,6 +322,9 @@ const AdminSettings = () => {
       min_withdrawal_amount: parseFloat(settings.min_withdrawal_amount) || 25,
       max_withdrawal_amount: parseFloat(settings.max_withdrawal_amount) || 5000,
       withdrawal_system_enabled: settings.withdrawal_system_enabled,
+      notification_tone: settings.notification_tone,
+      notification_vibration_enabled: settings.notification_vibration_enabled,
+      notification_vibration_pattern: settings.notification_vibration_pattern,
     };
 
     try {
@@ -1155,6 +1167,169 @@ const AdminSettings = () => {
                   />
                 </div>
               </div>
+            </CardContent>
+          </Card>
+
+          <Card className="border-sky-500/20 bg-sky-500/5">
+            <CardHeader>
+              <CardTitle className="text-lg flex items-center gap-2">
+                <Sparkles className="w-5 h-5 text-sky-500" />
+                Notification Sounds & Vibration Alerts
+              </CardTitle>
+              <CardDescription>
+                Configure premium audio signals and haptic vibration feedback for push notifications.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-5">
+              <div className="space-y-3">
+                <Label className="flex items-center gap-2">
+                  Notification Alert Tone
+                </Label>
+                <div className="flex gap-2">
+                  <select
+                    value={settings.notification_tone}
+                    onChange={(e) => setSettings({ ...settings, notification_tone: e.target.value })}
+                    className="flex-1 rounded-xl border border-input bg-background px-3 py-2 text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  >
+                    <option value="/sounds/notification_system.mp3">🔔 Modern System Chime (Default)</option>
+                    <option value="/sounds/success.mp3">💰 Crisp Digital Chime (Cha-Ching)</option>
+                    <option value="/sounds/glass_ting.mp3">🔔 Gentle Glass Ting</option>
+                    <option value="/sounds/marimba_chime.mp3">🎵 Playful Marimba Chime</option>
+                    <option value="/sounds/laser_drop.mp3">⚡ Cyberpunk Laser Drop</option>
+                  </select>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => {
+                      try {
+                        const audio = new Audio(settings.notification_tone);
+                        audio.volume = 0.5;
+                        audio.play().catch(() => {
+                          toast({ title: "Autoplay Blocked", description: "Please tap the screen first to allow audio.", variant: "destructive" });
+                        });
+                      } catch (err: any) {
+                        toast({ title: "Failed to play tone", description: err.message, variant: "destructive" });
+                      }
+                    }}
+                    className="rounded-xl border border-input bg-background/50"
+                  >
+                    Test Sound
+                  </Button>
+                </div>
+              </div>
+
+              <div className="space-y-3 pt-3 border-t border-white/10">
+                <Label className="flex items-center gap-2">
+                  Upload Custom Tone (MP3)
+                </Label>
+                <div className="relative">
+                  <Input
+                    type="file"
+                    accept="audio/mp3,audio/mpeg"
+                    className="hidden"
+                    id="tone-upload"
+                    onChange={async (e) => {
+                      const file = e.target.files?.[0];
+                      if (!file) return;
+
+                      if (file.size > 2 * 1024 * 1024) { // 2MB limit
+                        toast({ title: "File too large", description: "Audio files must be under 2MB.", variant: "destructive" });
+                        return;
+                      }
+
+                      setSaving(true);
+                      try {
+                        const ext = file.name.split('.').pop();
+                        const fileName = `custom-tone-${Date.now()}.${ext}`;
+
+                        const { error } = await supabase.storage
+                          .from('site-assets')
+                          .upload(fileName, file);
+
+                        if (error) throw error;
+
+                        const { data: { publicUrl } } = supabase.storage
+                          .from('site-assets')
+                          .getPublicUrl(fileName);
+
+                        setSettings({ ...settings, notification_tone: publicUrl });
+                        toast({ title: "Custom tone uploaded", description: "Remember to save all changes below." });
+                      } catch (err: any) {
+                        toast({ title: "Upload failed", description: err.message, variant: "destructive" });
+                      } finally {
+                        setSaving(false);
+                      }
+                    }}
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => document.getElementById('tone-upload')?.click()}
+                    disabled={saving}
+                    className="gap-2 w-full rounded-xl border border-input bg-background/50"
+                  >
+                    {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
+                    Upload Custom Tone
+                  </Button>
+                </div>
+                {settings.notification_tone.startsWith("http") && (
+                  <p className="text-[10px] text-emerald-400 font-bold flex items-center gap-1">
+                    ✓ Custom Tone Active: {settings.notification_tone.split("/").pop()}
+                  </p>
+                )}
+              </div>
+
+              <div className="flex items-center justify-between p-3 rounded-xl bg-white/5 border border-white/10 pt-3 mt-3">
+                <div className="space-y-0.5">
+                  <Label className="text-sm font-bold">Tactile Mobile Vibration</Label>
+                  <p className="text-xs text-muted-foreground">Trigger physical haptic vibration on incoming notifications.</p>
+                </div>
+                <Switch
+                  checked={settings.notification_vibration_enabled}
+                  onCheckedChange={(c) => setSettings({ ...settings, notification_vibration_enabled: c })}
+                />
+              </div>
+
+              {settings.notification_vibration_enabled && (
+                <div className="space-y-2 pt-3 border-t border-white/5 animate-in fade-in slide-in-from-top-2 duration-300">
+                  <Label>Vibration Pattern</Label>
+                  <div className="flex gap-2">
+                    <Input
+                      placeholder="e.g. 200,100,200"
+                      value={settings.notification_vibration_pattern}
+                      onChange={(e) => setSettings({ ...settings, notification_vibration_pattern: e.target.value })}
+                      className="rounded-xl flex-1"
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => {
+                        if (typeof navigator !== "undefined" && navigator.vibrate) {
+                          try {
+                            const pattern = settings.notification_vibration_pattern.split(",").map(Number).filter(Number.isFinite);
+                            if (pattern.length > 0) {
+                              navigator.vibrate(pattern);
+                              toast({ title: "Tactile Haptics Dispatched", description: "Your physical device is now vibrating." });
+                            } else {
+                              toast({ title: "Invalid Pattern", description: "Comma-separated milliseconds list (e.g. 200,100,200)", variant: "destructive" });
+                            }
+                          } catch (err: any) {
+                            toast({ title: "Vibration Blocked", description: err.message, variant: "destructive" });
+                          }
+                        } else {
+                          toast({ title: "Haptics Not Supported", description: "Device vibration requires a physical mobile browser.", variant: "destructive" });
+                        }
+                      }}
+                      className="rounded-xl border border-input bg-background/50"
+                    >
+                      Test Pattern
+                    </Button>
+                  </div>
+                  <p className="text-[10px] text-muted-foreground">
+                    Define vibration length in milliseconds, separated by commas. Example: <code>200,100,200</code> vibrates for 200ms, rests 100ms, then vibrates 200ms.
+                  </p>
+                </div>
+              )}
             </CardContent>
           </Card>
         </div>

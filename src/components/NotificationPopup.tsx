@@ -19,6 +19,11 @@ const NotificationPopup = () => {
   const { user, profile } = useAuth();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [isVisible, setIsVisible] = useState(false);
+  const [settings, setSettings] = useState({
+    tone: "/sounds/notification_system.mp3",
+    vibeEnabled: true,
+    vibePattern: "200,100,200"
+  });
 
   useEffect(() => {
     if (!user) return;
@@ -26,6 +31,30 @@ const NotificationPopup = () => {
     let active = true;
 
     const fetchNotifications = async () => {
+      // 1. Fetch custom audio & vibe settings
+      const { data: sysSettings } = await supabase
+        .from("public_system_settings")
+        .select("notification_tone, notification_vibration_enabled, notification_vibration_pattern")
+        .eq("id", 1)
+        .maybeSingle();
+
+      let currentTone = "/sounds/notification_system.mp3";
+      let currentVibeEnabled = true;
+      let currentVibePattern = "200,100,200";
+
+      if (sysSettings) {
+        if (sysSettings.notification_tone) currentTone = sysSettings.notification_tone;
+        currentVibeEnabled = sysSettings.notification_vibration_enabled !== false;
+        if (sysSettings.notification_vibration_pattern) currentVibePattern = sysSettings.notification_vibration_pattern;
+
+        setSettings({
+          tone: currentTone,
+          vibeEnabled: currentVibeEnabled,
+          vibePattern: currentVibePattern
+        });
+      }
+
+      // 2. Fetch notifications
       const { data: dismissals } = await supabase
         .from("notification_dismissals")
         .select("notification_id")
@@ -58,7 +87,7 @@ const NotificationPopup = () => {
         setTimeout(() => {
           if (!active) return;
           setIsVisible(true);
-          playPing();
+          playPing(currentTone, currentVibeEnabled, currentVibePattern);
         }, 1500);
       }
     };
@@ -86,7 +115,7 @@ const NotificationPopup = () => {
           if (matches && active) {
             setNotifications(prev => [newNotif, ...prev]);
             setIsVisible(true);
-            playPing();
+            playPing(settings.tone, settings.vibeEnabled, settings.vibePattern);
           }
         }
       )
@@ -96,14 +125,27 @@ const NotificationPopup = () => {
       active = false;
       supabase.removeChannel(channel);
     };
-  }, [user, profile]);
+  }, [user, profile, settings.tone, settings.vibeEnabled, settings.vibePattern]);
 
-  const playPing = () => {
-    const audio = new Audio(NOTIFICATION_SOUND);
+  const playPing = (customTone = settings.tone, customVibeEnabled = settings.vibeEnabled, customVibePattern = settings.vibePattern) => {
+    const audio = new Audio(customTone);
     audio.volume = 0.4;
     audio.play().catch(() => {
       console.log("[NotificationPopup] Audio blocked by browser");
     });
+
+    if (customVibeEnabled && customVibePattern) {
+      if (typeof navigator !== "undefined" && navigator.vibrate) {
+        try {
+          const pattern = customVibePattern.split(",").map(Number).filter(Number.isFinite);
+          if (pattern.length > 0) {
+            navigator.vibrate(pattern);
+          }
+        } catch (e) {
+          console.warn("[Vibration] Blocked or unsupported:", e);
+        }
+      }
+    }
   };
 
   const handleDismiss = async () => {
@@ -125,7 +167,7 @@ const NotificationPopup = () => {
       if (remaining.length > 0) {
         setTimeout(() => {
           setIsVisible(true);
-          playPing();
+          playPing(settings.tone, settings.vibeEnabled, settings.vibePattern);
         }, 1000);
       }
     }, 400);
