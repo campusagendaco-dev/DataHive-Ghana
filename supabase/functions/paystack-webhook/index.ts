@@ -983,7 +983,13 @@ serve(async (req) => {
     }
 
     if (orderType === "agent_activation") {
-      const AGENT_ACTIVATION_MINIMUM = 80; // GHS — enforced server-side
+      const { data: settings } = await supabaseAdmin
+        .from("system_settings")
+        .select("agent_activation_fee")
+        .eq("id", 1)
+        .maybeSingle();
+      const AGENT_ACTIVATION_MINIMUM = Number(settings?.agent_activation_fee || 50);
+
       if (verifiedAmount < AGENT_ACTIVATION_MINIMUM * 0.97) {
         await supabaseAdmin.from("orders").update({
           status: "fulfillment_failed",
@@ -1013,7 +1019,13 @@ serve(async (req) => {
     }
 
     if (orderType === "sub_agent_activation") {
-      const SUB_AGENT_MINIMUM = 80; // Minimum platform base fee
+      const { data: settings } = await supabaseAdmin
+        .from("system_settings")
+        .select("sub_agent_base_fee")
+        .eq("id", 1)
+        .maybeSingle();
+      const SUB_AGENT_MINIMUM = Number(settings?.sub_agent_base_fee || 5);
+
       if (verifiedAmount < SUB_AGENT_MINIMUM * 0.97) {
         await supabaseAdmin.from("orders").update({
           status: "fulfillment_failed",
