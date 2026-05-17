@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useAuth, Profile } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { Bell, X, Info, Zap, AlertCircle } from "lucide-react";
@@ -19,7 +19,7 @@ const NotificationPopup = () => {
   const { user, profile } = useAuth();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [isVisible, setIsVisible] = useState(false);
-  const [settings, setSettings] = useState({
+  const settingsRef = useRef({
     tone: "/sounds/notification_system.mp3",
     vibeEnabled: true,
     vibePattern: "200,100,200"
@@ -47,11 +47,11 @@ const NotificationPopup = () => {
         currentVibeEnabled = sysSettings.notification_vibration_enabled !== false;
         if (sysSettings.notification_vibration_pattern) currentVibePattern = sysSettings.notification_vibration_pattern;
 
-        setSettings({
+        settingsRef.current = {
           tone: currentTone,
           vibeEnabled: currentVibeEnabled,
           vibePattern: currentVibePattern
-        });
+        };
       }
 
       // 2. Fetch notifications
@@ -115,7 +115,7 @@ const NotificationPopup = () => {
           if (matches && active) {
             setNotifications(prev => [newNotif, ...prev]);
             setIsVisible(true);
-            playPing(settings.tone, settings.vibeEnabled, settings.vibePattern);
+            playPing(settingsRef.current.tone, settingsRef.current.vibeEnabled, settingsRef.current.vibePattern);
           }
         }
       )
@@ -125,9 +125,13 @@ const NotificationPopup = () => {
       active = false;
       supabase.removeChannel(channel);
     };
-  }, [user, profile, settings.tone, settings.vibeEnabled, settings.vibePattern]);
+  }, [user, profile]);
 
-  const playPing = (customTone = settings.tone, customVibeEnabled = settings.vibeEnabled, customVibePattern = settings.vibePattern) => {
+  const playPing = (
+    customTone = settingsRef.current.tone,
+    customVibeEnabled = settingsRef.current.vibeEnabled,
+    customVibePattern = settingsRef.current.vibePattern
+  ) => {
     const audio = new Audio(customTone);
     audio.volume = 0.4;
     audio.play().catch(() => {
@@ -167,7 +171,7 @@ const NotificationPopup = () => {
       if (remaining.length > 0) {
         setTimeout(() => {
           setIsVisible(true);
-          playPing(settings.tone, settings.vibeEnabled, settings.vibePattern);
+          playPing(settingsRef.current.tone, settingsRef.current.vibeEnabled, settingsRef.current.vibePattern);
         }, 1000);
       }
     }, 400);
