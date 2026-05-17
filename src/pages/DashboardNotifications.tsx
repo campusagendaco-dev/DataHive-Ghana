@@ -261,18 +261,30 @@ const DashboardNotifications = () => {
   return (
     <div className="p-4 sm:p-6 lg:p-8 space-y-8 max-w-6xl mx-auto">
       {/* HEADER SECTION */}
-      <div className="relative p-6 sm:p-8 rounded-3xl border border-white/5 bg-gradient-to-r from-sky-950/20 via-black/40 to-indigo-950/20 overflow-hidden shadow-2xl backdrop-blur-md">
+      <div className={`relative p-6 sm:p-8 rounded-3xl border transition-all duration-300 overflow-hidden shadow-2xl backdrop-blur-md ${
+        isDark 
+          ? "border-white/5 bg-gradient-to-r from-sky-950/20 via-black/40 to-indigo-950/20" 
+          : "border-sky-100 bg-gradient-to-r from-sky-50 via-white to-indigo-50/50"
+      }`}>
         <div className="absolute inset-0 bg-sky-500/5 blur-[80px] -z-10 animate-pulse" />
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
           <div className="flex items-center gap-4">
-            <div className="w-14 h-14 rounded-2xl bg-sky-500/10 border border-sky-500/20 flex items-center justify-center shadow-lg shadow-sky-500/5">
-              <Bell className="w-7 h-7 text-sky-400" />
+            <div className={`w-14 h-14 rounded-2xl flex items-center justify-center shadow-lg transition-colors ${
+              isDark 
+                ? "bg-sky-500/10 border border-sky-500/20 shadow-sky-500/5" 
+                : "bg-sky-50 border border-sky-200/60 shadow-sky-200/10"
+            }`}>
+              <Bell className="w-7 h-7 text-sky-500" />
             </div>
             <div>
-              <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-white uppercase italic flex items-center gap-2">
+              <h1 className={`text-2xl sm:text-3xl font-black tracking-tight uppercase italic flex items-center gap-2 ${
+                isDark ? "text-white" : "text-slate-900"
+              }`}>
                 Inbox Hub <span className="text-sky-500 text-xs not-italic font-bold">V1.5</span>
               </h1>
-              <p className="text-white/40 text-xs mt-0.5 font-medium">
+              <p className={`text-xs mt-0.5 font-medium ${
+                isDark ? "text-white/40" : "text-slate-500"
+              }`}>
                 Manage, review, and organize platform updates and transaction alerts.
               </p>
             </div>
@@ -284,7 +296,11 @@ const DashboardNotifications = () => {
               variant="outline"
               size="sm"
               disabled={loading}
-              className="rounded-xl border-white/10 bg-white/5 text-white/70 hover:bg-white/10 text-xs font-black uppercase h-9"
+              className={`rounded-xl text-xs font-black uppercase h-9 border transition-all ${
+                isDark 
+                  ? "border-white/10 bg-white/5 text-white/70 hover:bg-white/10" 
+                  : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50 shadow-sm"
+              }`}
             >
               <RefreshCw className={`w-3.5 h-3.5 mr-2 ${loading ? "animate-spin" : ""}`} />
               Refresh
@@ -313,18 +329,28 @@ const DashboardNotifications = () => {
             <motion.div
               initial={{ opacity: 0, y: 15 }}
               animate={{ opacity: 1, y: 0 }}
-              className="p-6 rounded-3xl border border-indigo-500/20 bg-indigo-500/5 relative overflow-hidden group shadow-xl"
+              className={`p-6 rounded-3xl border relative overflow-hidden group shadow-xl transition-all ${
+                isDark 
+                  ? "border-indigo-500/20 bg-indigo-500/5 text-indigo-400/10 group-hover:text-indigo-400/20" 
+                  : "border-indigo-100 bg-indigo-50/50 text-indigo-500/5 group-hover:text-indigo-500/10"
+              }`}
             >
-              <div className="absolute top-0 right-0 p-4 text-indigo-400/10 group-hover:text-indigo-400/20 transition-all">
-                <Smartphone className="w-16 h-16" />
+              <div className="absolute top-0 right-0 p-4 transition-all">
+                <Smartphone className="w-16 h-16 text-indigo-500/20" />
               </div>
               <div className="flex items-center gap-3 mb-3">
-                <div className="p-2.5 rounded-xl bg-indigo-500/10 border border-indigo-500/20">
-                  <Smartphone className="w-5 h-5 text-indigo-400" />
+                <div className={`p-2.5 rounded-xl border ${
+                  isDark ? "bg-indigo-500/10 border-indigo-500/20" : "bg-indigo-100/50 border-indigo-200"
+                }`}>
+                  <Smartphone className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
                 </div>
-                <h3 className="text-sm font-black text-white uppercase tracking-wider">Lock-screen Alerts</h3>
+                <h3 className={`text-sm font-black uppercase tracking-wider ${
+                  isDark ? "text-white" : "text-slate-900"
+                }`}>Lock-screen Alerts</h3>
               </div>
-              <p className="text-xs text-white/50 leading-relaxed mb-4">
+              <p className={`text-xs leading-relaxed mb-4 ${
+                isDark ? "text-white/50" : "text-slate-600"
+              }`}>
                 Enable native push notifications to receive real-time deposits and store checkout notifications even when the browser is closed.
               </p>
               <Button
@@ -338,22 +364,38 @@ const DashboardNotifications = () => {
           )}
 
           {/* PREFERENCES PANEL */}
-          <div className="p-6 rounded-3xl border border-white/5 bg-[#0a0a0e]/60 backdrop-blur-md space-y-6">
-            <div className="flex items-center gap-3 border-b border-white/5 pb-4">
-              <div className="p-2 rounded-xl bg-white/5 border border-white/5 text-white/70">
-                <Settings2 className="w-4 h-4 text-sky-400" />
+          <div className={`p-6 rounded-3xl border backdrop-blur-md space-y-6 transition-all ${
+            isDark 
+              ? "border-white/5 bg-[#0a0a0e]/60 shadow-2xl" 
+              : "border-slate-200 bg-white shadow-sm shadow-slate-100/50"
+          }`}>
+            <div className={`flex items-center gap-3 border-b pb-4 ${
+              isDark ? "border-white/5" : "border-slate-100"
+            }`}>
+              <div className={`p-2 rounded-xl border ${
+                isDark ? "bg-white/5 border-white/5 text-sky-400" : "bg-sky-50 border-sky-100 text-sky-600"
+              }`}>
+                <Settings2 className="w-4 h-4" />
               </div>
               <div>
-                <h3 className="text-sm font-black text-white uppercase tracking-wider">Inbox Settings</h3>
-                <p className="text-[10px] text-white/30 font-medium">Device-level alerts behavior</p>
+                <h3 className={`text-sm font-black uppercase tracking-wider ${
+                  isDark ? "text-white" : "text-slate-900"
+                }`}>Inbox Settings</h3>
+                <p className={`text-[10px] font-medium ${
+                  isDark ? "text-white/30" : "text-slate-400"
+                }`}>Device-level alerts behavior</p>
               </div>
             </div>
 
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <div className="space-y-0.5">
-                  <span className="text-xs font-bold text-white/80 block">Sound Chimes</span>
-                  <span className="text-[9px] text-white/35 block leading-none">Play chime on incoming alerts</span>
+                  <span className={`text-xs font-bold block ${
+                    isDark ? "text-white/80" : "text-slate-800"
+                  }`}>Sound Chimes</span>
+                  <span className={`text-[9px] block leading-none ${
+                    isDark ? "text-white/35" : "text-slate-500"
+                  }`}>Play chime on incoming alerts</span>
                 </div>
                 <button
                   onClick={() => setSoundEnabled(!soundEnabled)}
@@ -362,15 +404,21 @@ const DashboardNotifications = () => {
                   {soundEnabled ? (
                     <ToggleRight className="w-9 h-9 text-sky-400" />
                   ) : (
-                    <ToggleLeft className="w-9 h-9 text-white/20" />
+                    <ToggleLeft className={`w-9 h-9 ${isDark ? "text-white/20" : "text-slate-300"}`} />
                   )}
                 </button>
               </div>
 
-              <div className="flex items-center justify-between border-t border-white/5 pt-4">
+              <div className={`flex items-center justify-between border-t pt-4 ${
+                isDark ? "border-white/5" : "border-slate-100"
+              }`}>
                 <div className="space-y-0.5">
-                  <span className="text-xs font-bold text-white/80 block">Tactile Haptics</span>
-                  <span className="text-[9px] text-white/35 block leading-none">Vibrate mobile physical devices</span>
+                  <span className={`text-xs font-bold block ${
+                    isDark ? "text-white/80" : "text-slate-800"
+                  }`}>Tactile Haptics</span>
+                  <span className={`text-[9px] block leading-none ${
+                    isDark ? "text-white/35" : "text-slate-500"
+                  }`}>Vibrate mobile physical devices</span>
                 </div>
                 <button
                   onClick={() => setVibeEnabled(!vibeEnabled)}
@@ -379,7 +427,7 @@ const DashboardNotifications = () => {
                   {vibeEnabled ? (
                     <ToggleRight className="w-9 h-9 text-sky-400" />
                   ) : (
-                    <ToggleLeft className="w-9 h-9 text-white/20" />
+                    <ToggleLeft className={`w-9 h-9 ${isDark ? "text-white/20" : "text-slate-300"}`} />
                   )}
                 </button>
               </div>
@@ -393,7 +441,9 @@ const DashboardNotifications = () => {
           {/* SEARCH & FILTER CONTROLS */}
           <div className="flex flex-col sm:flex-row gap-3 items-center justify-between">
             {/* Filter Tabs */}
-            <div className="flex p-1 rounded-2xl bg-white/[0.03] border border-white/5 w-full sm:w-auto overflow-x-auto scrollbar-none shrink-0">
+            <div className={`flex p-1 rounded-2xl border w-full sm:w-auto overflow-x-auto scrollbar-none shrink-0 ${
+              isDark ? "bg-white/[0.03] border-white/5" : "bg-slate-100/80 border-slate-200/60"
+            }`}>
               {[
                 { id: 'all', label: 'All' },
                 { id: 'unread', label: 'Unread', badge: totalUnreadCount > 0 ? totalUnreadCount : null },
@@ -406,13 +456,19 @@ const DashboardNotifications = () => {
                   className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap ${
                     filter === tab.id
                       ? "text-black bg-sky-500 font-black shadow-lg shadow-sky-500/10"
-                      : "text-white/40 hover:text-white/80"
+                      : isDark
+                      ? "text-white/40 hover:text-white/80"
+                      : "text-slate-500 hover:text-slate-800"
                   }`}
                 >
                   {tab.label}
                   {tab.badge !== null && (
                     <span className={`text-[9px] font-black px-1.5 py-0.5 rounded-full ${
-                      filter === tab.id ? "bg-black text-sky-500" : "bg-sky-500/20 text-sky-400"
+                      filter === tab.id 
+                        ? "bg-black text-sky-500" 
+                        : isDark 
+                        ? "bg-sky-500/20 text-sky-400" 
+                        : "bg-sky-100 text-sky-700"
                     }`}>
                       {tab.badge}
                     </span>
@@ -423,23 +479,33 @@ const DashboardNotifications = () => {
 
             {/* Search Input */}
             <div className="relative w-full sm:max-w-xs">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/30" />
+              <Search className={`absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 ${
+                isDark ? "text-white/30" : "text-slate-400"
+              }`} />
               <Input
                 placeholder="Search alerts..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-9 rounded-2xl bg-white/[0.03] border-white/5 focus-visible:ring-sky-500/40 text-xs w-full text-white placeholder:text-white/20 h-9"
+                className={`pl-9 rounded-2xl focus-visible:ring-sky-500/40 text-xs w-full h-9 transition-all ${
+                  isDark 
+                    ? "bg-white/[0.03] border-white/5 text-white placeholder:text-white/20" 
+                    : "bg-white border-slate-200 text-slate-800 placeholder:text-slate-450 shadow-sm"
+                }`}
               />
             </div>
           </div>
 
           {/* BATCH BARS & CHECKBOX GENERAL SELECTOR */}
           {filteredNotifs.length > 0 && (
-            <div className="flex items-center justify-between p-3 px-4 rounded-2xl bg-white/[0.02] border border-white/5 animate-in fade-in duration-300">
+            <div className={`flex items-center justify-between p-3 px-4 rounded-2xl border animate-in fade-in duration-300 ${
+              isDark ? "bg-white/[0.02] border-white/5" : "bg-slate-50 border-slate-200/60 shadow-sm"
+            }`}>
               <div className="flex items-center gap-3">
                 <button
                   onClick={handleToggleSelectAll}
-                  className="p-1 text-white/40 hover:text-white/85 transition-colors"
+                  className={`p-1 transition-colors ${
+                    isDark ? "text-white/40 hover:text-white/85" : "text-slate-400 hover:text-slate-700"
+                  }`}
                   title={selectedIds.length === filteredNotifs.length ? "Deselect All" : "Select All"}
                 >
                   {selectedIds.length === filteredNotifs.length && selectedIds.length > 0 ? (
@@ -448,7 +514,9 @@ const DashboardNotifications = () => {
                     <Square className="w-4 h-4" />
                   )}
                 </button>
-                <span className="text-[10px] font-black uppercase tracking-wider text-white/40">
+                <span className={`text-[10px] font-black uppercase tracking-wider ${
+                  isDark ? "text-white/40" : "text-slate-500"
+                }`}>
                   {selectedIds.length > 0
                     ? `${selectedIds.length} Selected`
                     : "Multi-Select"
@@ -462,7 +530,11 @@ const DashboardNotifications = () => {
                     onClick={handleMarkSelectedAsRead}
                     variant="ghost"
                     size="sm"
-                    className="h-8 rounded-lg text-sky-400 hover:text-sky-300 hover:bg-sky-500/10 font-bold text-[10px] uppercase tracking-wider"
+                    className={`h-8 rounded-lg font-bold text-[10px] uppercase tracking-wider ${
+                      isDark 
+                        ? "text-sky-400 hover:text-sky-300 hover:bg-sky-500/10" 
+                        : "text-sky-600 hover:text-sky-700 hover:bg-sky-50"
+                    }`}
                   >
                     Mark Read
                   </Button>
@@ -470,7 +542,11 @@ const DashboardNotifications = () => {
                     onClick={handleDeleteSelected}
                     variant="ghost"
                     size="sm"
-                    className="h-8 rounded-lg text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 font-bold text-[10px] uppercase tracking-wider"
+                    className={`h-8 rounded-lg font-bold text-[10px] uppercase tracking-wider ${
+                      isDark 
+                        ? "text-rose-400 hover:text-rose-300 hover:bg-rose-500/10" 
+                        : "text-rose-600 hover:text-rose-750 hover:bg-rose-50"
+                    }`}
                   >
                     <Trash2 className="w-3.5 h-3.5 mr-1" />
                     Delete
@@ -485,16 +561,28 @@ const DashboardNotifications = () => {
             {loading ? (
               <div className="p-20 flex flex-col items-center justify-center gap-4 text-center opacity-40">
                 <RefreshCw className="w-8 h-8 text-sky-400 animate-spin" />
-                <p className="text-xs font-bold text-white/50 uppercase tracking-widest">Loading Inbox Stream...</p>
+                <p className={`text-xs font-bold uppercase tracking-widest ${
+                  isDark ? "text-white/50" : "text-slate-500"
+                }`}>Loading Inbox Stream...</p>
               </div>
             ) : filteredNotifs.length === 0 ? (
-              <div className="p-16 text-center border border-dashed border-white/5 rounded-3xl bg-[#0a0a0e]/30 flex flex-col items-center justify-center gap-4 text-white/20">
-                <div className="w-16 h-16 rounded-full bg-white/5 border border-white/5 flex items-center justify-center opacity-50">
-                  <Bell className="w-8 h-8" />
+              <div className={`p-16 text-center border border-dashed rounded-3xl flex flex-col items-center justify-center gap-4 ${
+                isDark 
+                  ? "border-white/5 bg-[#0a0a0e]/30 text-white/20" 
+                  : "border-slate-200 bg-slate-50/50 text-slate-400/60"
+              }`}>
+                <div className={`w-16 h-16 rounded-full flex items-center justify-center opacity-70 ${
+                  isDark ? "bg-white/5 border border-white/5" : "bg-slate-100 border border-slate-200"
+                }`}>
+                  <Bell className="w-8 h-8 text-slate-400" />
                 </div>
                 <div className="space-y-1 max-w-sm">
-                  <p className="font-black text-sm text-white/70 uppercase tracking-wider">No matching notifications</p>
-                  <p className="text-xs text-white/35 leading-relaxed">
+                  <p className={`font-black text-sm uppercase tracking-wider ${
+                    isDark ? "text-white/70" : "text-slate-800"
+                  }`}>No matching notifications</p>
+                  <p className={`text-xs leading-relaxed ${
+                    isDark ? "text-white/35" : "text-slate-500"
+                  }`}>
                     Try clearing filters, searching for another keyword, or check back later for live sale reports.
                   </p>
                 </div>
@@ -516,10 +604,16 @@ const DashboardNotifications = () => {
                         layout="position"
                         className={`rounded-2xl border transition-all duration-300 group overflow-hidden ${
                           isSelected 
-                            ? "border-sky-500/40 bg-sky-500/[0.03]" 
+                            ? isDark 
+                              ? "border-sky-500/40 bg-sky-500/[0.03]" 
+                              : "border-sky-300 bg-sky-50/40 shadow-sm"
                             : !notif.read
-                            ? "border-white/10 bg-white/[0.03] hover:bg-white/[0.04]"
-                            : "border-white/5 bg-white/[0.01] hover:bg-white/[0.02]"
+                            ? isDark
+                              ? "border-white/10 bg-white/[0.03] hover:bg-white/[0.04]"
+                              : "border-slate-200 bg-white hover:bg-slate-50/40 shadow-sm"
+                            : isDark
+                            ? "border-white/5 bg-white/[0.01] hover:bg-white/[0.02]"
+                            : "border-slate-100 bg-slate-50/50 hover:bg-slate-100/50"
                         }`}
                       >
                         {/* Summary Header */}
@@ -530,7 +624,13 @@ const DashboardNotifications = () => {
                           {/* Checkbox Selector */}
                           <div 
                             onClick={(e) => { e.stopPropagation(); handleSelectToggle(notif.id); }}
-                            className="p-1 mt-0.5 text-white/25 hover:text-white/60 transition-colors"
+                            className={`p-1 mt-0.5 transition-colors ${
+                              isSelected 
+                                ? "text-sky-500" 
+                                : isDark 
+                                ? "text-white/25 hover:text-white/60" 
+                                : "text-slate-350 hover:text-slate-600"
+                            }`}
                           >
                             {isSelected ? (
                               <CheckSquare className="w-4 h-4 text-sky-400" />
@@ -550,24 +650,32 @@ const DashboardNotifications = () => {
                           {/* Content summary */}
                           <div className="flex-1 min-w-0">
                             <div className="flex items-start justify-between gap-3 mb-1">
-                              <h3 className={`text-xs sm:text-sm font-black leading-tight truncate uppercase tracking-tight ${
-                                !notif.read ? "text-white" : "text-white/60"
+                              <h3 className={`text-xs sm:text-sm leading-tight truncate uppercase tracking-tight ${
+                                !notif.read 
+                                  ? isDark ? "text-white font-black" : "text-slate-900 font-extrabold"
+                                  : isDark ? "text-white/60 font-bold" : "text-slate-500 font-bold"
                               }`}>
                                 {notif.title}
                               </h3>
-                              <span className="text-[9px] font-bold text-white/30 whitespace-nowrap mt-0.5">
+                              <span className={`text-[9px] font-bold whitespace-nowrap mt-0.5 ${
+                                isDark ? "text-white/30" : "text-slate-400"
+                              }`}>
                                 {new Date(notif.created_at).toLocaleDateString()}
                               </span>
                             </div>
                             <p className={`text-xs leading-normal truncate pr-6 ${
-                              isExpanded ? "hidden" : "block text-white/40"
+                              isExpanded 
+                                ? "hidden" 
+                                : isDark ? "text-white/40" : "text-slate-500"
                             }`}>
                               {notif.message}
                             </p>
                           </div>
 
                           {/* Dropdown Chevron */}
-                          <div className="p-1 text-white/20 group-hover:text-white/60 transition-colors shrink-0">
+                          <div className={`p-1 transition-colors shrink-0 ${
+                            isDark ? "text-white/20 group-hover:text-white/60" : "text-slate-400 group-hover:text-slate-600"
+                          }`}>
                             <ChevronDown className={`w-4 h-4 transition-transform duration-300 ${isExpanded ? "rotate-180 text-sky-400" : ""}`} />
                           </div>
                         </div>
@@ -578,20 +686,28 @@ const DashboardNotifications = () => {
                             initial={{ height: 0 }}
                             animate={{ height: "auto" }}
                             exit={{ height: 0 }}
-                            className="border-t border-white/5 bg-black/25 overflow-hidden"
+                            className={`border-t overflow-hidden ${
+                              isDark ? "border-white/5 bg-black/25" : "border-slate-100 bg-slate-50/50"
+                            }`}
                           >
                             <div className="p-5 sm:px-14 space-y-4">
-                              <p className="text-xs text-white/70 leading-relaxed whitespace-pre-wrap font-medium">
+                              <p className={`text-xs leading-relaxed whitespace-pre-wrap font-medium ${
+                                isDark ? "text-white/70" : "text-slate-700"
+                              }`}>
                                 {notif.message}
                               </p>
 
                               {/* Interactive Actions footer */}
-                              <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-white/5">
+                              <div className={`flex flex-wrap items-center justify-between gap-3 pt-3 border-t ${
+                                isDark ? "border-white/5" : "border-slate-100"
+                              }`}>
                                 <div className="flex items-center gap-2">
                                   <Badge className={`text-[8px] font-black uppercase tracking-widest border-none ${style.badge}`}>
                                     {notif.type} alert
                                   </Badge>
-                                  <Badge className={`text-[8px] font-black uppercase tracking-widest border-none bg-white/5 text-white/40`}>
+                                  <Badge className={`text-[8px] font-black uppercase tracking-widest border-none ${
+                                    isDark ? "bg-white/5 text-white/40" : "bg-slate-150 text-slate-500"
+                                  }`}>
                                     ID: {notif.id.slice(0, 8)}
                                   </Badge>
                                 </div>
@@ -601,7 +717,9 @@ const DashboardNotifications = () => {
                                     onClick={() => handleToggleRead(notif.id, notif.read)}
                                     variant="ghost"
                                     size="sm"
-                                    className="h-8 px-3 rounded-lg text-white/40 hover:text-white hover:bg-white/5 font-bold text-[10px] uppercase tracking-wider"
+                                    className={`h-8 px-3 rounded-lg font-bold text-[10px] uppercase tracking-wider ${
+                                      isDark ? "text-white/40 hover:text-white hover:bg-white/5" : "text-slate-500 hover:text-slate-900 hover:bg-slate-100/50"
+                                    }`}
                                   >
                                     Mark {notif.read ? "Unread" : "Read"}
                                   </Button>
@@ -621,7 +739,9 @@ const DashboardNotifications = () => {
                                     onClick={() => handleDeleteItem(notif.id)}
                                     variant="ghost"
                                     size="sm"
-                                    className="h-8 w-8 p-0 rounded-lg text-rose-500 hover:text-rose-400 hover:bg-rose-500/10 shrink-0"
+                                    className={`h-8 w-8 p-0 rounded-lg shrink-0 ${
+                                      isDark ? "text-rose-500 hover:text-rose-450 hover:bg-rose-500/10" : "text-rose-650 hover:text-rose-700 hover:bg-rose-50"
+                                    }`}
                                     title="Delete notification"
                                   >
                                     <Trash className="w-3.5 h-3.5" />
