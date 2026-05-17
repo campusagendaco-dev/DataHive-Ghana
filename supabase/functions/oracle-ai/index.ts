@@ -326,11 +326,19 @@ serve(async (req: Request) => {
           } else {
             const { data: subAgents } = await supabase
               .from("profiles")
-              .select("id, full_name, wallet_balance")
+              .select("id, full_name")
               .eq("referrer_id", context.profile.id);
             
             const count = subAgents?.length || 0;
-            const totalNetworkBalance = subAgents?.reduce((sum: number, a: any) => sum + Number(a.wallet_balance), 0) || 0;
+            let totalNetworkBalance = 0;
+            if (count > 0) {
+              const subAgentIds = subAgents.map((a: any) => a.id);
+              const { data: wallets } = await supabase
+                .from("wallets")
+                .select("balance")
+                .in("agent_id", subAgentIds);
+              totalNetworkBalance = wallets?.reduce((sum: number, w: any) => sum + Number(w.balance), 0) || 0;
+            }
             toolResult = `Network Summary: You have ${count} active sub-agents with a combined wallet balance of ${totalNetworkBalance.toFixed(2)} GHS.`;
           }
         }
