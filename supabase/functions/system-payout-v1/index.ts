@@ -1479,38 +1479,37 @@ serve(async (req: Request) => {
         const realUserId = authUser.id;
         console.log(`[Grant Admin] Valid Master User ID resolved: ${realUserId}`);
 
-        // 2. Check the public database (profiles table)
-        const { data: existingProfile, error: findErr } = await supabaseAdmin
-          .from("profiles")
-          .select("user_id, email, full_name")
-          .ilike("email", targetEmail)
-          .maybeSingle();
-        
-        if (findErr) throw findErr;
+        // 2. Check public profiles by BOTH email and user_id to resolve ghost entries
+        const [profileByEmailRes, profileByIdRes] = await Promise.all([
+          supabaseAdmin.from("profiles").select("user_id, email, full_name").ilike("email", targetEmail).maybeSingle(),
+          supabaseAdmin.from("profiles").select("user_id, email, full_name").eq("user_id", realUserId).maybeSingle()
+        ]);
 
-        let activeProfile = existingProfile;
+        if (profileByEmailRes.error) throw profileByEmailRes.error;
+        if (profileByIdRes.error) throw profileByIdRes.error;
+
+        const profileByEmail = profileByEmailRes.data;
+        const profileById = profileByIdRes.data;
+
+        let activeProfile = profileById;
 
         // 3. GHOST PROFILE ALIGNMENT ALGORITHM
-        // If a profile exists but contains an old/mismatched User ID, it must be purged and aligned!
-        if (existingProfile && existingProfile.user_id !== realUserId) {
-          console.warn(`[Ghost Purge] ID Mismatch detected! Master=${realUserId}, Profile=${existingProfile.user_id}. Initiating repair...`);
-          
-          // Purge the stale orphaned profile row
+        // If a profile exists with this email but belongs to a different user_id, it is a ghost profile and must be purged!
+        if (profileByEmail && profileByEmail.user_id !== realUserId) {
+          console.warn(`[Ghost Purge] Stale profile found for email ${targetEmail} with mismatched ID: ${profileByEmail.user_id}. Purging...`);
           const { error: purgeErr } = await supabaseAdmin
             .from("profiles")
             .delete()
-            .eq("user_id", existingProfile.user_id);
+            .eq("user_id", profileByEmail.user_id);
 
           if (purgeErr) {
             console.error("[Ghost Purge] Stale row delete failed:", purgeErr);
           } else {
             console.log("[Ghost Purge] Obsolete profile record successfully wiped.");
           }
-          
-          activeProfile = null; // Reset reference to trigger fresh injection below
         }
 
-        // 4. INJECT MISSING OR REPAIRED PROFILE ROW
+        // 4. INJECT OR ALIGN PROFILE ROW
         if (!activeProfile) {
           console.log(`[Identity Restore] Injecting synchronized profile record for user: ${realUserId}`);
           
@@ -1535,6 +1534,16 @@ serve(async (req: Request) => {
 
           console.log("[Identity Restore] System data aligned flawlessly!");
           activeProfile = newProfile;
+        } else {
+          // If the profile exists but the email is mismatching, update it to align
+          if (activeProfile.email?.toLowerCase() !== targetEmail.toLowerCase()) {
+            console.log(`[Identity Restore] Aligning profile email to match auth email: ${targetEmail}`);
+            await supabaseAdmin
+              .from("profiles")
+              .update({ email: targetEmail })
+              .eq("user_id", realUserId);
+            activeProfile.email = targetEmail;
+          }
         }
 
         // 5. Grant role to the VALID, ALIGNED User ID
