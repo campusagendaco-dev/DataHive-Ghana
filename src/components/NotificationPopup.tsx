@@ -66,8 +66,9 @@ const NotificationPopup = () => {
     fetchNotifications();
 
     // REAL-TIME NOTIFICATION SUBSCRIBER: Listen for instant webhook alerts (deposits/purchases)
+    const uniqueChannelName = `public-notifications-live-${user.id}-${Math.random().toString(36).substring(7)}`;
     const channel = supabase
-      .channel("public-notifications-live")
+      .channel(uniqueChannelName)
       .on(
         "postgres_changes",
         { event: "INSERT", schema: "public", table: "notifications" },
