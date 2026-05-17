@@ -27,27 +27,36 @@ serve(async (req: Request) => {
       const { data: failedOrder } = await supabaseAdmin.from("orders").select("*").eq("id", order_id).single();
       if (failedOrder) {
         const [agentRes, walletRes] = await Promise.all([
-          supabaseAdmin.from("profiles").select("id, full_name, phone, wallet_balance, loyalty_points").eq("id", failedOrder.agent_id).single(),
+          supabaseAdmin.from("profiles").select("user_id, full_name, phone, loyalty_points").eq("user_id", failedOrder.agent_id).single(),
           supabaseAdmin.from("wallets").select("balance").eq("agent_id", failedOrder.agent_id).maybeSingle()
         ]);
-        const agent = agentRes.data;
-        if (agent) {
-          agent.wallet_balance = walletRes.data?.balance ?? 0;
+        const profileData = agentRes.data;
+        if (profileData) {
+          const agent = {
+            id: profileData.user_id,
+            full_name: profileData.full_name,
+            phone: profileData.phone,
+            loyalty_points: profileData.loyalty_points,
+            wallet_balance: walletRes.data?.balance ?? 0
+          };
           agentsToAnalyze = [agent];
         }
         ordersToAnalyze = [failedOrder];
       }
     } else {
       // General Scan
-      const { data: agents } = await supabaseAdmin.from("profiles").select("id, full_name, phone, wallet_balance, loyalty_points").eq("is_agent", true).limit(50);
+      const { data: agents } = await supabaseAdmin.from("profiles").select("user_id, full_name, phone, loyalty_points").eq("is_agent", true).limit(50);
       if (agents && agents.length > 0) {
-        const agentIds = agents.map(a => a.id);
+        const agentIds = agents.map(a => a.user_id);
         const { data: wallets } = await supabaseAdmin.from("wallets").select("agent_id, balance").in("agent_id", agentIds);
         const walletMap = new Map((wallets || []).map(w => [w.agent_id, w.balance]));
-        agents.forEach(a => {
-          a.wallet_balance = walletMap.get(a.id) ?? 0;
-        });
-        agentsToAnalyze = agents;
+        agentsToAnalyze = agents.map(a => ({
+          id: a.user_id,
+          full_name: a.full_name,
+          phone: a.phone,
+          loyalty_points: a.loyalty_points,
+          wallet_balance: walletMap.get(a.user_id) ?? 0
+        }));
       }
       const { data: recentOrders } = await supabaseAdmin.from("orders").select("*").gt("created_at", new Date(Date.now() - 3600000).toISOString());
       ordersToAnalyze = recentOrders || [];

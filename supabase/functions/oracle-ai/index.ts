@@ -215,7 +215,21 @@ serve(async (req: Request) => {
     let superContext = "";
     if (context.profile) {
       const p = context.profile;
-      superContext += `\nUSER PROFILE: Name: ${p.full_name || 'Customer'}, Balance: ${p.wallet_balance} GHS, Role: ${p.is_agent ? 'Agent' : 'Customer'}.`;
+      let liveBalance = p.wallet_balance;
+      
+      // Self-healing database fallback to native wallets table if profiles column is missing
+      if (p.user_id) {
+        const { data: walletData } = await supabaseAdmin
+          .from("wallets")
+          .select("balance")
+          .eq("agent_id", p.user_id)
+          .maybeSingle();
+        if (walletData) {
+          liveBalance = walletData.balance;
+        }
+      }
+      
+      superContext += `\nUSER PROFILE: Name: ${p.full_name || 'Customer'}, Balance: ${liveBalance ?? '0.00'} GHS, Role: ${p.is_agent ? 'Agent' : 'Customer'}.`;
     }
     if (context.recentOrders && context.recentOrders.length > 0) {
       superContext += "\nRECENT TRANSACTIONS:";

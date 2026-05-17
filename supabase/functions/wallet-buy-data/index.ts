@@ -92,7 +92,7 @@ serve(async (req: Request) => {
 
     // Fetch agent profile and package info in parallel for profit calculation
     const [profileResult, pkgResult] = await Promise.all([
-      supabaseAdmin.from("profiles").select("is_sub_agent, parent_agent_id, credit_enabled, credit_limit, credit_used, wallet_balance").eq("user_id", user.id).maybeSingle(),
+      supabaseAdmin.from("profiles").select("is_sub_agent, parent_agent_id, credit_enabled, credit_limit, credit_used").eq("user_id", user.id).maybeSingle(),
       supabaseAdmin.from("global_package_settings").select("agent_price, cost_price").eq("network", normalizedNet).eq("package_size", package_size).maybeSingle(),
     ]);
 
