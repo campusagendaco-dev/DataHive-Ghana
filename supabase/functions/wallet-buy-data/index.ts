@@ -185,13 +185,17 @@ serve(async (req: Request) => {
           p_agent_id: user.id, p_amount: requestedAmount,
         });
         if (!creditOk) {
-          return new Response(JSON.stringify({ error: "Insufficient wallet balance and credit limit reached." }), { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+          const debitErrMsg = debitError?.message || debitResult?.error || "Insufficient balance or wallet error";
+          console.error(`[CREDIT_FAIL] ${user.id}: debit_wallet error was: ${debitErrMsg}`);
+          return new Response(JSON.stringify({ error: `Insufficient wallet balance and credit limit reached. (${debitErrMsg})` }), { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } });
         }
         paymentMethod = "credit";
         log(supabaseAdmin, { level: "info", source: "wallet-buy-data", event: "credit.drawn", message: `Credit drawn GHS ${requestedAmount} for ${user.id}`, agent_id: user.id, data: { amount: requestedAmount, credit_available: creditAvailable } });
       } else {
-        console.error(`[DEBIT_FAIL] ${user.id}:`, debitError || debitResult?.error);
-        return new Response(JSON.stringify({ error: debitResult?.error || "Insufficient balance or wallet error" }), {
+        const debitErrMsg = debitError?.message || debitResult?.error || "Insufficient balance or wallet error";
+        console.error(`[DEBIT_FAIL] ${user.id}: ${debitErrMsg}`, { debitError, debitResult });
+        log(supabaseAdmin, { level: "error", source: "wallet-buy-data", event: "debit.failed", message: `Wallet debit failed: ${debitErrMsg}`, agent_id: user.id, data: { amount: requestedAmount, debit_error: debitError?.message, debit_result: debitResult } });
+        return new Response(JSON.stringify({ error: debitErrMsg }), {
           status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
