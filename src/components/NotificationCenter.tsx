@@ -100,8 +100,22 @@ export const NotificationCenter = ({ isDark }: { isDark: boolean }) => {
 
     fetchNotifications();
 
+    let activeTone = "/sounds/notification_system.mp3";
+
+    // Fetch system tone settings dynamically
+    supabase
+      .from("public_system_settings")
+      .select("notification_tone")
+      .eq("id", 1)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (data?.notification_tone) {
+          activeTone = data.notification_tone;
+        }
+      });
+
     const playPing = () => {
-      const audio = new Audio("/sounds/notification_system.mp3");
+      const audio = new Audio(activeTone);
       audio.volume = 0.45;
       audio.play().catch(() => {
         console.log("[NotificationCenter] Audio blocked by browser policy");
