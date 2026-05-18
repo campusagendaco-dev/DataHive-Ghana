@@ -1,6 +1,12 @@
 -- CRITICAL SECURITY HARDENING: Protect financial fields on profiles table
 -- This migration ensures that non-admins cannot update their own wallet_balance or loyalty_points.
 
+-- Ensure audit_logs has the target_id column
+ALTER TABLE public.audit_logs ADD COLUMN IF NOT EXISTS target_id UUID;
+
+-- Temporarily change details type to TEXT so that older restoration scripts writing raw text strings do not fail
+ALTER TABLE public.audit_logs ALTER COLUMN details TYPE TEXT USING details::text;
+
 CREATE OR REPLACE FUNCTION public.protect_profile_financial_fields()
 RETURNS TRIGGER
 LANGUAGE plpgsql
@@ -40,4 +46,4 @@ CREATE TRIGGER ensure_financial_security
 
 -- Log the security reinforcement
 INSERT INTO public.audit_logs (action, details, target_id)
-VALUES ('security_hardening', 'Reinforced financial field protection for profiles table (wallet_balance, loyalty_points, api_balance)', auth.uid());
+VALUES ('security_hardening', '{"message": "Reinforced financial field protection for profiles table (wallet_balance, loyalty_points, api_balance)"}'::jsonb, auth.uid());

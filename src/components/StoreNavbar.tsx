@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { createPortal } from "react-dom";
 import { Link, useNavigate } from "react-router-dom";
 import {
   Menu, X, ArrowLeft, MapPin, Users, TrendingUp,
@@ -30,6 +31,11 @@ export interface StoreNavbarProps {
   backHref?: string;
   stepLabel?: string;
   logoUrl?: string;
+  onOpenAuth?: () => void;
+  customerBalance?: number | null;
+  isCustomerLoggedIn?: boolean;
+  customerName?: string | null;
+  onSignOut?: () => void;
 }
 
 const StoreNavbar = ({
@@ -46,6 +52,11 @@ const StoreNavbar = ({
   backHref,
   stepLabel,
   logoUrl,
+  onOpenAuth,
+  customerBalance,
+  isCustomerLoggedIn = false,
+  customerName,
+  onSignOut,
 }: StoreNavbarProps) => {
   const [open, setOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
@@ -58,13 +69,16 @@ const StoreNavbar = ({
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
+  // Lock body scroll when side drawer is open
   useEffect(() => {
-    if (!open) return;
-    const handler = (e: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) setOpen(false);
+    if (open) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "";
+    }
+    return () => {
+      document.body.style.overflow = "";
     };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
   }, [open]);
 
   const waHref = whatsappNumber
@@ -130,11 +144,34 @@ const StoreNavbar = ({
         </div>
 
         {/* Desktop actions */}
-        <div className="hidden md:flex items-center gap-1">
+        <div className="hidden md:flex items-center gap-2">
           {!backMode && (
             <>
-              <Link to="/order-status"
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-white/50 hover:text-white hover:bg-white/8 transition-all">
+              {isCustomerLoggedIn ? (
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-2 border border-white/10 bg-white/5 rounded-xl px-3 py-1.5 shrink-0">
+                    <span className="text-[10px] text-white/40 font-black uppercase tracking-wider">Wallet:</span>
+                    <span className="text-xs font-black text-white">GHS {Number(customerBalance || 0).toFixed(2)}</span>
+                  </div>
+                  <button 
+                    onClick={onSignOut} 
+                    className="text-xs font-black text-red-400/80 hover:text-red-400 hover:bg-red-500/5 px-2.5 py-1.5 rounded-lg transition-all"
+                  >
+                    Sign Out
+                  </button>
+                </div>
+              ) : (
+                <button
+                  onClick={onOpenAuth}
+                  className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-black transition-all active:scale-95 border-0 hover:brightness-110"
+                  style={{ backgroundColor: networkAccent, color: "#000000" }}
+                >
+                  Sign In / Register
+                </button>
+              )}
+
+              <Link to={agentSlug ? `/store/${agentSlug}/order-status` : "/order-status"}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-white/50 hover:text-white hover:bg-white/8 transition-all ml-1">
                 <MapPin className="w-3.5 h-3.5" /> Track Order
               </Link>
               {showSubAgentLink && agentSlug && (
@@ -165,213 +202,273 @@ const StoreNavbar = ({
             </a>
           )}
         </div>
-
         {/* Mobile right */}
         <div className="md:hidden flex items-center gap-2">
+          {isCustomerLoggedIn && (
+            <div className="flex items-center gap-1.5 bg-white/5 border border-white/10 rounded-xl px-2.5 py-1.5 shrink-0">
+              <span className="text-[8px] text-white/40 font-black uppercase">Bal:</span>
+              <span className="text-[10px] font-black text-white">GHS {Number(customerBalance || 0).toFixed(0)}</span>
+            </div>
+          )}
           {waHref && (
             <a href={waHref} target="_blank" rel="noopener noreferrer"
-              className="flex items-center gap-1 text-white text-xs font-bold px-2.5 py-1.5 rounded-lg"
+              className="flex items-center gap-1 text-white text-xs font-bold px-2.5 py-1.5 rounded-lg shrink-0"
               style={{ background: "linear-gradient(135deg,#25D366,#128C7E)" }}>
               <MessageCircle className="w-4 h-4" /><span className="hidden xs:inline">Chat</span>
             </a>
           )}
           {!backMode && (
             <button
-              onClick={() => setOpen(!open)}
-              className="w-8 h-8 rounded-xl flex items-center justify-center transition-all"
-              style={{ background: open ? `${networkAccent}20` : "rgba(255,255,255,0.06)", color: open ? networkAccent : "rgba(255,255,255,0.6)" }}
+              onClick={() => setOpen(true)}
+              className="w-8 h-8 rounded-xl flex items-center justify-center transition-all shrink-0 bg-white/5 hover:bg-white/10 text-white/70 hover:text-white"
             >
-              {open ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+              <Menu className="w-5 h-5" />
             </button>
           )}
         </div>
       </div>
 
-      {/* ── Mobile drawer ── */}
-      {!backMode && (
-        <div
-          className={`md:hidden overflow-hidden transition-all duration-300 ease-in-out ${open ? "max-h-[640px] opacity-100" : "max-h-0 opacity-0 pointer-events-none"}`}
-          style={{ borderTop: open ? "1px solid rgba(255,255,255,0.06)" : "none" }}
-        >
-          <div className="px-3 py-3" style={{ background: "rgba(5,5,15,0.99)" }}>
+      {/* ── Premium Side Drawer & Backdrop ── */}
+      {!backMode && typeof document !== "undefined" && createPortal(
+        <>
+          {/* Backdrop */}
+          <div
+            className={`fixed inset-0 z-[99998] bg-black/75 backdrop-blur-[3px] transition-all duration-300 ${
+              open ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
+            }`}
+            onClick={() => setOpen(false)}
+          />
 
-            {/* ── Store Hero Card ── */}
-            <div className="relative rounded-2xl overflow-hidden mb-3 p-4"
-              style={{ background: `linear-gradient(135deg, ${networkAccent}18, ${networkAccent}06)`, border: `1px solid ${networkAccent}25` }}>
-              {/* Glow */}
-              <div className="absolute top-0 right-0 w-24 h-24 rounded-full blur-2xl pointer-events-none" style={{ background: `${networkAccent}25` }} />
-              <div className="relative flex items-center gap-3">
-                <div className="w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 shadow-lg overflow-hidden" style={{ background: logoUrl ? 'white' : `${networkAccent}25`, border: `1.5px solid ${networkAccent}50` }}>
+          {/* Sidebar Drawer */}
+          <div
+            className="fixed top-0 right-0 bottom-0 h-full w-[290px] sm:w-[320px] z-[99999] shadow-[0_0_50px_rgba(0,0,0,0.85)] border-l border-white/8 transition-transform duration-300 ease-out flex flex-col overflow-y-auto"
+            style={{
+              transform: open ? "translateX(0)" : "translateX(100%)",
+              background: "rgba(5,5,15,0.98)",
+              backdropFilter: "blur(20px)",
+              WebkitBackdropFilter: "blur(20px)",
+            }}
+          >
+            {/* Top row with Store Name and Close button */}
+            <div className="flex items-center justify-between p-4 border-b border-white/6 shrink-0">
+              <div className="flex items-center gap-2 min-w-0">
+                <div className="w-7 h-7 rounded-lg flex items-center justify-center overflow-hidden shrink-0" style={{ background: logoUrl ? 'white' : `${networkAccent}20`, border: `1px solid ${networkAccent}30` }}>
                   {logoUrl ? (
                     <img src={logoUrl} alt={storeName} className="w-full h-full object-contain" />
                   ) : (
-                    <Store className="w-6 h-6" style={{ color: networkAccent }} />
+                    <Store className="w-3.5 h-3.5" style={{ color: networkAccent }} />
                   )}
                 </div>
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2 mb-0.5">
-                    <p className="text-white font-black text-base leading-none truncate">{storeName}</p>
-                    <BadgeCheck className="w-4 h-4 shrink-0" style={{ color: networkAccent }} />
-                  </div>
-                  <p className="text-xs font-black uppercase tracking-widest mt-1" style={{ color: `${networkAccent}` }}>Official Store</p>
-                </div>
+                <span className="text-white font-bold text-xs leading-none truncate max-w-[130px]">
+                  {storeName}
+                </span>
               </div>
-              {/* Feature pills */}
-              <div className="relative flex flex-wrap gap-1.5 mt-3">
-                {[
-                  { icon: Zap, label: "Instant Delivery" },
-                  { icon: Shield, label: "Secure Payment" },
-                  { icon: Clock, label: "No Expiry" },
-                ].map((f) => (
-                  <div key={f.label} className="flex items-center gap-1 px-2 py-1 rounded-full text-[10px] font-semibold"
-                    style={{ background: "rgba(255,255,255,0.08)", color: "rgba(255,255,255,0.7)" }}>
-                    <f.icon className="w-2.5 h-2.5" style={{ color: networkAccent }} />
-                    {f.label}
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* ── Quick Actions ── */}
-            <div className="grid grid-cols-2 gap-2 mb-3">
-              <Link to={agentSlug ? `/store/${agentSlug}` : "/"} onClick={() => setOpen(false)}
-                className="flex items-center gap-2.5 p-3 rounded-xl transition-all active:scale-95"
-                style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.08)" }}>
-                <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0" style={{ background: `${networkAccent}20` }}>
-                  <ShoppingBag className="w-4 h-4" style={{ color: networkAccent }} />
-                </div>
-                <div>
-                  <p className="text-white text-xs font-bold leading-none">Buy Data</p>
-                  <p className="text-white/40 text-[10px] mt-0.5">Browse bundles</p>
-                </div>
-              </Link>
-
-              <Link to="/order-status" onClick={() => setOpen(false)}
-                className="flex items-center gap-2.5 p-3 rounded-xl transition-all active:scale-95"
-                style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.08)" }}>
-                <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 bg-blue-500/20">
-                  <MapPin className="w-4 h-4 text-blue-400" />
-                </div>
-                <div>
-                  <p className="text-white text-xs font-bold leading-none">Track Order</p>
-                  <p className="text-white/40 text-[10px] mt-0.5">Check status</p>
-                </div>
-              </Link>
-            </div>
-
-            {/* ── Become Sub-Agent CTA ── */}
-            {showSubAgentLink && agentSlug && (
-              <Link
-                to={`/store/${agentSlug}/sub-agent`}
+              
+              <button
                 onClick={() => setOpen(false)}
-                className="relative flex items-center gap-3 p-4 rounded-2xl mb-3 overflow-hidden group transition-all active:scale-[0.98]"
-                style={{ background: `linear-gradient(135deg, ${networkAccent}22, ${networkAccent}08)`, border: `1px solid ${networkAccent}35` }}
+                className="w-7 h-7 rounded-lg bg-white/5 hover:bg-white/10 text-white/50 hover:text-white flex items-center justify-center transition-all"
               >
-                <div className="absolute top-0 right-0 w-20 h-20 rounded-full blur-2xl opacity-40" style={{ background: networkAccent }} />
-                <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0" style={{ background: `${networkAccent}30`, border: `1px solid ${networkAccent}50` }}>
-                  <TrendingUp className="w-5 h-5" style={{ color: networkAccent }} />
-                </div>
-                <div className="flex-1 min-w-0 relative">
-                  <div className="flex items-center gap-2 mb-0.5">
-                    <p className="text-white font-black text-sm leading-none">Become a Sub-Agent</p>
-                    <span className="text-[9px] font-black px-1.5 py-0.5 rounded-full text-black" style={{ background: networkAccent }}>EARN</span>
-                  </div>
-                  <p className="text-white/50 text-xs">Resell data & earn daily profit from your own store</p>
-                </div>
-                <ChevronRight className="w-4 h-4 shrink-0 relative" style={{ color: networkAccent }} />
-              </Link>
-            )}
-
-            {/* ── Networks Available ── */}
-            <div className="flex gap-2 mb-3">
-              {Object.entries(NETWORK_COLORS).map(([net, style]) => (
-                <div key={net} className="flex-1 flex flex-col items-center gap-1 p-2 rounded-xl text-center"
-                  style={{ background: style.bg, border: `1px solid ${style.dot}25` }}>
-                  <div className="w-2 h-2 rounded-full" style={{ background: style.dot }} />
-                  <p className="text-[10px] font-bold" style={{ color: style.text }}>{net}</p>
-                </div>
-              ))}
+                <X className="w-4 h-4" />
+              </button>
             </div>
 
-            {/* ── How it works / Tutorial ── */}
-            <button
-              onClick={() => { setOpen(false); openTutorial(); }}
-              className="w-full flex items-center gap-3 p-3 rounded-xl mb-3 transition-all active:scale-[0.98]"
-              style={{ background: "rgba(245,158,11,0.08)", border: "1px solid rgba(245,158,11,0.20)" }}
-            >
-              <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-amber-400/15">
-                <Sparkles className="w-4 h-4 text-amber-400" />
-              </div>
-              <div className="text-left">
-                <p className="text-sm font-bold text-white">How It Works</p>
-                <p className="text-[10px] text-white/40">Watch the step-by-step tutorial</p>
-              </div>
-              <span className="ml-auto text-[10px] font-black text-amber-400 bg-amber-400/15 px-2 py-0.5 rounded-full">Tutorial</span>
-            </button>
-
-            {/* ── Contact section ── */}
-            {(waHref || whatsappGroupLink || supportNumber) && (
-              <>
-                <div className="flex items-center gap-2 mb-2">
-                  <div className="flex-1 h-px bg-white/8" />
-                  <p className="text-white/25 text-[10px] font-bold uppercase tracking-widest">Contact Store</p>
-                  <div className="flex-1 h-px bg-white/8" />
+            {/* Scrollable content body */}
+            <div className="flex-1 px-3.5 py-4 space-y-4">
+              {/* ── Customer Account Card (Mobile Drawer) ── */}
+              {isCustomerLoggedIn ? (
+                <div className="bg-white/5 border border-white/8 rounded-2xl p-4">
+                  <p className="text-[9px] font-black text-white/30 uppercase tracking-widest">Active Customer Session</p>
+                  <p className="text-white text-sm font-black mt-0.5 truncate">{customerName || "Customer Account"}</p>
+                  <div className="flex items-center justify-between mt-3 pt-3 border-t border-white/5">
+                    <div>
+                      <p className="text-[9px] text-white/40 font-bold uppercase">Store Wallet Balance</p>
+                      <p className="text-base font-black text-white">GHS {Number(customerBalance || 0).toFixed(2)}</p>
+                    </div>
+                    <button 
+                      onClick={() => { setOpen(false); onSignOut?.(); }} 
+                      className="text-xs font-black text-red-400 bg-red-500/10 px-3 py-1.5 rounded-xl transition-all"
+                    >
+                      Sign Out
+                    </button>
+                  </div>
                 </div>
+              ) : (
+                <button
+                  onClick={() => { setOpen(false); onOpenAuth?.(); }}
+                  className="w-full h-11 flex items-center justify-center gap-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all border-0 hover:brightness-110 shrink-0"
+                  style={{ backgroundColor: networkAccent, color: "#000000" }}
+                >
+                  <Users className="w-4 h-4" />
+                  <span>Customer Sign In</span>
+                </button>
+              )}
 
-                <div className="space-y-1.5">
-                  {waHref && (
-                    <a href={waHref} target="_blank" rel="noopener noreferrer" onClick={() => setOpen(false)}
-                      className="flex items-center gap-3 p-3 rounded-xl transition-all active:scale-[0.98]"
-                      style={{ background: "rgba(37,211,102,0.1)", border: "1px solid rgba(37,211,102,0.2)" }}>
-                      <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: "rgba(37,211,102,0.18)" }}>
-                        <MessageCircle className="w-4 h-4 text-[#25D366]" />
-                      </div>
-                      <div>
-                        <p className="text-sm font-bold text-white">WhatsApp Chat</p>
-                        <p className="text-[10px] text-white/40">Get instant support</p>
-                      </div>
-                      <ChevronRight className="w-3.5 h-3.5 text-[#25D366]/50 ml-auto" />
-                    </a>
-                  )}
-
-                  {whatsappGroupLink && (
-                    <a href={whatsappGroupLink} target="_blank" rel="noopener noreferrer" onClick={() => setOpen(false)}
-                      className="flex items-center gap-3 p-3 rounded-xl transition-all active:scale-[0.98]"
-                      style={{ background: "rgba(37,211,102,0.06)", border: "1px solid rgba(37,211,102,0.12)" }}>
-                      <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: "rgba(37,211,102,0.12)" }}>
-                        <Users className="w-4 h-4 text-[#25D366]" />
-                      </div>
-                      <div>
-                        <p className="text-sm font-bold text-white">WhatsApp Group</p>
-                        <p className="text-[10px] text-white/40">Join the community</p>
-                      </div>
-                      <ChevronRight className="w-3.5 h-3.5 text-[#25D366]/50 ml-auto" />
-                    </a>
-                  )}
-
-                  {supportNumber && (
-                    <a href={`tel:${supportNumber.replace(/\D+/g, "")}`} onClick={() => setOpen(false)}
-                      className="flex items-center gap-3 p-3 rounded-xl bg-white/5 border border-white/8 transition-all active:scale-[0.98]">
-                      <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-blue-500/15">
-                        <Phone className="w-4 h-4 text-blue-400" />
-                      </div>
-                      <div>
-                        <p className="text-sm font-bold text-white">Call Support</p>
-                        <p className="text-[10px] text-white/40 font-mono">{supportNumber}</p>
-                      </div>
-                    </a>
-                  )}
+              {/* ── Store Hero Card ── */}
+              <div className="relative rounded-2xl overflow-hidden p-4"
+                style={{ background: `linear-gradient(135deg, ${networkAccent}18, ${networkAccent}06)`, border: `1.5px solid ${networkAccent}25` }}>
+                <div className="absolute top-0 right-0 w-20 h-20 rounded-full blur-2xl pointer-events-none" style={{ background: `${networkAccent}20` }} />
+                <div className="relative flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 shadow-lg overflow-hidden" style={{ background: logoUrl ? 'white' : `${networkAccent}25`, border: `1px solid ${networkAccent}50` }}>
+                    {logoUrl ? (
+                      <img src={logoUrl} alt={storeName} className="w-full h-full object-contain" />
+                    ) : (
+                      <Store className="w-5 h-5" style={{ color: networkAccent }} />
+                    )}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-1.5 mb-0.5">
+                      <p className="text-white font-black text-sm leading-none truncate">{storeName}</p>
+                      <BadgeCheck className="w-3.5 h-3.5 shrink-0" style={{ color: networkAccent }} />
+                    </div>
+                    <p className="text-[10px] font-black uppercase tracking-widest mt-1" style={{ color: networkAccent }}>Official Reseller</p>
+                  </div>
                 </div>
-              </>
-            )}
+                {/* Feature pills */}
+                <div className="relative flex flex-wrap gap-1 mt-3">
+                  {[
+                    { icon: Zap, label: "Instant" },
+                    { icon: Shield, label: "Secure" },
+                    { icon: Clock, label: "No Expiry" },
+                  ].map((f) => (
+                    <div key={f.label} className="flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-bold"
+                      style={{ background: "rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.6)" }}>
+                      <f.icon className="w-2 h-2" style={{ color: networkAccent }} />
+                      {f.label}
+                    </div>
+                  ))}
+                </div>
+              </div>
 
-            <div className="flex items-center justify-center gap-1.5 pt-3 mt-2 border-t border-white/6">
-              <Zap className="w-2.5 h-2.5 text-emerald-400" />
-              <span className="text-white/20 text-[10px] font-black uppercase tracking-widest">Verified Digital Platform</span>
+              {/* ── Quick Actions ── */}
+              <div className="grid grid-cols-2 gap-2">
+                <Link to={agentSlug ? `/store/${agentSlug}` : "/"} onClick={() => setOpen(false)}
+                  className="flex flex-col items-start gap-1 p-3 rounded-xl transition-all active:scale-95"
+                  style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}>
+                  <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: `${networkAccent}15` }}>
+                    <ShoppingBag className="w-3.5 h-3.5" style={{ color: networkAccent }} />
+                  </div>
+                  <div className="mt-1">
+                    <p className="text-white text-xs font-bold leading-none">Buy Data</p>
+                    <p className="text-white/40 text-[9px] mt-0.5">Shop bundles</p>
+                  </div>
+                </Link>
+
+                <Link to={agentSlug ? `/store/${agentSlug}/order-status` : "/order-status"} onClick={() => setOpen(false)}
+                  className="flex flex-col items-start gap-1 p-3 rounded-xl transition-all active:scale-95"
+                  style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}>
+                  <div className="w-7 h-7 rounded-lg flex items-center justify-center bg-blue-500/10">
+                    <MapPin className="w-3.5 h-3.5 text-blue-400" />
+                  </div>
+                  <div className="mt-1">
+                    <p className="text-white text-xs font-bold leading-none">Track Order</p>
+                    <p className="text-white/40 text-[9px] mt-0.5">Check status</p>
+                  </div>
+                </Link>
+              </div>
+
+              {/* ── Become Sub-Agent CTA ── */}
+              {showSubAgentLink && agentSlug && (
+                <Link
+                  to={`/store/${agentSlug}/sub-agent`}
+                  onClick={() => setOpen(false)}
+                  className="relative flex items-center gap-3 p-3.5 rounded-xl overflow-hidden group transition-all active:scale-[0.98]"
+                  style={{ background: `linear-gradient(135deg, ${networkAccent}18, ${networkAccent}06)`, border: `1px solid ${networkAccent}25` }}
+                >
+                  <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0" style={{ background: `${networkAccent}20`, border: `1px solid ${networkAccent}30` }}>
+                    <TrendingUp className="w-4 h-4" style={{ color: networkAccent }} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-1.5 mb-0.5">
+                      <p className="text-white font-black text-xs leading-none">Become Sub-Agent</p>
+                      <span className="text-[8px] font-black px-1.5 py-0.5 rounded-full text-black leading-none" style={{ backgroundColor: networkAccent }}>EARN</span>
+                    </div>
+                    <p className="text-white/40 text-[10px]">Launch reseller shop</p>
+                  </div>
+                  <ChevronRight className="w-3.5 h-3.5 shrink-0" style={{ color: networkAccent }} />
+                </Link>
+              )}
+
+              {/* ── How it works / Tutorial ── */}
+              <button
+                onClick={() => { setOpen(false); openTutorial(); }}
+                className="w-full flex items-center gap-3 p-3 rounded-xl transition-all active:scale-[0.98]"
+                style={{ background: "rgba(245,158,11,0.06)", border: "1px solid rgba(245,158,11,0.15)" }}
+              >
+                <div className="w-7 h-7 rounded-lg flex items-center justify-center bg-amber-400/10">
+                  <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                </div>
+                <div className="text-left flex-1 min-w-0">
+                  <p className="text-xs font-bold text-white">How It Works</p>
+                  <p className="text-[9px] text-white/40">Watch tutorial guide</p>
+                </div>
+                <span className="text-[8px] font-black text-amber-400 bg-amber-400/10 px-2 py-0.5 rounded-full shrink-0">Help</span>
+              </button>
+
+              {/* ── Contact section ── */}
+              {(waHref || whatsappGroupLink || supportNumber) && (
+                <div className="space-y-3 pt-2">
+                  <div className="flex items-center gap-2">
+                    <div className="flex-1 h-px bg-white/6" />
+                    <p className="text-white/20 text-[9px] font-bold uppercase tracking-widest shrink-0">Support Desk</p>
+                    <div className="flex-1 h-px bg-white/6" />
+                  </div>
+
+                  <div className="space-y-2">
+                    {waHref && (
+                      <a href={waHref} target="_blank" rel="noopener noreferrer" onClick={() => setOpen(false)}
+                        className="flex items-center gap-3 p-3 rounded-xl transition-all active:scale-[0.98]"
+                        style={{ background: "rgba(37,211,102,0.06)", border: "1px solid rgba(37,211,102,0.12)" }}>
+                        <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: "rgba(37,211,102,0.12)" }}>
+                          <MessageCircle className="w-3.5 h-3.5 text-[#25D366]" />
+                        </div>
+                        <div className="text-left">
+                          <p className="text-xs font-bold text-white">WhatsApp Chat</p>
+                          <p className="text-[9px] text-white/40">Instant support chat</p>
+                        </div>
+                        <ChevronRight className="w-3.5 h-3.5 text-[#25D366]/40 ml-auto" />
+                      </a>
+                    )}
+
+                    {whatsappGroupLink && (
+                      <a href={whatsappGroupLink} target="_blank" rel="noopener noreferrer" onClick={() => setOpen(false)}
+                        className="flex items-center gap-3 p-3 rounded-xl transition-all active:scale-[0.98]"
+                        style={{ background: "rgba(37,211,102,0.03)", border: "1px solid rgba(37,211,102,0.08)" }}>
+                        <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: "rgba(37,211,102,0.08)" }}>
+                          <Users className="w-3.5 h-3.5 text-[#25D366]" />
+                        </div>
+                        <div className="text-left">
+                          <p className="text-xs font-bold text-white">Join Community</p>
+                          <p className="text-[9px] text-white/40">Updates & details</p>
+                        </div>
+                        <ChevronRight className="w-3.5 h-3.5 text-[#25D366]/40 ml-auto" />
+                      </a>
+                    )}
+
+                    {supportNumber && (
+                      <a href={`tel:${supportNumber.replace(/\D+/g, "")}`} onClick={() => setOpen(false)}
+                        className="flex items-center gap-3 p-3 rounded-xl bg-white/3 border border-white/6 transition-all active:scale-[0.98]">
+                        <div className="w-7 h-7 rounded-lg flex items-center justify-center bg-blue-500/10">
+                          <Phone className="w-3.5 h-3.5 text-blue-400" />
+                        </div>
+                        <div className="text-left">
+                          <p className="text-xs font-bold text-white">Call Support</p>
+                          <p className="text-[9px] text-white/40 font-mono">{supportNumber}</p>
+                        </div>
+                      </a>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Bottom brand footer */}
+            <div className="p-4 border-t border-white/6 flex items-center justify-center gap-1.5 shrink-0 bg-black/20">
+              <Zap className="w-3 h-3 text-emerald-400" />
+              <span className="text-white/20 text-[9px] font-black uppercase tracking-widest">Verified Digital Store</span>
             </div>
           </div>
-        </div>
-      )}
+        </>
+      , document.body)}
     </nav>
   );
 };

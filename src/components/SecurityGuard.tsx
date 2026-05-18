@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Lock, Clock, LogOut } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { getActiveStoreDomain } from "@/lib/app-base-url";
 
 // Constants for the Ghost Idle Timer
 const IDLE_TIMEOUT_MS = 15 * 60 * 1000; // 15 Minutes of complete inactivity
@@ -21,6 +22,27 @@ export function SecurityGuard({ children }: { children: React.ReactNode }) {
   const [timeLeft, setTimeLeft] = useState(COUNTDOWN_SECONDS);
   const idleTimerRef = useRef<number | null>(null);
   const countdownTimerRef = useRef<number | null>(null);
+
+  const [cachedStore, setCachedStore] = useState<{ name: string; logo: string | null; color: string | null } | null>(null);
+
+  const pathname = typeof window !== "undefined" ? window.location.pathname : "";
+  const activeDomain = getActiveStoreDomain();
+  const isStoreRoute = pathname.startsWith("/store/") || !!activeDomain;
+  const slug = pathname.startsWith("/store/") ? pathname.split("/store/")[1]?.split("/")[0] : null;
+
+  useEffect(() => {
+    const cacheKey = slug ? `store_loading_${slug}` : activeDomain ? `store_loading_${activeDomain}` : null;
+    if (cacheKey) {
+      try {
+        const stored = localStorage.getItem(cacheKey);
+        if (stored) {
+          setCachedStore(JSON.parse(stored));
+        }
+      } catch (err) {
+        console.error("Failed to parse cached store loading metadata in SecurityGuard:", err);
+      }
+    }
+  }, [slug, activeDomain]);
 
   const clearTimers = useCallback(() => {
     if (idleTimerRef.current) window.clearTimeout(idleTimerRef.current);
@@ -139,6 +161,10 @@ export function SecurityGuard({ children }: { children: React.ReactNode }) {
   // Consolidated Visual State (Removed passive blurred state, keeping cinematic reveal)
   const isCurrentlyShielded = isInitialReveal && isEnabled;
 
+  const brandLogoUrl = isStoreRoute ? cachedStore?.logo : "/logo.png";
+  const brandName = isStoreRoute ? (cachedStore?.name || "Online Store") : "SwiftData";
+  const brandColor = isStoreRoute ? (cachedStore?.color || "#f59e0b") : "#f59e0b";
+
   return (
     <div className="relative min-h-screen w-full overflow-hidden selection:bg-primary selection:text-black">
       {/* Main Application Layer */}
@@ -163,17 +189,27 @@ export function SecurityGuard({ children }: { children: React.ReactNode }) {
             >
               {/* 💎 Brand Logo integration with pulsing glow */}
               <div className="relative w-24 h-24 mb-8 flex items-center justify-center group">
-                <div className="absolute inset-0 rounded-full bg-primary/30 animate-ping opacity-40 blur-md" />
-                <div className="absolute inset-0 rounded-3xl border border-primary/20 bg-primary/5 animate-pulse" />
-                <img 
-                  src="/logo.png" 
-                  alt="SwiftData Logo" 
-                  className="w-16 h-16 object-contain drop-shadow-2xl relative z-10 transition-transform group-hover:scale-110 duration-500" 
+                <div 
+                  className="absolute inset-0 rounded-full animate-ping opacity-40 blur-md" 
+                  style={{ backgroundColor: `${brandColor}4d` }}
                 />
+                <div 
+                  className="absolute inset-0 rounded-3xl border bg-black/5 animate-pulse" 
+                  style={{ borderColor: `${brandColor}33` }}
+                />
+                {brandLogoUrl ? (
+                  <img 
+                    src={brandLogoUrl} 
+                    alt={brandName} 
+                    className="w-16 h-16 object-contain drop-shadow-2xl relative z-10 transition-transform group-hover:scale-110 duration-500" 
+                  />
+                ) : (
+                  <Lock className="w-8 h-8 relative z-10 animate-pulse" style={{ color: brandColor }} />
+                )}
               </div>
 
               <h2 className="text-2xl font-black mb-2 text-foreground tracking-tight flex items-center gap-2">
-                <Lock className="w-5 h-5 text-primary" /> 
+                <Lock className="w-5 h-5" style={{ color: brandColor }} /> 
                 Secure Protection
               </h2>
               <p className="text-muted-foreground text-sm font-medium leading-relaxed max-w-[280px]">

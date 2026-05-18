@@ -134,7 +134,7 @@ serve(async (req: Request) => {
         const earlyBody = await req.clone().json();
         earlyOrderType = earlyBody?.metadata?.order_type || "data";
       } catch { /* ignore */ }
-      const bypassTypes = ["agent_activation", "sub_agent_activation", "wallet_topup", "utility"];
+      const bypassTypes = ["agent_activation", "sub_agent_activation", "wallet_topup", "store_wallet_topup", "utility"];
       if (!bypassTypes.includes(earlyOrderType)) {
         return new Response(JSON.stringify({
           error: settings.holiday_message || "Ordering is currently disabled. Please try again later.",
@@ -516,6 +516,41 @@ serve(async (req: Request) => {
       resolvedAmount = expectedTotal;
     }
 
+    if (orderType === "store_wallet_topup") {
+      const walletCredit = Number(metadata.wallet_credit);
+      const customerId = typeof metadata.customer_id === "string" ? metadata.customer_id : null;
+
+      if (!customerId) {
+        return new Response(JSON.stringify({ error: "Missing customer_id for store wallet top-up" }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      if (!Number.isFinite(walletCredit) || walletCredit < 1) {
+        return new Response(JSON.stringify({ error: "Minimum store wallet top-up is GHS 1.00" }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      resolvedPaystackFee = parseFloat(calculatePaystackFee(walletCredit).toFixed(2));
+      const expectedTotal = parseFloat((walletCredit + resolvedPaystackFee).toFixed(2));
+
+      if (!amountMatches(expectedTotal, amount, 0.10)) {
+        return new Response(JSON.stringify({
+          error: `Invalid store wallet top-up amount. Expected GHS ${expectedTotal.toFixed(2)}.`,
+        }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      resolvedWalletCredit = walletCredit;
+      resolvedAmount = expectedTotal;
+      enrichedMetadata = { ...metadata, wallet_credit: walletCredit, customer_id: customerId };
+    }
+
     if (orderType === "airtime") {
       const network = typeof metadata.network === "string" ? metadata.network : "";
       if (!network || !metadata.customer_phone) {
@@ -626,6 +661,11 @@ serve(async (req: Request) => {
       
       // Verified Guest Name
       if (metadata.customer_name) orderRow.customer_name = metadata.customer_name;
+
+      // Store wallet topup: store customer_id so the webhook can credit them
+      if (orderType === "store_wallet_topup" && metadata.customer_id) {
+        orderRow.customer_id = metadata.customer_id;
+      }
 
       const { error: insertError } = await supabaseAdmin.from("orders").insert(orderRow);
       if (insertError) {

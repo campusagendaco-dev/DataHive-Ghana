@@ -173,7 +173,7 @@ const SubAgentSignup = () => {
         agent_prices: parentProfile?.sub_agent_prices || {}
       } as any).eq("user_id", userId);
       
-      navigate("/dashboard");
+      navigate(`/store/${autoSlug}`);
     }
     setSubmitting(false);
   };
@@ -396,7 +396,7 @@ const SubAgentSignup = () => {
             <div className="mt-8 pt-8 border-t border-white/5 text-center">
               <p className="text-xs text-white/30">
                 Already have an account?{" "}
-                <Link to="/login" className="text-amber-400 hover:text-amber-300 font-black transition-colors ml-1">Sign in here</Link>
+                <Link to={`/store/${slug}?auth=login`} className="text-amber-400 hover:text-amber-300 font-black transition-colors ml-1">Sign in here</Link>
               </p>
             </div>
           </div>

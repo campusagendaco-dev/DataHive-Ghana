@@ -1,19 +1,51 @@
-import { ShieldCheck, RefreshCw, WifiOff } from "lucide-react";
+import { ShieldCheck, RefreshCw, WifiOff, Store } from "lucide-react";
 import { useState, useEffect } from "react";
 import { TraditionalBackground } from "./TraditionalBackground";
+import { getActiveStoreDomain } from "@/lib/app-base-url";
 
 const LoadingScreen = () => {
   const [showSlowMessage, setShowSlowMessage] = useState(false);
   const [showRetry, setShowRetry] = useState(false);
+  const [cachedStore, setCachedStore] = useState<{ name: string; logo: string | null; color: string | null } | null>(null);
+
+  const pathname = window.location.pathname;
+  const activeDomain = getActiveStoreDomain();
+  const isStoreRoute = pathname.startsWith("/store/") || !!activeDomain;
+  // Extract slug from /store/:slug if present
+  const slug = pathname.startsWith("/store/") ? pathname.split("/store/")[1]?.split("/")[0] : null;
 
   useEffect(() => {
     const slowTimer = setTimeout(() => setShowSlowMessage(true), 12000);
     const retryTimer = setTimeout(() => setShowRetry(true), 20000);
+
+    const cacheKey = slug ? `store_loading_${slug}` : activeDomain ? `store_loading_${activeDomain}` : null;
+    if (cacheKey) {
+      try {
+        const stored = localStorage.getItem(cacheKey);
+        if (stored) {
+          setCachedStore(JSON.parse(stored));
+        }
+      } catch (err) {
+        console.error("Failed to parse cached store loading metadata:", err);
+      }
+    }
+
     return () => {
       clearTimeout(slowTimer);
       clearTimeout(retryTimer);
     };
-  }, []);
+  }, [slug, activeDomain]);
+
+  // Determine active brand attributes
+  const isWhitelabeled = isStoreRoute;
+  const brandName = isWhitelabeled
+    ? (cachedStore?.name || "ONLINE STORE")
+    : "SwiftData GH";
+  const brandSubtitle = isWhitelabeled ? "SECURE PORTAL" : "Secure Gateway";
+  const brandColor = isWhitelabeled
+    ? (cachedStore?.color || "#f59e0b") // Default premium amber for generic whitelabel
+    : "#f59e0b"; // Default SwiftData amber
+  const brandLogoUrl = isWhitelabeled ? cachedStore?.logo : "/logo.png";
 
   return (
     <div className="fixed inset-0 z-[9999] flex flex-col items-center justify-center bg-[#020402]">
@@ -22,26 +54,42 @@ const LoadingScreen = () => {
 
       {/* ── Premium Evening Glow ── */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
-        <div className="absolute top-[40%] left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-primary/10 rounded-full blur-[140px] animate-pulse-gentle" />
+        <div 
+          className="absolute top-[40%] left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] rounded-full blur-[140px] animate-pulse-gentle"
+          style={{ background: `${brandColor}15` }} 
+        />
       </div>
 
       {/* ── Signature Activation Animation ── */}
       <div className="relative z-10 flex items-center justify-center mb-10">
         {/* Outer Orbit - High Precision */}
         <div className="absolute w-[120px] h-[120px] rounded-full border border-white/5" />
-        <div className="absolute w-[120px] h-[120px] rounded-full border-t border-primary/40 animate-spin" style={{ animationDuration: '3s' }} />
+        <div 
+          className="absolute w-[120px] h-[120px] rounded-full border-t animate-spin" 
+          style={{ animationDuration: '3s', borderTopColor: `${brandColor}80` }} 
+        />
         
         {/* Inner Orbit - Faster */}
-        <div className="absolute w-[100px] h-[100px] rounded-full border-r border-primary/60 animate-spin" style={{ animationDuration: '2s', animationDirection: 'reverse' }} />
+        <div 
+          className="absolute w-[100px] h-[100px] rounded-full border-r animate-spin" 
+          style={{ animationDuration: '2s', animationDirection: 'reverse', borderRightColor: `${brandColor}aa` }} 
+        />
 
-        {/* Logo Container with Gold Pulse */}
+        {/* Logo Container with Brand Pulse */}
         <div className="relative z-20 w-24 h-24 rounded-full bg-[#020402] border border-white/10 backdrop-blur-sm shadow-2xl flex items-center justify-center overflow-hidden">
-          <div className="absolute inset-0 rounded-full bg-primary/5 animate-ping opacity-20" />
-          <img
-            src="/logo.png"
-            alt="SwiftData GH"
-            className="w-full h-full object-contain p-4 relative z-10"
+          <div 
+            className="absolute inset-0 rounded-full animate-ping opacity-20" 
+            style={{ background: `${brandColor}20` }}
           />
+          {brandLogoUrl ? (
+            <img
+              src={brandLogoUrl}
+              alt={brandName}
+              className="w-full h-full object-contain p-4 relative z-10"
+            />
+          ) : (
+            <Store className="w-8 h-8 relative z-10 animate-pulse" style={{ color: brandColor }} />
+          )}
           <div className="absolute bottom-2 right-2 w-5 h-5 rounded-full bg-blue-600 flex items-center justify-center border-2 border-[#020402] shadow-[0_0_15px_rgba(37,99,235,0.4)] z-20">
             <ShieldCheck className="w-3 h-3 text-white" />
           </div>
@@ -51,20 +99,43 @@ const LoadingScreen = () => {
       {/* ── Elite Brand Text ── */}
       <div className="relative z-10 text-center space-y-6 px-6 animate-in fade-in slide-in-from-bottom-4 duration-1000">
         <div className="flex flex-col items-center gap-1">
-          <h2 className="text-white font-black text-2xl tracking-[0.2em] uppercase">
-            SwiftData <span className="text-primary drop-shadow-[0_0_8px_rgba(245,158,11,0.4)]">GH</span>
-          </h2>
-          <div className="h-px w-12 bg-gradient-to-r from-transparent via-primary/50 to-transparent" />
+          {isWhitelabeled ? (
+            <h2 className="text-white font-black text-2xl tracking-[0.2em] uppercase text-center">
+              {cachedStore ? (
+                <>
+                  {brandName.split(" ")[0]}{" "}
+                  <span style={{ color: brandColor }}>
+                    {brandName.split(" ").slice(1).join(" ")}
+                  </span>
+                </>
+              ) : (
+                <>
+                  ONLINE <span style={{ color: brandColor }}>STORE</span>
+                </>
+              )}
+            </h2>
+          ) : (
+            <h2 className="text-white font-black text-2xl tracking-[0.2em] uppercase">
+              SwiftData <span className="text-primary drop-shadow-[0_0_8px_rgba(245,158,11,0.4)]">GH</span>
+            </h2>
+          )}
+          <div 
+            className="h-px w-12 bg-gradient-to-r from-transparent to-transparent" 
+            style={{ backgroundImage: `linear-gradient(to right, transparent, ${brandColor}80, transparent)` }}
+          />
         </div>
         
         <div className="flex flex-col items-center gap-5">
           <p className="text-white/30 text-[11px] font-bold uppercase tracking-[0.4em] translate-x-[0.2em]">
-            Secure Gateway
+            {brandSubtitle}
           </p>
           
           {/* Elite Progress Line */}
           <div className="w-40 h-[1.5px] bg-white/5 rounded-full overflow-hidden">
-            <div className="h-full bg-gradient-to-r from-transparent via-primary to-transparent animate-progress-slide" />
+            <div 
+              className="h-full animate-progress-slide" 
+              style={{ backgroundImage: `linear-gradient(to right, transparent, ${brandColor}, transparent)` }}
+            />
           </div>
         </div>
       </div>
@@ -115,7 +186,4 @@ const LoadingScreen = () => {
   );
 };
 
-
 export default LoadingScreen;
-
-

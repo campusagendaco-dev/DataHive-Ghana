@@ -12,3 +12,24 @@ export const getAppBaseUrl = () => {
   if (!envSiteUrl) return window.location.origin;
   return envSiteUrl.replace(/\/+$/, "");
 };
+
+export const getActiveStoreDomain = (): string | null => {
+  const host = window.location.hostname;
+  const centralDomain = "swiftdatagh.shop";
+  const devHosts = ["localhost", "127.0.0.1", "[::1]"];
+
+  const isLocalDev = devHosts.some(
+    (dh) => host === dh || host.startsWith("192.168.") || host.startsWith("10.") || host.startsWith("172.")
+  );
+
+  const isCentral = host === centralDomain || host.endsWith("." + centralDomain);
+
+  if (isLocalDev) {
+    // Allow local development testing via a query parameter or localStorage
+    const params = new URLSearchParams(window.location.search);
+    const mockDomain = params.get("domain") || localStorage.getItem("dev_mock_domain");
+    if (mockDomain) return mockDomain;
+  }
+
+  return (isLocalDev || isCentral) ? null : host;
+};

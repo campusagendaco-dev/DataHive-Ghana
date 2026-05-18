@@ -4,11 +4,13 @@ import { motion, AnimatePresence } from "framer-motion";
 import { 
   Search, Package, Clock, CheckCircle2, 
   XCircle, Loader2, ArrowLeft, RefreshCw,
-  Activity, ExternalLink, ShieldCheck, Zap, ArrowRight, ReceiptText, AlertTriangle
+  Activity, ExternalLink, ShieldCheck, Zap, ArrowRight, ReceiptText, AlertTriangle,
+  Copy
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+import { getActiveStoreDomain } from "@/lib/app-base-url";
 
 interface Order {
   id: string;
@@ -33,6 +35,74 @@ const MyOrders = () => {
   const [loading, setLoading] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [showReceipt, setShowReceipt] = useState<Order | null>(null);
+
+  const storeParam = searchParams.get("store") || "";
+  const activeDomain = getActiveStoreDomain();
+  const isStoreRoute = !!activeDomain || !!storeParam || window.location.pathname.startsWith("/store/");
+
+  // Load cached store tenant information
+  const [storeInfo, setStoreInfo] = useState<any>(() => {
+    try {
+      const saved = localStorage.getItem("current_store_tenant");
+      const parsed = saved ? JSON.parse(saved) : null;
+      if (storeParam && parsed?.slug === storeParam) {
+        return parsed;
+      }
+      if (activeDomain && parsed?.custom_domain === activeDomain) {
+        return parsed;
+      }
+      return parsed;
+    } catch {
+      return null;
+    }
+  });
+
+  useEffect(() => {
+    const loadStoreDetails = async () => {
+      if (storeInfo && (storeInfo.slug === storeParam || (activeDomain && storeInfo.custom_domain === activeDomain))) {
+        return;
+      }
+
+      const lookupSlug = storeParam;
+      const lookupDomain = activeDomain;
+
+      if (!lookupSlug && !lookupDomain) return;
+
+      try {
+        let query = supabase
+          .from("agent_stores")
+          .select("store_name, store_logo_url, store_primary_color, slug, custom_domain");
+        
+        if (lookupSlug) {
+          query = query.eq("slug", lookupSlug);
+        } else if (lookupDomain) {
+          query = query.eq("custom_domain", lookupDomain);
+        }
+
+        const { data, error } = await query.maybeSingle();
+        if (data && !error) {
+          const loaded = {
+            name: data.store_name,
+            logo: data.store_logo_url,
+            color: data.store_primary_color,
+            slug: data.slug,
+            custom_domain: data.custom_domain
+          };
+          setStoreInfo(loaded);
+          localStorage.setItem("current_store_tenant", JSON.stringify(loaded));
+        }
+      } catch (err) {
+        console.error("Error loading store brand:", err);
+      }
+    };
+
+    loadStoreDetails();
+  }, [storeParam, activeDomain]);
+
+  const storeName = isStoreRoute && storeInfo?.name ? storeInfo.name : "SwiftData Ghana";
+  const brandLogoUrl = isStoreRoute ? storeInfo?.logo : "/logo.png";
+  const brandColor = isStoreRoute ? (storeInfo?.color || "#f59e0b") : "#f59e0b";
+  const brandDomain = isStoreRoute ? (activeDomain || (storeInfo?.custom_domain) || window.location.host) : "swiftdatagh.shop";
 
   const handleDispute = async (order: Order) => {
     const reason = prompt("Please describe the issue (e.g., Data not received):");
@@ -79,7 +149,7 @@ const MyOrders = () => {
     const now = new Date(order.created_at).toLocaleString("en-GH", { dateStyle: "medium", timeStyle: "short" });
     const lines = [
       "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
-      "    SwiftData Ghana — Receipt",
+      `    ${storeName} — Receipt`,
       "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
       `Ref       : ${order.id.slice(0, 12).toUpperCase()}`,
       `Date      : ${now}`,
@@ -89,7 +159,7 @@ const MyOrders = () => {
       `Recipient : ${order.customer_phone}`,
       `Status    : ✅ ${order.status.toUpperCase()}`,
       "─────────────────────────────────",
-      "  swiftdatagh.shop",
+      `  ${brandDomain}`,
 
       "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
     ];
@@ -97,7 +167,7 @@ const MyOrders = () => {
     
     if (navigator.share) {
       navigator.share({
-        title: 'SwiftData Receipt',
+        title: `${storeName} Receipt`,
         text: text,
       }).catch(() => {
         navigator.clipboard.writeText(text);
@@ -118,7 +188,11 @@ const MyOrders = () => {
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
     if (!phone) return;
-    navigate(`/my-orders?phone=${phone}`);
+    if (isStoreRoute && storeInfo?.slug) {
+      navigate(`/store/${storeInfo.slug}/my-orders?phone=${phone}`);
+    } else {
+      navigate(`/my-orders?phone=${phone}`);
+    }
   };
 
   const getStatusColor = (status: string) => {
@@ -139,7 +213,15 @@ const MyOrders = () => {
         {/* Header */}
         <div className="flex items-center justify-between">
           <button 
-            onClick={() => navigate('/')}
+            onClick={() => {
+              if (activeDomain) {
+                navigate("/");
+              } else if (storeInfo?.slug) {
+                navigate(`/store/${storeInfo.slug}`);
+              } else {
+                navigate("/");
+              }
+            }}
             className="w-10 h-10 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center hover:bg-white/10 transition-all"
           >
             <ArrowLeft className="w-5 h-5 text-white/60" />
@@ -158,11 +240,12 @@ const MyOrders = () => {
             value={phone}
             onChange={(e) => setPhone(e.target.value)}
             placeholder="Search by phone number..."
-            className="w-full py-4 px-6 rounded-[2rem] bg-white/[0.03] border border-white/10 text-sm text-white placeholder:text-white/20 focus:outline-none focus:border-amber-500/50 transition-all shadow-2xl"
+            className="w-full py-4 px-6 rounded-[2rem] bg-white/[0.03] border border-white/10 text-sm text-white placeholder:text-white/20 focus:outline-none focus:border-primary/50 transition-all shadow-2xl"
           />
           <button 
             type="submit"
-            className="absolute right-3 top-1/2 -translate-y-1/2 w-10 h-10 rounded-xl bg-amber-500 flex items-center justify-center shadow-lg shadow-amber-500/20 active:scale-95 transition-all"
+            className="absolute right-3 top-1/2 -translate-y-1/2 w-10 h-10 rounded-xl flex items-center justify-center active:scale-95 transition-all"
+            style={{ backgroundColor: brandColor, boxShadow: `0 10px 15px -3px ${brandColor}33` }}
           >
             <Search className="w-4 h-4 text-black" />
           </button>
@@ -172,14 +255,14 @@ const MyOrders = () => {
         <div className="space-y-4">
           {loading ? (
             <div className="flex flex-col items-center justify-center py-20 gap-4">
-              <Loader2 className="w-8 h-8 text-amber-500 animate-spin" />
+              <Loader2 className="w-8 h-8 animate-spin" style={{ color: brandColor }} />
               <p className="text-[10px] font-black uppercase tracking-widest text-white/20">Scanning Records...</p>
             </div>
           ) : orders.length > 0 ? (
             orders.map((order) => (
               <div 
                 key={order.id}
-                onClick={() => navigate(`/order-status?reference=${order.id}`)}
+                onClick={() => navigate(isStoreRoute && storeInfo?.slug ? `/store/${storeInfo.slug}/order-status?reference=${order.id}` : `/order-status?reference=${order.id}`)}
                 className="group relative overflow-hidden rounded-[2rem] bg-white/[0.03] border border-white/10 p-5 hover:bg-white/[0.05] transition-all cursor-pointer active:scale-[0.98]"
               >
                 <div className="flex items-center justify-between mb-4">
@@ -202,7 +285,7 @@ const MyOrders = () => {
                     <Clock className="w-3 h-3" />
                     {new Date(order.created_at).toLocaleDateString()} • {new Date(order.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                   </div>
-                  <div className="flex items-center gap-1.5 text-[9px] font-black text-amber-400/60 uppercase tracking-widest">
+                  <div className="flex items-center gap-1.5 text-[9px] font-black uppercase tracking-widest" style={{ color: `${brandColor}99` }}>
                     View Details
                     <ArrowRight className="w-3 h-3" />
                   </div>
@@ -224,7 +307,7 @@ const MyOrders = () => {
                      Dispute
                    </button>
                    <button 
-                    onClick={(e) => { e.stopPropagation(); navigate(`/order-status?reference=${order.id}`); }}
+                    onClick={(e) => { e.stopPropagation(); navigate(isStoreRoute && storeInfo?.slug ? `/store/${storeInfo.slug}/order-status?reference=${order.id}` : `/order-status?reference=${order.id}`); }}
                     className="w-9 h-9 rounded-xl bg-white/5 border border-white/5 hover:bg-white/10 flex items-center justify-center text-white/40 transition-all"
                    >
                      <ExternalLink className="w-3 h-3" />
@@ -280,7 +363,7 @@ const MyOrders = () => {
                 <div className="p-8 space-y-6">
                   <div className="flex justify-between items-center">
                     <div className="flex items-center gap-2">
-                      <div className="w-8 h-8 rounded-full bg-amber-500 flex items-center justify-center">
+                      <div className="w-8 h-8 rounded-full flex items-center justify-center" style={{ backgroundColor: brandColor }}>
                         <CheckCircle2 className="w-5 h-5 text-black" />
                       </div>
                       <span className="text-xs font-black uppercase tracking-widest text-white/90">E-Receipt</span>
@@ -292,7 +375,7 @@ const MyOrders = () => {
 
                   <div className="bg-white/[0.02] border border-white/5 rounded-3xl p-6 space-y-4 font-mono">
                     <div className="text-center pb-4 border-b border-dashed border-white/10">
-                      <p className="text-sm font-black text-white mb-1 uppercase tracking-widest">SwiftData Ghana</p>
+                      <p className="text-sm font-black text-white mb-1 uppercase tracking-widest">{storeName}</p>
                       <p className="text-[10px] text-white/30">{new Date(showReceipt.created_at).toLocaleString()}</p>
                     </div>
                     
@@ -349,8 +432,8 @@ const MyOrders = () => {
                   </div>
                 </div>
                 
-                <div className="bg-amber-500/10 border-t border-white/5 py-3 text-center">
-                  <p className="text-[8px] font-black text-amber-500 uppercase tracking-[0.3em]">Verified Transaction</p>
+                <div className="border-t border-white/5 py-3 text-center" style={{ backgroundColor: `${brandColor}1a` }}>
+                  <p className="text-[8px] font-black uppercase tracking-[0.3em]" style={{ color: brandColor }}>Verified Transaction</p>
                 </div>
               </motion.div>
             </div>

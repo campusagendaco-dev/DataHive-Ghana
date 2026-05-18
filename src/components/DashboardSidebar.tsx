@@ -1,6 +1,7 @@
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { useAppTheme } from "@/contexts/ThemeContext";
+import { supabase } from "@/integrations/supabase/client";
 import {
   LayoutDashboard,
   Bell,
@@ -93,6 +94,27 @@ const DashboardSidebar = ({ open, onClose }: DashboardSidebarProps) => {
   const { isOnline, quality } = useConnectivity();
   const isPaidAgent = Boolean(profile?.agent_approved || profile?.sub_agent_approved);
   const [time, setTime] = useState(new Date());
+  const [parentStore, setParentStore] = useState<{
+    store_name: string | null;
+    store_logo_url: string | null;
+    store_primary_color: string | null;
+  } | null>(null);
+
+  useEffect(() => {
+    const fetchParentStore = async () => {
+      if (profile?.is_sub_agent && profile.parent_agent_id) {
+        const { data } = await supabase
+          .from("agent_stores")
+          .select("store_name, store_logo_url, store_primary_color")
+          .eq("user_id", profile.parent_agent_id)
+          .maybeSingle();
+        if (data) {
+          setParentStore(data);
+        }
+      }
+    };
+    fetchParentStore();
+  }, [profile]);
 
   useEffect(() => {
     const tick = setInterval(() => setTime(new Date()), 1000);
@@ -130,14 +152,24 @@ const DashboardSidebar = ({ open, onClose }: DashboardSidebarProps) => {
           <Link to="/" className="flex items-center gap-3 group">
             <div className="relative">
               <div className="absolute -inset-1 bg-primary/20 rounded-xl blur opacity-0 group-hover:opacity-100 transition duration-500"></div>
-              <img src="/logo.png" alt="Logo" className="w-10 h-10 shrink-0 relative" />
+              {parentStore?.store_logo_url ? (
+                <div className="w-10 h-10 rounded-xl overflow-hidden bg-white flex items-center justify-center border border-white/10 shrink-0 relative">
+                  <img src={parentStore.store_logo_url} alt="Logo" className="w-full h-full object-contain" />
+                </div>
+              ) : (
+                <img src="/logo.png" alt="Logo" className="w-10 h-10 shrink-0 relative" />
+              )}
               <div className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-blue-600 flex items-center justify-center border-2 border-[#0d140d] shadow-lg">
                 <ShieldCheck className="w-2.5 h-2.5 text-white" />
               </div>
             </div>
             <div>
-              <p className={cn("font-black text-sm tracking-tight leading-tight group-hover:text-primary transition-colors", isDark ? "text-white" : "text-gray-900")}>SwiftData GH</p>
-              <p className={cn("text-[10px] font-bold uppercase tracking-widest", isDark ? "text-white/40" : "text-gray-400")}>Agent Console</p>
+              <p className={cn("font-black text-sm tracking-tight leading-tight group-hover:text-primary transition-colors truncate max-w-[140px]", isDark ? "text-white" : "text-gray-900")}>
+                {parentStore?.store_name || "SwiftData GH"}
+              </p>
+              <p className={cn("text-[10px] font-bold uppercase tracking-widest truncate max-w-[140px]", isDark ? "text-white/40" : "text-gray-400")}>
+                {parentStore ? "Reseller Partner" : "Agent Console"}
+              </p>
             </div>
           </Link>
           <button 

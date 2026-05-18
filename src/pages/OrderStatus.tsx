@@ -5,7 +5,7 @@ import {
   CheckCircle2, XCircle, Loader2, ShieldCheck, Zap,
   Activity, Copy, Check, RefreshCw, ArrowLeft,
   Search, Info, Database, SignalHigh, Server,
-  Clock, ArrowRight, Package, ReceiptText
+  Clock, ArrowRight, Package, ReceiptText, Store
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -14,6 +14,7 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import SEO from "@/components/SEO";
 import html2canvas from "html2canvas";
+import { getActiveStoreDomain } from "@/lib/app-base-url";
 
 type OrderStatusType = "pending" | "paid" | "processing" | "fulfilled" | "fulfillment_failed" | "error" | "not_paid";
 
@@ -86,6 +87,74 @@ const OrderStatus = () => {
   const [isDownloading, setIsDownloading] = useState(false);
   const receiptRef = useRef<HTMLDivElement>(null);
 
+  const storeParam = searchParams.get("store") || "";
+  const activeDomain = getActiveStoreDomain();
+  const isStoreRoute = !!activeDomain || !!storeParam || window.location.pathname.startsWith("/store/");
+
+  // Load cached store tenant information
+  const [storeInfo, setStoreInfo] = useState<any>(() => {
+    try {
+      const saved = localStorage.getItem("current_store_tenant");
+      const parsed = saved ? JSON.parse(saved) : null;
+      if (storeParam && parsed?.slug === storeParam) {
+        return parsed;
+      }
+      if (activeDomain && parsed?.custom_domain === activeDomain) {
+        return parsed;
+      }
+      return parsed;
+    } catch {
+      return null;
+    }
+  });
+
+  useEffect(() => {
+    const loadStoreDetails = async () => {
+      if (storeInfo && (storeInfo.slug === storeParam || (activeDomain && storeInfo.custom_domain === activeDomain))) {
+        return;
+      }
+
+      const lookupSlug = storeParam;
+      const lookupDomain = activeDomain;
+
+      if (!lookupSlug && !lookupDomain) return;
+
+      try {
+        let query = supabase
+          .from("agent_stores")
+          .select("store_name, store_logo_url, store_primary_color, slug, custom_domain");
+        
+        if (lookupSlug) {
+          query = query.eq("slug", lookupSlug);
+        } else if (lookupDomain) {
+          query = query.eq("custom_domain", lookupDomain);
+        }
+
+        const { data, error } = await query.maybeSingle();
+        if (data && !error) {
+          const loaded = {
+            name: data.store_name,
+            logo: data.store_logo_url,
+            color: data.store_primary_color,
+            slug: data.slug,
+            custom_domain: data.custom_domain
+          };
+          setStoreInfo(loaded);
+          localStorage.setItem("current_store_tenant", JSON.stringify(loaded));
+        }
+      } catch (err) {
+        console.error("Error loading store brand:", err);
+      }
+    };
+
+    loadStoreDetails();
+  }, [storeParam, activeDomain]);
+
+  const storeName = isStoreRoute && storeInfo?.name ? storeInfo.name : "SwiftData Ghana";
+  const brandLogoUrl = isStoreRoute ? storeInfo?.logo : "/logo.png";
+  const brandColor = isStoreRoute ? (storeInfo?.color || "#f59e0b") : "#f59e0b";
+  const brandDomain = isStoreRoute ? (activeDomain || (storeInfo?.custom_domain) || window.location.host) : "swiftdatagh.shop";
+
   const meta = getStatusMeta(orderStatus, failed, statusMessage);
 
   // --- SINGLE ORDER LOGIC ---
@@ -126,7 +195,7 @@ const OrderStatus = () => {
     const now = new Date().toLocaleString("en-GH", { dateStyle: "medium", timeStyle: "short" });
     const lines = [
       "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
-      "    SwiftData Ghana — Receipt",
+      `    ${storeName} — Receipt`,
       "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
       `Ref       : ${reference.slice(0, 12).toUpperCase()}`,
       `Date      : ${now}`,
@@ -136,7 +205,7 @@ const OrderStatus = () => {
       ...(phoneParam ? [`Recipient : ${phoneParam}`] : []),
       `Status    : ✅ ${orderStatus.toUpperCase()}`,
       "─────────────────────────────────",
-      "  swiftdatagh.shop",
+      `  ${brandDomain}`,
 
       "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
     ];
@@ -144,7 +213,7 @@ const OrderStatus = () => {
     
     if (navigator.share) {
       navigator.share({
-        title: 'SwiftData Receipt',
+        title: `${storeName} Receipt`,
         text: text,
       }).catch(() => {
         navigator.clipboard.writeText(text);
@@ -167,7 +236,7 @@ const OrderStatus = () => {
         useCORS: true
       });
       const link = document.createElement("a");
-      link.download = `SwiftData-Receipt-${reference.slice(0, 8)}.png`;
+      link.download = `${storeName.replace(/\s+/g, "-")}-Receipt-${reference.slice(0, 8)}.png`;
       link.href = canvas.toDataURL("image/png");
       link.click();
       toast.success("Receipt saved to your device!");
@@ -219,7 +288,7 @@ const OrderStatus = () => {
       toast.error("Please enter a valid phone number");
       return;
     }
-    navigate(`/my-orders?phone=${sanitized}`);
+    navigate(isStoreRoute && storeInfo?.slug ? `/store/${storeInfo.slug}/my-orders?phone=${sanitized}` : `/my-orders?phone=${sanitized}`);
   };
 
   const step = orderStatus === "fulfilled" ? 3 : orderStatus === "processing" ? 2 : orderStatus === "paid" ? 1 : 0;
@@ -229,11 +298,10 @@ const OrderStatus = () => {
     return (
       <div className="min-h-screen bg-black flex flex-col items-center justify-center p-6 font-sans antialiased">
         <SEO 
-          title="Track Order Status — SwiftData Ghana"
-          description="Track the real-time delivery status of your data bundle purchase. Enter your reference ID to see payment and fulfillment progress."
-          keywords="track data order Ghana, order status SwiftData, data delivery status"
-          canonical={`https://swiftdatagh.shop/order-status?reference=${reference}`}
-
+          title={`Track Order Status — ${storeName}`}
+          description={`Track the real-time delivery status of your data bundle purchase on ${storeName}.`}
+          keywords="track data order Ghana, order status, data delivery status"
+          canonical={`https://${brandDomain}/order-status?reference=${reference}`}
         />
         <div className="w-full max-w-[340px]">
           <div className="relative overflow-hidden rounded-[2.5rem] bg-white/[0.03] border border-white/10 backdrop-blur-3xl shadow-2xl">
@@ -294,7 +362,8 @@ const OrderStatus = () => {
             <button 
               onClick={() => setShowReceipt(true)} 
               disabled={orderStatus !== "fulfilled" && orderStatus !== "paid" && orderStatus !== "processing"}
-              className="flex-1 h-12 rounded-[1.2rem] bg-amber-500 text-black flex items-center justify-center gap-2 transition-all active:scale-95 disabled:opacity-20 font-black uppercase text-[10px] tracking-widest shadow-lg shadow-amber-500/20"
+              className="flex-1 h-12 rounded-[1.2rem] text-black flex items-center justify-center gap-2 transition-all active:scale-95 disabled:opacity-20 font-black uppercase text-[10px] tracking-widest shadow-lg"
+              style={{ backgroundColor: brandColor, boxShadow: `0 10px 15px -3px ${brandColor}33` }}
             >
               <ReceiptText className="w-4 h-4" />
               View Receipt
@@ -302,7 +371,7 @@ const OrderStatus = () => {
             <button onClick={pollStatus} disabled={isRefreshing || orderStatus === "fulfilled"} className="w-12 h-12 rounded-[1.2rem] bg-white/5 border border-white/5 flex items-center justify-center transition-all active:scale-95 disabled:opacity-20">
               <RefreshCw className={cn("w-3.5 h-3.5 text-white/20", isRefreshing && "animate-spin")} />
             </button>
-            <button onClick={() => navigate('/order-status')} className="w-12 h-12 rounded-[1.2rem] bg-white/5 border border-white/5 flex items-center justify-center">
+            <button onClick={() => navigate(isStoreRoute && storeInfo?.slug ? `/store/${storeInfo.slug}/order-status` : '/order-status')} className="w-12 h-12 rounded-[1.2rem] bg-white/5 border border-white/5 flex items-center justify-center">
               <ArrowLeft className="w-4 h-4 text-white/20" />
             </button>
           </div>
@@ -327,7 +396,7 @@ const OrderStatus = () => {
                   <div className="p-8 space-y-6">
                     <div className="flex justify-between items-center">
                       <div className="flex items-center gap-2">
-                        <div className="w-8 h-8 rounded-full bg-amber-500 flex items-center justify-center">
+                        <div className="w-8 h-8 rounded-full flex items-center justify-center" style={{ backgroundColor: brandColor }}>
                           <CheckCircle2 className="w-5 h-5 text-black" />
                         </div>
                         <span className="text-xs font-black uppercase tracking-widest text-white/90">E-Receipt</span>
@@ -339,7 +408,7 @@ const OrderStatus = () => {
 
                     <div ref={receiptRef} className="bg-[#0F0F12] border border-white/5 rounded-3xl p-6 space-y-4 font-mono">
                       <div className="text-center pb-4 border-b border-dashed border-white/10">
-                        <p className="text-sm font-black text-white mb-1 uppercase tracking-widest">SwiftData Ghana</p>
+                        <p className="text-sm font-black text-white mb-1 uppercase tracking-widest">{storeName}</p>
                         <p className="text-[10px] text-white/30">{new Date().toLocaleString()}</p>
                       </div>
                       
@@ -394,8 +463,8 @@ const OrderStatus = () => {
                     </div>
                   </div>
                   
-                  <div className="bg-amber-500/10 border-t border-white/5 py-3 text-center">
-                    <p className="text-[8px] font-black text-amber-500 uppercase tracking-[0.3em]">Verified Transaction</p>
+                  <div className="border-t border-white/5 py-3 text-center" style={{ backgroundColor: `${brandColor}1a` }}>
+                    <p className="text-[8px] font-black uppercase tracking-[0.3em]" style={{ color: brandColor }}>Verified Transaction</p>
                   </div>
                 </motion.div>
               </div>
@@ -406,18 +475,84 @@ const OrderStatus = () => {
     );
   }
 
-  // --- RENDER GLOBAL SYSTEM TRACKER ---
+  // --- RENDER GLOBAL SYSTEM TRACKER OR STORE LOOKUP ---
+  if (isStoreRoute) {
+    return (
+      <div className="min-h-screen bg-[#050505] text-white selection:bg-amber-500/30 font-sans antialiased flex flex-col items-center justify-center p-6">
+        <SEO 
+          title={`Track Order Status — ${storeName}`}
+          description={`Track the real-time delivery status of your purchases on ${storeName}.`}
+          keywords="track data order Ghana, order status, data delivery status"
+          canonical={`https://${brandDomain}/order-status`}
+        />
+        <div className="w-full max-w-md space-y-8">
+          {/* Header */}
+          <div className="flex flex-col items-center text-center space-y-3">
+            <div className="w-16 h-16 rounded-[1.5rem] flex items-center justify-center overflow-hidden border bg-white/5" style={{ borderColor: `${brandColor}40` }}>
+              {brandLogoUrl ? (
+                <img src={brandLogoUrl} alt={storeName} className="w-full h-full object-contain" />
+              ) : (
+                <Store className="w-8 h-8" style={{ color: brandColor }} />
+              )}
+            </div>
+            <div>
+              <h1 className="text-xl font-black uppercase tracking-widest text-white/90">{storeName}</h1>
+              <p className="text-[10px] font-bold text-white/30 uppercase tracking-widest">Order Tracking Portal</p>
+            </div>
+          </div>
+
+          {/* Search Card */}
+          <div className="relative overflow-hidden rounded-[2.5rem] bg-white/[0.03] border border-white/10 p-8 backdrop-blur-3xl shadow-2xl">
+            <div className="absolute inset-0 bg-gradient-to-br from-white/[0.02] to-transparent pointer-events-none" />
+            <h3 className="font-bold text-base text-center mb-1">Lookup Order Status</h3>
+            <p className="text-[10px] text-white/30 font-medium text-center mb-6">Enter your phone number to fetch all recent purchase records.</p>
+            
+            <form onSubmit={handleSearch} className="relative group">
+              <input 
+                type="tel"
+                value={searchPhone}
+                onChange={(e) => setSearchPhone(e.target.value)}
+                placeholder="Enter recipient phone number..."
+                className="w-full py-4 pl-6 pr-14 rounded-[2rem] bg-white/[0.03] border border-white/10 text-xs text-white placeholder:text-white/20 focus:outline-none focus:border-primary/50 transition-all shadow-2xl"
+              />
+              <button type="submit" className="absolute right-2 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full flex items-center justify-center active:scale-95 transition-all" style={{ backgroundColor: brandColor, boxShadow: `0 10px 15px -3px ${brandColor}33` }}>
+                <Search className="w-4 h-4 text-black" />
+              </button>
+            </form>
+          </div>
+
+          {/* Back Action */}
+          <div className="flex justify-center">
+            <button 
+              onClick={() => {
+                if (activeDomain) {
+                  navigate("/");
+                } else if (storeInfo?.slug) {
+                  navigate(`/store/${storeInfo.slug}`);
+                } else {
+                  navigate("/");
+                }
+              }}
+              className="inline-flex items-center gap-2 px-6 py-2.5 rounded-full bg-white/5 border border-white/5 text-[10px] font-black uppercase tracking-widest text-white/40 hover:text-white transition-all hover:scale-105 active:scale-95"
+            >
+              <ArrowLeft className="w-3.5 h-3.5" /> Back to Store
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-[#050505] text-white selection:bg-amber-500/30 font-sans antialiased">
       <SEO 
-        title="Live Delivery Scanner — Order Tracking"
-        description="View live data bundle deliveries and track your orders in real-time. Ghana's most transparent data vending platform."
+        title={`Live Delivery Scanner — ${storeName}`}
+        description={`Track your purchases and view live data bundle deliveries in real-time on ${storeName}.`}
         keywords="live data scanner, track data delivery Ghana, real-time data tracking"
-        canonical="https://swiftdatagh.shop/order-status"
-
+        canonical={`https://${brandDomain}/order-status`}
       />
       <div className="fixed inset-0 pointer-events-none overflow-hidden">
-        <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-amber-500/5 rounded-full blur-[120px]" />
+        <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] rounded-full blur-[120px]" style={{ backgroundColor: `${brandColor}0d` }} />
         <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-blue-500/5 rounded-full blur-[120px]" />
       </div>
 
@@ -445,16 +580,16 @@ const OrderStatus = () => {
             value={searchPhone}
             onChange={(e) => setSearchPhone(e.target.value)}
             placeholder="Track your orders by phone number..."
-            className="w-full py-4 px-6 rounded-[2rem] bg-white/[0.03] border border-white/10 text-xs text-white placeholder:text-white/20 focus:outline-none focus:border-amber-500/50 transition-all shadow-2xl"
+            className="w-full py-4 px-6 rounded-[2rem] bg-white/[0.03] border border-white/10 text-xs text-white placeholder:text-white/20 focus:outline-none focus:border-primary/50 transition-all shadow-2xl"
           />
-          <button type="submit" className="absolute right-3 top-1/2 -translate-y-1/2 w-10 h-10 rounded-xl bg-amber-500 flex items-center justify-center shadow-lg shadow-amber-500/20 active:scale-95 transition-all">
+          <button type="submit" className="absolute right-3 top-1/2 -translate-y-1/2 w-10 h-10 rounded-xl flex items-center justify-center active:scale-95 transition-all" style={{ backgroundColor: brandColor, boxShadow: `0 10px 15px -3px ${brandColor}33` }}>
             <Search className="w-4 h-4 text-black" />
           </button>
         </form>
 
         {loadingTracker && !trackerData ? (
           <div className="py-20 flex flex-col items-center gap-4">
-             <Loader2 className="w-8 h-8 text-amber-500 animate-spin" />
+             <Loader2 className="w-8 h-8 animate-spin" style={{ color: brandColor }} />
              <p className="text-[10px] font-black uppercase tracking-widest text-white/20">Syncing with Node...</p>
           </div>
         ) : (
@@ -464,8 +599,8 @@ const OrderStatus = () => {
               <div className="p-8 pb-4">
                 <div className="flex items-center justify-between mb-8">
                    <div className="flex items-center gap-4">
-                      <div className="w-12 h-12 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center">
-                         <Activity className={cn("w-6 h-6 text-amber-500", trackerData?.data.scanner.active && "animate-pulse")} />
+                      <div className="w-12 h-12 rounded-2xl flex items-center justify-center border" style={{ backgroundColor: `${brandColor}1a`, borderColor: `${brandColor}33` }}>
+                         <Activity className={cn("w-6 h-6", trackerData?.data.scanner.active && "animate-pulse")} style={{ color: brandColor }} />
                       </div>
                       <div>
                          <h3 className="font-bold text-base">Network Scanner</h3>
@@ -512,7 +647,7 @@ const OrderStatus = () => {
             {/* Live Feed */}
             <div className="space-y-6">
               <div className="flex items-center gap-2 px-2">
-                 <Clock className="w-4 h-4 text-amber-500" />
+                 <Clock className="w-4 h-4" style={{ color: brandColor }} />
                  <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-white/40">Realtime Dispatch Feed</h4>
               </div>
               <div className="space-y-2">
@@ -525,7 +660,7 @@ const OrderStatus = () => {
                           <p className="text-[8px] font-medium text-white/20">{o.capacity} • {o.deliveryStatus}</p>
                        </div>
                     </div>
-                    <div className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
+                    <div className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ backgroundColor: brandColor }} />
                   </div>
                 ))}
                 {trackerData?.data.yourOrders.inLastDeliveredBatch.map((o, i) => (

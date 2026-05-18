@@ -14,16 +14,28 @@ CREATE TABLE IF NOT EXISTS public.agent_api_keys (
 );
 
 -- 2. Enable Realtime
-ALTER PUBLICATION supabase_realtime ADD TABLE public.agent_api_keys;
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_publication_rel pr 
+    JOIN pg_publication p ON p.oid = pr.prpubid 
+    JOIN pg_class c ON c.oid = pr.prrelid 
+    WHERE p.pubname = 'supabase_realtime' AND c.relname = 'agent_api_keys'
+  ) THEN
+    ALTER PUBLICATION supabase_realtime ADD TABLE public.agent_api_keys;
+  END IF;
+END $$;
 
 -- 3. RLS Policies
 ALTER TABLE public.agent_api_keys ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Agents can manage their own API keys" ON public.agent_api_keys;
 CREATE POLICY "Agents can manage their own API keys" 
 ON public.agent_api_keys 
 FOR ALL 
 USING (auth.uid() = agent_id);
 
+DROP POLICY IF EXISTS "Admins can view all agent API keys" ON public.agent_api_keys;
 CREATE POLICY "Admins can view all agent API keys" 
 ON public.agent_api_keys 
 FOR SELECT 

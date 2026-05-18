@@ -41,9 +41,9 @@ ALTER TABLE public.fraud_risk_logs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.reconciliation_reports ENABLE ROW LEVEL SECURITY;
 
 -- Only admins can see AI insights and Fraud logs
-CREATE POLICY "Admin full access to AI insights" ON public.ai_insights FOR ALL TO authenticated USING (auth.jwt() ->> 'email' IN (SELECT email FROM public.profiles WHERE is_admin = true));
-CREATE POLICY "Admin full access to Fraud logs" ON public.fraud_risk_logs FOR ALL TO authenticated USING (auth.jwt() ->> 'email' IN (SELECT email FROM public.profiles WHERE is_admin = true));
-CREATE POLICY "Admin full access to Recon reports" ON public.reconciliation_reports FOR ALL TO authenticated USING (auth.jwt() ->> 'email' IN (SELECT email FROM public.profiles WHERE is_admin = true));
+CREATE POLICY "Admin full access to AI insights" ON public.ai_insights FOR ALL TO authenticated USING (public.is_admin());
+CREATE POLICY "Admin full access to Fraud logs" ON public.fraud_risk_logs FOR ALL TO authenticated USING (public.is_admin());
+CREATE POLICY "Admin full access to Recon reports" ON public.reconciliation_reports FOR ALL TO authenticated USING (public.is_admin());
 
 -- 5. Helper Function for Real-Time Risk Scoring
 CREATE OR REPLACE FUNCTION calculate_terminal_risk(p_agent_id UUID)

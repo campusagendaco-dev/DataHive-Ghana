@@ -20,7 +20,7 @@ CREATE POLICY "Parent agents can view sub agent orders" ON public.orders
 DROP POLICY IF EXISTS "Users view own notifications" ON public.notifications;
 CREATE POLICY "Users view own notifications" ON public.notifications
   FOR SELECT TO authenticated
-  USING (user_id = auth.uid());
+  USING (target_user_id = auth.uid() OR target_type = 'all');
 
 -- 5. Restore any dropped withdrawal policies
 DROP POLICY IF EXISTS "Users view own withdrawals" ON public.withdrawals;

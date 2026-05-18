@@ -370,8 +370,8 @@ const DashboardOrders = () => {
       else if (o.status === "fulfillment_failed") acc.failed += 1;
       else if (o.status === "paid" || o.status === "processing") acc.processing += 1;
       
-      // Exclude pending/activation from total sales volume
-      if (o.status === "fulfilled" && !["agent_activation", "sub_agent_activation"].includes(o.order_type)) {
+      // Exclude pending/activation/topups from total sales volume
+      if (o.status === "fulfilled" && ["data", "airtime", "utility", "afa", "api"].includes(o.order_type) && Number(o.amount || 0) > 0) {
         acc.totalSales += Number(o.amount);
       }
       // Only count profit on delivered orders; parent_profit is the upstream commission, not this agent's income

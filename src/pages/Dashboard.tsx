@@ -92,7 +92,7 @@ const Dashboard = () => {
       const allOrders = ordersRes.data ?? [];
       
       const fulfilledOrders = allOrders.filter((o: any) => o.status === "fulfilled");
-      const depositedOrders = allOrders.filter((o: any) => o.order_type === "wallet_topup" && o.status === "fulfilled");
+      const depositedOrders = allOrders.filter((o: any) => o.order_type === "wallet_topup" && o.status === "fulfilled" && Number(o.amount || 0) > 0);
       const subAgentActivationOrders = allOrders.filter((o: any) => o.order_type === "sub_agent_activation" && o.status === "fulfilled");
 
       // Direct profit + Parent profit (commissions from sub-agents)

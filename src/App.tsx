@@ -29,6 +29,7 @@ import { SecurityGuard } from "@/components/SecurityGuard";
 import { UpdatePrompt } from "@/components/UpdatePrompt";
 import { ChunkErrorBoundary } from "@/components/ChunkErrorBoundary";
 import AIConcierge from "@/components/AIConcierge";
+import { getActiveStoreDomain } from "@/lib/app-base-url";
 
 // Route-level code splitting — each page chunk loads only when first visited
 const Index = lazy(() => import("./pages/Index"));
@@ -311,9 +312,10 @@ const AppContent = () => {
     };
   }, []);
 
+  const activeDomain = getActiveStoreDomain();
   const isDashboard = location.pathname.startsWith("/dashboard");
   const isAdmin = location.pathname.startsWith("/admin");
-  const isAgentStore = location.pathname.startsWith("/store/");
+  const isAgentStore = location.pathname.startsWith("/store/") || (!!activeDomain && !isDashboard && !isAdmin);
   const isMaintenanceBypassRoute =
     location.pathname.startsWith("/admin") ||
     location.pathname === "/login" ||
@@ -342,9 +344,11 @@ const AppContent = () => {
         <Suspense fallback={<LoadingScreen />}>
       <Routes>
         {/* Public pages */}
-        <Route path="/" element={<Index />} />
+        <Route path="/" element={activeDomain ? <AgentStore /> : <Index />} />
         <Route path="/agent-program" element={<AgentProgram />} />
         <Route path="/store/:slug" element={<AgentStore />} />
+        <Route path="/store/:slug/order-status" element={<OrderStatus />} />
+        <Route path="/store/:slug/my-orders" element={<MyOrders />} />
         <Route path="/order-status" element={<OrderStatus />} />
         <Route path="/my-orders" element={<MyOrders />} />
         <Route path="/delivery-tracker" element={<Navigate to="/order-status" replace />} />

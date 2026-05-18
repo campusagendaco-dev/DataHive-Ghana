@@ -3,6 +3,7 @@ import { Loader2, Search, Zap, Activity, AlertTriangle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { getActiveStoreDomain } from "@/lib/app-base-url";
 
 interface PhoneOrderTrackerProps {
   title?: string;
@@ -43,7 +44,20 @@ const PhoneOrderTracker = ({
       }
 
       // Redirect to the multi-order tracking portal
-      window.location.href = `/my-orders?phone=${sanitizedPhone}`;
+      const activeDomain = getActiveStoreDomain();
+      const isStorePath = window.location.pathname.startsWith("/store/");
+      let redirectUrl = `/my-orders?phone=${sanitizedPhone}`;
+
+      if (activeDomain) {
+        redirectUrl = `/my-orders?phone=${sanitizedPhone}`;
+      } else if (isStorePath) {
+        const parts = window.location.pathname.split("/");
+        const slug = parts[2];
+        if (slug) {
+          redirectUrl = `/store/${slug}/my-orders?phone=${sanitizedPhone}`;
+        }
+      }
+      window.location.href = redirectUrl;
     } catch (err) {
       setError("Unable to sync with network. Try again.");
     } finally {

@@ -46,12 +46,13 @@ export const WalletStatement = ({ userId }: { userId: string }) => {
 
         if (o.order_type === 'wallet_topup') {
           if (o.status !== 'fulfilled') return; // Only show successful topups as deposits
+          const isAdjustment = Number(o.amount) < 0;
           combined.push({
             id: o.id,
             created_at: o.created_at,
-            type: 'deposit',
-            description: 'Wallet Top-up (Paystack)',
-            amount: Number(o.amount),
+            type: isAdjustment ? 'purchase' : 'deposit',
+            description: isAdjustment ? 'Wallet Balance Adjustment (Reversal)' : 'Wallet Top-up (Paystack)',
+            amount: Math.abs(Number(o.amount)),
             status: o.status
           });
         } else {

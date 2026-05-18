@@ -900,7 +900,7 @@ serve(async (req) => {
       await sendWalletTopupSms(supabaseAdmin, existingOrder.agent_id, verifiedAmount);
     }
 
-    if (orderType !== "wallet_topup" && Number.isFinite(existingAmount) && existingAmount > 0 && !amountMatches(existingAmount, verifiedAmount)) {
+    if (orderType !== "wallet_topup" && orderType !== "store_wallet_topup" && Number.isFinite(existingAmount) && existingAmount > 0 && !amountMatches(existingAmount, verifiedAmount)) {
       await supabaseAdmin.from("orders").update({
         status: "fulfillment_failed",
         failure_reason: `Payment amount mismatch. Expected GHS ${existingAmount.toFixed(2)}, received GHS ${verifiedAmount.toFixed(2)}.`,
@@ -920,6 +920,18 @@ serve(async (req) => {
       }).eq("id", orderId);
 
       return new Response(JSON.stringify({ received: true, fulfilled: false, failure_reason: "Wallet credit exceeds verified payment" }), {
+        status: 200,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    if (orderType === "store_wallet_topup" && Number.isFinite(existingAmount) && existingAmount > (verifiedAmount + 0.10)) {
+      await supabaseAdmin.from("orders").update({
+        status: "fulfillment_failed",
+        failure_reason: `Store wallet credit mismatch. Credit GHS ${existingAmount.toFixed(2)} exceeds payment GHS ${verifiedAmount.toFixed(2)}.`,
+      }).eq("id", orderId);
+
+      return new Response(JSON.stringify({ received: true, fulfilled: false, failure_reason: "Store wallet credit exceeds verified payment" }), {
         status: 200,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -1114,6 +1126,79 @@ serve(async (req) => {
           icon: "https://lsocdjpflecduumopijn.supabase.co/storage/v1/object/public/assets/notification-icon.png"
         });
       }
+      return new Response(JSON.stringify({ received: true, fulfilled: true }), {
+        status: 200,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    if (orderType === "store_wallet_topup") {
+      // Read from order row first (most reliable) then fall back to metadata
+      const { data: storeOrder } = await supabaseAdmin
+        .from("orders")
+        .select("amount, agent_id, customer_id, metadata")
+        .eq("id", orderId)
+        .maybeSingle();
+
+      const customerId = (storeOrder?.customer_id as string | null)
+        ?? (typeof metadata?.customer_id === "string" ? metadata.customer_id : null);
+      const agentId = (storeOrder?.agent_id as string | null)
+        ?? (typeof metadata?.agent_id === "string" ? metadata.agent_id : null);
+      const creditAmount = Number(
+        storeOrder?.metadata?.wallet_credit
+        ?? metadata?.wallet_credit
+        ?? storeOrder?.amount
+        ?? verifiedAmount
+      );
+
+      console.log("[store_wallet_topup] orderId:", orderId, "customerId:", customerId, "agentId:", agentId, "creditAmount:", creditAmount);
+
+      if (customerId && agentId && creditAmount > 0) {
+        const { data: creditRes, error: creditErr } = await supabaseAdmin.rpc("fulfill_store_wallet_topup", {
+          p_order_id: orderId,
+          p_customer_id: customerId,
+          p_agent_id: agentId,
+          p_amount: creditAmount
+        });
+
+        if (creditErr || !creditRes?.success) {
+          console.error("Store topup automation failed:", creditErr || creditRes?.error);
+          await supabaseAdmin.from("orders").update({
+            status: "fulfillment_failed",
+            failure_reason: creditRes?.error || "Automatic credit failed."
+          }).eq("id", orderId);
+          
+          return new Response(JSON.stringify({ received: true, fulfilled: false, error: creditRes?.error || "Automatic credit failed" }), {
+            status: 200,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+
+        // Trigger Push Notification for Agent (Deposit Received)
+        await triggerPushNotification(supabaseAdmin, {
+          user_id: agentId,
+          title: "💰 Store Customer Deposit",
+          body: `Your customer has topped up GHS ${creditAmount.toFixed(2)}. Your agent wallet was credited!`,
+          url: "/dashboard",
+          icon: "https://lsocdjpflecduumopijn.supabase.co/storage/v1/object/public/assets/notification-icon.png"
+        });
+
+        // Trigger Push Notification for Customer
+        await triggerPushNotification(supabaseAdmin, {
+          user_id: customerId,
+          title: "💰 Store Wallet Funded",
+          body: `Your store wallet has been credited with GHS ${creditAmount.toFixed(2)}. Start shopping!`,
+          url: `/store/${metadata?.slug || 'shop'}/my-orders`,
+          icon: "https://lsocdjpflecduumopijn.supabase.co/storage/v1/object/public/assets/notification-icon.png"
+        });
+      } else {
+        console.error("[store_wallet_topup] Missing required fields. customerId:", customerId, "agentId:", agentId, "creditAmount:", creditAmount);
+        await supabaseAdmin.from("orders").update({
+          status: "fulfillment_failed",
+          failure_reason: "Missing customer_id or agent_id for store wallet top-up."
+        }).eq("id", orderId);
+      }
+      
       return new Response(JSON.stringify({ received: true, fulfilled: true }), {
         status: 200,
         headers: { ...corsHeaders, "Content-Type": "application/json" },

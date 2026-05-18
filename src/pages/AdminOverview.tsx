@@ -195,6 +195,7 @@ const AdminOverview = () => {
       // wallet_topup: admin earns the Paystack spread (verified - fee - amount credited to wallet)
       if (o.order_type === "wallet_topup") {
         const credited = Number(o.amount) || 0;
+        if (credited <= 0) return s;
         const received = Number(o.paystack_verified_amount) || credited;
         return s + (received - fee - credited);
       }
@@ -274,7 +275,7 @@ const AdminOverview = () => {
     const todayPending = todayOrders.filter((o: any) => o.status === "pending").length;
     const todayUsers = profiles.filter((p: any) => (p.created_at as string)?.slice(0, 10) === todayStr).length;
 
-    const inflowOrders = orders.filter((o: any) => o.status === "fulfilled" && ["wallet_topup", "agent_activation", "sub_agent_activation"].includes(o.order_type));
+    const inflowOrders = orders.filter((o: any) => o.status === "fulfilled" && ["wallet_topup", "agent_activation", "sub_agent_activation"].includes(o.order_type) && Number(o.amount || 0) > 0);
     const purchaseOrders = orders.filter((o: any) => o.status === "fulfilled" && ["data", "airtime", "utility", "afa", "api"].includes(o.order_type));
 
     // Inflow: always use paystack_verified_amount (confirmed settlement)
@@ -309,8 +310,8 @@ const AdminOverview = () => {
       pendingCount: todayPending,
       newUsers: todayUsers
     });
-    const rangeInflow = rangeOrders.filter((o: any) => o.status === "fulfilled" && ["wallet_topup", "agent_activation", "sub_agent_activation"].includes(o.order_type)).reduce((s: number, o: any) => s + (Number(o.amount) || 0), 0);
-    const rangeVerifiedInflow = rangeOrders.filter((o: any) => o.status === "fulfilled" && ["wallet_topup", "agent_activation", "sub_agent_activation"].includes(o.order_type)).reduce((s: number, o: any) => s + (Number(o.paystack_verified_amount) || Number(o.amount) || 0), 0);
+    const rangeInflow = rangeOrders.filter((o: any) => o.status === "fulfilled" && ["wallet_topup", "agent_activation", "sub_agent_activation"].includes(o.order_type) && Number(o.amount || 0) > 0).reduce((s: number, o: any) => s + (Number(o.amount) || 0), 0);
+    const rangeVerifiedInflow = rangeOrders.filter((o: any) => o.status === "fulfilled" && ["wallet_topup", "agent_activation", "sub_agent_activation"].includes(o.order_type) && Number(o.amount || 0) > 0).reduce((s: number, o: any) => s + (Number(o.paystack_verified_amount) || Number(o.amount) || 0), 0);
     // Range purchases: API orders use amount, Paystack orders use verified amount
     const rangePurchaseOrders = rangeOrders.filter((o: any) => o.status === "fulfilled" && ["data", "airtime", "utility", "afa", "api"].includes(o.order_type));
     const rangePurchases = rangePurchaseOrders.reduce((s: number, o: any) => {

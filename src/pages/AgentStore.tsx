@@ -1,13 +1,13 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import { useParams, Link } from "react-router-dom";
+import { useParams, Link, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { basePackages } from "@/lib/data";
 import { getNetworkCardColors } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { getFunctionErrorMessage } from "@/lib/function-errors";
-import { getAppBaseUrl } from "@/lib/app-base-url";
+import { getAppBaseUrl, getActiveStoreDomain } from "@/lib/app-base-url";
 import { fetchApiPricingContext, applyPriceMultiplier } from "@/lib/api-source-pricing";
-import { invokePublicFunction } from "@/lib/public-function-client";
+import { invokePublicFunction, invokePublicFunctionAsUser } from "@/lib/public-function-client";
 import PhoneOrderTracker from "@/components/PhoneOrderTracker";
 import StoreNavbar from "@/components/StoreNavbar";
 import StoreVisitorPopup from "@/components/StoreVisitorPopup";
@@ -18,6 +18,9 @@ import {
   ShieldCheck, Phone, X, CreditCard, Gift, Tag, CheckCircle2,
   Smartphone, Package, Clock, ArrowRight, Wifi, Star,
 } from "lucide-react";
+import { useAuth } from "@/hooks/useAuth";
+import StoreAuth from "@/components/StoreAuth";
+import { playSuccessSound } from "@/lib/sound";
 
 interface PromoResult {
   valid: boolean;
@@ -69,10 +72,20 @@ interface GlobalPkgSetting {
 const AgentStore = () => {
   const { slug } = useParams<{ slug: string }>();
   const { toast } = useToast();
+  const { profile, refreshProfile, signOut } = useAuth();
+  const [searchParams] = useSearchParams();
 
   const [agent, setAgent] = useState<AgentProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
+  const [greeting, setGreeting] = useState("Welcome");
+
+  useEffect(() => {
+    const hrs = new Date().getHours();
+    if (hrs < 12) setGreeting("Good Morning 🌅");
+    else if (hrs < 18) setGreeting("Good Afternoon ☀️");
+    else setGreeting("Good Evening 🌃");
+  }, []);
 
   const [selectedNetwork, setSelectedNetwork] = useState<NetworkName>("MTN");
   const [selectedService, setSelectedService] = useState<ServiceType>("data");
@@ -83,6 +96,180 @@ const AgentStore = () => {
   const [utilityAmount, setUtilityAmount] = useState("");
   const [phone, setPhone] = useState("");
   const [buying, setBuying] = useState(false);
+
+  const [authOpen, setAuthOpen] = useState(false);
+
+  useEffect(() => {
+    if (searchParams.get("auth") === "login") {
+      setAuthOpen(true);
+    }
+  }, [searchParams]);
+  const [depositOpen, setDepositOpen] = useState(false);
+  const [depositAmount, setDepositAmount] = useState("");
+  const [depositPhone, setDepositPhone] = useState("");
+  const [depositTxRef, setDepositTxRef] = useState("");
+  const [submittingDeposit, setSubmittingDeposit] = useState(false);
+  const [payMethod, setPayMethod] = useState<"wallet" | "paystack">("paystack");
+
+  const isCustomerLoggedIn = Boolean(
+    profile && 
+    (profile.parent_agent_id === agent?.user_id || profile.user_id === agent?.user_id)
+  );
+  const customerBalance = profile?.balance ?? 0;
+  const customerName = profile?.full_name || profile?.email || "Store Customer";
+
+  // Automatically link visiting users with no parent agent to the visited store
+  useEffect(() => {
+    if (profile && !profile.parent_agent_id && agent?.user_id && profile.user_id !== agent.user_id) {
+      const linkAccount = async () => {
+        await supabase
+          .from("profiles")
+          .update({ parent_agent_id: agent.user_id })
+          .eq("user_id", profile.user_id);
+        refreshProfile();
+      };
+      linkAccount();
+    }
+  }, [profile, agent?.user_id]);
+
+  // Dynamically update document title and favicon to match storefront branding
+  useEffect(() => {
+    if (agent?.store_name) {
+      document.title = `${agent.store_name} | Buy Cheap Data Bundles Ghana`;
+      
+      if (agent.store_logo_url) {
+        let link = document.querySelector("link[rel~='icon']") as HTMLLinkElement;
+        if (!link) {
+          link = document.createElement('link');
+          link.rel = 'icon';
+          document.getElementsByTagName('head')[0].appendChild(link);
+        }
+        link.href = agent.store_logo_url;
+      }
+    }
+  }, [agent]);
+
+  const handleWalletBuy = async () => {
+    if (!isPhoneValid) {
+      toast({ title: "Invalid phone number", description: "Use a valid Ghana number.", variant: "destructive" });
+      return;
+    }
+    setBuying(true);
+    const startTime = Date.now();
+    const orderId = crypto.randomUUID();
+    
+    try {
+      const { data, error } = await invokePublicFunctionAsUser("wallet-buy-data", {
+        body: {
+          network: selectedNetwork,
+          package_size: selectedPkg!.size,
+          customer_phone: phone,
+          amount: selectedPkg!.price,
+          reference: orderId,
+        },
+      });
+
+      const elapsedTime = Date.now() - startTime;
+      const remainingTime = Math.max(0, 100 - elapsedTime);
+      if (remainingTime > 0) await new Promise(resolve => setTimeout(resolve, remainingTime));
+
+      if (error || data?.error) {
+        const description = data?.error || await getFunctionErrorMessage(error, "Could not complete purchase.");
+        toast({ title: "Purchase failed", description, variant: "destructive" });
+        setBuying(false);
+        return;
+      }
+
+      playSuccessSound();
+      toast({ title: "Purchase successful!", description: "Order proceed. Will be delivered between 10min to 60min.", variant: "default" });
+      refreshProfile();
+      setShowSuccessOverlay(true);
+      setPhone("");
+      setSelectedPkg(null);
+    } catch (err) {
+      console.error("Wallet buy error:", err);
+    } finally {
+      setBuying(false);
+    }
+  };
+
+  const handleManualDeposit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!profile || !agent) return;
+
+    const requestedAmount = Number(depositAmount);
+    if (!Number.isFinite(requestedAmount) || requestedAmount < 1) {
+      toast({ title: "Enter a valid amount", variant: "destructive" });
+      return;
+    }
+    if (!depositPhone.trim()) {
+      toast({ title: "Enter your MoMo sender number", variant: "destructive" });
+      return;
+    }
+    if (!depositTxRef.trim()) {
+      toast({ title: "Enter the transaction reference", variant: "destructive" });
+      return;
+    }
+
+    setSubmittingDeposit(true);
+    try {
+      const { error } = await supabase.from("store_deposits").insert({
+        agent_id: agent.user_id,
+        customer_id: profile.user_id,
+        amount: requestedAmount,
+        sender_number: depositPhone.trim(),
+        transaction_reference: depositTxRef.trim(),
+        status: "pending",
+      });
+
+      if (error) throw error;
+
+      toast({
+        title: "✅ Deposit Request Sent",
+        description: `Your deposit of GHS ${requestedAmount.toFixed(2)} is pending approval from your agent.`,
+      });
+      setDepositOpen(false);
+      setDepositAmount("");
+      setDepositPhone("");
+      setDepositTxRef("");
+    } catch (err: any) {
+      toast({ title: "Deposit failed", description: err.message, variant: "destructive" });
+    } finally {
+      setSubmittingDeposit(false);
+    }
+  };
+
+
+  const verifiedRef = useRef(false);
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const reference = params.get("reference") || params.get("trxref");
+    if (reference && !verifiedRef.current) {
+      verifiedRef.current = true;
+      invokePublicFunctionAsUser("verify-payment", { body: { reference } })
+        .then(async (res) => {
+          const status = res.data?.status;
+          if (status === "fulfilled" || res.data?.success) {
+            toast({ title: "Success!", description: "Your store wallet balance has been credited." });
+          } else {
+            toast({ title: "Payment Received", description: "Updating your balance shortly." });
+          }
+          refreshProfile();
+          let retries = 3;
+          const poll = setInterval(async () => {
+            refreshProfile();
+            retries--;
+            if (retries <= 0) clearInterval(poll);
+          }, 2500);
+          window.history.replaceState({}, "", window.location.pathname);
+        })
+        .catch(() => {
+          toast({ title: "Deposit complete", description: "Refreshing your balance..." });
+          refreshProfile();
+          window.history.replaceState({}, "", window.location.pathname);
+        });
+    }
+  }, [refreshProfile, toast]);
 
   const [globalSettings, setGlobalSettings] = useState<Record<string, GlobalPkgSetting>>({});
   const [parentAssignedPrices, setParentAssignedPrices] = useState<Record<string, Record<string, string | number>>>({});
@@ -107,12 +294,23 @@ const AgentStore = () => {
     const fetchStore = async () => {
       try {
         setLoading(true);
+        const activeDomain = getActiveStoreDomain();
+        let storeQuery = supabase
+          .from("agent_stores")
+          .select("user_id, store_name, full_name, whatsapp_number, support_number, email, whatsapp_group_link, agent_prices, sub_agent_prices, disabled_packages, is_agent, is_sub_agent, agent_approved, sub_agent_approved, parent_agent_id, sub_agent_activation_markup, store_logo_url, store_primary_color, slug, custom_domain");
+
+        if (slug) {
+          storeQuery = storeQuery.eq("slug", slug);
+        } else if (activeDomain) {
+          storeQuery = storeQuery.eq("custom_domain", activeDomain);
+        } else {
+          setNotFound(true);
+          setLoading(false);
+          return;
+        }
+
         const [agentRes, pkgRes, pricingCtx] = await Promise.all([
-          supabase
-            .from("agent_stores")
-            .select("user_id, store_name, full_name, whatsapp_number, support_number, email, whatsapp_group_link, agent_prices, sub_agent_prices, disabled_packages, is_agent, is_sub_agent, agent_approved, sub_agent_approved, parent_agent_id, sub_agent_activation_markup, store_logo_url, store_primary_color")
-            .eq("slug", slug)
-            .maybeSingle(),
+          storeQuery.maybeSingle(),
           supabase.from("global_package_settings").select("network, package_size, agent_price, sub_agent_price, public_price, is_unavailable"),
           fetchApiPricingContext().catch(() => ({ source: "primary", multipliers: { MTN: 1, Telecel: 1, AirtelTigo: 1 }, multiplier: 1 })),
         ]);
@@ -131,6 +329,32 @@ const AgentStore = () => {
 
         const profile = agentRes.data as unknown as AgentProfile;
         setAgent(profile);
+
+        const tenantData = {
+          name: profile.store_name,
+          logo: profile.store_logo_url,
+          color: profile.store_primary_color,
+          slug: (profile as any).slug || slug,
+          custom_domain: (profile as any).custom_domain
+        };
+        localStorage.setItem("current_store_tenant", JSON.stringify(tenantData));
+
+        const storeSlug = slug || (profile as any).slug;
+        if (storeSlug) {
+          localStorage.setItem(`store_loading_${storeSlug}`, JSON.stringify({
+            name: profile.store_name,
+            logo: profile.store_logo_url,
+            color: profile.store_primary_color
+          }));
+        }
+        const storeDomain = activeDomain || (profile as any).custom_domain;
+        if (storeDomain) {
+          localStorage.setItem(`store_loading_${storeDomain}`, JSON.stringify({
+            name: profile.store_name,
+            logo: profile.store_logo_url,
+            color: profile.store_primary_color
+          }));
+        }
 
         if (profile.is_sub_agent && profile.parent_agent_id) {
           const { data: parentProfile } = await supabase
@@ -275,7 +499,7 @@ const AgentStore = () => {
     }
   };
 
-  const handlePay = async () => {
+  const handlePaystackBuy = async () => {
     if (!agent) return;
     if (selectedService === "data" && !selectedPkg) return;
     if (selectedService === "airtime") {
@@ -313,7 +537,10 @@ const AgentStore = () => {
     const { data: paymentData, error: paymentError } = await invokePublicFunction("initialize-payment", {
       body: {
         email: `${phoneDigits}@customer.data-portal.gh`, amount: total, reference: orderId,
-        callback_url: `${getAppBaseUrl()}/order-status?${callbackParams.toString()}`, metadata,
+        callback_url: slug
+          ? `${window.location.origin}/store/${slug}/order-status?${callbackParams.toString()}`
+          : `${window.location.origin}/order-status?${callbackParams.toString()}`,
+        metadata,
       },
     });
     if (paymentError || !paymentData?.authorization_url) {
@@ -323,6 +550,14 @@ const AgentStore = () => {
       return;
     }
     window.location.href = paymentData.authorization_url;
+  };
+
+  const handlePay = async () => {
+    if (isCustomerLoggedIn && payMethod === "wallet") {
+      await handleWalletBuy();
+    } else {
+      await handlePaystackBuy();
+    }
   };
 
   // ── Inline purchase panel (inserted row-by-row below the selected package) ──
@@ -409,21 +644,74 @@ const AgentStore = () => {
             <button
               type="button"
               onClick={handlePay}
-              disabled={buying}
+              disabled={buying || (isCustomerLoggedIn && payMethod === "wallet" && customerBalance < total)}
               className="shrink-0 h-12 px-4 rounded-2xl font-black text-sm flex items-center gap-2 active:scale-95 transition-all whitespace-nowrap"
               style={{
                 backgroundColor: netConf.color,
                 color: netConf.textClass === "text-black" ? "#000" : "#fff",
-                opacity: (!isPhoneValid || buying) ? 0.5 : 1,
-                boxShadow: isPhoneValid ? `0 6px 20px ${netConf.color}40` : "none",
+                opacity: (!isPhoneValid || buying || (isCustomerLoggedIn && payMethod === "wallet" && customerBalance < total)) ? 0.5 : 1,
+                boxShadow: (isPhoneValid && !(isCustomerLoggedIn && payMethod === "wallet" && customerBalance < total)) ? `0 6px 20px ${netConf.color}40` : "none",
               }}
             >
-              {buying
-                ? <Loader2 className="w-4 h-4 animate-spin" />
-                : <><CreditCard className="w-4 h-4" />Pay ₵{total.toFixed(2)}</>}
+              {buying ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : isCustomerLoggedIn && payMethod === "wallet" ? (
+                <><CreditCard className="w-4 h-4" />Wallet Pay ₵{total.toFixed(2)}</>
+              ) : (
+                <><CreditCard className="w-4 h-4" />Pay ₵{total.toFixed(2)}</>
+              )}
             </button>
           )}
         </div>
+
+        {/* Payment Method Selector for Storefront Customer */}
+        {isCustomerLoggedIn && !isFreePromo && (
+          <div className="pt-1 pb-1">
+            <p className="text-[10px] font-black uppercase tracking-widest text-white/30 mb-2">Select Payment Method</p>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => setPayMethod("wallet")}
+                className={`p-2.5 rounded-xl border text-left transition-all ${
+                  payMethod === "wallet"
+                    ? "border-amber-400 bg-amber-400/10"
+                    : "border-white/8 hover:border-white/20 bg-white/4"
+                }`}
+              >
+                <p className="text-[10px] font-black text-white">Wallet Balance</p>
+                <p className="text-[9px] text-white/50 font-bold mt-0.5 font-mono">₵{customerBalance.toFixed(2)}</p>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setPayMethod("paystack")}
+                className={`p-2.5 rounded-xl border text-left transition-all ${
+                  payMethod === "paystack"
+                    ? "border-amber-400 bg-amber-400/10"
+                    : "border-white/8 hover:border-white/20 bg-white/4"
+                }`}
+              >
+                <p className="text-[10px] font-black text-white">Card / MoMo</p>
+                <p className="text-[9px] text-white/50 font-bold mt-0.5">Pay online instant</p>
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Wallet insufficient warning */}
+        {isCustomerLoggedIn && payMethod === "wallet" && !isFreePromo && customerBalance < total && (
+          <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 px-4 py-3 text-[10px] font-bold text-amber-500 flex items-center gap-2.5 uppercase tracking-tight">
+            <CreditCard className="w-3.5 h-3.5 shrink-0" />
+            <span className="flex-1">Insufficient wallet balance. Top up or use Card.</span>
+            <button
+              type="button"
+              onClick={() => setDepositOpen(true)}
+              className="bg-amber-500 text-black px-2.5 py-1 rounded-lg text-[9px] font-black hover:bg-amber-400 transition-colors shrink-0"
+            >
+              DEPOSIT
+            </button>
+          </div>
+        )}
 
         {/* Phone validation */}
         {phone.length > 0 && !isPhoneValid && (
@@ -546,7 +834,13 @@ const AgentStore = () => {
         />
       </div>
 
-      <StoreVisitorPopup agentSlug={slug} showSubAgentLink={!agent.is_sub_agent} />
+      <StoreVisitorPopup
+        agentSlug={slug}
+        showSubAgentLink={!agent.is_sub_agent}
+        storeName={agent.store_name}
+        logoUrl={agent.store_logo_url}
+        primaryColor={accentColor}
+      />
 
       {/* Navbar */}
       <StoreNavbar
@@ -559,56 +853,99 @@ const AgentStore = () => {
         email={agent.email}
         showSubAgentLink={!agent.is_sub_agent}
         logoUrl={agent.store_logo_url ?? undefined}
+        onOpenAuth={() => setAuthOpen(true)}
+        customerBalance={customerBalance}
+        isCustomerLoggedIn={isCustomerLoggedIn}
+        customerName={customerName}
+        onSignOut={signOut}
       />
 
       {/* Main content */}
       <main className="relative z-10 flex-1 max-w-lg mx-auto w-full px-4 pt-4 pb-24">
 
-        {/* ── Hero card ── */}
+        {/* ── Unique Storefront Welcome Hero Card ── */}
         <div
-          className="rounded-3xl p-5 mb-5 relative overflow-hidden border border-white/8"
-          style={{ background: `linear-gradient(135deg, ${accentColor}22 0%, ${accentColor}08 100%)` }}
+          className="rounded-3xl p-6 mb-5 relative overflow-hidden border border-white/8 backdrop-blur-md shadow-2xl"
+          style={{ background: `linear-gradient(135deg, ${accentColor}18 0%, ${accentColor}03 100%)` }}
         >
-          <div className="flex items-center gap-3 mb-3">
-            {agent.store_logo_url ? (
-              <img src={agent.store_logo_url} alt="logo" className="w-11 h-11 rounded-2xl object-cover border border-white/10" />
-            ) : (
-              <div className="w-11 h-11 rounded-2xl flex items-center justify-center border border-white/10" style={{ backgroundColor: `${accentColor}30` }}>
-                <Store className="w-5 h-5" style={{ color: accentColor }} />
-              </div>
-            )}
-            <div>
-              <p className="font-black text-base text-white leading-tight">{agent.store_name}</p>
-              <div className="flex items-center gap-1.5 mt-0.5">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                <span className="text-[10px] font-bold text-emerald-400 uppercase tracking-widest">Live Store</span>
+          {/* Ambient Glow Dot */}
+          <div className="absolute top-0 right-0 w-24 h-24 rounded-full blur-3xl opacity-20 pointer-events-none" style={{ backgroundColor: accentColor }} />
+          
+          <div className="flex items-center gap-2 mb-3">
+            <span className="px-2.5 py-0.5 text-[9px] font-black tracking-wider text-amber-400 bg-amber-400/10 border border-amber-400/20 rounded-full uppercase">
+              {greeting}
+            </span>
+            <div className="flex items-center gap-1">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+              <span className="text-[9px] font-black text-emerald-400 uppercase tracking-widest">Active Server</span>
+            </div>
+          </div>
+
+          <h2 className="text-2xl font-black text-white tracking-tight leading-tight mb-2">
+            Instant & Cheap Data Bundles
+          </h2>
+          <p className="text-white/40 text-xs font-semibold leading-normal mb-5">
+            Purchase super-fast internet bundles for MTN, Telecel, and AirtelTigo with no expiry. Secure, direct payments.
+          </p>
+
+          <div className="flex items-center justify-between p-3.5 rounded-2xl bg-white/[0.03] border border-white/6 backdrop-blur-md">
+            <div className="flex items-center gap-2.5 min-w-0">
+              {agent.store_logo_url ? (
+                <img src={agent.store_logo_url} alt="logo" className="w-8 h-8 rounded-xl object-cover border border-white/10 shrink-0" />
+              ) : (
+                <div className="w-8 h-8 rounded-xl flex items-center justify-center border border-white/10 shrink-0" style={{ backgroundColor: `${accentColor}25` }}>
+                  <Store className="w-4 h-4" style={{ color: accentColor }} />
+                </div>
+              )}
+              <div className="leading-tight min-w-0">
+                <p className="font-black text-xs text-white truncate max-w-[120px]">{agent.store_name}</p>
+                <p className="text-[8px] font-black uppercase tracking-widest text-white/30">Verified Partner</p>
               </div>
             </div>
+            
             {agent.whatsapp_number && (
               <a
                 href={`https://wa.me/${agent.whatsapp_number.replace(/\D+/g, "")}`}
                 target="_blank" rel="noopener noreferrer"
-                aria-label={`Chat with ${agent.store_name} on WhatsApp`}
-                className="ml-auto w-10 h-10 rounded-2xl bg-emerald-500 flex items-center justify-center shadow-lg shadow-emerald-500/30 shrink-0"
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-white text-[10px] font-black uppercase tracking-wider transition-all shadow-lg shadow-emerald-500/20 active:scale-95 shrink-0"
               >
-                <MessageCircle className="w-5 h-5 text-white" />
+                <MessageCircle className="w-3.5 h-3.5" />
+                Chat Support
               </a>
             )}
           </div>
-
-          <div className="grid grid-cols-3 gap-2">
-            {[
-              { icon: ShieldCheck, label: "Secure Pay", color: "text-emerald-400" },
-              { icon: Zap, label: "Instant", color: "text-amber-400" },
-              { icon: Clock, label: "24 / 7", color: "text-sky-400" },
-            ].map(({ icon: Icon, label, color }) => (
-              <div key={label} className="flex flex-col items-center gap-1 py-2 rounded-2xl bg-white/4 border border-white/6">
-                <Icon className={`w-4 h-4 ${color}`} />
-                <span className="text-[9px] font-black text-white/40 uppercase tracking-widest">{label}</span>
-              </div>
-            ))}
-          </div>
         </div>
+
+        {/* ── Customer Account Dashboard Card ── */}
+        {isCustomerLoggedIn && (
+          <div className="bg-white/5 border border-white/8 rounded-3xl p-5 mb-4 relative overflow-hidden">
+            <div className="absolute top-0 right-0 w-24 h-24 rounded-full blur-3xl opacity-30" style={{ background: accentColor }} />
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <p className="text-[10px] font-black text-white/30 uppercase tracking-widest leading-none">Store Wallet Portal</p>
+                <p className="text-white text-base font-black truncate mt-1.5 leading-tight">{customerName}</p>
+              </div>
+              <span className="text-[9px] font-black px-2 py-0.5 rounded-full text-black uppercase tracking-wider leading-none" style={{ backgroundColor: accentColor }}>Logged In</span>
+            </div>
+            
+            <div className="grid grid-cols-2 gap-3 pt-3 border-t border-white/6">
+              <div className="bg-white/4 rounded-2xl p-3">
+                <p className="text-[9px] text-white/40 font-bold uppercase leading-none">Your Balance</p>
+                <p className="text-lg font-black text-white mt-1.5 leading-none font-mono">GHS {Number(customerBalance).toFixed(2)}</p>
+              </div>
+              
+              <button
+                type="button"
+                onClick={() => setDepositOpen(true)}
+                className="rounded-2xl flex flex-col items-center justify-center gap-1 active:scale-[0.98] transition-all hover:brightness-110 border-0"
+                style={{ backgroundColor: accentColor, color: "#000000" }}
+              >
+                <CreditCard className="w-5 h-5 shrink-0" />
+                <span className="text-[10px] font-black uppercase tracking-wider leading-none">Deposit Funds</span>
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* ── Service tabs ── */}
         <div className="flex gap-1.5 p-1 rounded-2xl bg-white/4 border border-white/8 mb-4">
@@ -849,6 +1186,108 @@ const AgentStore = () => {
         </div>
       )}
 
+      {/* ── Store Authentication Modal Overlay ── */}
+      <StoreAuth
+        isOpen={authOpen}
+        onClose={() => setAuthOpen(false)}
+        agentId={agent.user_id}
+        storeName={agent.store_name}
+        primaryColor={accentColor}
+      />
+
+      {/* ── Manual MoMo Deposit Modal ── */}
+      {depositOpen && (
+        <div className="fixed inset-0 z-[150] flex items-center justify-center p-4 animate-in fade-in duration-300">
+          <div className="absolute inset-0 bg-black/85 backdrop-blur-md" onClick={() => setDepositOpen(false)} />
+          <div className="relative max-w-sm w-full bg-[#111116] border border-white/10 rounded-3xl p-6 text-left space-y-5 animate-in zoom-in-95 duration-200">
+            <button
+              onClick={() => setDepositOpen(false)}
+              className="absolute top-4 right-4 text-white/40 hover:text-white/80 p-1"
+            >
+              <X className="w-4 h-4" />
+            </button>
+
+            <div>
+              <h3 className="text-lg font-black text-white">Fund Your Wallet</h3>
+              <p className="text-[10px] text-white/40 font-bold uppercase mt-0.5 tracking-wider">Send MoMo · Submit Reference · Agent Approves</p>
+            </div>
+
+            {/* Step hint */}
+            <div className="bg-amber-400/8 border border-amber-400/20 rounded-2xl p-3 space-y-1">
+              <p className="text-[10px] font-black text-amber-400 uppercase tracking-wider">How it works</p>
+              <ol className="text-[11px] text-white/50 space-y-0.5 list-decimal list-inside">
+                <li>Send MoMo to agent: <span className="text-white font-bold">{agent.momo_number || "—"}</span></li>
+                <li>Fill in the form below with your details</li>
+                <li>Agent confirms and credits your balance</li>
+              </ol>
+            </div>
+
+            {/* Deposit Form */}
+            <form onSubmit={handleManualDeposit} className="space-y-4">
+              {/* Amount */}
+              <div>
+                <label className="block text-[10px] font-black uppercase text-white/40 mb-1.5 tracking-wider">Amount Sent (GHS)</label>
+                <div className="relative">
+                  <div className="absolute left-4 top-1/2 -translate-y-1/2 text-white/30 text-sm font-black">₵</div>
+                  <input
+                    type="number"
+                    required
+                    min="1"
+                    step="0.01"
+                    placeholder="e.g. 50.00"
+                    value={depositAmount}
+                    onChange={(e) => setDepositAmount(e.target.value)}
+                    className="w-full h-12 rounded-2xl bg-white/5 border border-white/8 pl-9 pr-4 text-sm font-bold text-white focus:outline-none focus:border-amber-400 transition-colors"
+                  />
+                </div>
+              </div>
+
+              {/* Sender number */}
+              <div>
+                <label className="block text-[10px] font-black uppercase text-white/40 mb-1.5 tracking-wider">Your MoMo Number</label>
+                <input
+                  type="tel"
+                  required
+                  placeholder="e.g. 0244000000"
+                  value={depositPhone}
+                  onChange={(e) => setDepositPhone(e.target.value)}
+                  className="w-full h-12 rounded-2xl bg-white/5 border border-white/8 px-4 text-sm font-bold text-white focus:outline-none focus:border-amber-400 transition-colors"
+                />
+              </div>
+
+              {/* Transaction reference */}
+              <div>
+                <label className="block text-[10px] font-black uppercase text-white/40 mb-1.5 tracking-wider">Transaction Reference / ID</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="From your MoMo SMS"
+                  value={depositTxRef}
+                  onChange={(e) => setDepositTxRef(e.target.value)}
+                  className="w-full h-12 rounded-2xl bg-white/5 border border-white/8 px-4 text-sm font-bold text-white focus:outline-none focus:border-amber-400 transition-colors"
+                />
+              </div>
+
+              <button
+                type="submit"
+                disabled={submittingDeposit || !depositAmount || !depositPhone || !depositTxRef}
+                className="w-full h-12 rounded-2xl font-black text-xs uppercase tracking-widest text-black flex items-center justify-center gap-2 transition-all hover:brightness-110 active:scale-95 disabled:opacity-50 border-0"
+                style={{ backgroundColor: accentColor }}
+              >
+                {submittingDeposit ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <>
+                    <CheckCircle2 className="w-4 h-4" />
+                    Submit Deposit Request
+                  </>
+                )}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
       {/* ── Floating WhatsApp ── */}
       {agent.whatsapp_number && (
         <a
@@ -861,6 +1300,19 @@ const AgentStore = () => {
             <MessageCircle className="w-6 h-6 text-white fill-white/20" />
           </div>
         </a>
+      )}
+
+      {/* ── Store Owner Admin Portal Access Button ── */}
+      {profile && (profile.user_id === agent?.user_id || profile.is_agent || profile.is_sub_agent) && (
+        <Link
+          to={profile.user_id === agent?.user_id ? "/dashboard/my-store" : "/dashboard"}
+          className="fixed left-4 bottom-6 z-[100] animate-bounce shrink-0 select-none outline-none"
+        >
+          <div className="flex items-center gap-2 h-12 px-4 rounded-2xl bg-amber-400 text-black shadow-xl shadow-amber-400/25 hover:scale-105 active:scale-95 transition-all font-black text-xs uppercase tracking-widest border border-amber-500/30">
+            <Store className="w-5 h-5 shrink-0 animate-pulse" />
+            {profile.user_id === agent?.user_id ? "Manage Storefront" : "Reseller Dashboard"}
+          </div>
+        </Link>
       )}
     </div>
   );

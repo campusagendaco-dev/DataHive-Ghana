@@ -17,6 +17,10 @@ const SubAgentPending = () => {
   const [verifying, setVerifying] = useState(false);
   const [loadingData, setLoadingData] = useState(true);
   const [platformBaseFee, setPlatformBaseFee] = useState(50);
+  const [parentStore, setParentStore] = useState<{
+    store_name: string | null;
+    store_logo_url: string | null;
+  } | null>(null);
 
   // Load fees + auto-verify on return from Paystack
   useEffect(() => {
@@ -26,12 +30,19 @@ const SubAgentPending = () => {
 
       const { data: parentRes } = await supabase
         .from("agent_stores")
-        .select("sub_agent_activation_markup")
+        .select("sub_agent_activation_markup, store_name, store_logo_url")
         .eq("user_id", profile.parent_agent_id)
         .maybeSingle();
 
       const configuredFee = Number(parentRes?.sub_agent_activation_markup || 0);
       setActivationFee(Number.isFinite(configuredFee) && configuredFee > 0 ? configuredFee : 0);
+      
+      if (parentRes) {
+        setParentStore({
+          store_name: parentRes.store_name,
+          store_logo_url: parentRes.store_logo_url,
+        });
+      }
 
       // Fetch platform base fee
       const { data: settings } = await supabase.from("system_settings").select("agent_activation_fee").eq("id", 1).maybeSingle();
@@ -55,7 +66,9 @@ const SubAgentPending = () => {
       if (res.data?.status === "fulfilled") {
         toast({ title: "Activation successful!", description: "Welcome to the team!" });
         await refreshProfile();
-        navigate("/dashboard", { replace: true });
+        const { data: prof } = await supabase.from("profiles").select("slug").eq("user_id", user?.id).maybeSingle();
+        const targetSlug = prof?.slug || profile?.slug;
+        navigate(targetSlug ? `/store/${targetSlug}` : "/dashboard", { replace: true });
       } else {
         toast({ title: "Verifying payment...", description: "Please wait while we confirm your payment." });
         await refreshProfile();
@@ -118,7 +131,9 @@ const SubAgentPending = () => {
     await refreshProfile();
     setVerifying(false);
     if (profile?.sub_agent_approved) {
-      navigate("/dashboard", { replace: true });
+      const { data: prof } = await supabase.from("profiles").select("slug").eq("user_id", user?.id).maybeSingle();
+      const targetSlug = prof?.slug || profile?.slug;
+      navigate(targetSlug ? `/store/${targetSlug}` : "/dashboard", { replace: true });
     } else {
       toast({ title: "Not yet activated", description: "Payment may still be processing. Try again shortly." });
     }
@@ -150,12 +165,18 @@ const SubAgentPending = () => {
         <div className="flex flex-col items-center text-center space-y-4">
           <div className="relative">
             <div className="absolute -inset-4 bg-amber-400/10 rounded-full blur-2xl animate-pulse" />
-            <img src="/logo.png" alt="SwiftData" className="relative w-20 h-20 shadow-2xl rounded-3xl" />
+            {parentStore?.store_logo_url ? (
+              <div className="w-20 h-20 rounded-3xl overflow-hidden bg-white flex items-center justify-center border border-white/10 shrink-0 relative shadow-2xl">
+                <img src={parentStore.store_logo_url} alt="Logo" className="w-full h-full object-contain" />
+              </div>
+            ) : (
+              <img src="/logo.png" alt="Logo" className="relative w-20 h-20 shadow-2xl rounded-3xl" />
+            )}
           </div>
           <div className="space-y-1">
             <h1 className="text-3xl font-black tracking-tight text-white">Activate Account</h1>
             <p className="text-white/40 text-sm max-w-[280px] mx-auto">
-              Pay your one-time activation fee to unlock your reseller dashboard.
+              Join {parentStore?.store_name || "us"} today! Pay your one-time activation fee to unlock your reseller dashboard.
             </p>
           </div>
         </div>

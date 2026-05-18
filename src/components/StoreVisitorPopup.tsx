@@ -8,10 +8,18 @@ import { motion, AnimatePresence } from "framer-motion";
 interface StoreVisitorPopupProps {
   agentSlug?: string;
   showSubAgentLink?: boolean;
+  storeName?: string;
+  logoUrl?: string | null;
+  primaryColor?: string;
 }
 
-const StoreVisitorPopup = ({ agentSlug, showSubAgentLink = true }: StoreVisitorPopupProps) => {
-  // Force cache flush for hmr sync
+const StoreVisitorPopup = ({
+  agentSlug,
+  showSubAgentLink = true,
+  storeName = "Whitelabel Store",
+  logoUrl,
+  primaryColor = "#f59e0b",
+}: StoreVisitorPopupProps) => {
   const { profile } = useAuth();
   const [visible, setVisible] = useState(false);
 
@@ -34,12 +42,13 @@ const StoreVisitorPopup = ({ agentSlug, showSubAgentLink = true }: StoreVisitorP
       });
   }, [isAgent]);
 
-  // Dismiss only hides for this page view — popup returns on every refresh
+  // Dismiss only hides for this page view
   const dismiss = () => setVisible(false);
 
   const ctaHref = showSubAgentLink && agentSlug ? `/store/${agentSlug}/sub-agent` : "/agent-program";
+  const hostname = window.location.hostname;
 
-  // Animation variants for children staggering
+  // Animation variants
   const containerVariants = {
     hidden: { opacity: 0, scale: 0.92, y: -40 },
     visible: { 
@@ -85,16 +94,21 @@ const StoreVisitorPopup = ({ agentSlug, showSubAgentLink = true }: StoreVisitorP
           >
             <div
               className="relative w-full max-w-[380px] overflow-hidden rounded-3xl shadow-2xl shadow-black/90"
-              style={{ background: "#080800", border: "1px solid rgba(251,191,36,0.22)" }}
+              style={{ 
+                background: "#08080c", 
+                border: `1px solid ${primaryColor}33`,
+                boxShadow: `0 24px 64px -12px ${primaryColor}22`
+              }}
             >
               {/* ── Ambient glow ── */}
               <div className="absolute inset-0 pointer-events-none">
                 <motion.div 
                   animate={{ opacity: [0.4, 0.7, 0.4] }}
                   transition={{ repeat: Infinity, duration: 4, ease: "easeInOut" }}
-                  className="absolute -top-12 -left-12 w-48 h-48 bg-amber-400/12 rounded-full blur-3xl" 
+                  className="absolute -top-12 -left-12 w-48 h-48 rounded-full blur-3xl" 
+                  style={{ backgroundColor: `${primaryColor}1a` }}
                 />
-                <div className="absolute bottom-0 right-0 w-40 h-40 bg-amber-400/8 rounded-full blur-2xl" />
+                <div className="absolute bottom-0 right-0 w-40 h-40 rounded-full blur-2xl" style={{ backgroundColor: `${primaryColor}0d` }} />
               </div>
 
               {/* ── Close ── */}
@@ -111,9 +125,13 @@ const StoreVisitorPopup = ({ agentSlug, showSubAgentLink = true }: StoreVisitorP
               <motion.div
                 variants={itemVariants}
                 className="relative overflow-hidden mx-5 mt-5 mb-3 rounded-2xl shadow-lg shadow-black/40 flex flex-col justify-center"
-                style={{ background: "#0d0d00", border: "1px solid rgba(251,191,36,0.18)", minHeight: 180 }}
+                style={{ 
+                  background: "#0d0d12", 
+                  border: `1px solid ${primaryColor}25`, 
+                  minHeight: 180 
+                }}
               >
-                {/* Diagonal yellow slash */}
+                {/* Diagonal primary slash */}
                 <div
                   className="absolute inset-0 pointer-events-none overflow-hidden"
                   style={{ borderRadius: "inherit" }}
@@ -126,7 +144,7 @@ const StoreVisitorPopup = ({ agentSlug, showSubAgentLink = true }: StoreVisitorP
                     style={{
                       top: -40, right: -30,
                       width: 220, height: 340,
-                      background: "rgba(245,158,11,0.08)",
+                      background: `${primaryColor}0c`,
                       borderRadius: 40,
                     }}
                   />
@@ -138,7 +156,7 @@ const StoreVisitorPopup = ({ agentSlug, showSubAgentLink = true }: StoreVisitorP
                     style={{
                       top: 10, right: -10,
                       width: 130, height: 260,
-                      background: "rgba(245,158,11,0.12)",
+                      background: `${primaryColor}14`,
                       borderRadius: 30,
                     }}
                   />
@@ -147,7 +165,7 @@ const StoreVisitorPopup = ({ agentSlug, showSubAgentLink = true }: StoreVisitorP
                     style={{
                       bottom: -20, left: -20,
                       width: 180, height: 160,
-                      background: "rgba(0,0,0,0.6)",
+                      background: "rgba(0,0,0,0.7)",
                       transform: "rotate(-18deg)",
                       borderRadius: 24,
                     }}
@@ -160,16 +178,21 @@ const StoreVisitorPopup = ({ agentSlug, showSubAgentLink = true }: StoreVisitorP
                     initial={{ scale: 0.8 }}
                     animate={{ scale: 1 }}
                     transition={{ type: "spring", delay: 0.3 }}
-                    className="w-10 h-10 rounded-xl overflow-hidden bg-amber-400 flex items-center justify-center shrink-0 shadow-lg shadow-amber-400/40"
+                    className="w-10 h-10 rounded-xl overflow-hidden bg-white flex items-center justify-center shrink-0 shadow-md"
+                    style={{ border: `1.5px solid ${primaryColor}` }}
                   >
-                    <img src="/logo.png" alt="SwiftData Ghana" className="w-8 h-8 object-contain" />
+                    {logoUrl ? (
+                      <img src={logoUrl} alt={storeName} className="w-full h-full object-contain" />
+                    ) : (
+                      <Store className="w-5 h-5" style={{ color: primaryColor }} />
+                    )}
                   </motion.div>
                   <div>
                     <div className="flex items-center gap-1.5">
-                      <Wifi className="w-3.5 h-3.5 text-amber-400" />
-                      <span className="text-white font-black text-base leading-none tracking-tight">SwiftData</span>
+                      <Wifi className="w-3.5 h-3.5" style={{ color: primaryColor }} />
+                      <span className="text-white font-black text-base leading-none tracking-tight">{storeName}</span>
                     </div>
-                    <p className="text-amber-400 text-[11px] font-black tracking-[0.2em] uppercase">GH</p>
+                    <p className="text-[10px] font-black tracking-[0.2em] uppercase mt-0.5" style={{ color: primaryColor }}>Reseller Node</p>
                   </div>
                 </div>
 
@@ -180,7 +203,8 @@ const StoreVisitorPopup = ({ agentSlug, showSubAgentLink = true }: StoreVisitorP
                       initial={{ opacity: 0, x: -10 }}
                       animate={{ opacity: 1, x: 0 }}
                       transition={{ delay: 0.4 }}
-                      className="text-amber-400 inline-block"
+                      className="inline-block"
+                      style={{ color: primaryColor }}
                     >Better service,</motion.span>
                     <br />
                     <motion.span 
@@ -196,16 +220,18 @@ const StoreVisitorPopup = ({ agentSlug, showSubAgentLink = true }: StoreVisitorP
                       initial={{ width: 0 }}
                       animate={{ width: 40 }}
                       transition={{ delay: 0.6, duration: 0.4 }}
-                      className="h-[3px] bg-amber-400 rounded-full" 
+                      className="h-[3px] rounded-full" 
+                      style={{ backgroundColor: primaryColor }}
                     />
                     <motion.div 
                       initial={{ width: 0 }}
                       animate={{ width: 20 }}
                       transition={{ delay: 0.7, duration: 0.3 }}
-                      className="h-[3px] bg-amber-400/30 rounded-full" 
+                      className="h-[3px] rounded-full" 
+                      style={{ backgroundColor: `${primaryColor}4d` }}
                     />
                   </div>
-                  <p className="text-white/40 text-sm font-medium">we handle the rest</p>
+                  <p className="text-white/40 text-sm font-medium">instant digital delivery</p>
                 </div>
               </motion.div>
 
@@ -213,10 +239,14 @@ const StoreVisitorPopup = ({ agentSlug, showSubAgentLink = true }: StoreVisitorP
               <motion.div
                 variants={itemVariants}
                 whileHover={{ scale: 1.02 }}
-                className="relative z-10 mx-5 mb-3 rounded-2xl flex items-center justify-between px-5 py-3 cursor-pointer shadow-md shadow-amber-500/10"
-                style={{ background: "#f59e0b" }}
+                onClick={() => setVisible(false)}
+                className="relative z-10 mx-5 mb-3 rounded-2xl flex items-center justify-between px-5 py-3 cursor-pointer shadow-md"
+                style={{ 
+                  backgroundColor: primaryColor,
+                  boxShadow: `0 8px 20px -6px ${primaryColor}55`
+                }}
               >
-                <span className="font-black text-black text-sm">Just share your link.</span>
+                <span className="font-black text-black text-xs uppercase tracking-wider">Fast & Secure Bundles</span>
                 <motion.div
                   animate={{ x: [0, 5, 0] }}
                   transition={{ repeat: Infinity, duration: 1.5, ease: "easeInOut" }}
@@ -228,19 +258,20 @@ const StoreVisitorPopup = ({ agentSlug, showSubAgentLink = true }: StoreVisitorP
               {/* ── Feature pills ── */}
               <motion.div variants={itemVariants} className="relative z-10 px-5 pb-2 grid grid-cols-3 gap-2">
                 {[
-                  { icon: Store,       text: "Your store" },
-                  { icon: Zap,         text: "Instant pay" },
-                  { icon: ShieldCheck, text: "Auto delivery" },
+                  { icon: Store,       text: "Official Shop" },
+                  { icon: Zap,         text: "Instant Pay" },
+                  { icon: ShieldCheck, text: "Auto Delivery" },
                 ].map(({ icon: Icon, text }, idx) => (
                   <motion.div
                     key={text}
                     initial={{ opacity: 0, scale: 0.8 }}
                     animate={{ opacity: 1, scale: 1 }}
                     transition={{ delay: 0.5 + (idx * 0.1) }}
-                    whileHover={{ y: -3, borderColor: "rgba(251,191,36,0.3)", background: "rgba(255,255,255,0.05)" }}
-                    className="flex flex-col items-center gap-1.5 p-3 rounded-xl bg-white/[0.03] border border-amber-400/10 transition-colors"
+                    whileHover={{ y: -3, background: "rgba(255,255,255,0.05)" }}
+                    className="flex flex-col items-center gap-1.5 p-3 rounded-xl bg-white/[0.03] border transition-all"
+                    style={{ borderColor: `${primaryColor}1a` }}
                   >
-                    <Icon className="w-3.5 h-3.5 text-amber-400" />
+                    <Icon className="w-3.5 h-3.5" style={{ color: primaryColor }} />
                     <span className="text-[10px] font-bold text-white/35 text-center leading-tight">{text}</span>
                   </motion.div>
                 ))}
@@ -253,10 +284,13 @@ const StoreVisitorPopup = ({ agentSlug, showSubAgentLink = true }: StoreVisitorP
                   onClick={dismiss}
                 >
                   <motion.div
-                    whileHover={{ scale: 1.03, boxShadow: "0 15px 30px -5px rgba(245, 158, 11, 0.4)" }}
+                    whileHover={{ scale: 1.03 }}
                     whileTap={{ scale: 0.97 }}
-                    className="w-full flex items-center justify-center gap-2 font-black text-black py-3.5 rounded-2xl text-sm shadow-xl shadow-amber-400/25 cursor-pointer relative overflow-hidden group"
-                    style={{ background: "#f59e0b" }}
+                    className="w-full flex items-center justify-center gap-2 font-black text-black py-3.5 rounded-2xl text-xs uppercase tracking-wider cursor-pointer relative overflow-hidden group shadow-lg"
+                    style={{ 
+                      backgroundColor: primaryColor,
+                      boxShadow: `0 12px 24px -4px ${primaryColor}44`
+                    }}
                   >
                     <motion.div
                       className="absolute inset-0 bg-white/20"
@@ -265,7 +299,7 @@ const StoreVisitorPopup = ({ agentSlug, showSubAgentLink = true }: StoreVisitorP
                       transition={{ duration: 0.5 }}
                     />
                     <TrendingUp className="w-4 h-4 group-hover:rotate-12 transition-transform" />
-                    Get Your Own Store Now
+                    Become a Partner Agent
                   </motion.div>
                 </Link>
                 <motion.button
@@ -273,20 +307,20 @@ const StoreVisitorPopup = ({ agentSlug, showSubAgentLink = true }: StoreVisitorP
                   onClick={dismiss}
                   className="w-full text-white/25 text-xs font-medium hover:text-white/50 transition-colors py-1"
                 >
-                  Maybe later
+                  Close & Browse Store
                 </motion.button>
               </motion.div>
 
               {/* ── Footer ── */}
-              <motion.div variants={itemVariants} className="relative z-10 px-5 pb-4 flex items-center gap-2">
-                <div className="w-5 h-5 rounded-full bg-amber-400/15 border border-amber-400/25 flex items-center justify-center">
+              <motion.div variants={itemVariants} className="relative z-10 px-5 pb-4 flex items-center gap-2 justify-center border-t border-white/5 pt-3 mt-1">
+                <div className="w-4 h-4 rounded-full bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center">
                   <motion.div 
                     animate={{ scale: [1, 1.2, 1], opacity: [1, 0.7, 1] }}
                     transition={{ repeat: Infinity, duration: 2 }}
-                    className="w-2 h-2 rounded-full bg-amber-400" 
+                    className="w-1.5 h-1.5 rounded-full bg-emerald-400" 
                   />
                 </div>
-                <span className="text-white/20 text-[10px]">swiftdatagh.shop</span>
+                <span className="text-white/20 text-[10px] font-medium tracking-wide">{hostname}</span>
               </motion.div>
             </div>
           </motion.div>
