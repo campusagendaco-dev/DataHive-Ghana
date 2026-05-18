@@ -111,8 +111,8 @@ async function triggerPushNotification(supabaseAdmin: any, payload: { user_id: s
   }
 }
 
-function buildProviderUrls(baseUrl: string, endpoint: string = "purchase", handlerType?: string): string[] {
-  const clean = baseUrl.trim().replace(/\/+$/, "");
+function buildProviderUrls(baseUrl: string | null | undefined, endpoint: string = "purchase", handlerType?: string): string[] {
+  const clean = (baseUrl || "").trim().replace(/\/+$/, "");
   if (!clean) return [];
 
   const urls = new Set<string>();
