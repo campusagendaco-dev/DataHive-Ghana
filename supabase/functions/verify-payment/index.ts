@@ -827,9 +827,7 @@ serve(async (req) => {
 
     const buildDataPayload = (provider: any, overrideNetKey?: string) => {
       const ht = provider.handler_type || "standard";
-      const defaultNetKey = (ht === "datamart" || ht === "spendless" || ht === "datahub")
-        ? (() => { const n = network.toUpperCase(); if (n === "MTN") return "YELLO"; if (n === "TELECEL") return "TELECEL"; return "AT_PREMIUM"; })()
-        : mapDataNetworkKey(network);
+      const defaultNetKey = mapDataNetworkKey(network);
       
       const netKey = overrideNetKey || defaultNetKey;
       if (ht === "datamart") return { phoneNumber: recipient, network: netKey, planId: packageSize, plan: packageSize, bundle: packageSize, capacity: String(parseCapacity(packageSize)), orderReference: targetReference, gateway: "wallet", reference: targetReference };

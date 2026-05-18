@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import {
   LifeBuoy, Inbox, CheckCircle2, Loader2, Send, Search,
   RefreshCw, Clock, AlertCircle, ChevronDown, ChevronUp,
-  User, Phone, Mail, MessageSquare, AlertTriangle, X,
+  User, Phone, Mail, MessageSquare, AlertTriangle, X, Sparkles,
 } from "lucide-react";
 
 interface UserInfo {
@@ -70,6 +70,7 @@ const AdminTickets = () => {
   const [updatingStatus, setUpdatingStatus] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [filterTab, setFilterTab] = useState<FilterTab>("all");
+  const [aiLoading, setAiLoading] = useState<Record<string, boolean>>({});
 
   const fetchTickets = useCallback(async () => {
     setLoading(true);
@@ -128,6 +129,40 @@ const AdminTickets = () => {
       toast({ title: `Ticket marked as ${status.replace("_", " ")}` });
     }
     setUpdatingStatus(null);
+  };
+
+  const handleAiSuggest = async (ticket: Ticket) => {
+    setAiLoading(prev => ({ ...prev, [ticket.id]: true }));
+    try {
+      const prompt = `Act as SwiftData AI Support Agent (Ama). Generate a warm, professional, Ghanaian-style support response to resolve this ticket.
+Customer Name: ${ticket.userInfo?.full_name || 'Customer'}
+Subject: ${ticket.subject}
+Description: ${ticket.description}
+
+Keep the response concise (2-4 sentences), highly empathetic, and direct. Do not include any greeting prefix like "Here is a response:" or quotes, just output the response body directly.`;
+
+      const { data, error } = await supabase.functions.invoke("oracle-ai", {
+        body: { message: prompt }
+      });
+
+      if (error) throw error;
+
+      const suggestion = data?.oracle_opinion || "";
+      if (suggestion) {
+        setReplyText(prev => ({ ...prev, [ticket.id]: suggestion }));
+        toast({ title: "AI reply generated!" });
+      } else {
+        throw new Error("Empty reply from AI");
+      }
+    } catch (err: any) {
+      toast({
+        title: "AI suggestion failed",
+        description: err.message || "Please check connection or try again",
+        variant: "destructive"
+      });
+    } finally {
+      setAiLoading(prev => ({ ...prev, [ticket.id]: false }));
+    }
   };
 
   const handleReply = async (ticket: Ticket) => {
@@ -392,7 +427,7 @@ const AdminTickets = () => {
                         className="bg-white/5 border-white/10 text-white placeholder:text-white/30 resize-none rounded-xl text-sm focus:border-amber-400/40 min-h-[100px]"
                         rows={4}
                       />
-                      <div className="flex gap-2 mt-2">
+                      <div className="flex gap-2 mt-2 flex-wrap">
                         <Button
                           onClick={() => handleReply(ticket)}
                           disabled={submitting === ticket.id || !(replyText[ticket.id] || "").trim()}
@@ -400,6 +435,20 @@ const AdminTickets = () => {
                         >
                           {submitting === ticket.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
                           Send & Resolve
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={() => handleAiSuggest(ticket)}
+                          disabled={aiLoading[ticket.id] || submitting === ticket.id}
+                          className="border-primary/30 text-primary hover:bg-primary/10 rounded-xl gap-2 font-bold bg-transparent"
+                        >
+                          {aiLoading[ticket.id] ? (
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                          ) : (
+                            <Sparkles className="w-4 h-4 text-primary" />
+                          )}
+                          AI Suggest Reply
                         </Button>
                         {ticket.status !== "in_progress" && (
                           <Button variant="outline" size="sm"
