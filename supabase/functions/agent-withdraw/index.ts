@@ -65,7 +65,7 @@ serve(async (req: Request) => {
   }
 
   const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
-  const supabaseUser = createClient(SUPABASE_URL, Deno.env.get("SUPABASE_ANON_KEY")!, {
+  const supabaseUser = createClient(SUPABASE_URL, Deno.env.get("SUPABASE_ANON_KEY") || SUPABASE_SERVICE_ROLE_KEY, {
     global: { headers: { Authorization: authHeader } },
   });
 
@@ -124,7 +124,10 @@ serve(async (req: Request) => {
     });
 
     if (rpcError || !result?.success) {
-      const errMsg = result?.error || "Withdrawal failed";
+      if (rpcError) {
+        console.error("[Withdrawal RPC Error] Failed database execution:", rpcError);
+      }
+      const errMsg = rpcError?.message || result?.error || "Withdrawal failed";
       return new Response(JSON.stringify({
         error: errMsg === "Insufficient balance"
           ? `Insufficient balance. Available: GHS ${(result?.available || 0).toFixed(2)}`
