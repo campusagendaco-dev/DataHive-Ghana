@@ -15,6 +15,7 @@ import { Wallet, Loader2, CreditCard, X, RefreshCw, ArrowRight, Tag, CheckCircle
 import { basePackages, getPublicPrice } from "@/lib/data";
 import { getNetworkCardColors, detectNetwork } from "@/lib/utils";
 import OrderStatusBanner from "@/components/OrderStatusBanner";
+import { playSuccessSound } from "@/lib/sound";
 
 type NetworkName = "MTN" | "Telecel" | "AirtelTigo";
 type PayMethod = "wallet" | "paystack";
@@ -402,6 +403,7 @@ const DashboardBuyDataNetwork = ({ network }: DashboardBuyDataNetworkProps) => {
       console.log("Wallet buy response data:", data);
 
       if (typeof data?.order_id === "string" || data?.success) {
+        playSuccessSound();
         toast({ title: "Purchase successful!", description: "Order proceed. Will be delivered between 10min to 60min.", variant: "default" });
         if (data?.order_id) {
           setLastOrder({ 
@@ -417,6 +419,7 @@ const DashboardBuyDataNetwork = ({ network }: DashboardBuyDataNetworkProps) => {
         setTimeout(() => setShowSuccessOverlay(false), 6000);
       } else {
         // Fallback success if we got here without a explicit error
+        playSuccessSound();
         toast({ title: "Order Placed", description: "Check your order history for status." });
         setShowSuccessOverlay(true);
         setTimeout(() => setShowSuccessOverlay(false), 5000);

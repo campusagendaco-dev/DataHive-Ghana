@@ -10,6 +10,7 @@ import {
 import { cn } from "@/lib/utils";
 import { useConnectivity } from "@/hooks/useConnectivity";
 import { WifiOff } from "lucide-react";
+import { playSuccessSound } from "@/lib/sound";
 
 type VoucherType = "WASSCE" | "BECE";
 
@@ -92,6 +93,7 @@ const DashboardResultCheckers = () => {
           variant: "destructive" 
         });
       } else {
+        playSuccessSound();
         toast({ title: "Purchase Successful!", description: `Vouchers delivered to ${digits}` });
         setSuccessData(data);
       }
