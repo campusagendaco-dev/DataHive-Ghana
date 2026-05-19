@@ -673,9 +673,14 @@ const DashboardDeveloperAPI = () => {
                     {savingWhitelist ? <Loader2 className="w-4 h-4 animate-spin" /> : "Save"}
                   </Button>
                 </div>
-                <p className="text-[9px] text-muted-foreground/70 leading-relaxed">
-                  💡 Comma-separated list. Leave blank to allow access from any IP address (not recommended for production).
-                </p>
+                <div className="text-[9px] text-muted-foreground/70 leading-relaxed space-y-1">
+                  <p>
+                    <strong className="text-amber-400">🛡️ Fully Optional but Recommended:</strong> Leaving this blank allows access from any IP address. Whitelisting shields your float balance from unauthorized debits in case your API keys are accidentally leaked (e.g., in a public GitHub repository).
+                  </p>
+                  <p className="mt-1">
+                    <strong className="text-sky-400">🔍 Finding Your Server IP:</strong> Copy your hosting provider's (e.g., AWS, Heroku, DigitalOcean) outbound server IP, or run <code className="bg-white/5 px-1 rounded text-white/80">curl ifconfig.me</code> or <code className="bg-white/5 px-1 rounded text-white/80">curl icanhazip.com</code> in your backend server terminal to discover it.
+                  </p>
+                </div>
               </div>
             </CardContent>
           </Card>
