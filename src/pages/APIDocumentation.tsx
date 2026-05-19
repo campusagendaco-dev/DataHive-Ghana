@@ -996,6 +996,15 @@ const APIDocumentation = () => {
                 </p>
               </div>
 
+              <div className="p-4 rounded-xl border border-red-500/20 bg-red-500/5">
+                <h3 className="text-sm font-bold text-red-400 mb-2 flex items-center gap-2">
+                  <Shield className="w-4 h-4 text-red-400 animate-pulse" /> Enforce IP Whitelisting
+                </h3>
+                <p className="text-xs text-white/45 leading-relaxed">
+                  <strong className="text-red-400 font-bold">Recommended:</strong> Restrict your API credentials to trust requests originating only from your designated server IP addresses. This locks down your wallet balance even if your API key is leaked. Find your outbound hosting IP on your server dashboard or query <code className="text-sky-300 bg-white/5 px-1 rounded">curl ifconfig.me</code> on your server.
+                </p>
+              </div>
+
               <div className="p-4 rounded-xl border border-white/8 bg-white/[0.02]">
                 <h3 className="text-sm font-bold text-white mb-2 flex items-center gap-2">
                   <RotateCcw className="w-4 h-4 text-amber-400" /> Always Use Idempotency Keys
