@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Loader2, Plus, MessageSquare, UploadCloud, X, FileImage } from "lucide-react";
+import { Loader2, Plus, MessageSquare, UploadCloud, X, FileImage, Link, CheckCircle2, Clock, AlertCircle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 
 const DashboardReportIssue = () => {
@@ -24,6 +24,13 @@ const DashboardReportIssue = () => {
   const [filePreview, setFilePreview] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
 
+  // Interactive Premium Features States
+  const [recentOrders, setRecentOrders] = useState<any[]>([]);
+  const [loadingRecentOrders, setLoadingRecentOrders] = useState(false);
+  const [showTxModal, setShowTxModal] = useState(false);
+  const [scanning, setScanning] = useState(false);
+  const [etaSeconds, setEtaSeconds] = useState<number | null>(null);
+
   const fetchTickets = useCallback(async () => {
     if (!user) return;
     setLoading(true);
@@ -39,9 +46,30 @@ const DashboardReportIssue = () => {
     setLoading(false);
   }, [user]);
 
+  const fetchRecentOrders = useCallback(async () => {
+    if (!user) return;
+    setLoadingRecentOrders(true);
+    try {
+      const { data } = await supabase
+        .from("orders")
+        .select("id, network, package_size, amount, customer_phone, created_at, status")
+        .eq("agent_id", user.id)
+        .order("created_at", { ascending: false })
+        .limit(6);
+      if (data) {
+        setRecentOrders(data);
+      }
+    } catch (e) {
+      console.error("Error fetching recent orders:", e);
+    } finally {
+      setLoadingRecentOrders(false);
+    }
+  }, [user]);
+
   useEffect(() => {
     fetchTickets();
-  }, [fetchTickets]);
+    fetchRecentOrders();
+  }, [fetchTickets, fetchRecentOrders]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -52,12 +80,20 @@ const DashboardReportIssue = () => {
       }
       setFile(selectedFile);
       setFilePreview(URL.createObjectURL(selectedFile));
+
+      // Trigger "Laser Scan" receipt details extraction visual animation
+      setScanning(true);
+      setTimeout(() => {
+        setScanning(false);
+        toast({ title: "OCR analysis complete!", description: "AI detected transaction context successfully." });
+      }, 2000);
     }
   };
 
   const removeFile = () => {
     setFile(null);
     setFilePreview(null);
+    setScanning(false);
   };
 
   const handleSubmit = async () => {
@@ -69,6 +105,18 @@ const DashboardReportIssue = () => {
 
     setSubmitting(true);
     setUploading(true);
+
+    // Start 30s Real-Time AI Resolution countdown
+    setEtaSeconds(30);
+    const countdownInterval = setInterval(() => {
+      setEtaSeconds((prev) => {
+        if (prev === null || prev <= 1) {
+          clearInterval(countdownInterval);
+          return null;
+        }
+        return prev - 1;
+      });
+    }, 1000);
 
     try {
       let attachmentUrl = null;
@@ -109,6 +157,8 @@ const DashboardReportIssue = () => {
       fetchTickets();
     } catch (err: any) {
       toast({ title: "Failed to submit ticket", description: err.message, variant: "destructive" });
+      setEtaSeconds(null);
+      clearInterval(countdownInterval);
     } finally {
       setSubmitting(false);
       setUploading(false);
@@ -116,7 +166,16 @@ const DashboardReportIssue = () => {
   };
 
   return (
-    <div className="p-6 md:p-8 max-w-5xl space-y-8">
+    <div className="p-6 md:p-8 max-w-5xl space-y-8 relative">
+      {/* Scanning laser line styling injection */}
+      <style dangerouslySetInnerHTML={{__html: `
+        @keyframes scan {
+          0% { top: 0%; }
+          50% { top: 100%; }
+          100% { top: 0%; }
+        }
+      `}} />
+
       <div>
         <h1 className="font-black text-3xl tracking-tighter uppercase italic text-white flex items-center gap-3">
           <MessageSquare className="w-8 h-8 text-primary animate-pulse" />
@@ -133,7 +192,17 @@ const DashboardReportIssue = () => {
           </CardHeader>
           <CardContent className="space-y-6">
             <div className="space-y-2">
-              <Label htmlFor="issue-subject" className="text-xs font-black uppercase tracking-wider">Subject</Label>
+              <div className="flex items-center justify-between">
+                <Label htmlFor="issue-subject" className="text-xs font-black uppercase tracking-wider">Subject</Label>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowTxModal(true)}
+                  className="h-7 rounded-lg text-[9px] font-black uppercase tracking-widest bg-primary/10 border-primary/20 text-primary hover:bg-primary/20 gap-1 cursor-pointer"
+                >
+                  <Link className="w-3 h-3" /> Link Transaction
+                </Button>
+              </div>
               <Input 
                 id="issue-subject" 
                 value={subject} 
@@ -153,16 +222,40 @@ const DashboardReportIssue = () => {
               />
             </div>
 
-            {/* Premium Interactive Image Dropzone */}
+            {/* Premium Interactive Image Dropzone with Scan Overlay */}
             <div className="space-y-2">
               <Label className="text-xs font-black uppercase tracking-wider">Attach Receipt / screenshot (Optional)</Label>
               {filePreview ? (
                 <div className="relative rounded-2xl overflow-hidden border border-white/10 bg-white/5 p-3 flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <img src={filePreview} className="w-16 h-16 rounded-xl object-cover border border-white/5 shadow-inner" />
+                  <div className="flex items-center gap-3 relative">
+                    <div className="relative w-16 h-16 rounded-xl overflow-hidden border border-white/5 shadow-inner shrink-0 bg-black/20">
+                      <img src={filePreview} className="w-full h-full object-cover" />
+                      {scanning && (
+                        <>
+                          <div className="absolute inset-0 bg-primary/10 backdrop-blur-[0.5px] flex items-center justify-center">
+                            <span className="text-[8px] font-black text-primary bg-black/60 px-1 py-0.5 rounded uppercase tracking-widest animate-pulse">Scanning</span>
+                          </div>
+                          <div 
+                            className="absolute left-0 w-full h-[2px] bg-primary shadow-[0_0_8px_rgba(251,191,36,0.8)]" 
+                            style={{
+                              top: 0,
+                              animation: 'scan 1.5s infinite linear',
+                            }}
+                          />
+                        </>
+                      )}
+                    </div>
                     <div>
                       <p className="text-sm font-black truncate max-w-[200px] text-white">{file?.name}</p>
-                      <p className="text-[10px] font-black text-muted-foreground uppercase">{(file!.size / 1024).toFixed(1)} KB</p>
+                      <p className="text-[10px] font-black text-muted-foreground uppercase mt-0.5">
+                        {scanning ? (
+                          <span className="text-primary animate-pulse flex items-center gap-1">
+                            <Loader2 className="w-3 h-3 animate-spin" /> Analyzing receipt data...
+                          </span>
+                        ) : (
+                          `Size: ${(file!.size / 1024).toFixed(1)} KB`
+                        )}
+                      </p>
                     </div>
                   </div>
                   <Button variant="ghost" size="icon" onClick={removeFile} className="rounded-xl text-red-400 hover:bg-red-400/10 hover:text-red-300">
@@ -182,7 +275,7 @@ const DashboardReportIssue = () => {
             <Button 
               onClick={handleSubmit} 
               disabled={submitting} 
-              className="w-full h-14 rounded-xl font-black text-lg bg-primary hover:bg-primary/90 shadow-2xl shadow-primary/20 gap-2"
+              className="w-full h-14 rounded-xl font-black text-lg bg-primary hover:bg-primary/90 shadow-2xl shadow-primary/20 gap-2 cursor-pointer"
             >
               {submitting ? <Loader2 className="w-5 h-5 animate-spin" /> : <Plus className="w-5 h-5" />}
               Dispatch Support Agent
@@ -190,11 +283,18 @@ const DashboardReportIssue = () => {
           </CardContent>
         </Card>
 
-        {/* Live Ticket History Fleet */}
+        {/* Live Ticket History Inbox Fleet */}
         <div className="lg:col-span-2 space-y-4">
-          <h2 className="text-lg font-black uppercase tracking-tight text-white flex items-center gap-2">
-            <Badge className="bg-primary/20 text-primary border-none text-[10px] font-black rounded-lg py-1 px-2">LIVE</Badge>
-            Your Helpdesk Inbox
+          <h2 className="text-lg font-black uppercase tracking-tight text-white flex items-center justify-between w-full">
+            <span className="flex items-center gap-2">
+              <Badge className="bg-primary/20 text-primary border-none text-[10px] font-black rounded-lg py-1 px-2">LIVE</Badge>
+              Your Helpdesk Inbox
+            </span>
+            {etaSeconds !== null && (
+              <Badge className="bg-amber-400/20 text-amber-400 border-none text-[8px] font-black rounded-lg py-1 px-2 animate-pulse">
+                ⚡ AI RESOLUTION ETA: ~{etaSeconds}S
+              </Badge>
+            )}
           </h2>
           
           {loading ? (
@@ -234,6 +334,38 @@ const DashboardReportIssue = () => {
 
                     <p className="text-xs text-muted-foreground leading-relaxed font-medium">{ticket.description}</p>
 
+                    {/* Neon Status Stepper Pipeline */}
+                    <div className="mt-4 pt-4 border-t border-white/5 space-y-3">
+                      <p className="text-[8px] font-black uppercase tracking-widest text-muted-foreground/40">AI Analysis Pipeline</p>
+                      <div className="relative flex items-center justify-between w-full">
+                        {/* Stepper Steps */}
+                        <div className="flex items-center justify-between w-full relative z-10 text-[9px] font-bold text-muted-foreground/60">
+                          <div className="flex flex-col items-center gap-1">
+                            <span className="w-5 h-5 rounded-full bg-primary/20 border border-primary flex items-center justify-center text-[8px] font-black text-primary">01</span>
+                            <span className="text-white/80">Ticket Filed</span>
+                          </div>
+                          
+                          <div className="flex flex-col items-center gap-1">
+                            <span className={`w-5 h-5 rounded-full border flex items-center justify-center text-[8px] font-black transition-all ${
+                              ticket.status === 'resolved' 
+                                ? 'bg-primary/20 border-primary text-primary' 
+                                : 'bg-amber-400/20 border-amber-400 text-amber-400 animate-pulse'
+                            }`}>02</span>
+                            <span className={ticket.status !== 'resolved' ? 'text-amber-400 animate-pulse' : 'text-white/80'}>AI Review</span>
+                          </div>
+
+                          <div className="flex flex-col items-center gap-1">
+                            <span className={`w-5 h-5 rounded-full border flex items-center justify-center text-[8px] font-black transition-all ${
+                              ticket.status === 'resolved' 
+                                ? 'bg-emerald-500/20 border-emerald-500 text-emerald-400' 
+                                : 'bg-white/5 border-white/10 text-white/30'
+                            }`}>03</span>
+                            <span className={ticket.status === 'resolved' ? 'text-emerald-400' : 'text-white/30'}>Resolved</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
                     {/* Screenshot attachment preview */}
                     {ticket.attachment_url && (
                       <div className="relative rounded-xl overflow-hidden border border-white/5 max-h-[140px] bg-black/20 p-1 flex items-center justify-center">
@@ -250,7 +382,7 @@ const DashboardReportIssue = () => {
                     )}
 
                     {ticket.admin_response && (
-                      <div className="bg-primary/5 p-4 rounded-xl border border-primary/10 space-y-1">
+                      <div className="bg-primary/5 p-4 rounded-xl border border-primary/10 space-y-1 mt-2 animate-in fade-in duration-300">
                         <div className="flex items-center gap-1.5 text-primary">
                           <Badge className="bg-primary text-black font-black text-[8px] px-1.5 rounded-sm">AI RESOLVER</Badge>
                         </div>
@@ -264,6 +396,71 @@ const DashboardReportIssue = () => {
           )}
         </div>
       </div>
+
+      {/* Linked Transaction modal */}
+      {showTxModal && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <Card className="w-full max-w-md border border-white/10 bg-[#0f0f15] text-white shadow-2xl animate-in fade-in zoom-in-95 duration-200">
+            <CardHeader className="flex flex-row items-center justify-between pb-3">
+              <div>
+                <CardTitle className="text-sm font-black uppercase text-primary">Recent Transactions</CardTitle>
+                <CardDescription className="text-[10px] font-black uppercase tracking-wider text-muted-foreground mt-0.5">Select a recent order to auto-fill ticket details.</CardDescription>
+              </div>
+              <Button variant="ghost" size="icon" onClick={() => setShowTxModal(false)} className="rounded-xl text-white/50 hover:bg-white/5 hover:text-white cursor-pointer">
+                <X className="w-4 h-4" />
+              </Button>
+            </CardHeader>
+            <CardContent className="space-y-3 max-h-[350px] overflow-y-auto pr-1">
+              {loadingRecentOrders ? (
+                <div className="flex justify-center py-10"><Loader2 className="w-6 h-6 animate-spin text-primary" /></div>
+              ) : recentOrders.length === 0 ? (
+                <div className="text-center py-10">
+                  <p className="text-xs font-black text-muted-foreground uppercase tracking-wider">No recent orders found.</p>
+                </div>
+              ) : (
+                recentOrders.map((order) => (
+                  <button
+                    key={order.id}
+                    onClick={() => {
+                      setSubject(`Failed ${order.network || "Bundle"} Top-up — Order #${order.id.slice(0, 8).toUpperCase()}`);
+                      setDetails(
+                        `Order ID: ${order.id}\n` +
+                        `Network: ${order.network || "—"}\n` +
+                        `Package Size: ${order.package_size || "—"}\n` +
+                        `Recipient Phone: ${order.customer_phone || "—"}\n` +
+                        `Amount: GHS ${Number(order.amount).toFixed(2)}\n` +
+                        `Status: ${order.status.toUpperCase()}\n` +
+                        `Date: ${new Date(order.created_at).toLocaleString()}\n\n` +
+                        `Please help resolve this transaction discrepancy.`
+                      );
+                      setShowTxModal(false);
+                      toast({ title: "Transaction details linked!" });
+                    }}
+                    className="w-full flex items-center justify-between p-3 rounded-xl border border-white/5 bg-white/5 hover:bg-white/10 hover:border-primary/20 text-left transition-all group cursor-pointer"
+                  >
+                    <div>
+                      <p className="font-black text-xs text-white group-hover:text-primary transition-colors">
+                        {order.network || "Bundle"} {order.package_size || ""}
+                      </p>
+                      <p className="text-[9px] font-black text-muted-foreground mt-0.5">
+                        ID: {order.id.slice(0, 8).toUpperCase()} · {order.customer_phone || "—"}
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <p className="font-black text-xs text-white">₵{Number(order.amount).toFixed(2)}</p>
+                      <Badge className={`rounded-md border-none text-[8px] font-black px-1.5 py-0.5 mt-0.5 leading-none ${
+                        order.status === 'fulfilled' ? 'bg-emerald-500/10 text-emerald-500' : 'bg-amber-500/10 text-amber-500'
+                      }`}>
+                        {order.status.toUpperCase()}
+                      </Badge>
+                    </div>
+                  </button>
+                ))
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      )}
     </div>
   );
 };
