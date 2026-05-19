@@ -162,8 +162,8 @@ serve(async (req: Request) => {
       });
     }
 
-    // Anti-Duplicate Protection (60 Minutes)
-    const sixtyMinutesAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+    // Anti-Duplicate Protection (1 Minute to prevent double-clicks)
+    const oneMinuteAgo = new Date(Date.now() - 1 * 60 * 1000).toISOString();
 
     const { data: duplicateOrder } = await supabaseAdmin
       .from("orders")
@@ -172,15 +172,15 @@ serve(async (req: Request) => {
       .eq("network", normalizedNet)
       .eq("package_size", package_size)
       .in("status", ["paid", "processing", "fulfilled", "completed"])
-      .gte("created_at", sixtyMinutesAgo)
+      .gte("created_at", oneMinuteAgo)
       .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle();
 
     if (duplicateOrder) {
-      console.warn(`[DUPLICATE] Rejected duplicate order for ${normalizedPhone} within 60 minutes`);
+      console.warn(`[DUPLICATE] Rejected duplicate order for ${normalizedPhone} within 1 minute`);
       return new Response(JSON.stringify({ 
-        error: "Duplicate order detected. Please wait 60 minutes before placing the same order again." 
+        error: "Duplicate order detected. Please wait 60 seconds before placing the same order again." 
       }), {
         status: 409,
         headers: { ...corsHeaders, "Content-Type": "application/json" },

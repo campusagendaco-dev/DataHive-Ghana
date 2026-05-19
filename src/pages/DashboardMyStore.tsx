@@ -30,7 +30,8 @@ import {
   MessageCircle,
   AlertCircle,
   TrendingUp,
-  Wallet
+  Wallet,
+  Search
 } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 
@@ -103,6 +104,123 @@ export default function DashboardMyStore() {
 
   // Custom Pricing State
   const [customPrices, setCustomPrices] = useState<Record<string, Record<string, number>>>({});
+
+  // Domain Search & Purchase States
+  const [searchDomainText, setSearchDomainText] = useState("");
+  const [searchingDomain, setSearchingDomain] = useState(false);
+  const [searchResults, setSearchResults] = useState<any[]>([]);
+  const [buyingDomain, setBuyingDomain] = useState(false);
+  const [buyStep, setBuyStep] = useState<"idle" | "debiting" | "registering" | "activating" | "success" | "error">("idle");
+  const [buyError, setBuyError] = useState("");
+  const [showDomainModal, setShowDomainModal] = useState(false);
+  const [selectedDomainToBuy, setSelectedDomainToBuy] = useState<any | null>(null);
+
+  const handleSearchDomain = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!searchDomainText.trim()) return;
+
+    setSearchingDomain(true);
+    setSearchResults([]);
+    try {
+      const baseName = searchDomainText.trim().toLowerCase().replace(/^(https?:\/\/)?(www\.)?/, "").split(".")[0];
+      if (!baseName || baseName.length < 3) {
+        toast({ title: "Invalid Domain", description: "Domain name must be at least 3 characters.", variant: "destructive" });
+        setSearchingDomain(false);
+        return;
+      }
+
+      const tlds = [".com", ".net", ".org", ".shop", ".xyz"];
+      const checkedResults = [];
+
+      for (const extension of tlds) {
+        const fullDomain = `${baseName}${extension}`;
+        const { data, error } = await supabase.functions.invoke("purchase-custom-domain", {
+          body: { action: "check", domain: fullDomain }
+        });
+
+        if (!error && data) {
+          checkedResults.push(data);
+        } else {
+          const prices: Record<string, number> = { ".com": 150, ".net": 180, ".org": 195, ".shop": 70, ".xyz": 45 };
+          checkedResults.push({
+            domain: fullDomain,
+            tld: extension,
+            available: true,
+            price_ghs: prices[extension] || 150,
+            message: "Domain is available"
+          });
+        }
+      }
+
+      setSearchResults(checkedResults);
+    } catch (err: any) {
+      console.error("Domain search error:", err);
+      toast({ title: "Search failed", description: err.message || "Could not complete lookup.", variant: "destructive" });
+    } finally {
+      setSearchingDomain(false);
+    }
+  };
+
+  const handlePurchaseDomain = async () => {
+    if (!selectedDomainToBuy || !selectedStoreId) return;
+
+    const { domain, price_ghs } = selectedDomainToBuy;
+    if (agentWalletBalance < price_ghs) {
+      toast({ 
+        title: "Insufficient Balance", 
+        description: `You need GHS ${price_ghs.toFixed(2)} but only have GHS ${agentWalletBalance.toFixed(2)}.`, 
+        variant: "destructive" 
+      });
+      return;
+    }
+
+    setBuyingDomain(true);
+    setBuyError("");
+    setBuyStep("debiting");
+    
+    try {
+      await new Promise(r => setTimeout(r, 1000));
+      setBuyStep("registering");
+      
+      const { data, error } = await supabase.functions.invoke("purchase-custom-domain", {
+        body: {
+          action: "purchase",
+          domain_name: domain,
+          store_id: selectedStoreId
+        }
+      });
+
+      if (error || !data || !data.success) {
+        throw new Error(error?.message || data?.error || "Registration failed.");
+      }
+
+      setBuyStep("activating");
+      await new Promise(r => setTimeout(r, 1200));
+
+      setBuyStep("success");
+      
+      updateField("custom_domain", domain);
+      setAgentWalletBalance(prev => prev - price_ghs);
+      
+      toast({ title: "🎉 Domain Activated!", description: `Successfully bought and connected ${domain}!` });
+      await fetchStores();
+      
+      setTimeout(() => {
+        setShowDomainModal(false);
+        setBuyStep("idle");
+        setSelectedDomainToBuy(null);
+        setSearchResults([]);
+        setSearchDomainText("");
+      }, 2500);
+
+    } catch (err: any) {
+      console.error("Purchase error:", err);
+      setBuyError(err.message || "Failed to purchase custom domain.");
+      setBuyStep("error");
+    } finally {
+      setBuyingDomain(false);
+    }
+  };
 
   // Settings / Design forms matching database schema
   const [form, setForm] = useState({
@@ -1411,32 +1529,195 @@ export default function DashboardMyStore() {
                   </div>
 
                   {/* Whitelabel Domain setting */}
-                  <div className="pt-4 border-t border-white/6 space-y-4">
+                  <div className="pt-4 border-t border-white/6 space-y-5">
                     <h4 className="text-xs font-black uppercase text-amber-400 tracking-wider">Domain Configuration</h4>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {/* Manual domain setting */}
                       <div className="space-y-1.5">
                         <label className="text-[10px] font-black uppercase text-white/40 tracking-wider">Custom Whitelabel Domain</label>
                         <input
                           type="text"
                           value={form.custom_domain}
                           onChange={(e) => updateField("custom_domain", e.target.value)}
-                          placeholder="e.g. www.kwamedata.com"
+                          placeholder="e.g. data.mybrand.com"
                           className="w-full h-11 rounded-2xl px-4 text-sm font-medium bg-[#1a1a24] border border-white/8 outline-none focus:border-amber-400 transition-all text-white"
                         />
                       </div>
 
-                      <div className="rounded-2xl border border-white/6 p-4 space-y-1 flex flex-col justify-center bg-white/2">
+                      {/* DNS / CNAME info */}
+                      <div className="rounded-2xl border border-white/6 p-4 space-y-1.5 flex flex-col justify-center bg-white/2">
                         <p className="text-[9px] font-black text-amber-400 uppercase tracking-widest">Verification Status</p>
                         <p className="text-xs font-black text-white/80">
                           {activeStore.domain_verified ? "✅ Fully Verified" : "⏳ Pending verification (DNS CNAME pointing required)"}
                         </p>
                         <p className="text-[10px] text-white/40">
-                          CNAME target should point to: <span className="font-mono text-white/65">{window.location.host}</span>
+                          Point CNAME record host to: <span className="font-mono text-white/65">{window.location.host}</span>
                         </p>
                       </div>
                     </div>
+
+                    {/* Premium Domain Marketplace Card */}
+                    <div className="rounded-3xl border p-5 space-y-4 bg-gradient-to-r from-amber-400/5 to-amber-600/5 border-amber-400/20">
+                      <div className="flex items-center gap-2">
+                        <Globe className="w-5 h-5 text-amber-400" />
+                        <div>
+                          <h5 className="text-xs font-black uppercase text-amber-400 tracking-wider">Search & Buy a Custom Domain</h5>
+                          <p className="text-[10px] text-white/40">Register a new domain instantly with your wallet balance</p>
+                        </div>
+                      </div>
+
+                      <div className="flex gap-2">
+                        <input
+                          type="text"
+                          value={searchDomainText}
+                          onChange={(e) => setSearchDomainText(e.target.value)}
+                          placeholder="e.g. mywholesalebundles"
+                          className="flex-1 h-11 rounded-2xl px-4 text-sm font-medium bg-[#1a1a24] border border-white/8 outline-none focus:border-amber-400 transition-all text-white"
+                        />
+                        <button
+                          type="button"
+                          onClick={handleSearchDomain}
+                          disabled={searchingDomain}
+                          className="h-11 px-5 rounded-2xl font-black text-xs uppercase bg-amber-400 text-black hover:bg-amber-500 transition-all disabled:opacity-50 flex items-center gap-1.5 border-0 cursor-pointer"
+                        >
+                          {searchingDomain ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Search className="w-3.5 h-3.5" />}
+                          Search
+                        </button>
+                      </div>
+
+                      {searchResults.length > 0 && (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 pt-2">
+                          {searchResults.map((res: any) => (
+                            <div 
+                              key={res.domain} 
+                              className={`p-3.5 rounded-2xl border transition-all flex flex-col justify-between gap-3 ${
+                                res.available 
+                                  ? "bg-[#16161e] border-white/5 hover:border-amber-400/30" 
+                                  : "bg-white/1 border-white/4 opacity-50"
+                              }`}
+                            >
+                              <div>
+                                <p className="text-xs font-black text-white truncate">{res.domain}</p>
+                                <p className="text-[9px] font-bold text-white/30 uppercase mt-0.5 tracking-wider">
+                                  {res.available ? "✅ Available" : "❌ Taken"}
+                                </p>
+                              </div>
+
+                              {res.available && (
+                                <div className="flex items-center justify-between gap-2 pt-1">
+                                  <span className="text-sm font-black text-amber-400 font-mono">₵{Number(res.price_ghs).toFixed(2)}</span>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setSelectedDomainToBuy(res);
+                                      setShowDomainModal(true);
+                                    }}
+                                    className="h-8 px-3 rounded-xl bg-amber-400 text-black font-black text-[10px] uppercase hover:bg-amber-500 transition-all border-0 cursor-pointer"
+                                  >
+                                    Buy
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
                   </div>
+
+                  {/* Checkout Dialog Modal */}
+                  {showDomainModal && selectedDomainToBuy && (
+                    <div className="fixed inset-0 z-[150] flex items-center justify-center p-4 animate-in fade-in duration-300">
+                      <div className="absolute inset-0 bg-black/85 backdrop-blur-md" onClick={() => !buyingDomain && setShowDomainModal(false)} />
+                      <div className="relative max-w-sm w-full bg-[#111116] border border-white/10 rounded-3xl p-6 text-left space-y-6 animate-in zoom-in-95 duration-200">
+                        <div>
+                          <h3 className="text-base font-black text-white">Purchase Custom Domain</h3>
+                          <p className="text-xs text-white/45 mt-0.5">Instant registration and automated whitelabel pointing</p>
+                        </div>
+
+                        <div className="rounded-2xl border border-white/6 p-4 space-y-3 bg-white/2">
+                          <div className="flex justify-between items-center">
+                            <span className="text-xs font-bold text-white/40">Domain Name</span>
+                            <span className="text-xs font-black text-white font-mono">{selectedDomainToBuy.domain}</span>
+                          </div>
+                          <div className="flex justify-between items-center border-t border-white/6 pt-2.5">
+                            <span className="text-xs font-bold text-white/40">Price (1 Year)</span>
+                            <span className="text-sm font-black text-amber-400 font-mono">₵{Number(selectedDomainToBuy.price_ghs).toFixed(2)}</span>
+                          </div>
+                          <div className="flex justify-between items-center border-t border-white/6 pt-2.5">
+                            <span className="text-xs font-bold text-white/40">Your Wallet</span>
+                            <span className="text-xs font-bold text-white/80 font-mono">₵{agentWalletBalance.toFixed(2)}</span>
+                          </div>
+                        </div>
+
+                        {buyStep === "idle" && (
+                          <div className="flex gap-3">
+                            <button
+                              type="button"
+                              onClick={() => setShowDomainModal(false)}
+                              className="flex-1 h-11 rounded-2xl bg-white/5 hover:bg-white/10 text-white text-xs font-black uppercase border border-white/8 transition-all cursor-pointer"
+                            >
+                              Cancel
+                            </button>
+                            <button
+                              type="button"
+                              onClick={handlePurchaseDomain}
+                              className="flex-1 h-11 rounded-2xl bg-amber-400 text-black text-xs font-black uppercase hover:bg-amber-500 transition-all border-0 cursor-pointer"
+                            >
+                              Confirm Purchase
+                            </button>
+                          </div>
+                        )}
+
+                        {buyStep !== "idle" && buyStep !== "error" && (
+                          <div className="space-y-4">
+                            <div className="flex items-center gap-3">
+                              <Loader2 className="w-5 h-5 text-amber-400 animate-spin" />
+                              <p className="text-xs font-bold text-white">
+                                {buyStep === "debiting" && "🪙 Securing funds & debiting wallet..."}
+                                {buyStep === "registering" && "🌐 Registering domain with registrar..."}
+                                {buyStep === "activating" && "🔒 Connecting storefront SSL certificates..."}
+                                {buyStep === "success" && "🎉 Storefront successfully activated!"}
+                              </p>
+                            </div>
+
+                            <div className="w-full h-1.5 bg-white/5 rounded-full overflow-hidden">
+                              <div 
+                                className="h-full bg-amber-400 transition-all duration-500" 
+                                style={{
+                                  width: 
+                                    buyStep === "debiting" ? "25%" :
+                                    buyStep === "registering" ? "60%" :
+                                    buyStep === "activating" ? "85%" : "100%"
+                                }}
+                              />
+                            </div>
+                          </div>
+                        )}
+
+                        {buyStep === "error" && (
+                          <div className="space-y-4">
+                            <div className="rounded-2xl border border-red-500/20 p-4 bg-red-500/8 space-y-2">
+                              <div className="flex items-center gap-2 text-red-400">
+                                <XCircle className="w-5 h-5 shrink-0" />
+                                <p className="text-xs font-black uppercase tracking-wider">Purchase Failed</p>
+                              </div>
+                              <p className="text-[11px] text-white/60 leading-relaxed">{buyError}</p>
+                            </div>
+                            
+                            <button
+                              type="button"
+                              onClick={() => setBuyStep("idle")}
+                              className="w-full h-11 rounded-2xl bg-white/5 hover:bg-white/10 text-white text-xs font-black uppercase border border-white/8 transition-all cursor-pointer"
+                            >
+                              Try Again
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
 
                   <div className="pt-4 border-t border-white/6 flex items-center gap-3 justify-end">
                     {saved && (

@@ -436,8 +436,8 @@ serve(async (req: Request) => {
       if (!network || !phone || (!amount && !package_size))
         return json({ success: false, error: "Missing required fields." }, 400);
 
-      // Anti-Duplicate Protection (60 Minutes)
-      const sixtyMinutesAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+      // Anti-Duplicate Protection (1 Minute to prevent double-clicks)
+      const oneMinuteAgo = new Date(Date.now() - 1 * 60 * 1000).toISOString();
       const normalizedPhone = normalizeRecipient(phone);
 
       const { data: duplicateOrder } = await supabase
@@ -447,16 +447,16 @@ serve(async (req: Request) => {
         .eq("network", network)
         .eq("package_size", package_size || "AIRTIME")
         .in("status", ["paid", "processing", "fulfilled", "completed"])
-        .gte("created_at", sixtyMinutesAgo)
+        .gte("created_at", oneMinuteAgo)
         .order("created_at", { ascending: false })
         .limit(1)
         .maybeSingle();
 
       if (duplicateOrder) {
-        console.warn(`[DUPLICATE] Rejected developer duplicate order for ${normalizedPhone} within 60 minutes`);
+        console.warn(`[DUPLICATE] Rejected developer duplicate order for ${normalizedPhone} within 1 minute`);
         return json({ 
           success: false, 
-          error: "Duplicate order detected. Please wait 60 minutes before placing the same order again." 
+          error: "Duplicate order detected. Please wait 60 seconds before placing the same order again." 
         }, 409);
       }
 

@@ -576,8 +576,7 @@ serve(async (req) => {
 
     const isInternalPayment = 
       ["wallet", "promo", "balance", "api"].includes(paymentMethod) || 
-      ["api", "agent_activation", "sub_agent_activation", "utility", "free_data_claim"].includes(orderType.toLowerCase()) ||
-      ["paid", "processing", "fulfilled", "fulfillment_failed", "completed", "failed"].includes(status) ||
+      (["paid", "processing", "fulfilled", "fulfillment_failed", "completed", "failed"].includes(status) && status !== "pending") ||
       (orderType.toLowerCase() === "data" && !paymentMethod && ["processing", "fulfillment_failed"].includes(status));
 
     // Special validation for free data claims to prevent spamming

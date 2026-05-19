@@ -12,7 +12,18 @@ serve(async (req) => {
   }
 
   try {
-    const { phone } = await req.json();
+    let phone = "";
+    if (req.method === "GET") {
+      const url = new URL(req.url);
+      phone = url.searchParams.get("phone") || "";
+    } else {
+      try {
+        const body = await req.json();
+        phone = body.phone || "";
+      } catch (_e) {
+        // Fallback if JSON parsing fails
+      }
+    }
 
     if (!phone) {
       return new Response(JSON.stringify({ error: "Phone number required" }), {
