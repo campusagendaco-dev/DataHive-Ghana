@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Loader2, Plus, MessageSquare, UploadCloud, X, FileImage, Link, CheckCircle2, Clock, AlertCircle } from "lucide-react";
+import { Loader2, Plus, MessageSquare, UploadCloud, X, FileImage, Link, CheckCircle2, Clock, AlertCircle, RefreshCw } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 
 const DashboardReportIssue = () => {
@@ -30,6 +30,7 @@ const DashboardReportIssue = () => {
   const [showTxModal, setShowTxModal] = useState(false);
   const [scanning, setScanning] = useState(false);
   const [etaSeconds, setEtaSeconds] = useState<number | null>(null);
+  const [retryingTicketId, setRetryingTicketId] = useState<string | null>(null);
 
   const fetchTickets = useCallback(async () => {
     if (!user) return;
@@ -94,6 +95,24 @@ const DashboardReportIssue = () => {
     setFile(null);
     setFilePreview(null);
     setScanning(false);
+  };
+
+  const handleRetryOrder = async (orderId: string, ticketId: string) => {
+    setRetryingTicketId(ticketId);
+    try {
+      const { error } = await supabase.functions.invoke("verify-payment", {
+        body: { reference: orderId }
+      });
+      if (error) throw error;
+
+      toast({ title: "Fulfillment Retried!", description: "Order status check successfully dispatched." });
+      await fetchTickets();
+    } catch (err: any) {
+      console.error("Retry order error:", err);
+      toast({ title: "Retry failed", description: err.message || "Failed to contact fulfillment provider.", variant: "destructive" });
+    } finally {
+      setRetryingTicketId(null);
+    }
   };
 
   const handleSubmit = async () => {
@@ -309,89 +328,113 @@ const DashboardReportIssue = () => {
             </Card>
           ) : (
             <div className="space-y-4 max-h-[600px] overflow-y-auto pr-1">
-              {tickets.map((ticket) => (
-                <Card key={ticket.id} className="border-none bg-white/5 hover:bg-white/[0.07] transition-all duration-300">
-                  <CardContent className="p-5 space-y-4">
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <p className="font-black text-sm text-white leading-tight">{ticket.subject}</p>
-                        <p className="text-[9px] font-black text-muted-foreground uppercase tracking-wider mt-1">
-                          {new Date(ticket.created_at).toLocaleString()}
-                        </p>
-                      </div>
-                      <Badge 
-                        className={`rounded-lg border-none text-[8px] font-black px-2 h-5 shrink-0 ${
-                          ticket.status === 'resolved' 
-                            ? 'bg-emerald-500/10 text-emerald-500' 
-                            : ticket.status === 'in_progress' 
-                            ? 'bg-amber-500/10 text-amber-500' 
-                            : 'bg-indigo-500/10 text-indigo-500'
-                        }`}
-                      >
-                        {ticket.status.replace('_', ' ').toUpperCase()}
-                      </Badge>
-                    </div>
+              {tickets.map((ticket) => {
+                const orderIdMatch = ticket.description.match(/Order ID:\s*([a-f0-9-]{36})/i);
+                const orderId = orderIdMatch ? orderIdMatch[1] : null;
 
-                    <p className="text-xs text-muted-foreground leading-relaxed font-medium">{ticket.description}</p>
-
-                    {/* Neon Status Stepper Pipeline */}
-                    <div className="mt-4 pt-4 border-t border-white/5 space-y-3">
-                      <p className="text-[8px] font-black uppercase tracking-widest text-muted-foreground/40">AI Analysis Pipeline</p>
-                      <div className="relative flex items-center justify-between w-full">
-                        {/* Stepper Steps */}
-                        <div className="flex items-center justify-between w-full relative z-10 text-[9px] font-bold text-muted-foreground/60">
-                          <div className="flex flex-col items-center gap-1">
-                            <span className="w-5 h-5 rounded-full bg-primary/20 border border-primary flex items-center justify-center text-[8px] font-black text-primary">01</span>
-                            <span className="text-white/80">Ticket Filed</span>
-                          </div>
-                          
-                          <div className="flex flex-col items-center gap-1">
-                            <span className={`w-5 h-5 rounded-full border flex items-center justify-center text-[8px] font-black transition-all ${
-                              ticket.status === 'resolved' 
-                                ? 'bg-primary/20 border-primary text-primary' 
-                                : 'bg-amber-400/20 border-amber-400 text-amber-400 animate-pulse'
-                            }`}>02</span>
-                            <span className={ticket.status !== 'resolved' ? 'text-amber-400 animate-pulse' : 'text-white/80'}>AI Review</span>
-                          </div>
-
-                          <div className="flex flex-col items-center gap-1">
-                            <span className={`w-5 h-5 rounded-full border flex items-center justify-center text-[8px] font-black transition-all ${
-                              ticket.status === 'resolved' 
-                                ? 'bg-emerald-500/20 border-emerald-500 text-emerald-400' 
-                                : 'bg-white/5 border-white/10 text-white/30'
-                            }`}>03</span>
-                            <span className={ticket.status === 'resolved' ? 'text-emerald-400' : 'text-white/30'}>Resolved</span>
-                          </div>
+                return (
+                  <Card key={ticket.id} className="border-none bg-white/5 hover:bg-white/[0.07] transition-all duration-300">
+                    <CardContent className="p-5 space-y-4">
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <p className="font-black text-sm text-white leading-tight">{ticket.subject}</p>
+                          <p className="text-[9px] font-black text-muted-foreground uppercase tracking-wider mt-1">
+                            {new Date(ticket.created_at).toLocaleString()}
+                          </p>
                         </div>
-                      </div>
-                    </div>
-
-                    {/* Screenshot attachment preview */}
-                    {ticket.attachment_url && (
-                      <div className="relative rounded-xl overflow-hidden border border-white/5 max-h-[140px] bg-black/20 p-1 flex items-center justify-center">
-                        <img src={ticket.attachment_url} className="max-h-[130px] rounded-lg object-contain w-full" alt="Attachment" />
-                        <a 
-                          href={ticket.attachment_url} 
-                          target="_blank" 
-                          rel="noreferrer" 
-                          className="absolute bottom-2 right-2 bg-black/70 hover:bg-black/90 p-1.5 rounded-lg text-[8px] font-black text-white uppercase tracking-widest border border-white/10"
+                        <Badge 
+                          className={`rounded-lg border-none text-[8px] font-black px-2 h-5 shrink-0 ${
+                            ticket.status === 'resolved' 
+                              ? 'bg-emerald-500/10 text-emerald-500' 
+                              : ticket.status === 'in_progress' 
+                              ? 'bg-amber-500/10 text-amber-500' 
+                              : 'bg-indigo-500/10 text-indigo-500'
+                          }`}
                         >
-                          View Fullsize
-                        </a>
+                          {ticket.status.replace('_', ' ').toUpperCase()}
+                        </Badge>
                       </div>
-                    )}
 
-                    {ticket.admin_response && (
-                      <div className="bg-primary/5 p-4 rounded-xl border border-primary/10 space-y-1 mt-2 animate-in fade-in duration-300">
-                        <div className="flex items-center gap-1.5 text-primary">
-                          <Badge className="bg-primary text-black font-black text-[8px] px-1.5 rounded-sm">AI RESOLVER</Badge>
+                      <p className="text-xs text-muted-foreground leading-relaxed font-medium">{ticket.description}</p>
+
+                      {/* Self-Healing linked transaction quick action card */}
+                      {orderId && ticket.status !== 'resolved' && (
+                        <div className="p-3 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-between gap-3 animate-in slide-in-from-top-1 duration-200">
+                          <div>
+                            <p className="text-[10px] font-black uppercase tracking-wider text-primary">Self-Healing Trigger Active</p>
+                            <p className="text-[9px] text-muted-foreground/60 font-bold mt-0.5">Order ID: #{orderId.slice(0, 8).toUpperCase()}</p>
+                          </div>
+                          <Button
+                            size="sm"
+                            onClick={() => handleRetryOrder(orderId, ticket.id)}
+                            disabled={retryingTicketId === ticket.id}
+                            className="h-8 rounded-lg text-[9px] font-black uppercase tracking-widest bg-primary hover:bg-primary/90 text-black gap-1 cursor-pointer"
+                          >
+                            {retryingTicketId === ticket.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
+                            Force Retry
+                          </Button>
                         </div>
-                        <p className="text-xs text-white/90 leading-relaxed font-medium italic">"{ticket.admin_response}"</p>
+                      )}
+
+                      {/* Neon Status Stepper Pipeline */}
+                      <div className="mt-4 pt-4 border-t border-white/5 space-y-3">
+                        <p className="text-[8px] font-black uppercase tracking-widest text-muted-foreground/40">AI Analysis Pipeline</p>
+                        <div className="relative flex items-center justify-between w-full">
+                          {/* Stepper Steps */}
+                          <div className="flex items-center justify-between w-full relative z-10 text-[9px] font-bold text-muted-foreground/60">
+                            <div className="flex flex-col items-center gap-1">
+                              <span className="w-5 h-5 rounded-full bg-primary/20 border border-primary flex items-center justify-center text-[8px] font-black text-primary">01</span>
+                              <span className="text-white/80">Ticket Filed</span>
+                            </div>
+                            
+                            <div className="flex flex-col items-center gap-1">
+                              <span className={`w-5 h-5 rounded-full border flex items-center justify-center text-[8px] font-black transition-all ${
+                                ticket.status === 'resolved' 
+                                  ? 'bg-primary/20 border-primary text-primary' 
+                                  : 'bg-amber-400/20 border-amber-400 text-amber-400 animate-pulse'
+                              }`}>02</span>
+                              <span className={ticket.status !== 'resolved' ? 'text-amber-400 animate-pulse' : 'text-white/80'}>AI Review</span>
+                            </div>
+
+                            <div className="flex flex-col items-center gap-1">
+                              <span className={`w-5 h-5 rounded-full border flex items-center justify-center text-[8px] font-black transition-all ${
+                                ticket.status === 'resolved' 
+                                  ? 'bg-emerald-500/20 border-emerald-500 text-emerald-400' 
+                                  : 'bg-white/5 border-white/10 text-white/30'
+                              }`}>03</span>
+                              <span className={ticket.status === 'resolved' ? 'text-emerald-400' : 'text-white/30'}>Resolved</span>
+                            </div>
+                          </div>
+                        </div>
                       </div>
-                    )}
-                  </CardContent>
-                </Card>
-              ))}
+
+                      {/* Screenshot attachment preview */}
+                      {ticket.attachment_url && (
+                        <div className="relative rounded-xl overflow-hidden border border-white/5 max-h-[140px] bg-black/20 p-1 flex items-center justify-center">
+                          <img src={ticket.attachment_url} className="max-h-[130px] rounded-lg object-contain w-full" alt="Attachment" />
+                          <a 
+                            href={ticket.attachment_url} 
+                            target="_blank" 
+                            rel="noreferrer" 
+                            className="absolute bottom-2 right-2 bg-black/70 hover:bg-black/90 p-1.5 rounded-lg text-[8px] font-black text-white uppercase tracking-widest border border-white/10"
+                          >
+                            View Fullsize
+                          </a>
+                        </div>
+                      )}
+
+                      {ticket.admin_response && (
+                        <div className="bg-primary/5 p-4 rounded-xl border border-primary/10 space-y-1 mt-2 animate-in fade-in duration-300">
+                          <div className="flex items-center gap-1.5 text-primary">
+                            <Badge className="bg-primary text-black font-black text-[8px] px-1.5 rounded-sm">AI RESOLVER</Badge>
+                          </div>
+                          <p className="text-xs text-white/90 leading-relaxed font-medium italic">"{ticket.admin_response}"</p>
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                );
+              })}
             </div>
           )}
         </div>
