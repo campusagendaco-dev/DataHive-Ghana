@@ -1,6 +1,18 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { createHmac } from "node:crypto";
 
+// SSRF Prevention: Block private/loopback/link-local destinations
+const PRIVATE_IP_RE = /^(127\.|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|169\.254\.|::1|fc|fd)/i;
+function isSafeWebhookUrl(url: string): boolean {
+  try {
+    const parsed = new URL(url);
+    if (parsed.protocol !== "https:") return false;
+    if (PRIVATE_IP_RE.test(parsed.hostname)) return false;
+    if (parsed.hostname === "localhost") return false;
+    return true;
+  } catch { return false; }
+}
+
 export async function notifyApiClient(supabaseAdmin: any, orderId: string, status: string) {
   try {
     const { data: order, error: orderError } = await supabaseAdmin
@@ -18,6 +30,11 @@ export async function notifyApiClient(supabaseAdmin: any, orderId: string, statu
       .maybeSingle();
 
     if (profile?.api_webhook_url && profile?.api_secret_key_hash) {
+      if (!isSafeWebhookUrl(profile.api_webhook_url)) {
+        console.warn(`[Webhook] Blocked SSRF attempt or insecure protocol to: ${profile.api_webhook_url} for order ${orderId}`);
+        return;
+      }
+
       const payload = JSON.stringify({
         event: "order.updated",
         data: {
@@ -58,6 +75,11 @@ export async function notifyWalletCredit(supabaseAdmin: any, userId: string, amo
       .maybeSingle();
 
     if (profile?.api_webhook_url && profile?.api_secret_key_hash) {
+      if (!isSafeWebhookUrl(profile.api_webhook_url)) {
+        console.warn(`[Webhook] Blocked SSRF attempt or insecure protocol to: ${profile.api_webhook_url} for wallet credit`);
+        return;
+      }
+
       const payload = JSON.stringify({
         event: "wallet.funded",
         data: {

@@ -320,8 +320,7 @@ serve(async (req: Request) => {
     // ── 4. Access and IP Checks ─────────────────────────────────────────────────
     if (!profile.access_enabled) return json({ success: false, error: "API access is disabled." }, 403);
     
-    // IP Whitelisting is turned off as requested
-    /*
+    // Optional IP Whitelisting: Enforce only if whitelist is configured (non-empty)
     const whitelist: string[] = Array.isArray(profile.ip_whitelist) ? profile.ip_whitelist : [];
     if (whitelist.length > 0 && !isMasterKey) {
       const clientIp = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || req.headers.get("cf-connecting-ip") || "";
@@ -329,7 +328,6 @@ serve(async (req: Request) => {
         return json({ success: false, error: `IP ${clientIp} not whitelisted.` }, 403);
       }
     }
-    */
 
     // ── 5. Idempotency Check (Optional for client, mandatory for DB) ────────────
     const idemKey = req.headers.get("X-Idempotency-Key") || crypto.randomUUID();
@@ -436,28 +434,31 @@ serve(async (req: Request) => {
       if (!network || !phone || (!amount && !package_size))
         return json({ success: false, error: "Missing required fields." }, 400);
 
-      // Anti-Duplicate Protection (1 Minute to prevent double-clicks)
+      // Anti-Duplicate Protection (1 Minute to prevent double-clicks, optional override via payload or header)
+      const allowDuplicate = payload?.allow_duplicate === true || payload?.bypass_duplicate_check === true || req.headers.get("X-Bypass-Duplicate-Check") === "true";
       const oneMinuteAgo = new Date(Date.now() - 1 * 60 * 1000).toISOString();
       const normalizedPhone = normalizeRecipient(phone);
 
-      const { data: duplicateOrder } = await supabase
-        .from("orders")
-        .select("id, created_at")
-        .eq("customer_phone", normalizedPhone)
-        .eq("network", network)
-        .eq("package_size", package_size || "AIRTIME")
-        .in("status", ["paid", "processing", "fulfilled", "completed"])
-        .gte("created_at", oneMinuteAgo)
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
+      if (!allowDuplicate) {
+        const { data: duplicateOrder } = await supabase
+          .from("orders")
+          .select("id, created_at")
+          .eq("customer_phone", normalizedPhone)
+          .eq("network", network)
+          .eq("package_size", package_size || "AIRTIME")
+          .in("status", ["paid", "processing", "fulfilled", "completed"])
+          .gte("created_at", oneMinuteAgo)
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
 
-      if (duplicateOrder) {
-        console.warn(`[DUPLICATE] Rejected developer duplicate order for ${normalizedPhone} within 1 minute`);
-        return json({ 
-          success: false, 
-          error: "Duplicate order detected. Please wait 60 seconds before placing the same order again." 
-        }, 409);
+        if (duplicateOrder) {
+          console.warn(`[DUPLICATE] Rejected developer duplicate order for ${normalizedPhone} within 1 minute`);
+          return json({ 
+            success: false, 
+            error: "Duplicate order detected. Please wait 60 seconds before placing the same order again. Pass 'allow_duplicate': true to bypass." 
+          }, 409);
+        }
       }
 
       // CALL SECURE RPC
@@ -476,6 +477,12 @@ serve(async (req: Request) => {
       if (!result.success) return json(result, 400);
 
       const orderId = result.order_id;
+
+      // Sync custom request ID to order metadata for webhook tracking
+      const clientRef = request_id || payload?.client_reference || idemKey;
+      await supabase.from("orders").update({
+        metadata: { client_reference: clientRef }
+      }).eq("id", orderId);
       
       // ── 9. Fulfillment Logic (SKIP IF TEST MODE) ──────────────────────────
       if (profile.test_mode) {
@@ -488,9 +495,8 @@ serve(async (req: Request) => {
       let finalResult = { ok: false, reason: "No active providers", body: "" };
       let successfulProviderId = null;
 
-      const primaryProvider = providers[0];
-      if (primaryProvider) {
-        const handlerType = primaryProvider.handler_type || "standard";
+      for (const provider of providers) {
+        const handlerType = provider.handler_type || "standard";
         const networkKey = handlerType === "datamart" 
           ? (network?.toUpperCase() === "MTN" ? "YELLO" : (network?.toUpperCase() === "TELECEL" ? "TELECEL" : "AT_PREMIUM"))
           : mapNetworkKey(network || "");
@@ -525,13 +531,16 @@ serve(async (req: Request) => {
               webhook_url: profile.webhook_url
             };
 
-        const res = await callProviderApi(primaryProvider, dataPayload, "purchase");
+        console.log(`[developer-api] Attempting fulfillment with provider: ${provider.name} (${provider.id}) for order ${orderId}`);
+        const res = await callProviderApi(provider, dataPayload, "purchase");
         if (res.ok) {
           finalResult = res;
-          successfulProviderId = primaryProvider.id;
+          successfulProviderId = provider.id;
+          break; // Stop fallbacks on success
         } else {
-          await logProviderError(supabase, primaryProvider.id, orderId, res.reason);
-          finalResult = res;
+          console.warn(`[developer-api] Provider ${provider.name} failed for order ${orderId}: ${res.reason}`);
+          await logProviderError(supabase, provider.id, orderId, res.reason);
+          finalResult = res; // Keep latest failure result for response details
         }
       }
 

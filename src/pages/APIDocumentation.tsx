@@ -129,7 +129,7 @@ const RESPONSES: Record<string, string> = {
   webhook_event: `{\n  "event": "order.fulfilled",\n  "order_id": "a3f2b1c0-...",\n  "status": "fulfilled",\n  "network": "MTN",\n  "package_size": "5GB",\n  "customer_phone": "0241234567",\n  "amount": 22.00,\n  "timestamp": "2026-05-16T10:00:00Z"\n}`,
   error_401: `{\n  "success": false,\n  "error": "Invalid API key"\n}`,
   error_402: `{\n  "success": false,\n  "error": "Insufficient balance"\n}`,
-  error_409: `{\n  "success": false,\n  "error": "Duplicate order detected. Please wait 60 minutes before placing the same order again."\n}`,
+  error_409: `{\n  "success": false,\n  "error": "Duplicate order detected. Please wait 60 seconds before placing the same order again. Pass 'allow_duplicate': true to bypass."\n}`,
   error_429: `{\n  "success": false,\n  "error": "Rate limit exceeded."\n}`,
   error_500: `{\n  "success": false,\n  "error": "Internal Server Error",\n  "reference": "ERR-7f3a2b1c"\n}`,
 };
@@ -619,7 +619,7 @@ const APIDocumentation = () => {
                 <ul className="text-[11px] text-white/50 space-y-1 leading-relaxed">
                   <li><span className="text-amber-400 font-mono font-bold">Airtime</span> — send <code className="text-sky-400 bg-white/5 px-1 rounded">amount</code> (GHS). Omit <code className="bg-white/5 px-1 rounded">package_size</code>.</li>
                   <li><span className="text-emerald-400 font-mono font-bold">Data bundle</span> — send <code className="text-sky-400 bg-white/5 px-1 rounded">package_size</code> from <code className="bg-white/5 px-1 rounded">/plans</code>. Omit <code className="bg-white/5 px-1 rounded">amount</code>.</li>
-                  <li><span className="text-sky-400 font-mono font-bold">Duplicate protection</span> — the same phone + network + package within 60 minutes returns <code className="bg-white/5 px-1 rounded">409</code>. Use a unique <code className="bg-white/5 px-1 rounded">request_id</code> to track retries.</li>
+                  <li><span className="text-sky-400 font-mono font-bold">Duplicate protection</span> — the same phone + network + package within 60 seconds returns <code className="bg-white/5 px-1 rounded">409</code>. Pass <code className="bg-white/5 px-1 rounded">"allow_duplicate": true</code> to override this safety lock.</li>
                 </ul>
               </div>
             </div>
@@ -634,7 +634,8 @@ const APIDocumentation = () => {
                 <ParamRow name="phone"        type="string" required      desc="Recipient phone number (e.g. 0241234567)" />
                 <ParamRow name="amount"       type="number" required={false} desc="GHS amount — required for airtime. Omit for data." />
                 <ParamRow name="package_size" type="string" required={false} desc="Bundle size from /plans (e.g. 5GB) — required for data. Omit for airtime." />
-                <ParamRow name="request_id"   type="string" required={false} desc="Your idempotency key. Re-send the same ID to avoid double charges on retry." />
+                <ParamRow name="request_id"   type="string" required={false} desc="Your custom tracking reference. Mapped to client_reference in webhook notifications." />
+                <ParamRow name="allow_duplicate" type="boolean" required={false} desc="Set to true to bypass the 60-second duplicate safety block for identical rapid-fire orders." />
               </div>
 
               {/* Airtime example */}
@@ -888,8 +889,10 @@ const APIDocumentation = () => {
 
               {/* Retry policy */}
               <div className="rounded-xl border border-white/8 bg-white/[0.02] p-4">
-                <p className="text-xs font-bold text-white/60 mb-2">Retry Policy</p>
+                <p className="text-xs font-bold text-white/60 mb-2">Security Requirements & Retry Policy</p>
                 <ul className="text-[11px] text-white/40 leading-relaxed space-y-1">
+                  <li><strong className="text-emerald-400">Strict HTTPS Only:</strong> The webhook callback URL must use secure <code className="text-emerald-300">https://</code> protocol.</li>
+                  <li><strong className="text-amber-400">VPC SSRF Firewall:</strong> Loopback addresses (<code className="text-amber-300">localhost</code>, <code className="text-amber-300">127.x.x.x</code>), private IP blocks (<code className="text-amber-300">10.x.x.x</code>, <code className="text-amber-300">192.168.x.x</code>), and link-local ranges are blocked for infrastructure security.</li>
                   <li>Your endpoint must respond with <code className="text-white/60">HTTP 200</code> within <strong className="text-white/60">10 seconds</strong>.</li>
                   <li>Failed deliveries are retried up to <strong className="text-white/60">5 times</strong> with exponential back-off (1 min → 5 min → 30 min → 2 hr → 12 hr).</li>
                   <li>Use the <code className="text-amber-300 bg-white/5 px-1 rounded">order_id</code> field to deduplicate events in case of retries.</li>
@@ -916,7 +919,7 @@ const APIDocumentation = () => {
                   { label: "Default rate limit",   value: "30 req / min per key" },
                   { label: "Max rate limit",        value: "300 req / min (contact support)" },
                   { label: "Daily spend cap",       value: "Set per key in dashboard (GHS)" },
-                  { label: "Duplicate protection",  value: "Same phone + network + package = 409 within 60 min" },
+                  { label: "Duplicate protection",  value: "Same phone + network + package = 409 within 60 sec (bypass with allow_duplicate: true)" },
                   { label: "Exceeded response",     value: "HTTP 429 — Rate limit exceeded" },
                 ].map(({ label, value }) => (
                   <div key={label} className="flex flex-col sm:grid sm:grid-cols-12 sm:gap-2 px-4 py-3 text-xs border-b border-white/5 last:border-0 hover:bg-white/[0.02] gap-1">
@@ -958,7 +961,7 @@ const APIDocumentation = () => {
                   { code: "402", title: "Low Balance",       desc: "API wallet balance insufficient for this purchase" },
                   { code: "403", title: "Forbidden",         desc: "API access disabled or action not permitted for this key" },
                   { code: "404", title: "Not Found",         desc: "Order ID not found or endpoint does not exist" },
-                  { code: "409", title: "Duplicate Order",   desc: "Same phone + network + package placed within the last 60 minutes" },
+                  { code: "409", title: "Duplicate Order",   desc: "Same phone + network + package placed within 60 seconds (override with allow_duplicate)" },
                   { code: "429", title: "Rate Limited",      desc: "Exceeded your per-minute request limit or daily spend cap" },
                   { code: "500", title: "Server Error",      desc: "Unexpected internal error — includes a reference ID for support" },
                 ].map(({ code, title, desc }) => (
