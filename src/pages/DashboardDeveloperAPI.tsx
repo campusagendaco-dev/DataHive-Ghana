@@ -10,7 +10,7 @@ import {
   Key, Copy, RefreshCw, Loader2, ExternalLink,
   Shield, AlertTriangle, CheckCircle, Eye, EyeOff, Zap, Wallet,
   Terminal, History, Bug, Users2, MessageCircle, Share2, Code2,
-  PlusCircle, ArrowRightLeft, CreditCard
+  PlusCircle, ArrowRightLeft, CreditCard, Globe
 } from "lucide-react";
 import { invokePublicFunctionAsUser } from "@/lib/public-function-client";
 import { getAppBaseUrl } from "@/lib/app-base-url";
@@ -55,6 +55,13 @@ const DashboardDeveloperAPI = () => {
   const [testMode, setTestMode] = useState(false);
   const [updatingTestMode, setUpdatingTestMode] = useState(false);
 
+  // Webhook and Firewall Whitelisting states
+  const [apiWebhookUrl, setApiWebhookUrl] = useState("");
+  const [apiIpWhitelist, setApiIpWhitelist] = useState<string[]>([]);
+  const [whitelistInput, setWhitelistInput] = useState("");
+  const [savingWebhook, setSavingWebhook] = useState(false);
+  const [savingWhitelist, setSavingWhitelist] = useState(false);
+
   // API Top-up / Transfer State
   const [isTransferModalOpen, setIsTransferModalOpen] = useState(false);
   const [fundingMethod, setFundingMethod] = useState<"paystack" | "transfer">("paystack");
@@ -70,7 +77,7 @@ const DashboardDeveloperAPI = () => {
     const [profileRes, walletRes] = await Promise.all([
       supabase
         .from("profiles")
-        .select("api_key_prefix, api_access_enabled, api_rate_limit, api_secret_key_hash, api_test_mode")
+        .select("api_key_prefix, api_access_enabled, api_rate_limit, api_secret_key_hash, api_test_mode, api_webhook_url, api_ip_whitelist")
         .eq("user_id", user.id)
         .maybeSingle(),
       supabase
@@ -86,6 +93,10 @@ const DashboardDeveloperAPI = () => {
       setAccessEnabled(profileRes.data.api_access_enabled ?? true);
       setRateLimit(profileRes.data.api_rate_limit ?? 30);
       setTestMode(profileRes.data.api_test_mode ?? false);
+      setApiWebhookUrl(profileRes.data.api_webhook_url ?? "");
+      const ips = profileRes.data.api_ip_whitelist ?? [];
+      setApiIpWhitelist(ips);
+      setWhitelistInput(ips.join(", "));
     }
 
     if (walletRes.data) {
@@ -191,6 +202,69 @@ const DashboardDeveloperAPI = () => {
       });
     }
     setUpdatingTestMode(false);
+  };
+
+  const handleSaveWebhook = async () => {
+    if (!user) return;
+    setSavingWebhook(true);
+    
+    if (apiWebhookUrl && !apiWebhookUrl.startsWith("https://")) {
+      toast({ 
+        title: "Secure HTTPS Required", 
+        description: "Your callback URL must use the secure HTTPS protocol for webhook payload delivery.", 
+        variant: "destructive" 
+      });
+      setSavingWebhook(false);
+      return;
+    }
+
+    const { error } = await supabase
+      .from("profiles")
+      .update({ api_webhook_url: apiWebhookUrl || null })
+      .eq("user_id", user.id);
+
+    if (error) {
+      toast({ title: "Failed to save webhook", description: error.message, variant: "destructive" });
+    } else {
+      toast({ title: "✅ Webhook URL Updated", description: "Real-time purchase events will now deliver to this endpoint." });
+    }
+    setSavingWebhook(false);
+  };
+
+  const handleSaveWhitelist = async () => {
+    if (!user) return;
+    setSavingWhitelist(true);
+
+    const ipArray = whitelistInput
+      .split(",")
+      .map(ip => ip.trim())
+      .filter(ip => ip.length > 0);
+
+    const ipRegex = /^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$|^(?:[a-fA-F0-9]{1,4}:){7}[a-fA-F0-9]{1,4}$/;
+    const invalidIps = ipArray.filter(ip => !ipRegex.test(ip));
+    
+    if (invalidIps.length > 0) {
+      toast({ 
+        title: "Invalid IP Address", 
+        description: `"${invalidIps[0]}" is not a valid IPv4 or IPv6 format.`, 
+        variant: "destructive" 
+      });
+      setSavingWhitelist(false);
+      return;
+    }
+
+    const { error } = await supabase
+      .from("profiles")
+      .update({ api_ip_whitelist: ipArray.length > 0 ? ipArray : null })
+      .eq("user_id", user.id);
+
+    if (error) {
+      toast({ title: "Failed to save firewall settings", description: error.message, variant: "destructive" });
+    } else {
+      setApiIpWhitelist(ipArray);
+      toast({ title: "✅ IP Firewall Rules Saved", description: "Only whitelisted source IPs will be permitted to access your API keys." });
+    }
+    setSavingWhitelist(false);
   };
 
   const handleTransferToApi = async () => {
@@ -530,6 +604,83 @@ const DashboardDeveloperAPI = () => {
           </div>
         </CardContent>
       </Card>
+
+      {/* Webhook & IP Whitelist Security Configuration */}
+      {!loading && hasKey && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
+          {/* Webhook Config Card */}
+          <Card className="border-border bg-card">
+            <CardHeader className="pb-3">
+              <CardTitle className="flex items-center gap-2 text-base font-bold">
+                <Globe className="w-4 h-4 text-emerald-400" /> Webhook Configuration
+              </CardTitle>
+              <CardDescription className="text-xs">
+                Receive real-time transaction event callbacks (e.g. <code>order.fulfilled</code>).
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/80">Webhook Endpoint URL</label>
+                <div className="flex gap-2">
+                  <Input 
+                    type="url"
+                    placeholder="https://yourserver.com/api/webhooks"
+                    value={apiWebhookUrl}
+                    onChange={(e) => setApiWebhookUrl(e.target.value)}
+                    className="font-mono bg-background border-border text-xs h-10 rounded-xl"
+                  />
+                  <Button 
+                    onClick={handleSaveWebhook}
+                    disabled={savingWebhook}
+                    className="h-10 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl px-4 text-xs font-black uppercase tracking-wider"
+                  >
+                    {savingWebhook ? <Loader2 className="w-4 h-4 animate-spin" /> : "Save"}
+                  </Button>
+                </div>
+                <p className="text-[9px] text-muted-foreground/70 leading-relaxed">
+                  ⚠️ Must be a secure HTTPS endpoint. Loopback / private VPC addresses are blocked by our SSRF firewall.
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* IP Whitelist Firewall Card */}
+          <Card className="border-border bg-card">
+            <CardHeader className="pb-3">
+              <CardTitle className="flex items-center gap-2 text-base font-bold">
+                <Shield className="w-4 h-4 text-sky-400" /> API Firewall (IP Whitelist)
+              </CardTitle>
+              <CardDescription className="text-xs">
+                Restrict API request authorization to trusted origin server IP addresses.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/80">Whitelisted IP Addresses</label>
+                <div className="flex gap-2">
+                  <Input 
+                    type="text"
+                    placeholder="e.g. 192.0.2.1, 203.0.113.5"
+                    value={whitelistInput}
+                    onChange={(e) => setWhitelistInput(e.target.value)}
+                    className="font-mono bg-background border-border text-xs h-10 rounded-xl"
+                  />
+                  <Button 
+                    onClick={handleSaveWhitelist}
+                    disabled={savingWhitelist}
+                    className="h-10 bg-sky-500 hover:bg-sky-600 text-white rounded-xl px-4 text-xs font-black uppercase tracking-wider"
+                  >
+                    {savingWhitelist ? <Loader2 className="w-4 h-4 animate-spin" /> : "Save"}
+                  </Button>
+                </div>
+                <p className="text-[9px] text-muted-foreground/70 leading-relaxed">
+                  💡 Comma-separated list. Leave blank to allow access from any IP address (not recommended for production).
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
 
       {/* API Logs & Quick Start */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
