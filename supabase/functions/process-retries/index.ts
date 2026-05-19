@@ -165,11 +165,12 @@ serve(async (req: Request) => {
     const twoMinutesAgo = new Date(Date.now() - 2 * 60 * 1000).toISOString();
     const { data: ordersToRetry, error: fetchError } = await supabaseAdmin
       .from("orders")
-      .select("*, profiles:agent_id(api_access_enabled)")
+      .select("*")
       .in("status", ["paid", "processing"])
+      .gte("created_at", yesterday)
       .lt("retry_count", 3)
       .or(`last_retry_at.is.null,last_retry_at.lt.${twoMinutesAgo}`)
-      .order("created_at", { ascending: true })
+      .order("created_at", { ascending: false })
       .limit(20);
 
     if (fetchError) throw fetchError;
